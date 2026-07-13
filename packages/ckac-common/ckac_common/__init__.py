@@ -1,0 +1,1 @@
+"""CKAC shared library."""

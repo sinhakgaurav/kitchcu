@@ -1,0 +1,34 @@
+{
+  "name": "ckac-website",
+  "private": true,
+  "version": "2.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "dev:portal": "vite",
+    "dev:customer": "vite --config vite.customer.config.ts",
+    "dev:kitchen": "vite --config vite.kitchen.config.ts",
+    "dev:admin": "vite --config vite.admin.config.ts",
+    "build:portal": "vite build",
+    "build:customer": "vite build --config vite.customer.config.ts",
+    "build:kitchen": "vite build --config vite.kitchen.config.ts",
+    "build:admin": "vite build --config vite.admin.config.ts",
+    "build": "npm run build:portal && npm run build:customer && npm run build:kitchen && npm run build:admin",
+    "preview:portal": "vite preview",
+    "preview:customer": "vite preview --config vite.customer.config.ts",
+    "preview:kitchen": "vite preview --config vite.kitchen.config.ts"
+  },
+  "dependencies": {
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-router-dom": "^7.1.1"
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "@vitejs/plugin-react": "^4.3.4",
+    "typescript": "~5.6.3",
+    "vite": "^6.0.3",
+    "vite-plugin-pwa": "^0.21.2"
+  }
+}

@@ -1,0 +1,53 @@
+---
+description: KitchCu PWA frontend production standards
+globs: apps/**/*
+alwaysApply: false
+---
+
+# KitchCu Frontend Rules
+
+Read `AGENTS.md` and `docs/KITCHCU-ENGINEERING-STANDARDS.md` first.
+
+## Stack (Phase 1 — current)
+
+- React 18 + Vite + TypeScript + React Router 7
+- Tailwind + project CSS (`apps/website/src/index.css`)
+- Brand/hosts: `apps/website/src/shared/brand.ts` (single source)
+- Cross-app URLs: `apps/website/src/shared/urls.ts`
+
+## Apps (`apps/website/`)
+
+| App | Host | Port |
+|-----|------|------|
+| Portal | kitchcu.in | 13000 |
+| Customer | customer.kitchcu.in | 13001 |
+| Kitchen | kitchen.kitchcu.in | 13002 |
+| Admin | admin.kitchcu.in | 13003 |
+
+Build: `npm run build:portal|customer|kitchen|admin`
+
+## API
+
+- Gateway only: `/api/v1/` — never call services directly
+- Owner JWT in kitchen app · isolated from customer session keys
+
+## UX (cloud kitchen only)
+
+- Owner: inbox-first · one primary action per screen
+- Customer: discovery-first · trust via live-capture media
+- Minimum touch target 44px · hi/en i18n (Phase 2)
+
+## Dish photos
+
+- Hero: live-capture required (`is_live_capture: true`)
+- Server rejects stock-photo heroes
+
+## Phase 2 targets (ADR before adoption)
+
+TanStack Query · React Hook Form · Workbox PWA offline · push notifications
+
+## Do not
+
+- Hardcode subdomains — use `brand.ts` constants
+- Build native apps before PWA stable
+- Add restaurant POS / dine-in UI patterns

@@ -1,0 +1,16 @@
+-- CKAC PostgreSQL bootstrap (runs once on first container start)
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+CREATE EXTENSION IF NOT EXISTS postgis;
+CREATE EXTENSION IF NOT EXISTS pg_trgm;
+
+CREATE SCHEMA IF NOT EXISTS ckac_identity;
+CREATE SCHEMA IF NOT EXISTS ckac_catalog;
+CREATE SCHEMA IF NOT EXISTS ckac_orders;
+CREATE SCHEMA IF NOT EXISTS ckac_billing;
+CREATE SCHEMA IF NOT EXISTS ckac_events;
+CREATE SCHEMA IF NOT EXISTS ckac_support;
+CREATE SCHEMA IF NOT EXISTS ckac_marketing;
+CREATE SCHEMA IF NOT EXISTS ckac_ratings;
+CREATE SCHEMA IF NOT EXISTS ckac_learning;
+CREATE SCHEMA IF NOT EXISTS ckac_growth;
+CREATE SCHEMA IF NOT EXISTS ckac_delivery;

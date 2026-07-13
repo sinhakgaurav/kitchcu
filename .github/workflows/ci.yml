@@ -1,0 +1,163 @@
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+jobs:
+  lint-and-test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgis/postgis:16-3.4
+        env:
+          POSTGRES_USER: ckac
+          POSTGRES_PASSWORD: ckac_dev
+          POSTGRES_DB: ckac
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U ckac -d ckac"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: |
+          pip install ./packages/ckac-common
+          pip install "./services/identity[dev]"
+          pip install "./services/catalog[dev]"
+          pip install "./services/order[dev]"
+          pip install "./services/billing[dev]"
+          pip install "./services/marketing[dev]"
+          pip install "./services/ratings[dev]"
+          pip install "./services/growth[dev]"
+          pip install "./services/delivery[dev]"
+          pip install "./services/learning[dev]"
+          pip install "./services/notification[dev]"
+          pip install "./services/gateway[dev]"
+          pip install ruff
+
+      - name: Init database schemas
+        run: |
+          PGPASSWORD=ckac_dev psql -h localhost -U ckac -d ckac -c 'CREATE EXTENSION IF NOT EXISTS postgis;'
+          PGPASSWORD=ckac_dev psql -h localhost -U ckac -d ckac -f infra/postgres/init/01-schemas.sql
+          PGPASSWORD=ckac_dev psql -h localhost -U ckac -d ckac -f infra/postgres/init/02-events.sql
+
+      - name: Run migrations
+        env:
+          DATABASE_URL: postgresql+asyncpg://ckac:ckac_dev@localhost:5432/ckac
+        run: |
+          cd services/identity && alembic upgrade head
+          cd ../catalog && alembic upgrade head
+          cd ../order && alembic upgrade head
+          cd ../billing && alembic upgrade head
+          cd ../marketing && alembic upgrade head
+          cd ../ratings && alembic upgrade head
+          cd ../growth && alembic upgrade head
+          cd ../delivery && alembic upgrade head
+          cd ../learning && alembic upgrade head
+
+      - name: Ruff check
+        run: ruff check services/identity services/catalog services/order services/billing services/marketing services/ratings services/growth services/delivery services/learning services/notification services/gateway packages/ckac-common
+
+      - name: Run identity tests
+        env:
+          DATABASE_URL: postgresql+asyncpg://ckac:ckac_dev@localhost:5432/ckac
+          DATABASE_SYNC_URL: postgresql://ckac:ckac_dev@localhost:5432/ckac
+          REDIS_URL: redis://localhost:6379/0
+        working-directory: services/identity
+        run: pytest -q
+
+      - name: Run catalog tests
+        env:
+          DATABASE_URL: postgresql+asyncpg://ckac:ckac_dev@localhost:5432/ckac
+          DATABASE_SYNC_URL: postgresql://ckac:ckac_dev@localhost:5432/ckac
+          REDIS_URL: redis://localhost:6379/0
+        working-directory: services/catalog
+        run: pytest -q
+
+      - name: Run order tests
+        env:
+          DATABASE_URL: postgresql+asyncpg://ckac:ckac_dev@localhost:5432/ckac
+          DATABASE_SYNC_URL: postgresql://ckac:ckac_dev@localhost:5432/ckac
+          REDIS_URL: redis://localhost:6379/0
+        working-directory: services/order
+        run: pytest -q
+
+      - name: Run billing tests
+        env:
+          DATABASE_URL: postgresql+asyncpg://ckac:ckac_dev@localhost:5432/ckac
+          DATABASE_SYNC_URL: postgresql://ckac:ckac_dev@localhost:5432/ckac
+          REDIS_URL: redis://localhost:6379/0
+        working-directory: services/billing
+        run: pytest -q
+
+      - name: Run marketing tests
+        env:
+          DATABASE_URL: postgresql+asyncpg://ckac:ckac_dev@localhost:5432/ckac
+          DATABASE_SYNC_URL: postgresql://ckac:ckac_dev@localhost:5432/ckac
+          REDIS_URL: redis://localhost:6379/0
+        working-directory: services/marketing
+        run: pytest -q
+
+      - name: Run ratings tests
+        env:
+          DATABASE_URL: postgresql+asyncpg://ckac:ckac_dev@localhost:5432/ckac
+          DATABASE_SYNC_URL: postgresql://ckac:ckac_dev@localhost:5432/ckac
+          REDIS_URL: redis://localhost:6379/0
+        working-directory: services/ratings
+        run: pytest -q
+
+      - name: Run growth tests
+        env:
+          DATABASE_URL: postgresql+asyncpg://ckac:ckac_dev@localhost:5432/ckac
+          DATABASE_SYNC_URL: postgresql://ckac:ckac_dev@localhost:5432/ckac
+          REDIS_URL: redis://localhost:6379/0
+        working-directory: services/growth
+        run: pytest -q
+
+      - name: Run delivery tests
+        env:
+          DATABASE_URL: postgresql+asyncpg://ckac:ckac_dev@localhost:5432/ckac
+          DATABASE_SYNC_URL: postgresql://ckac:ckac_dev@localhost:5432/ckac
+          REDIS_URL: redis://localhost:6379/0
+        working-directory: services/delivery
+        run: pytest -q
+
+      - name: Run learning tests
+        env:
+          DATABASE_URL: postgresql+asyncpg://ckac:ckac_dev@localhost:5432/ckac
+          DATABASE_SYNC_URL: postgresql://ckac:ckac_dev@localhost:5432/ckac
+          REDIS_URL: redis://localhost:6379/0
+        working-directory: services/learning
+        run: pytest -q
+
+      - name: Run notification tests
+        env:
+          DATABASE_URL: postgresql+asyncpg://ckac:ckac_dev@localhost:5432/ckac
+          DATABASE_SYNC_URL: postgresql://ckac:ckac_dev@localhost:5432/ckac
+          REDIS_URL: redis://localhost:6379/0
+          WHATSAPP_VERIFY_TOKEN: ckac-dev-verify
+          ORDER_SERVICE_URL: http://localhost:8003
+        working-directory: services/notification
+        run: pytest -q
+
+      - name: Run gateway tests
+        env:
+          REDIS_URL: redis://localhost:6379/0
+        working-directory: services/gateway
+        run: pytest -q

@@ -1,0 +1,57 @@
+---
+description: KitchCu engineering constitution — read before any code change
+alwaysApply: true
+---
+
+# KitchCu Agent Rules (Always Apply)
+
+Before implementing or modifying code, read:
+
+1. **`AGENTS.md`** — quick spec + current build status
+2. **`docs/KITCHCU-ENGINEERING-STANDARDS.md`** — full engineering constitution
+3. **`docs/templates/MODULE-DESIGN-PACK.md`** — required before new modules/features
+
+## Product
+
+- **KitchCu** = Growth Operating System for cloud kitchens & home food businesses
+- **Model:** Owner subscription SaaS — **no per-order food commission**
+- **Never build:** restaurant POS, dine-in, tables, waiters, KDS, bar, hotel features
+- **Gate:** *Does this help a cloud kitchen grow?* If no → reject
+
+## Development order (never skip)
+
+Understand → Challenge → Improve → Design (domain, events, DB, API, tests) → **then** production code.
+
+No `TODO`, dummy logic, placeholders, or tutorial patterns in production paths.
+
+## Stack (Phase 1 — do not substitute without ADR)
+
+- Backend: Python 3.12+, FastAPI, async SQLAlchemy 2.0, Pydantic v2
+- DB: PostgreSQL 16 + PostGIS (`ckac_<domain>` schemas)
+- Cache/Events: Redis 7 Streams + transactional outbox
+- Frontend: React 18 + Vite + TypeScript (`apps/website/`)
+- Domains: `kitchcu.in`, `customer.kitchcu.in`, `kitchen.kitchcu.in`, `admin.kitchcu.in`
+- API prefix: `/api/v1/`
+
+## Implemented services
+
+gateway · identity · catalog · order · notification (+ support/tickets)
+
+## Implementation rules
+
+1. Follow **phase order** in `docs/DEVELOPMENT-PHASES.md` unless user specifies otherwise
+2. Match service structure: `main.py`, `routes.py`, `schemas.py`, `models.py`, `tests/`
+3. Alembic for schema changes; UUID PKs; `kitchen_id` tenant scope
+4. **TDD:** failing tests first; **EDD:** event + outbox on every write
+5. Run `scripts/run-tests.ps1` after backend changes
+6. Update `AGENTS.md` when adding services or changing conventions
+7. No commits unless user explicitly requests
+
+## Deep reference
+
+| Need | Doc |
+|------|-----|
+| Engineering constitution | `docs/KITCHCU-ENGINEERING-STANDARDS.md` |
+| Module design template | `docs/templates/MODULE-DESIGN-PACK.md` |
+| Feature acceptance criteria | `docs/CKAC-COMPLETE-PLANNING-BENCHMARK.md` |
+| Architecture, cache, SLOs | `docs/CKAC-SYSTEM-BENCHMARK.md` |

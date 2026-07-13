@@ -1,0 +1,41 @@
+---
+description: KitchCu security, tenancy, and observability standards
+alwaysApply: true
+---
+
+# KitchCu Security & Observability
+
+Read `docs/KITCHCU-ENGINEERING-STANDARDS.md` §10–11.
+
+## Multi-tenancy
+
+- Every tenant table: `kitchen_id` + query filter in domain layer
+- Cache keys include tenant: `menu:{kitchen_id}`, not global
+- Admin routes: platform scope only; no owner JWT on admin APIs
+
+## Security (OWASP)
+
+- Pydantic validation on all inputs · SQLAlchemy parameterized queries
+- No secrets in code · env vars + `.env.example`
+- Mask phone/PII in logs
+- Signed URLs for media (when media service active)
+- Rate limiting on gateway (implement in S5/S6)
+
+## Auth
+
+- Owner: OTP + JWT Bearer
+- Admin: platform JWT via identity
+- Future: refresh tokens, RBAC permissions per route
+
+## Observability
+
+- `/health/live` + `/health/ready` on every service (required)
+- Structured logs · no PII
+- Correlation ID: `ckac_common.observability.CorrelationMiddleware` on gateway; forward `X-Correlation-ID` to services
+- Phase 2: OpenTelemetry + Prometheus
+
+## Do not
+
+- Return cross-tenant data in API or cache
+- Log OTP, tokens, or full phone numbers
+- Bypass gateway for public clients

@@ -1,0 +1,45 @@
+---
+description: KitchCu TDD, EDD, and microservice boundaries
+alwaysApply: true
+---
+
+# KitchCu TDD + EDD (Always Apply)
+
+Read `AGENTS.md`, `docs/KITCHCU-ENGINEERING-STANDARDS.md`, and `docs/DEVELOPMENT-PHASES.md` before implementing.
+
+## 10-step gate (new features)
+
+Design pack → tests → migration → domain → routes → events → run `scripts/run-tests.ps1`.
+
+Skip design pack only for trivial bugfixes in existing modules.
+
+## TDD (mandatory)
+
+1. Read feature ID + acceptance criteria from planning benchmark
+2. **RED:** Failing tests in `services/<name>/tests/`
+3. **GREEN:** Minimal production implementation
+4. **REFACTOR:** Clean up; no TODO in prod paths
+5. Alembic if schema changes
+
+Test layers: `test_schemas.py` (domain) · `test_*.py` (API) · `test_events.py` (streams)
+
+Coverage: 80%+ on touched modules now; 95%+ target · **100% on payment/order state machine**
+
+## EDD (every write)
+
+1. Commit owning schema only (`ckac_<domain>`)
+2. `EventPublisher.publish(..., session=session)` after flush
+3. `EventEnvelope` from `ckac_common.events`
+4. Stream: `ckac:<domain>:<aggregate>`
+5. Assert in `tests/test_events.py`
+
+## Microservices
+
+- One bounded context per container · own schema · own tests
+- Gateway public edge only
+- Cross-service: **events only** (no cross-schema writes)
+- Cross-schema reads: ownership validation only
+
+## Current phase
+
+**S1–S4 complete · S5 partial (PWAs, analytics, support) · S6 next (billing, checkout)** unless user specifies otherwise.

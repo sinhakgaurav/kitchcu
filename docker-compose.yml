@@ -1,0 +1,375 @@
+services:
+  postgres:
+    image: postgis/postgis:16-3.4
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-ckac}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-ckac_dev}
+      POSTGRES_DB: ${POSTGRES_DB:-ckac}
+    ports:
+      - "15432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./infra/postgres/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-ckac} -d ${POSTGRES_DB:-ckac}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "16379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  minio:
+    image: minio/minio:latest
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-ckac}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-ckac_minio_dev}
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio_data:/data
+
+  identity:
+    build:
+      context: .
+      dockerfile: services/identity/Dockerfile
+    env_file:
+      - .env.example
+    environment:
+      DATABASE_URL: postgresql+asyncpg://ckac:ckac_dev@postgres:5432/ckac
+      REDIS_URL: redis://redis:6379/0
+    ports:
+      - "18001:8001"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./services/identity:/app/services/identity
+      - ./packages:/app/packages
+
+  catalog:
+    build:
+      context: .
+      dockerfile: services/catalog/Dockerfile
+    env_file:
+      - .env.example
+    environment:
+      DATABASE_URL: postgresql+asyncpg://ckac:ckac_dev@postgres:5432/ckac
+      REDIS_URL: redis://redis:6379/0
+      MINIO_ENDPOINT: minio:9000
+      MINIO_PUBLIC_URL: http://localhost:9000
+    ports:
+      - "18002:8002"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_started
+    volumes:
+      - ./services/catalog:/app/services/catalog
+      - ./packages:/app/packages
+
+  order:
+    build:
+      context: .
+      dockerfile: services/order/Dockerfile
+    env_file:
+      - .env.example
+    environment:
+      DATABASE_URL: postgresql+asyncpg://ckac:ckac_dev@postgres:5432/ckac
+      REDIS_URL: redis://redis:6379/0
+    ports:
+      - "18003:8003"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./services/order:/app/services/order
+      - ./packages:/app/packages
+
+  billing:
+    build:
+      context: .
+      dockerfile: services/billing/Dockerfile
+    env_file:
+      - .env.example
+    environment:
+      DATABASE_URL: postgresql+asyncpg://ckac:ckac_dev@postgres:5432/ckac
+      REDIS_URL: redis://redis:6379/0
+    ports:
+      - "18004:8004"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./services/billing:/app/services/billing
+      - ./packages:/app/packages
+
+  notification:
+    build:
+      context: .
+      dockerfile: services/notification/Dockerfile
+    env_file:
+      - .env.example
+    environment:
+      DATABASE_URL: postgresql+asyncpg://ckac:ckac_dev@postgres:5432/ckac
+      REDIS_URL: redis://redis:6379/0
+      ORDER_SERVICE_URL: http://order:8003
+    ports:
+      - "18005:8005"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      order:
+        condition: service_started
+    volumes:
+      - ./services/notification:/app/services/notification
+      - ./packages:/app/packages
+
+  marketing:
+    build:
+      context: .
+      dockerfile: services/marketing/Dockerfile
+    env_file:
+      - .env.example
+    environment:
+      DATABASE_URL: postgresql+asyncpg://ckac:ckac_dev@postgres:5432/ckac
+      REDIS_URL: redis://redis:6379/0
+    ports:
+      - "18006:8006"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./services/marketing:/app/services/marketing
+      - ./packages:/app/packages
+
+  ratings:
+    build:
+      context: .
+      dockerfile: services/ratings/Dockerfile
+    env_file:
+      - .env.example
+    environment:
+      DATABASE_URL: postgresql+asyncpg://ckac:ckac_dev@postgres:5432/ckac
+      REDIS_URL: redis://redis:6379/0
+    ports:
+      - "18007:8007"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./services/ratings:/app/services/ratings
+      - ./packages:/app/packages
+
+  growth:
+    build:
+      context: .
+      dockerfile: services/growth/Dockerfile
+    env_file:
+      - .env.example
+    environment:
+      DATABASE_URL: postgresql+asyncpg://ckac:ckac_dev@postgres:5432/ckac
+      REDIS_URL: redis://redis:6379/0
+    ports:
+      - "18008:8008"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./services/growth:/app/services/growth
+      - ./packages:/app/packages
+
+  delivery:
+    build:
+      context: .
+      dockerfile: services/delivery/Dockerfile
+    env_file:
+      - .env.example
+    environment:
+      DATABASE_URL: postgresql+asyncpg://ckac:ckac_dev@postgres:5432/ckac
+      REDIS_URL: redis://redis:6379/0
+    ports:
+      - "18009:8009"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./services/delivery:/app/services/delivery
+      - ./packages:/app/packages
+
+  learning:
+    build:
+      context: .
+      dockerfile: services/learning/Dockerfile
+    env_file:
+      - .env.example
+    environment:
+      DATABASE_URL: postgresql+asyncpg://ckac:ckac_dev@postgres:5432/ckac
+      REDIS_URL: redis://redis:6379/0
+      CATALOG_SERVICE_URL: http://catalog:8002
+      NOTIFICATION_SERVICE_URL: http://notification:8005
+    ports:
+      - "18010:8010"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      catalog:
+        condition: service_started
+      notification:
+        condition: service_started
+    volumes:
+      - ./services/learning:/app/services/learning
+      - ./packages:/app/packages
+
+  gateway:
+    build:
+      context: .
+      dockerfile: services/gateway/Dockerfile
+    env_file:
+      - .env.example
+    environment:
+      IDENTITY_SERVICE_URL: http://identity:8001
+      CATALOG_SERVICE_URL: http://catalog:8002
+      ORDER_SERVICE_URL: http://order:8003
+      BILLING_SERVICE_URL: http://billing:8004
+      NOTIFICATION_SERVICE_URL: http://notification:8005
+      MARKETING_SERVICE_URL: http://marketing:8006
+      RATINGS_SERVICE_URL: http://ratings:8007
+      GROWTH_SERVICE_URL: http://growth:8008
+      DELIVERY_SERVICE_URL: http://delivery:8009
+      LEARNING_SERVICE_URL: http://learning:8010
+      REDIS_URL: redis://redis:6379/0
+    ports:
+      - "18000:8000"
+    depends_on:
+      identity:
+        condition: service_started
+      catalog:
+        condition: service_started
+      order:
+        condition: service_started
+      billing:
+        condition: service_started
+      notification:
+        condition: service_started
+      marketing:
+        condition: service_started
+      ratings:
+        condition: service_started
+      growth:
+        condition: service_started
+      delivery:
+        condition: service_started
+      learning:
+        condition: service_started
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./services/gateway:/app/services/gateway
+      - ./packages:/app/packages
+
+  customer-web:
+    build:
+      context: ./apps/website
+      dockerfile: Dockerfile
+      args:
+        APP: customer
+        VITE_CUSTOMER_APP_URL: http://localhost:13001
+        VITE_KITCHEN_APP_URL: http://localhost:13002
+        VITE_ADMIN_APP_URL: http://localhost:13003
+    ports:
+      - "13001:80"
+    depends_on:
+      gateway:
+        condition: service_started
+
+  kitchen-web:
+    build:
+      context: ./apps/website
+      dockerfile: Dockerfile
+      args:
+        APP: kitchen
+        VITE_CUSTOMER_APP_URL: http://localhost:13001
+        VITE_KITCHEN_APP_URL: http://localhost:13002
+        VITE_ADMIN_APP_URL: http://localhost:13003
+    ports:
+      - "13002:80"
+    depends_on:
+      gateway:
+        condition: service_started
+
+  portal-web:
+    build:
+      context: ./apps/website
+      dockerfile: Dockerfile
+      args:
+        APP: portal
+        VITE_CUSTOMER_APP_URL: http://localhost:13001
+        VITE_KITCHEN_APP_URL: http://localhost:13002
+        VITE_ADMIN_APP_URL: http://localhost:13003
+    ports:
+      - "13000:80"
+
+  admin-web:
+    build:
+      context: ./apps/website
+      dockerfile: Dockerfile
+      args:
+        APP: admin
+        VITE_CUSTOMER_APP_URL: http://localhost:13001
+        VITE_KITCHEN_APP_URL: http://localhost:13002
+        VITE_ADMIN_APP_URL: http://localhost:13003
+    ports:
+      - "13003:80"
+    depends_on:
+      gateway:
+        condition: service_started
+
+  seed:
+    image: python:3.12-slim
+    volumes:
+      - ./scripts:/scripts:ro
+    working_dir: /scripts
+    environment:
+      CKAC_GATEWAY_URL: http://gateway:8000
+    command: ["python", "seed-dev-data.py"]
+    depends_on:
+      gateway:
+        condition: service_started
+    restart: "no"
+    profiles:
+      - seed
+
+volumes:
+  pgdata:
+  minio_data:

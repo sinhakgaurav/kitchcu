@@ -1,0 +1,56 @@
+---
+description: KitchCu Python/FastAPI backend production standards
+globs: services/**/*.py,packages/**/*.py
+alwaysApply: false
+---
+
+# KitchCu Backend Rules
+
+Read `AGENTS.md` and `docs/KITCHCU-ENGINEERING-STANDARDS.md` first.
+
+## Architecture (hexagonal)
+
+```
+routes.py   → HTTP adapter (thin)
+schemas.py  → domain logic + Pydantic
+models.py   → SQLAlchemy persistence (ckac_<domain>)
+```
+
+Business logic **never** in `routes.py`. Async-only on request path.
+
+## Required on every service
+
+- `GET /health/live` + `GET /health/ready`
+- OpenAPI via FastAPI (review new routes)
+- JWT on owner routes · `X-Internal-Key` on internal routes
+- Alembic migration per schema change
+- Tests: NullPool conftest, httpx LifespanManager, event assertions
+
+## Database
+
+- UUID PKs · `kitchen_id` tenant scope · PostGIS via `WKTElement`
+- Indexes for list/filter query paths
+- Never cache payments/settlements in Redis
+
+## API
+
+- Prefix `/api/v1/` · consistent `HTTPException` errors
+- Idempotency-Key on financial POSTs (when billing ships)
+- Pagination on list endpoints
+
+## Events
+
+```python
+await publisher.publish(stream_key("order", "order"), event, session=session)
+```
+
+## Do not
+
+- Cross-schema INSERT/UPDATE from another service
+- Sync DB drivers in async handlers (psycopg2 = tests/Alembic only)
+- Ship TODO, mock payment logic, or placeholder endpoints
+- Skip tests on auth, orders, billing, or tenant isolation
+
+## Run
+
+`.\scripts\run-tests.ps1` after changes

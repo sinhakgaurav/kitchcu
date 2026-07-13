@@ -1,0 +1,23 @@
+[project]
+name = "ckac-common"
+version = "0.1.0"
+description = "Shared utilities for CKAC microservices"
+requires-python = ">=3.12"
+dependencies = [
+    "pydantic>=2.7",
+    "pydantic-settings>=2.3",
+    "sqlalchemy[asyncio]>=2.0",
+    "asyncpg>=0.29",
+    "redis>=5.0",
+    "python-jose[cryptography]>=3.3",
+    "fastapi>=0.111",
+    "minio>=7.2",
+]
+
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["ckac_common*"]

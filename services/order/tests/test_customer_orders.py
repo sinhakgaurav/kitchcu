@@ -1,0 +1,158 @@
+"""Customer checkout order tests — Sprint 5."""
+
+import uuid
+from datetime import UTC, datetime, timedelta
+
+import psycopg2
+import pytest
+from httpx import AsyncClient
+from jose import jwt
+
+from tests.conftest import JWT_SECRET, SYNC_DB_URL, _make_token
+
+CUSTOMER_ORDER_PAYLOAD = {
+    "items": [{"dish_id": None, "quantity": 1}],
+    "delivery_type": "pickup",
+    "payment_method": "cod",
+    "delivery_fee": 0,
+}
+
+
+def _make_customer_token(customer_id: uuid.UUID) -> str:
+    expire = datetime.now(UTC) + timedelta(hours=1)
+    return jwt.encode(
+        {"sub": str(customer_id), "type": "customer", "exp": expire},
+        JWT_SECRET,
+        algorithm="HS256",
+    )
+
+
+def _seed_customer(*, phone: str = "+919988776655", name: str = "Test Customer") -> uuid.UUID:
+    customer_id = uuid.uuid4()
+    conn = psycopg2.connect(SYNC_DB_URL)
+    conn.autocommit = True
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            INSERT INTO ckac_identity.customers (id, name, phone, status)
+            VALUES (%s::uuid, %s, %s, 'active')
+            """,
+            (str(customer_id), name, phone),
+        )
+    conn.close()
+    return customer_id
+
+
+@pytest.mark.asyncio
+async def test_customer_order_requires_auth(client: AsyncClient, order_ctx, manual_order_payload):
+    _, kitchen_id, dish_id, _, _ = order_ctx
+    payload = CUSTOMER_ORDER_PAYLOAD.copy()
+    payload["items"] = [{"dish_id": str(dish_id), "quantity": 1}]
+    response = await client.post(
+        f"/api/v1/kitchens/{kitchen_id}/orders/customer",
+        json=payload,
+    )
+    assert response.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_customer_order_success(client: AsyncClient, order_ctx):
+    _, kitchen_id, dish_id, kitchen_code, _ = order_ctx
+    customer_id = _seed_customer()
+    token = _make_customer_token(customer_id)
+    payload = CUSTOMER_ORDER_PAYLOAD.copy()
+    payload["items"] = [{"dish_id": str(dish_id), "quantity": 2}]
+
+    response = await client.post(
+        f"/api/v1/kitchens/{kitchen_id}/orders/customer",
+        json=payload,
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert response.status_code == 201
+    data = response.json()
+    assert data["source"] == "customer_pwa"
+    assert data["payment_method"] == "cod"
+    assert data["customer_phone"] == "+919988776655"
+    assert data["customer_name"] == "Test Customer"
+    assert data["subtotal"] == 398.0
+    assert kitchen_code in data["order_code"]
+
+
+@pytest.mark.asyncio
+async def test_customer_orders_list(client: AsyncClient, order_ctx):
+    _, kitchen_id, dish_id, _, owner_token = order_ctx
+    customer_id = _seed_customer(phone="+919911122233")
+    token = _make_customer_token(customer_id)
+    payload = CUSTOMER_ORDER_PAYLOAD.copy()
+    payload["items"] = [{"dish_id": str(dish_id), "quantity": 1}]
+
+    create = await client.post(
+        f"/api/v1/kitchens/{kitchen_id}/orders/customer",
+        json=payload,
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert create.status_code == 201
+
+    listing = await client.get(
+        "/api/v1/customers/me/orders",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert listing.status_code == 200
+    data = listing.json()
+    assert data["total"] == 1
+    assert data["orders"][0]["source"] == "customer_pwa"
+
+    owner_list = await client.get(
+        f"/api/v1/kitchens/{kitchen_id}/orders",
+        headers={"Authorization": f"Bearer {owner_token}"},
+    )
+    assert owner_list.status_code == 200
+    assert owner_list.json()["total"] >= 1
+
+
+@pytest.mark.asyncio
+async def test_owner_cannot_use_customer_order_endpoint(client: AsyncClient, order_ctx):
+    _, kitchen_id, dish_id, _, owner_token = order_ctx
+    payload = CUSTOMER_ORDER_PAYLOAD.copy()
+    payload["items"] = [{"dish_id": str(dish_id), "quantity": 1}]
+    response = await client.post(
+        f"/api/v1/kitchens/{kitchen_id}/orders/customer",
+        json=payload,
+        headers={"Authorization": f"Bearer {owner_token}"},
+    )
+    assert response.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_customer_order_repeat(client: AsyncClient, order_ctx):
+    _, kitchen_id, dish_id, _, _ = order_ctx
+    customer_id = _seed_customer(phone="+919933344455")
+    token = _make_customer_token(customer_id)
+    payload = CUSTOMER_ORDER_PAYLOAD.copy()
+    payload["items"] = [{"dish_id": str(dish_id), "quantity": 2}]
+
+    create = await client.post(
+        f"/api/v1/kitchens/{kitchen_id}/orders/customer",
+        json=payload,
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert create.status_code == 201
+    order_id = create.json()["id"]
+
+    repeat = await client.post(
+        f"/api/v1/customers/me/orders/{order_id}/repeat",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert repeat.status_code == 201
+    data = repeat.json()
+    assert data["id"] != order_id
+    assert data["source"] == "customer_pwa"
+    assert data["subtotal"] == 398.0
+    assert len(data["items"]) == 1
+    assert data["items"][0]["quantity"] == 2
+
+    listing = await client.get(
+        "/api/v1/customers/me/orders",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert listing.json()["total"] == 2
