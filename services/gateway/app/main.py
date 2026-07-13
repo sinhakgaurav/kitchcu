@@ -21,6 +21,7 @@ MARKETING_PATH_MARKERS = ("/crm", "/coupons", "/promotions")
 RATINGS_PATH_MARKERS = ("/ratings", "/suggestions")
 GROWTH_PATH_MARKERS = ("/growth",)
 LEARNING_PATH_MARKERS = ("/learning",)
+COMMUNITY_PATH_MARKERS = ("/community",)
 
 
 def resolve_service_url(path: str) -> str | None:
@@ -37,6 +38,8 @@ def resolve_service_url(path: str) -> str | None:
         return settings.identity_service_url
     if path.startswith("/api/v1/billing") or path.startswith("/api/v1/webhooks/razorpay"):
         return settings.billing_service_url
+    if path.startswith("/api/v1/community"):
+        return settings.community_service_url
     if path.startswith("/api/v1/learning"):
         return settings.learning_service_url
     if path.startswith("/api/v1/growth"):
@@ -50,6 +53,8 @@ def resolve_service_url(path: str) -> str | None:
     if path.startswith("/api/v1/orders"):
         return settings.order_service_url
     if path.startswith("/api/v1/kitchens"):
+        if any(marker in path for marker in COMMUNITY_PATH_MARKERS):
+            return settings.community_service_url
         if any(marker in path for marker in LEARNING_PATH_MARKERS):
             return settings.learning_service_url
         if any(marker in path for marker in GROWTH_PATH_MARKERS):
@@ -85,6 +90,8 @@ def resolve_client_key(base_url: str) -> str:
         return "delivery"
     if base_url == settings.learning_service_url:
         return "learning"
+    if base_url == settings.community_service_url:
+        return "community"
     return "identity"
 
 
@@ -102,6 +109,7 @@ async def lifespan(app: FastAPI):
         "growth": httpx.AsyncClient(base_url=settings.growth_service_url, timeout=30.0),
         "delivery": httpx.AsyncClient(base_url=settings.delivery_service_url, timeout=30.0),
         "learning": httpx.AsyncClient(base_url=settings.learning_service_url, timeout=30.0),
+        "community": httpx.AsyncClient(base_url=settings.community_service_url, timeout=30.0),
     }
     redis_client = redis.from_url(settings.redis_url, decode_responses=True)
     yield
@@ -115,7 +123,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="kitchCU API Gateway",
     version="0.4.0",
-    description="Unified entry point — routes to identity, catalog, order, billing, marketing, ratings, growth, delivery, learning, notification",
+    description="Unified entry point — routes to identity, catalog, order, billing, marketing, ratings, growth, delivery, learning, community, notification",
     lifespan=lifespan,
 )
 

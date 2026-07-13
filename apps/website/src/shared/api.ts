@@ -1079,6 +1079,83 @@ export async function promoteTrial(kitchenId: string, trialId: string, force = f
   });
 }
 
+export type SharedRecipe = {
+  id: string;
+  kitchen_id: string;
+  title: string;
+  summary: string | null;
+  recipe_html: string;
+  dish_id: string | null;
+  appreciation_count: number;
+  points_earned: number;
+  kitchen_name: string | null;
+  kitchen_code: string | null;
+  created_at: string;
+};
+
+export type RewardBalance = {
+  kitchen_id: string;
+  points_balance: number;
+  ledger: { id: string; delta: number; reason: string; balance_after: number; created_at: string }[];
+};
+
+export type ChefRankingEntry = {
+  rank: number;
+  kitchen_id: string;
+  kitchen_code: string;
+  kitchen_name: string;
+  score: number;
+  metrics: Record<string, number>;
+};
+
+export async function fetchSharedRecipes(kitchenId?: string): Promise<{ recipes: SharedRecipe[]; total: number }> {
+  const q = kitchenId ? `?kitchen_id=${kitchenId}` : "";
+  return apiFetch(`/api/v1/community/recipes${q}`);
+}
+
+export async function shareCommunityRecipe(
+  kitchenId: string,
+  data: { title: string; recipe_html: string; summary?: string; dish_id?: string },
+): Promise<SharedRecipe> {
+  return apiFetch(`/api/v1/kitchens/${kitchenId}/community/recipes`, {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+}
+
+export async function fetchRewardBalance(kitchenId: string): Promise<RewardBalance> {
+  return apiFetch(`/api/v1/kitchens/${kitchenId}/community/rewards`);
+}
+
+export async function redeemRewardPoints(
+  kitchenId: string,
+  redemption_type: "subscription_discount" | "featured_listing",
+): Promise<{ redemption_id: string; points_spent: number; points_balance: number; status: string }> {
+  return apiFetch(`/api/v1/kitchens/${kitchenId}/community/rewards/redeem`, {
+    method: "POST",
+    body: JSON.stringify({ redemption_type }),
+  });
+}
+
+export async function fetchChefRankings(
+  scope = "city",
+  regionKey?: string,
+): Promise<{ period: string; scope: string; region_key: string; rankings: ChefRankingEntry[]; total: number }> {
+  const params = new URLSearchParams({ scope });
+  if (regionKey) params.set("region_key", regionKey);
+  return apiFetch(`/api/v1/community/rankings?${params}`);
+}
+
+export async function computeChefRankings(
+  kitchenId: string,
+  scope: "city" | "state" | "national",
+  regionKey?: string,
+): Promise<{ period: string; scope: string; region_key: string; rankings: ChefRankingEntry[]; total: number }> {
+  const params = new URLSearchParams({ scope });
+  if (regionKey) params.set("region_key", regionKey);
+  return apiFetch(`/api/v1/kitchens/${kitchenId}/community/rankings/compute?${params}`, { method: "POST" });
+}
+
 export const ORDER_NEXT: Record<string, string[]> = {
   received: ["accepted", "cancelled"],
   accepted: ["preparing", "cancelled"],

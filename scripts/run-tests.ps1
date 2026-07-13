@@ -54,6 +54,11 @@ Push-Location "$PSScriptRoot\..\services\learning"
 python -m alembic upgrade head
 Pop-Location
 
+Write-Host "Running community migrations..."
+Push-Location "$PSScriptRoot\..\services\community"
+python -m alembic upgrade head
+Pop-Location
+
 Write-Host "Bootstrapping events outbox..."
 python -c @"
 import psycopg2
@@ -117,6 +122,12 @@ Pop-Location
 
 Write-Host "Running learning service tests..."
 Push-Location "$PSScriptRoot\..\services\learning"
+python -m pytest -q
+if ($LASTEXITCODE -ne 0) { Pop-Location; exit $LASTEXITCODE }
+Pop-Location
+
+Write-Host "Running community service tests..."
+Push-Location "$PSScriptRoot\..\services\community"
 python -m pytest -q
 if ($LASTEXITCODE -ne 0) { Pop-Location; exit $LASTEXITCODE }
 Pop-Location

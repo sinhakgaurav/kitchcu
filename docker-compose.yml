@@ -251,6 +251,27 @@ services:
       - ./services/learning:/app/services/learning
       - ./packages:/app/packages
 
+  community:
+    build:
+      context: .
+      dockerfile: services/community/Dockerfile
+    env_file:
+      - .env.example
+    environment:
+      DATABASE_URL: postgresql+asyncpg://ckac:ckac_dev@postgres:5432/ckac
+      REDIS_URL: redis://redis:6379/0
+      COMMUNITY_MIN_ORDERS_RANKING: "3"
+    ports:
+      - "18011:8011"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./services/community:/app/services/community
+      - ./packages:/app/packages
+
   gateway:
     build:
       context: .
@@ -268,6 +289,7 @@ services:
       GROWTH_SERVICE_URL: http://growth:8008
       DELIVERY_SERVICE_URL: http://delivery:8009
       LEARNING_SERVICE_URL: http://learning:8010
+      COMMUNITY_SERVICE_URL: http://community:8011
       REDIS_URL: redis://redis:6379/0
     ports:
       - "18000:8000"
@@ -291,6 +313,8 @@ services:
       delivery:
         condition: service_started
       learning:
+        condition: service_started
+      community:
         condition: service_started
       redis:
         condition: service_healthy

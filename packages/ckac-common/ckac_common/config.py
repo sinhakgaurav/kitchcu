@@ -24,6 +24,7 @@ class Settings(BaseSettings):
     growth_service_url: str = "http://localhost:8008"
     delivery_service_url: str = "http://localhost:8009"
     learning_service_url: str = "http://localhost:8010"
+    community_service_url: str = "http://localhost:8011"
     internal_api_key: str = "dev-internal-key-change-in-production"
     whatsapp_verify_token: str = "ckac-dev-verify"
     admin_email: str = "admin@kitchcu.dev"
