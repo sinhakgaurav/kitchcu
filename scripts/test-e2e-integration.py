@@ -127,8 +127,8 @@ def run() -> None:
 
     # Analytics smoke
     summary = request("GET", f"/api/v1/kitchens/{kitchen_id}/analytics/summary?days=30", token=token)
-    assert_ok("total_revenue" in summary, "Analytics summary failed")
-    print(f"Revenue (30d): ₹{summary['total_revenue']}")
+    assert_ok("gross_revenue" in summary, "Analytics summary failed")
+    print(f"Revenue (30d): Rs {summary['gross_revenue']}")
 
     # Nearby public discovery
     nearby = request(

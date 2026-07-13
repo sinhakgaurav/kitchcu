@@ -29,20 +29,16 @@ async def _catalog_request(
 
 async def _resolve_menu_defaults(kitchen_id: uuid.UUID, owner_token: str) -> tuple[uuid.UUID, uuid.UUID]:
     menu = await _catalog_request("GET", f"/api/v1/kitchens/{kitchen_id}/menu", owner_token=owner_token)
-    cuisines = menu.get("cuisines") or []
-    if not cuisines:
+    grouped = menu.get("grouped") or []
+    if not grouped:
         raise ValueError("Set up your kitchen menu (cuisine + category) before learning a dish")
-    first_cuisine = cuisines[0]
+    first_cuisine = grouped[0]
     diets = first_cuisine.get("diets") or []
     if not diets:
         raise ValueError("Add a diet category to your menu before learning a dish")
     first_diet = diets[0]
-    dishes = first_diet.get("dishes") or []
     cuisine_id = uuid.UUID(first_cuisine["cuisine"]["id"])
     category_id = uuid.UUID(first_diet["diet"]["id"])
-    if dishes:
-        sample = dishes[0]
-        return cuisine_id, category_id
     return cuisine_id, category_id
 
 

@@ -83,8 +83,8 @@ def main() -> None:
     check("customer support chat", status == 200 and len(chat.get("reply", "")) > 20)
 
     print("\nGateway")
-    status, _ = api("GET", "/health/ready")
-    check("gateway health ready", status == 200)
+    status, _ = api("GET", "/health/live")
+    check("gateway health live", status == 200)
 
     print("\nOwner auth + cuisine menu")
     api("POST", "/api/v1/auth/otp/request", {"phone": DEMO_PHONE})

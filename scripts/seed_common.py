@@ -48,8 +48,8 @@ def wait_for_gateway() -> None:
     deadline = time.time() + MAX_WAIT_SEC
     while time.time() < deadline:
         try:
-            request("GET", "/health/ready")
-            print("Gateway ready.")
+            request("GET", "/health/live")
+            print("Gateway live.")
             return
         except (ApiError, urllib.error.URLError, TimeoutError):
             time.sleep(2)

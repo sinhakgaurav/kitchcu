@@ -39,7 +39,7 @@ def _owner_bearer(request: Request) -> str:
     auth = request.headers.get("Authorization", "")
     if not auth.startswith("Bearer "):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
-    return auth
+    return auth.removeprefix("Bearer ").strip()
 
 
 @router.get("/learning/recipes", response_model=CuratedRecipeListResponse)
