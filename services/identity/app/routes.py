@@ -171,6 +171,7 @@ async def kitchens_public_nearby(
     sort: str = Query("asc", pattern="^(asc|desc)$", description="asc = nearest first"),
     diet: str | None = Query(None, pattern="^(veg|non_veg|vegan)$"),
     live_capture: bool | None = Query(None, description="Only kitchens with live-capture hero dishes"),
+    live_only: bool | None = Query(None, description="Only kitchens currently streaming live prep"),
 ) -> KitchenNearbyListResponse:
     """List active cloud kitchens near a point, sorted by distance."""
     kitchens = await list_kitchens_nearby(
@@ -182,6 +183,7 @@ async def kitchens_public_nearby(
         sort=sort,
         diet=diet,
         live_capture=live_capture,
+        live_only=live_only,
     )
     return KitchenNearbyListResponse(
         kitchens=kitchens,

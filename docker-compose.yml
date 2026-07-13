@@ -272,6 +272,26 @@ services:
       - ./services/community:/app/services/community
       - ./packages:/app/packages
 
+  streaming:
+    build:
+      context: .
+      dockerfile: services/streaming/Dockerfile
+    env_file:
+      - .env.example
+    environment:
+      DATABASE_URL: postgresql+asyncpg://ckac:ckac_dev@postgres:5432/ckac
+      REDIS_URL: redis://redis:6379/0
+    ports:
+      - "18012:8012"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./services/streaming:/app/services/streaming
+      - ./packages:/app/packages
+
   gateway:
     build:
       context: .
@@ -290,9 +310,16 @@ services:
       DELIVERY_SERVICE_URL: http://delivery:8009
       LEARNING_SERVICE_URL: http://learning:8010
       COMMUNITY_SERVICE_URL: http://community:8011
+      STREAMING_SERVICE_URL: http://streaming:8012
       REDIS_URL: redis://redis:6379/0
     ports:
       - "18000:8000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/live', timeout=5)"]
+      interval: 10s
+      timeout: 8s
+      retries: 12
+      start_period: 90s
     depends_on:
       identity:
         condition: service_started
@@ -316,6 +343,8 @@ services:
         condition: service_started
       community:
         condition: service_started
+      streaming:
+        condition: service_started
       redis:
         condition: service_healthy
     volumes:
@@ -335,7 +364,7 @@ services:
       - "13001:80"
     depends_on:
       gateway:
-        condition: service_started
+        condition: service_healthy
 
   kitchen-web:
     build:
@@ -350,7 +379,7 @@ services:
       - "13002:80"
     depends_on:
       gateway:
-        condition: service_started
+        condition: service_healthy
 
   portal-web:
     build:
@@ -377,7 +406,7 @@ services:
       - "13003:80"
     depends_on:
       gateway:
-        condition: service_started
+        condition: service_healthy
 
   seed:
     image: python:3.12-slim
@@ -389,7 +418,7 @@ services:
     command: ["python", "seed-dev-data.py"]
     depends_on:
       gateway:
-        condition: service_started
+        condition: service_healthy
     restart: "no"
     profiles:
       - seed

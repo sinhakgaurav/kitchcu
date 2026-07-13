@@ -116,6 +116,7 @@ class KitchenNearbyResponse(KitchenPublicResponse):
     has_veg: bool = False
     has_non_veg: bool = False
     has_live_capture: bool = False
+    is_live_now: bool = False
 
 
 class KitchenNearbyListResponse(BaseModel):
@@ -279,6 +280,7 @@ async def list_kitchens_nearby(
     sort: str = "asc",
     diet: str | None = None,
     live_capture: bool | None = None,
+    live_only: bool | None = None,
 ) -> list[KitchenNearbyResponse]:
     """Active kitchens within max_km, ordered by distance (asc = nearest first)."""
     order = "ASC" if sort.lower() != "desc" else "DESC"
@@ -307,6 +309,16 @@ async def list_kitchens_nearby(
                       AND d.is_active = true
                       AND m.is_hero = true
                       AND m.is_live_capture = true
+              )
+        """
+    if live_only:
+        diet_filter += """
+              AND EXISTS (
+                    SELECT 1 FROM ckac_streaming.live_sessions s
+                    INNER JOIN ckac_streaming.kitchen_stream_settings st ON st.kitchen_id = s.kitchen_id
+                    WHERE s.kitchen_id = ckac_identity.kitchens.id
+                      AND s.status = 'live'
+                      AND st.live_sharing_enabled = true
               )
         """
 
@@ -344,7 +356,14 @@ async def list_kitchens_nearby(
                     WHERE d.kitchen_id = ckac_identity.kitchens.id
                       AND d.is_active = true
                       AND m.is_hero = true AND m.is_live_capture = true
-                ) AS has_live_capture
+                ) AS has_live_capture,
+                EXISTS (
+                    SELECT 1 FROM ckac_streaming.live_sessions s
+                    INNER JOIN ckac_streaming.kitchen_stream_settings st ON st.kitchen_id = s.kitchen_id
+                    WHERE s.kitchen_id = ckac_identity.kitchens.id
+                      AND s.status = 'live'
+                      AND st.live_sharing_enabled = true
+                ) AS is_live_now
             FROM ckac_identity.kitchens
             WHERE status = 'active'
               AND ST_DWithin(
@@ -374,6 +393,7 @@ async def list_kitchens_nearby(
             has_veg=bool(row.has_veg),
             has_non_veg=bool(row.has_non_veg),
             has_live_capture=bool(row.has_live_capture),
+            is_live_now=bool(row.is_live_now),
         )
         for row in rows
     ]

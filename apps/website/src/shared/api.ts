@@ -65,6 +65,7 @@ export type KitchenNearby = KitchenPublic & {
   has_veg: boolean;
   has_non_veg: boolean;
   has_live_capture: boolean;
+  is_live_now: boolean;
 };
 
 export type KitchenNearbyList = {
@@ -388,6 +389,7 @@ export async function fetchNearbyKitchens(params: {
   sort?: "asc" | "desc";
   diet?: "veg" | "non_veg" | "vegan";
   live_capture?: boolean;
+  live_only?: boolean;
 }): Promise<KitchenNearbyList> {
   const q = new URLSearchParams({
     latitude: String(params.latitude),
@@ -398,6 +400,7 @@ export async function fetchNearbyKitchens(params: {
   if (params.max_km != null) q.set("max_km", String(params.max_km));
   if (params.diet) q.set("diet", params.diet);
   if (params.live_capture) q.set("live_capture", "true");
+  if (params.live_only) q.set("live_only", "true");
   return apiFetch(`/api/v1/kitchens/public/nearby?${q.toString()}`);
 }
 
@@ -1154,6 +1157,83 @@ export async function computeChefRankings(
   const params = new URLSearchParams({ scope });
   if (regionKey) params.set("region_key", regionKey);
   return apiFetch(`/api/v1/kitchens/${kitchenId}/community/rankings/compute?${params}`, { method: "POST" });
+}
+
+export type StreamSettings = {
+  kitchen_id: string;
+  live_sharing_enabled: boolean;
+  q_and_a_enabled: boolean;
+  is_live: boolean;
+  livekit_configured: boolean;
+};
+
+export type LiveSession = {
+  id: string;
+  kitchen_id: string;
+  title: string;
+  room_name: string;
+  status: string;
+  order_id: string | null;
+  viewer_count: number;
+  started_at: string;
+  ended_at: string | null;
+  livekit_url: string | null;
+  publisher_token: string | null;
+};
+
+export type LiveKitchenSummary = {
+  kitchen_id: string;
+  kitchen_code: string;
+  kitchen_name: string;
+  session_id: string;
+  title: string;
+  started_at: string;
+};
+
+export async function fetchStreamSettings(kitchenId: string): Promise<StreamSettings> {
+  return apiFetch(`/api/v1/kitchens/${kitchenId}/stream/settings`);
+}
+
+export async function updateStreamSettings(
+  kitchenId: string,
+  data: { live_sharing_enabled?: boolean; q_and_a_enabled?: boolean },
+): Promise<StreamSettings> {
+  return apiFetch(`/api/v1/kitchens/${kitchenId}/stream/settings`, {
+    method: "PATCH",
+    body: JSON.stringify(data),
+  });
+}
+
+export async function goKitchenLive(
+  kitchenId: string,
+  data: { title?: string; order_id?: string },
+): Promise<LiveSession> {
+  return apiFetch(`/api/v1/kitchens/${kitchenId}/stream/go-live`, {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+}
+
+export async function endKitchenStream(kitchenId: string): Promise<LiveSession> {
+  return apiFetch(`/api/v1/kitchens/${kitchenId}/stream/end`, { method: "POST" });
+}
+
+export async function fetchStreamSession(kitchenId: string): Promise<LiveSession | null> {
+  return apiFetch(`/api/v1/kitchens/${kitchenId}/stream/session`);
+}
+
+export async function fetchLiveKitchens(): Promise<{ kitchens: LiveKitchenSummary[]; total: number }> {
+  return apiFetch("/api/v1/stream/live-kitchens");
+}
+
+export async function fetchViewerToken(sessionId: string): Promise<{
+  session_id: string;
+  room_name: string;
+  livekit_url: string | null;
+  token: string | null;
+  kitchen_name: string | null;
+}> {
+  return apiFetch(`/api/v1/stream/sessions/${sessionId}/viewer-token`, { method: "POST" });
 }
 
 export const ORDER_NEXT: Record<string, string[]> = {

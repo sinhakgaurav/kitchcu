@@ -69,11 +69,12 @@
 | **Ingredient mapper** | `services/catalog/`, `apps/website/` | **S15** — F19 recipes, stock deduct on accept, low-stock warnings |
 | **Learning service** | `services/learning/`, `apps/website/` | **S16** — F21 curated portal, F22 dish trials + promote |
 | **Community service** | `services/community/`, `apps/website/` | **S17** — F23 recipe rewards, F24 chef rankings |
+| **Streaming service** | `services/streaming/`, `apps/website/` | **S18** — F46 LiveKit sessions, F47 owner opt-in go-live, F48 customer live filter |
 | **Owner analytics** | `services/order/app/analytics.py` | F07–F08 revenue, top dishes, peak hours, customer segments |
 | Shared lib | `packages/ckac-common/` | Config, DB, auth, `EventPublisher`, cache, health, internal auth |
-| Event bus | Redis Streams | `ckac:catalog:dish`, `ckac:catalog:ingredient`, `ckac:orders:order`, `ckac:orders:draft`, `ckac:orders:master_order`, `ckac:billing:payment`, `ckac:billing:settlement`, `ckac:billing:subscription`, `ckac:marketing:coupon`, `ckac:marketing:promotion`, `ckac:marketing:crm`, `ckac:ratings:rating`, `ckac:ratings:dish`, `ckac:growth:suggestion`, `ckac:growth:daily_menu`, `ckac:delivery:quote`, `ckac:delivery:tracking`, `ckac:learning:trial`, `ckac:community:recipe`, `ckac:community:reward`, `ckac:community:ranking`, `ckac:notify:whatsapp`, `ckac:notify:dispatch`, `ckac:notify:tracking` |
+| Event bus | Redis Streams | `ckac:catalog:dish`, `ckac:catalog:ingredient`, `ckac:orders:order`, `ckac:orders:draft`, `ckac:orders:master_order`, `ckac:billing:payment`, `ckac:billing:settlement`, `ckac:billing:subscription`, `ckac:marketing:coupon`, `ckac:marketing:promotion`, `ckac:marketing:crm`, `ckac:ratings:rating`, `ckac:ratings:dish`, `ckac:growth:suggestion`, `ckac:growth:daily_menu`, `ckac:delivery:quote`, `ckac:delivery:tracking`, `ckac:learning:trial`, `ckac:community:recipe`, `ckac:community:reward`, `ckac:community:ranking`, `ckac:streaming:session`, `ckac:notify:whatsapp`, `ckac:notify:dispatch`, `ckac:notify:tracking` |
 | PostgreSQL + PostGIS | `infra/postgres/init/` | Schema-per-domain |
-| Docker stack | `docker-compose.yml` | postgres, redis, minio, gateway, identity, catalog, order, billing, marketing, ratings, growth, delivery, learning, community, notification |
+| Docker stack | `docker-compose.yml` | postgres, redis, minio, gateway, identity, catalog, order, billing, marketing, ratings, growth, delivery, learning, community, streaming, notification |
 | Tests | `services/*/tests/` | TDD — run `scripts/run-tests.ps1` |
 
 ### Next ⏳ (follow `docs/DEVELOPMENT-PHASES.md`)
@@ -93,6 +94,7 @@
 | S15 | F19 ingredient balance mapper ✅ |
 | S16 | F21 learning portal + F22 dish trials ✅ |
 | S17 | F23 recipe rewards + F24 chef rankings ✅ |
+| S18 | F46–F48 live streaming (LiveKit opt-in) ✅ |
 
 **Do not implement Phase 2+ features unless explicitly requested.**
 
@@ -329,6 +331,7 @@ DATABASE_SYNC_URL=postgresql://ckac:ckac_dev@localhost:5432/ckac
 | Delivery | 18009 |
 | Learning | 18010 |
 | Community | 18011 |
+| Streaming | 18012 |
 | PostgreSQL | 15432 |
 | Redis | 16379 |
 | MinIO | 9000 / 9001 |

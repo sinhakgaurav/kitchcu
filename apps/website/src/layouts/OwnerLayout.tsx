@@ -13,6 +13,7 @@ const NAV = [
   { to: "/dashboard/ingredients", label: "Ingredients" },
   { to: "/dashboard/learning", label: "Learning" },
   { to: "/dashboard/community", label: "Community" },
+  { to: "/dashboard/stream", label: "Live stream" },
   { to: "/dashboard/crm", label: "CRM" },
   { to: "/dashboard/coupons", label: "Coupons" },
   { to: "/dashboard/subscription", label: "Subscription" },

@@ -15,6 +15,7 @@ import { ReportsPage } from "../pages/owner/ReportsPage";
 import { GrowthPage } from "../pages/owner/GrowthPage";
 import { IngredientsPage } from "../pages/owner/IngredientsPage";
 import { CommunityPage } from "../pages/owner/CommunityPage";
+import { StreamPage } from "../pages/owner/StreamPage";
 import { LearningPage } from "../pages/owner/LearningPage";
 import { TrialDetailPage } from "../pages/owner/TrialDetailPage";
 import { CrmPage } from "../pages/owner/CrmPage";
@@ -52,6 +53,7 @@ export default function KitchenApp() {
             <Route path="learning" element={<LearningPage />} />
             <Route path="learning/trials/:trialId" element={<TrialDetailPage />} />
             <Route path="community" element={<CommunityPage />} />
+            <Route path="stream" element={<StreamPage />} />
             <Route path="crm" element={<CrmPage />} />
             <Route path="coupons" element={<CouponsPage />} />
             <Route path="subscription" element={<SubscriptionPage />} />

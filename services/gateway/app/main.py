@@ -22,6 +22,7 @@ RATINGS_PATH_MARKERS = ("/ratings", "/suggestions")
 GROWTH_PATH_MARKERS = ("/growth",)
 LEARNING_PATH_MARKERS = ("/learning",)
 COMMUNITY_PATH_MARKERS = ("/community",)
+STREAMING_PATH_MARKERS = ("/stream",)
 
 
 def resolve_service_url(path: str) -> str | None:
@@ -40,6 +41,8 @@ def resolve_service_url(path: str) -> str | None:
         return settings.billing_service_url
     if path.startswith("/api/v1/community"):
         return settings.community_service_url
+    if path.startswith("/api/v1/stream"):
+        return settings.streaming_service_url
     if path.startswith("/api/v1/learning"):
         return settings.learning_service_url
     if path.startswith("/api/v1/growth"):
@@ -53,6 +56,8 @@ def resolve_service_url(path: str) -> str | None:
     if path.startswith("/api/v1/orders"):
         return settings.order_service_url
     if path.startswith("/api/v1/kitchens"):
+        if any(marker in path for marker in STREAMING_PATH_MARKERS):
+            return settings.streaming_service_url
         if any(marker in path for marker in COMMUNITY_PATH_MARKERS):
             return settings.community_service_url
         if any(marker in path for marker in LEARNING_PATH_MARKERS):
@@ -92,6 +97,8 @@ def resolve_client_key(base_url: str) -> str:
         return "learning"
     if base_url == settings.community_service_url:
         return "community"
+    if base_url == settings.streaming_service_url:
+        return "streaming"
     return "identity"
 
 
@@ -99,17 +106,18 @@ def resolve_client_key(base_url: str) -> str:
 async def lifespan(app: FastAPI):
     global http_clients, redis_client
     http_clients = {
-        "identity": httpx.AsyncClient(base_url=settings.identity_service_url, timeout=30.0),
-        "catalog": httpx.AsyncClient(base_url=settings.catalog_service_url, timeout=30.0),
-        "order": httpx.AsyncClient(base_url=settings.order_service_url, timeout=30.0),
-        "billing": httpx.AsyncClient(base_url=settings.billing_service_url, timeout=30.0),
-        "notification": httpx.AsyncClient(base_url=settings.notification_service_url, timeout=30.0),
-        "marketing": httpx.AsyncClient(base_url=settings.marketing_service_url, timeout=30.0),
-        "ratings": httpx.AsyncClient(base_url=settings.ratings_service_url, timeout=30.0),
-        "growth": httpx.AsyncClient(base_url=settings.growth_service_url, timeout=30.0),
-        "delivery": httpx.AsyncClient(base_url=settings.delivery_service_url, timeout=30.0),
-        "learning": httpx.AsyncClient(base_url=settings.learning_service_url, timeout=30.0),
-        "community": httpx.AsyncClient(base_url=settings.community_service_url, timeout=30.0),
+        "identity": httpx.AsyncClient(base_url=settings.identity_service_url, timeout=httpx.Timeout(10.0, connect=5.0)),
+        "catalog": httpx.AsyncClient(base_url=settings.catalog_service_url, timeout=httpx.Timeout(10.0, connect=5.0)),
+        "order": httpx.AsyncClient(base_url=settings.order_service_url, timeout=httpx.Timeout(10.0, connect=5.0)),
+        "billing": httpx.AsyncClient(base_url=settings.billing_service_url, timeout=httpx.Timeout(10.0, connect=5.0)),
+        "notification": httpx.AsyncClient(base_url=settings.notification_service_url, timeout=httpx.Timeout(10.0, connect=5.0)),
+        "marketing": httpx.AsyncClient(base_url=settings.marketing_service_url, timeout=httpx.Timeout(10.0, connect=5.0)),
+        "ratings": httpx.AsyncClient(base_url=settings.ratings_service_url, timeout=httpx.Timeout(10.0, connect=5.0)),
+        "growth": httpx.AsyncClient(base_url=settings.growth_service_url, timeout=httpx.Timeout(10.0, connect=5.0)),
+        "delivery": httpx.AsyncClient(base_url=settings.delivery_service_url, timeout=httpx.Timeout(10.0, connect=5.0)),
+        "learning": httpx.AsyncClient(base_url=settings.learning_service_url, timeout=httpx.Timeout(10.0, connect=5.0)),
+        "community": httpx.AsyncClient(base_url=settings.community_service_url, timeout=httpx.Timeout(10.0, connect=5.0)),
+        "streaming": httpx.AsyncClient(base_url=settings.streaming_service_url, timeout=httpx.Timeout(10.0, connect=5.0)),
     }
     redis_client = redis.from_url(settings.redis_url, decode_responses=True)
     yield
@@ -123,7 +131,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="kitchCU API Gateway",
     version="0.4.0",
-    description="Unified entry point — routes to identity, catalog, order, billing, marketing, ratings, growth, delivery, learning, community, notification",
+    description="Unified entry point — routes to identity, catalog, order, billing, marketing, ratings, growth, delivery, learning, community, streaming, notification",
     lifespan=lifespan,
 )
 
@@ -191,7 +199,20 @@ async def proxy(path: str, request: Request) -> Response:
     }
     headers.update(correlation_headers(request))
 
-    upstream = await client.request(request.method, url, content=body, headers=headers)
+    try:
+        upstream = await client.request(request.method, url, content=body, headers=headers)
+    except httpx.ConnectError:
+        return JSONResponse(
+            status_code=503,
+            content={"detail": "Backend service unavailable — ensure Docker stack is running"},
+        )
+    except httpx.TimeoutException:
+        return JSONResponse(
+            status_code=504,
+            content={"detail": "Backend service timed out — try again or restart Docker"},
+        )
+    except httpx.HTTPError as exc:
+        return JSONResponse(status_code=502, content={"detail": f"Gateway upstream error: {exc}"})
 
     return Response(
         content=upstream.content,

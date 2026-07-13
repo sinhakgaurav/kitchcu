@@ -25,6 +25,7 @@ export function NearbyKitchensList() {
   const [maxKm, setMaxKm] = useState(25);
   const [diet, setDiet] = useState<DietFilter>("");
   const [liveCaptureOnly, setLiveCaptureOnly] = useState(false);
+  const [liveOnly, setLiveOnly] = useState(false);
 
   const mapSrc = useMemo(() => {
     const pad = 0.04;
@@ -46,6 +47,7 @@ export function NearbyKitchensList() {
         sort,
         diet: diet || undefined,
         live_capture: liveCaptureOnly || undefined,
+        live_only: liveOnly || undefined,
       });
       setKitchens(data.kitchens);
     } catch (err) {
@@ -54,7 +56,7 @@ export function NearbyKitchensList() {
     } finally {
       setLoading(false);
     }
-  }, [coords.latitude, coords.longitude, maxKm, sort, diet, liveCaptureOnly]);
+  }, [coords.latitude, coords.longitude, maxKm, sort, diet, liveCaptureOnly, liveOnly]);
 
   useEffect(() => {
     load();
@@ -82,7 +84,7 @@ export function NearbyKitchensList() {
             <span className="section__eyebrow">Near you</span>
             <h2>Cloud kitchens nearby</h2>
             <p>
-              Map + list sorted by distance. Filter by diet and live-capture menu photos.
+              Map + list sorted by distance. Filter by diet, live-capture menu photos, or kitchens streaming now.
               {geoError && <span className="nearby-kitchens__geo-hint"> {geoError}</span>}
             </p>
           </div>
@@ -110,6 +112,14 @@ export function NearbyKitchensList() {
                 <option value="non_veg">Non-veg</option>
                 <option value="vegan">Vegan</option>
               </select>
+            </label>
+            <label className="nearby-kitchens__checkbox">
+              <input
+                type="checkbox"
+                checked={liveOnly}
+                onChange={(e) => setLiveOnly(e.target.checked)}
+              />
+              Live prep streaming only
             </label>
             <label className="nearby-kitchens__checkbox">
               <input
@@ -168,6 +178,7 @@ export function NearbyKitchensList() {
                       {k.has_veg && <span className="nearby-kitchens__badge">Veg</span>}
                       {k.has_non_veg && <span className="nearby-kitchens__badge">Non-veg</span>}
                       {k.has_live_capture && <span className="nearby-kitchens__badge">Live photo</span>}
+                      {k.is_live_now && <span className="nearby-kitchens__badge nearby-kitchens__badge--live">LIVE</span>}
                     </span>
                   </div>
                   <span className="nearby-kitchens__arrow" aria-hidden="true">→</span>

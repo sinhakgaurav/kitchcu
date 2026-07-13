@@ -48,6 +48,7 @@ jobs:
           pip install "./services/delivery[dev]"
           pip install "./services/learning[dev]"
           pip install "./services/community[dev]"
+          pip install "./services/streaming[dev]"
           pip install "./services/notification[dev]"
           pip install "./services/gateway[dev]"
           pip install ruff
@@ -72,9 +73,10 @@ jobs:
           cd ../delivery && alembic upgrade head
           cd ../learning && alembic upgrade head
           cd ../community && alembic upgrade head
+          cd ../streaming && alembic upgrade head
 
       - name: Ruff check
-        run: ruff check services/identity services/catalog services/order services/billing services/marketing services/ratings services/growth services/delivery services/learning services/community services/notification services/gateway packages/ckac-common
+        run: ruff check services/identity services/catalog services/order services/billing services/marketing services/ratings services/growth services/delivery services/learning services/community services/streaming services/notification services/gateway packages/ckac-common
 
       - name: Run identity tests
         env:
@@ -155,6 +157,14 @@ jobs:
           REDIS_URL: redis://localhost:6379/0
           COMMUNITY_MIN_ORDERS_RANKING: "3"
         working-directory: services/community
+        run: pytest -q
+
+      - name: Run streaming tests
+        env:
+          DATABASE_URL: postgresql+asyncpg://ckac:ckac_dev@localhost:5432/ckac
+          DATABASE_SYNC_URL: postgresql://ckac:ckac_dev@localhost:5432/ckac
+          REDIS_URL: redis://localhost:6379/0
+        working-directory: services/streaming
         run: pytest -q
 
       - name: Run notification tests

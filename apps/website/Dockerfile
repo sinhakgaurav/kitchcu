@@ -20,6 +20,7 @@ RUN if [ "$APP" = "customer" ]; then npm run build:customer; \
 # Serve stage
 FROM nginx:alpine
 ARG APP=customer
+COPY nginx.api-proxy.conf /etc/nginx/conf.d/api-proxy.conf
 COPY nginx.${APP}.conf /etc/nginx/conf.d/default.conf
 COPY --from=build /app/dist/${APP} /usr/share/nginx/html
 EXPOSE 80
