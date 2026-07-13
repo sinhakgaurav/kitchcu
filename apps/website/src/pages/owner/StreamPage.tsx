@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { OwnerPageShell, OwnerPanel } from "../../components/owner/OwnerPageShell";
 import {
   endKitchenStream,
   fetchLiveKitchens,
@@ -95,19 +96,15 @@ export function StreamPage() {
   if (!kitchen) return <p className="app-loading">Select a kitchen…</p>;
 
   return (
-    <div className="owner-page">
-      <header className="owner-page__head">
-        <div>
-          <h1>Live streaming</h1>
-          <p>Opt in to share live prep with customers (F47). Enterprise kitchens can broadcast via LiveKit.</p>
-        </div>
-      </header>
-
+    <OwnerPageShell
+      eyebrow="Engagement"
+      title="Live streaming"
+      description="Opt in to share live prep with customers (F47). Enterprise kitchens can broadcast via LiveKit."
+    >
       {error && <div className="auth-card__error">{error}</div>}
       {msg && <div className="auth-card__success">{msg}</div>}
 
-      <section className="glass owner-page__section">
-        <h2>Sharing settings</h2>
+      <OwnerPanel title="Sharing settings">
         {settings && (
           <div className="stream-settings">
             <label className="stream-settings__toggle">
@@ -147,10 +144,9 @@ export function StreamPage() {
             </p>
           </div>
         )}
-      </section>
+      </OwnerPanel>
 
-      <section className="glass owner-page__section">
-        <h2>Go live</h2>
+      <OwnerPanel title="Go live">
         {session?.status === "live" ? (
           <div className="stream-live">
             <p><strong>{session.title}</strong> — room <code>{session.room_name}</code></p>
@@ -182,12 +178,11 @@ export function StreamPage() {
             </button>
           </form>
         )}
-      </section>
+      </OwnerPanel>
 
-      <section className="glass owner-page__section">
-        <h2>Kitchens live now</h2>
+      <OwnerPanel title="Kitchens live now" description="Other kitchens broadcasting on kitchCU">
         {liveKitchens.length === 0 ? (
-          <p>No kitchens are streaming right now.</p>
+          <p className="owner-muted">No kitchens are streaming right now.</p>
         ) : (
           <ul className="stream-live-list">
             {liveKitchens.map((k) => (
@@ -197,7 +192,7 @@ export function StreamPage() {
             ))}
           </ul>
         )}
-      </section>
-    </div>
+      </OwnerPanel>
+    </OwnerPageShell>
   );
 }

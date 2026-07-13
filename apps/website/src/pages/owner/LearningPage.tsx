@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
+import { OwnerEmpty, OwnerPageShell, OwnerPanel } from "../../components/owner/OwnerPageShell";
 import {
   fetchCuratedRecipes,
   fetchDishTrials,
@@ -66,20 +67,16 @@ export function LearningPage() {
   if (!kitchen) return null;
 
   return (
-    <div className="owner-page">
-      <header className="owner-page__head">
-        <div>
-          <h1>Learning portal</h1>
-          <p className="owner-page__code">Browse curated recipes, learn dishes, run sample trials (F21–F22)</p>
-        </div>
-      </header>
+    <OwnerPageShell
+      eyebrow="Growth"
+      title="Learning portal"
+      description="Browse curated recipes, learn dishes, run sample trials (F21–F22)"
+    >
+      {error && <p className="form-error">{error}</p>}
 
-      {error && <p className="owner-error">{error}</p>}
-
-      <section className="glass owner-section">
-        <h2>Your trials</h2>
+      <OwnerPanel title="Your trials" description="Dishes you're testing before adding to menu">
         {trials.length === 0 ? (
-          <p className="owner-page__code">No trials yet — pick a recipe below and tap &quot;I learned this dish&quot;.</p>
+          <OwnerEmpty message='No trials yet — pick a recipe below and tap "I learned this dish".' />
         ) : (
           <ul className="owner-detail-items">
             {trials.map((t) => (
@@ -92,31 +89,38 @@ export function LearningPage() {
             ))}
           </ul>
         )}
-      </section>
+      </OwnerPanel>
 
-      <section className="glass owner-section">
-        <div className="owner-page__head">
-          <h2>Curated recipes</h2>
-          <select value={category} onChange={(e) => setCategory(e.target.value)}>
+      <OwnerPanel
+        title="Curated recipes"
+        description="Learn from the community and test with your regulars"
+        action={
+          <select
+            className="owner-input"
+            value={category}
+            onChange={(e) => setCategory(e.target.value)}
+          >
             {CATEGORIES.map((c) => (
               <option key={c.value || "all"} value={c.value}>
                 {c.label}
               </option>
             ))}
           </select>
-        </div>
-
+        }
+      >
         {loading ? (
-          <p>Loading recipes…</p>
+          <div className="app-loading">Loading recipes…</div>
+        ) : recipes.length === 0 ? (
+          <OwnerEmpty message="No recipes in this category yet." />
         ) : (
           <div className="owner-menu-grid">
             {recipes.map((r) => (
-              <article key={r.id} className="glass owner-dish-card">
+              <article key={r.id} className="dash-card owner-dish-card">
                 <img src={r.image_url} alt={r.title} loading="lazy" />
                 <div>
                   <h3>{r.title}</h3>
                   <p className="owner-dish-card__desc">{r.description}</p>
-                  <p className="owner-page__code">
+                  <p className="owner-muted">
                     {r.category.replace("_", " ")} · {r.source_name}
                   </p>
                   <button
@@ -132,7 +136,7 @@ export function LearningPage() {
             ))}
           </div>
         )}
-      </section>
-    </div>
+      </OwnerPanel>
+    </OwnerPageShell>
   );
 }

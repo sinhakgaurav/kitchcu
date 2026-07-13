@@ -1,5 +1,6 @@
 import { Link, useNavigate } from "react-router-dom";
 import { FormEvent, useEffect, useState } from "react";
+import { OwnerPageShell, OwnerPanel } from "../../components/owner/OwnerPageShell";
 import { createManualOrder, fetchMenu, type Dish } from "../../lib/api";
 import { useKitchen } from "../../lib/kitchen";
 
@@ -62,17 +63,17 @@ export function NewOrderPage() {
   };
 
   return (
-    <div className="owner-page">
-      <Link to="/dashboard/orders" className="owner-back">← Back to orders</Link>
-      <header className="owner-page__head">
-        <h1>New manual order</h1>
-      </header>
-
+    <OwnerPageShell
+      eyebrow="Order operations"
+      title="New manual order"
+      description="Walk-in, phone, or counter orders — add dishes and place instantly"
+      backTo="/dashboard/orders"
+      backLabel="← Back to orders"
+    >
       <div className="owner-new-order">
-        <section className="glass">
-          <h2>Menu</h2>
+        <OwnerPanel title="Menu" description="Tap dishes to add to the order">
           {dishes.length === 0 ? (
-            <p>No dishes yet. <Link to="/dashboard/menu/new">Add dishes</Link> first.</p>
+            <p className="owner-muted">No dishes yet. <Link to="/dashboard/menu/new">Add dishes</Link> first.</p>
           ) : (
             <div className="owner-dish-pick">
               {dishes.map((d) => (
@@ -83,9 +84,9 @@ export function NewOrderPage() {
               ))}
             </div>
           )}
-        </section>
+        </OwnerPanel>
 
-        <form className="glass owner-form" onSubmit={handleSubmit}>
+        <form className="dash-card owner-form" onSubmit={handleSubmit}>
           <h2>Order details</h2>
           {lines.length > 0 && (
             <ul className="owner-cart">
@@ -125,6 +126,6 @@ export function NewOrderPage() {
           </button>
         </form>
       </div>
-    </div>
+    </OwnerPageShell>
   );
 }

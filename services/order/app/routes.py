@@ -17,6 +17,13 @@ from app.deps import (
     verify_kitchen_active,
     verify_kitchen_owner,
 )
+from app.receipts import (
+    bill_pdf_filename,
+    build_master_receipt,
+    build_order_receipt,
+    render_master_bill_pdf,
+    render_order_bill_pdf,
+)
 from app.schemas import (
     CustomerOrderCreateRequest,
     ManualOrderCreateRequest,
@@ -202,6 +209,28 @@ async def customer_master_order_get(
     return await master_order_to_response(session, master)
 
 
+@router.get("/customers/me/master-orders/{master_order_id}/bill.pdf")
+async def customer_master_order_bill_pdf(
+    master_order_id: uuid.UUID,
+    customer_id: Annotated[uuid.UUID, Depends(get_current_customer_id)],
+    session: Annotated[AsyncSession, Depends(get_db)],
+) -> Response:
+    master = await get_master_order_for_customer(session, master_order_id, customer_id)
+    if not master:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Master order not found",
+        )
+    receipt = await build_master_receipt(session, master)
+    pdf_bytes = render_master_bill_pdf(receipt)
+    filename = bill_pdf_filename(receipt.master_order_code)
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
 @router.get("/customers/me/orders", response_model=OrderListResponse)
 async def customer_orders_list(
     customer_id: Annotated[uuid.UUID, Depends(get_current_customer_id)],
@@ -229,6 +258,27 @@ async def customer_order_get(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Order not found")
     order = await get_order_for_customer(order_id, phone, session)
     return await order_to_response(session, order)
+
+
+@router.get("/customers/me/orders/{order_id}/bill.pdf")
+async def customer_order_bill_pdf(
+    order_id: uuid.UUID,
+    customer_id: Annotated[uuid.UUID, Depends(get_current_customer_id)],
+    session: Annotated[AsyncSession, Depends(get_db)],
+) -> Response:
+    profile = await load_customer_profile(customer_id, session)
+    phone = profile.get("phone")
+    if not phone:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Order not found")
+    order = await get_order_for_customer(order_id, phone, session)
+    receipt = await build_order_receipt(session, order)
+    pdf_bytes = render_order_bill_pdf(receipt)
+    filename = bill_pdf_filename(receipt.order_code)
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
 
 
 @router.post(
@@ -280,6 +330,23 @@ async def order_get(
 ) -> OrderResponse:
     order = await get_order_for_owner(order_id, owner_id, session)
     return await order_to_response(session, order)
+
+
+@router.get("/orders/{order_id}/bill.pdf")
+async def order_bill_pdf(
+    order_id: uuid.UUID,
+    owner_id: Annotated[uuid.UUID, Depends(get_current_owner_id)],
+    session: Annotated[AsyncSession, Depends(get_db)],
+) -> Response:
+    order = await get_order_for_owner(order_id, owner_id, session)
+    receipt = await build_order_receipt(session, order)
+    pdf_bytes = render_order_bill_pdf(receipt)
+    filename = bill_pdf_filename(receipt.order_code)
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
 
 
 @router.get("/orders/{order_id}/stock-warnings", response_model=OrderStockWarningsResponse)

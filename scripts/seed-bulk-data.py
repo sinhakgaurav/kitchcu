@@ -1,15 +1,17 @@
 #!/usr/bin/env python3
 """Seed a large demo dataset for full UI / report verification.
 
-Creates many kitchens (nearby search), dishes (all categories), orders (all
-statuses), and WhatsApp drafts. Idempotent — skips existing kitchens/dishes by
-name; adds orders until target count is reached.
+Creates multiple owners, many kitchens (nearby search), dishes (all categories),
+orders (all statuses), and WhatsApp drafts. Idempotent — skips existing
+kitchens/dishes by name and adds orders/drafts until each target is reached.
 
 Usage:
   python scripts/seed-bulk-data.py
   CKAC_BULK_ORDERS=300 python scripts/seed-bulk-data.py
+  $env:CKAC_BULK_OWNERS=5; .\\scripts\\seed-bulk-data.ps1
 
-Requires: docker compose up (gateway + postgres) and scripts/seed-dev-data.py run once.
+Requires: docker compose up (gateway + postgres). The primary demo owner is
+created automatically, so running seed-dev-data.py first is optional.
 """
 
 from __future__ import annotations
@@ -36,13 +38,26 @@ from demo_data import DEMO_KITCHEN_CODE, DEMO_OTP, DEMO_OWNER  # noqa: E402
 from seed_common import ApiError, cuisine_map, dish_create_payload, ensure_dish_recipes, ensure_ingredients, login_owner, request, wait_for_gateway  # noqa: E402
 from ingredient_demo_data import DEMO_PANTRY, DISH_PREP_STEPS, DISH_RECIPES  # noqa: E402
 
-BULK_KITCHENS = int(os.environ.get("CKAC_BULK_KITCHENS", "22"))
-BULK_OWNERS = int(os.environ.get("CKAC_BULK_OWNERS", "5"))
-BULK_KITCHENS_PER_OWNER = int(os.environ.get("CKAC_BULK_KITCHENS_PER_OWNER", "3"))
-BULK_ORDERS = int(os.environ.get("CKAC_BULK_ORDERS", "250"))
-BULK_DRAFTS = int(os.environ.get("CKAC_BULK_DRAFTS", "25"))
-BULK_DISHES_PER_KITCHEN = int(os.environ.get("CKAC_BULK_DISHES_PER_KITCHEN", "6"))
-BACKDATE_DAYS = int(os.environ.get("CKAC_BULK_BACKDATE_DAYS", "30"))
+def env_int(name: str, default: int, *, minimum: int = 0) -> int:
+    raw = os.environ.get(name, str(default))
+    try:
+        value = int(raw)
+    except ValueError as exc:
+        raise SystemExit(f"{name} must be an integer, got {raw!r}") from exc
+    if value < minimum:
+        raise SystemExit(f"{name} must be at least {minimum}, got {value}")
+    return value
+
+
+BULK_KITCHENS = env_int("CKAC_BULK_KITCHENS", 22, minimum=1)
+BULK_OWNERS = env_int("CKAC_BULK_OWNERS", 5)
+BULK_KITCHENS_PER_OWNER = env_int("CKAC_BULK_KITCHENS_PER_OWNER", 3, minimum=1)
+BULK_ORDERS = env_int("CKAC_BULK_ORDERS", 250)
+BULK_DRAFTS = env_int("CKAC_BULK_DRAFTS", 25)
+BULK_ORDERS_PER_OWNER = env_int("CKAC_BULK_ORDERS_PER_OWNER", 40)
+BULK_DRAFTS_PER_OWNER = env_int("CKAC_BULK_DRAFTS_PER_OWNER", 5)
+BULK_DISHES_PER_KITCHEN = env_int("CKAC_BULK_DISHES_PER_KITCHEN", 6, minimum=1)
+BACKDATE_DAYS = env_int("CKAC_BULK_BACKDATE_DAYS", 30)
 POSTGRES_CONTAINER = os.environ.get("CKAC_POSTGRES_CONTAINER", "ckac-postgres-1")
 
 random.seed(42)
@@ -264,7 +279,7 @@ def backdate_orders(kitchen_id: str) -> None:
             ],
             capture_output=True,
             text=True,
-            timeout=60,
+            timeout=180,
         )
         if proc.returncode == 0:
             log(f"  Backdated orders over {BACKDATE_DAYS} days for reporting.")
@@ -279,11 +294,19 @@ def primary_kitchen(kitchens: list[dict]) -> dict:
 
 
 def main() -> None:
+    owner_count = min(BULK_OWNERS, len(EXTRA_OWNERS))
+    if BULK_OWNERS > len(EXTRA_OWNERS):
+        log(
+            f"Requested {BULK_OWNERS} extra owners, but only {len(EXTRA_OWNERS)} "
+            "deterministic owner profiles are available; using all available profiles."
+        )
+
     log("CKAC bulk seed")
     log("=" * 50)
     log(
-        f"Targets: {BULK_KITCHENS} demo kitchens, {BULK_OWNERS} extra owners x "
-        f"{BULK_KITCHENS_PER_OWNER} kitchens, {BULK_ORDERS} orders, {BULK_DRAFTS} drafts"
+        f"Targets: {BULK_KITCHENS} primary-owner kitchens, {owner_count} extra owners x "
+        f"{BULK_KITCHENS_PER_OWNER} kitchens, {BULK_ORDERS} primary orders, "
+        f"{BULK_ORDERS_PER_OWNER} orders per extra owner"
     )
     log("")
 
@@ -330,17 +353,39 @@ def main() -> None:
     # Additional owners — more kitchens for nearby density
     log("")
     log("Extra owners for nearby search diversity:")
-    for idx, owner in enumerate(EXTRA_OWNERS[:BULK_OWNERS]):
+    seeded_owners: list[tuple[dict, list[dict]]] = []
+    for idx, owner in enumerate(EXTRA_OWNERS[:owner_count]):
         ensure_owner(owner["phone"], owner["name"], owner["email"])
         token = login_owner(owner["phone_e164"], DEMO_OTP)
         specs = owner_kitchen_specs(idx + 1, BULK_KITCHENS_PER_OWNER, owner["name"])
         kitchens = ensure_kitchens_for_owner(token, specs)
+        owner_primary_dishes: dict[str, str] = {}
         for j, k in enumerate(kitchens):
             chunk = all_dishes[(idx * 5 + j * 3) : (idx * 5 + j * 3) + BULK_DISHES_PER_KITCHEN]
             if not chunk:
                 chunk = subset
-            ensure_dishes(token, k["id"], chunk, limit=BULK_DISHES_PER_KITCHEN)
-        log(f"  {owner['name']}: {len(kitchens)} kitchen(s)")
+            dish_ids = ensure_dishes(token, k["id"], chunk, limit=BULK_DISHES_PER_KITCHEN)
+            if j == 0:
+                owner_primary_dishes = dish_ids
+
+        owner_primary = kitchens[0]
+        created_orders = ensure_orders(
+            token,
+            owner_primary["id"],
+            owner_primary_dishes,
+            BULK_ORDERS_PER_OWNER,
+        )
+        created_drafts = ensure_drafts(
+            token,
+            owner_primary["id"],
+            BULK_DRAFTS_PER_OWNER,
+        )
+        backdate_orders(owner_primary["id"])
+        seeded_owners.append((owner, kitchens))
+        log(
+            f"  {owner['name']}: {len(kitchens)} kitchen(s), "
+            f"{created_orders} new orders, {created_drafts} new drafts"
+        )
 
     # Summary
     nearby = request(
@@ -359,9 +404,11 @@ def main() -> None:
     log(f"  Primary orders:         {orders_final.get('total', 0)}")
     log(f"  Primary drafts:         {drafts_final.get('total', 0)}")
     log("")
-    log("Demo login (kitchen app http://localhost:13002)")
-    log(f"  Phone: {DEMO_OWNER['phone']}  OTP: {DEMO_OTP}")
-    log(f"  Kitchen: {primary['code']} — {primary['name']}")
+    log("Owner logins (kitchen app http://localhost:13002)")
+    log(f"  {DEMO_OWNER['phone']} / {DEMO_OTP} — {DEMO_OWNER['name']} ({primary['code']})")
+    for owner, kitchens in seeded_owners:
+        kitchen = kitchens[0]
+        log(f"  {owner['phone']} / {DEMO_OTP} — {owner['name']} ({kitchen['code']})")
     log("")
     log("Customer app: http://localhost:13001  (#nearby for kitchen list)")
 

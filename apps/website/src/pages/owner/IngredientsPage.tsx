@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
-import { Link, useSearchParams } from "react-router-dom";
+import { useSearchParams } from "react-router-dom";
 import { LiveCapturePhotoField } from "../../components/LiveCapturePhotoField";
 import { RichTextEditor } from "../../components/RichTextEditor";
+import { OwnerPageShell, OwnerPanel } from "../../components/owner/OwnerPageShell";
 import {
   adjustIngredientStock,
   createIngredient,
@@ -217,24 +218,18 @@ export function IngredientsPage() {
   if (!kitchen) return null;
 
   return (
-    <div className="owner-page">
-      <header className="owner-page__head">
-        <div>
-          <h1>Ingredient mapper</h1>
-          <p className="owner-page__code">
-            Recipe standards, prep steps with photos, and stock tracking (F19)
-          </p>
-        </div>
-      </header>
-
-      {error && <p className="owner-error">{error}</p>}
-      {savedMsg && <p className="owner-success">{savedMsg}</p>}
+    <OwnerPageShell
+      eyebrow="Operations"
+      title="Ingredient mapper"
+      description="Recipe standards, prep steps with photos, and stock tracking (F19)"
+    >
+      {error && <p className="form-error">{error}</p>}
+      {savedMsg && <div className="auth-card__success">{savedMsg}</div>}
       {loading ? (
-        <p>Loading pantry…</p>
+        <div className="app-loading">Loading pantry…</div>
       ) : (
         <>
-          <section className="glass owner-section">
-            <h2>Pantry stock</h2>
+          <OwnerPanel title="Pantry stock" description="Track ingredients and low-stock alerts">
             <form className="owner-form owner-form--grid" onSubmit={onAddIngredient}>
               <label>
                 Name
@@ -270,7 +265,7 @@ export function IngredientsPage() {
               </div>
             </form>
 
-            <div className="owner-table-wrap">
+            <div className="owner-table-wrap dash-card">
               <table className="owner-table">
                 <thead>
                   <tr>
@@ -311,10 +306,9 @@ export function IngredientsPage() {
                 </tbody>
               </table>
             </div>
-          </section>
+          </OwnerPanel>
 
-          <section className="glass owner-section">
-            <h2>Dish recipe &amp; prep</h2>
+          <OwnerPanel title="Dish recipe & prep" description="Standard portions and preparation steps">
             <label>
               Dish
               <select value={selectedDishId} onChange={(e) => setSelectedDishId(e.target.value)}>
@@ -507,6 +501,8 @@ export function IngredientsPage() {
                             return { ...prev, prep_steps };
                           });
                         }}
+                        kitchenId={kitchen.id}
+                        uploadContext="prep_step"
                         placeholder="Describe this step — quality notes, temperature, timing…"
                       />
                       <LiveCapturePhotoField
@@ -537,9 +533,9 @@ export function IngredientsPage() {
                 </div>
               </>
             )}
-          </section>
+          </OwnerPanel>
         </>
       )}
-    </div>
+    </OwnerPageShell>
   );
 }

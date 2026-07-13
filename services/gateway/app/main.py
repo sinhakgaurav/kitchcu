@@ -18,6 +18,7 @@ IDENTITY_PREFIXES = ("/api/v1/auth", "/api/v1/owners", "/api/v1/admin", "/api/v1
 CATALOG_PATH_MARKERS = ("/categories", "/menu", "/dishes", "/cuisines", "/ingredients", "/media")
 ORDER_PATH_MARKERS = ("/orders", "/analytics")
 MARKETING_PATH_MARKERS = ("/crm", "/coupons", "/promotions")
+GST_PATH_MARKERS = ("/gst",)
 RATINGS_PATH_MARKERS = ("/ratings", "/suggestions")
 GROWTH_PATH_MARKERS = ("/growth",)
 LEARNING_PATH_MARKERS = ("/learning",)
@@ -70,6 +71,8 @@ def resolve_service_url(path: str) -> str | None:
             return settings.order_service_url
         if any(marker in path for marker in MARKETING_PATH_MARKERS):
             return settings.marketing_service_url
+        if any(marker in path for marker in GST_PATH_MARKERS):
+            return settings.billing_service_url
         if any(marker in path for marker in CATALOG_PATH_MARKERS):
             return settings.catalog_service_url
         return settings.identity_service_url
@@ -108,7 +111,7 @@ async def lifespan(app: FastAPI):
     http_clients = {
         "identity": httpx.AsyncClient(base_url=settings.identity_service_url, timeout=httpx.Timeout(10.0, connect=5.0)),
         "catalog": httpx.AsyncClient(base_url=settings.catalog_service_url, timeout=httpx.Timeout(10.0, connect=5.0)),
-        "order": httpx.AsyncClient(base_url=settings.order_service_url, timeout=httpx.Timeout(10.0, connect=5.0)),
+        "order": httpx.AsyncClient(base_url=settings.order_service_url, timeout=httpx.Timeout(30.0, connect=5.0)),
         "billing": httpx.AsyncClient(base_url=settings.billing_service_url, timeout=httpx.Timeout(10.0, connect=5.0)),
         "notification": httpx.AsyncClient(base_url=settings.notification_service_url, timeout=httpx.Timeout(10.0, connect=5.0)),
         "marketing": httpx.AsyncClient(base_url=settings.marketing_service_url, timeout=httpx.Timeout(10.0, connect=5.0)),

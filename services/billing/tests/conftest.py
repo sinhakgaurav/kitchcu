@@ -50,6 +50,9 @@ def _truncate_all() -> None:
     conn = psycopg2.connect(SYNC_DB_URL)
     conn.autocommit = True
     with conn.cursor() as cur:
+        cur.execute("TRUNCATE TABLE ckac_billing.gst_monthly_audits CASCADE")
+        cur.execute("TRUNCATE TABLE ckac_billing.gst_tax_invoices CASCADE")
+        cur.execute("TRUNCATE TABLE ckac_billing.kitchen_gst_profiles CASCADE")
         cur.execute("TRUNCATE TABLE ckac_billing.settlements CASCADE")
         cur.execute("TRUNCATE TABLE ckac_billing.payments CASCADE")
         cur.execute("TRUNCATE TABLE ckac_billing.owner_subscriptions CASCADE")
@@ -73,6 +76,7 @@ async def _flush_billing_streams() -> None:
             "ckac:billing:payment",
             "ckac:billing:subscription",
             "ckac:billing:settlement",
+            "ckac:billing:gst",
         )
     finally:
         await client.aclose()
@@ -133,6 +137,24 @@ def _seed_owner_with_order(
         )
     conn.close()
     return owner_id, kitchen_id, order_id, code, _make_token(owner_id)
+
+
+def _mark_order_delivered(order_id: uuid.UUID) -> None:
+    conn = psycopg2.connect(SYNC_DB_URL)
+    conn.autocommit = True
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            UPDATE ckac_orders.orders
+            SET status = 'delivered', updated_at = NOW()
+            WHERE id = %s::uuid
+            """,
+            (str(order_id),),
+        )
+    conn.close()
+
+
+VALID_GSTIN = "27AABCU9603R1ZM"
 
 
 @pytest.fixture(autouse=True)

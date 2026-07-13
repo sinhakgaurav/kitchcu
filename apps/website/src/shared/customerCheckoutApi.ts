@@ -113,3 +113,39 @@ export async function captureCustomerPayment(paymentId: string): Promise<Payment
     method: "POST",
   });
 }
+
+async function downloadCustomerPdf(path: string, filename: string): Promise<void> {
+  const token = getCustomerToken();
+  if (!token) throw new Error("Sign in required");
+  const res = await fetch(path, { headers: { Authorization: `Bearer ${token}` } });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    const detail = typeof body.detail === "string" ? body.detail : "Could not download bill";
+    throw new Error(detail);
+  }
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = filename;
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  URL.revokeObjectURL(url);
+}
+
+export function downloadCustomerOrderBillPdf(orderId: string, orderCode: string): Promise<void> {
+  const safe = orderCode.replace(/[^\w.-]+/g, "_");
+  return downloadCustomerPdf(`/api/v1/customers/me/orders/${orderId}/bill.pdf`, `${safe}.pdf`);
+}
+
+export function downloadCustomerMasterBillPdf(
+  masterOrderId: string,
+  masterOrderCode: string,
+): Promise<void> {
+  const safe = masterOrderCode.replace(/[^\w.-]+/g, "_");
+  return downloadCustomerPdf(
+    `/api/v1/customers/me/master-orders/${masterOrderId}/bill.pdf`,
+    `${safe}.pdf`,
+  );
+}

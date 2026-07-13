@@ -1,0 +1,278 @@
+/* KitchCu owner dashboard — unified fields, tabs, responsive controls */
+
+:root {
+  --kc-field-h: 3rem;
+  --kc-field-radius: 12px;
+  --kc-field-bg: var(--dark-3);
+  --kc-field-border: rgba(255, 255, 255, 0.12);
+  --kc-field-border-focus: rgba(230, 81, 0, 0.55);
+  --kc-field-shadow-focus: 0 0 0 3px rgba(230, 81, 0, 0.15);
+}
+
+/* ── Text inputs, selects, textareas ─────────────────────── */
+
+.kc-input,
+.kc-select,
+.kc-textarea,
+.owner-form input:not([type="checkbox"]):not([type="radio"]):not([type="file"]),
+.owner-form select,
+.owner-form textarea,
+.od-orders__parse textarea,
+.owner-parse textarea,
+.owner-cancel input,
+.auth-card input,
+.auth-card textarea,
+.auth-card select,
+.admin-tickets__filters select,
+.admin-tickets__actions select,
+.admin-tickets__reply textarea,
+.owner-app__kitchen-select {
+  display: block;
+  width: 100%;
+  min-height: var(--kc-field-h);
+  padding: 0.75rem 1rem;
+  border-radius: var(--kc-field-radius);
+  border: 1px solid var(--kc-field-border);
+  background: var(--kc-field-bg);
+  color: var(--text);
+  font-family: var(--font-body);
+  font-size: 1rem;
+  line-height: 1.4;
+  transition: border-color 0.2s, box-shadow 0.2s, background 0.2s;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.kc-textarea,
+.owner-form textarea,
+.od-orders__parse textarea,
+.owner-parse textarea,
+.admin-tickets__reply textarea {
+  min-height: 7rem;
+  resize: vertical;
+  padding-top: 0.85rem;
+  padding-bottom: 0.85rem;
+}
+
+.kc-select,
+.owner-form select,
+.admin-tickets__filters select,
+.admin-tickets__actions select,
+.owner-app__kitchen-select {
+  padding-right: 2.5rem;
+  cursor: pointer;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  overflow: hidden;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%239ca3af' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.85rem center;
+  background-size: 1rem;
+}
+
+.kc-input::placeholder,
+.kc-textarea::placeholder,
+.owner-form input::placeholder,
+.owner-form textarea::placeholder,
+.od-orders__parse textarea::placeholder {
+  color: rgba(156, 163, 175, 0.75);
+}
+
+.kc-input:hover,
+.kc-select:hover,
+.kc-textarea:hover,
+.owner-form input:hover,
+.owner-form select:hover,
+.owner-form textarea:hover,
+.od-orders__parse textarea:hover,
+.owner-app__kitchen-select:hover {
+  border-color: rgba(255, 255, 255, 0.2);
+  background: #1e1e2a;
+}
+
+.kc-input:focus,
+.kc-select:focus,
+.kc-textarea:focus,
+.owner-form input:focus,
+.owner-form select:focus,
+.owner-form textarea:focus,
+.od-orders__parse textarea:focus,
+.owner-cancel input:focus,
+.auth-card input:focus,
+.auth-card textarea:focus,
+.admin-tickets__filters select:focus,
+.admin-tickets__actions select:focus,
+.admin-tickets__reply textarea:focus,
+.owner-app__kitchen-select:focus {
+  outline: none;
+  border-color: var(--kc-field-border-focus);
+  box-shadow: var(--kc-field-shadow-focus);
+  background: #1a1a28;
+}
+
+.kc-input:disabled,
+.kc-select:disabled,
+.kc-textarea:disabled,
+.owner-form input:disabled,
+.owner-form select:disabled,
+.owner-form textarea:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+/* ── Field wrapper (label + hint) ────────────────────────── */
+
+.kc-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  margin-bottom: 1rem;
+}
+
+.kc-field__label,
+.owner-form label,
+.auth-card label {
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--text-muted);
+  margin-bottom: 0 !important;
+}
+
+.kc-field__hint {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  line-height: 1.4;
+}
+
+.kc-field--row {
+  flex-direction: row;
+  align-items: flex-end;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.kc-field--row .kc-input,
+.kc-field--row .kc-select {
+  flex: 1;
+  min-width: 10rem;
+}
+
+/* ── Segmented tabs (orders, reports) ───────────────────── */
+
+.kc-tabs,
+.owner-tabs {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 0.5rem;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  padding-bottom: 0.15rem;
+  margin-bottom: 1rem;
+}
+
+.kc-tabs::-webkit-scrollbar,
+.owner-tabs::-webkit-scrollbar {
+  display: none;
+}
+
+.kc-tabs button,
+.owner-tabs button {
+  flex-shrink: 0;
+  min-height: 2.75rem;
+  padding: 0.55rem 1.1rem;
+  border-radius: 999px;
+  border: 1px solid var(--surface-border);
+  background: rgba(0, 0, 0, 0.25);
+  color: var(--text-muted);
+  font-family: var(--font-body);
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.2s, color 0.2s, border-color 0.2s;
+}
+
+.kc-tabs button:hover,
+.owner-tabs button:hover {
+  border-color: rgba(255, 255, 255, 0.18);
+  color: var(--text);
+}
+
+.kc-tabs button.active,
+.owner-tabs button.active {
+  background: rgba(230, 81, 0, 0.18);
+  border-color: rgba(230, 81, 0, 0.45);
+  color: var(--orange-light);
+  font-weight: 600;
+}
+
+.kc-tabs button:disabled,
+.owner-tabs button:disabled {
+  opacity: 0.5;
+  cursor: wait;
+}
+
+/* ── Action bar (stack buttons on narrow screens) ────────── */
+
+.kc-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+  align-items: center;
+}
+
+.kc-actions .btn {
+  min-height: 2.75rem;
+}
+
+@media (max-width: 540px) {
+  .kc-actions--stack-sm {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .kc-actions--stack-sm .btn {
+    width: 100%;
+  }
+}
+
+/* ── Read-only code / copy field ─────────────────────────── */
+
+.kc-copy-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+}
+
+@media (min-width: 541px) {
+  .kc-copy-field {
+    flex-direction: row;
+    align-items: stretch;
+  }
+}
+
+.kc-copy-field code,
+.owner-share__row code {
+  flex: 1;
+  min-width: 0;
+  display: block;
+  padding: 0.85rem 1rem;
+  border-radius: var(--kc-field-radius);
+  border: 1px solid var(--surface-border);
+  background: rgba(0, 0, 0, 0.35);
+  font-size: 0.8rem;
+  line-height: 1.45;
+  word-break: break-all;
+  color: var(--teal-light);
+}
+
+.kc-copy-field .btn {
+  flex-shrink: 0;
+}
+
+/* Sidebar kitchen picker — slightly smaller so long names fit */
+.owner-app__kitchen-field .owner-app__kitchen-select {
+  font-size: 0.875rem;
+}

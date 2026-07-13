@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { OwnerEmpty, OwnerPageShell, OwnerPanel } from "../../components/owner/OwnerPageShell";
 import {
   createCoupon,
   createPromotion,
@@ -119,21 +120,17 @@ export function CouponsPage() {
   if (!kitchen) return null;
 
   return (
-    <div className="owner-page">
-      <header className="owner-page__head">
-        <div>
-          <h1>Coupons & promotions</h1>
-          <p className="owner-page__code">Share codes on WhatsApp or run targeted dish pricing</p>
-        </div>
-      </header>
-
+    <OwnerPageShell
+      eyebrow="Marketing"
+      title="Coupons & promotions"
+      description="Share codes on WhatsApp or run targeted dish pricing"
+    >
       {error && <p className="form-error">{error}</p>}
       {loading ? (
-        <div className="app-loading">Loading...</div>
+        <div className="app-loading">Loading…</div>
       ) : (
         <>
-          <section className="owner-card">
-            <h2>New coupon</h2>
+          <OwnerPanel title="New coupon" description="Create a code customers can apply at checkout">
             <form className="owner-form owner-form--inline" onSubmit={addCoupon}>
               <input
                 className="owner-input"
@@ -168,12 +165,11 @@ export function CouponsPage() {
                 Create
               </button>
             </form>
-          </section>
+          </OwnerPanel>
 
-          <section className="owner-card">
-            <h2>Active coupons</h2>
+          <OwnerPanel title="Active coupons">
             {coupons.length === 0 ? (
-              <p className="owner-empty">No coupons yet.</p>
+              <OwnerEmpty message="No coupons yet — create one above to share on WhatsApp." />
             ) : (
               <ul className="owner-list">
                 {coupons.map((c) => (
@@ -198,10 +194,12 @@ export function CouponsPage() {
                 ))}
               </ul>
             )}
-          </section>
+          </OwnerPanel>
 
-          <section className="owner-card">
-            <h2>Targeted promotion (F38)</h2>
+          <OwnerPanel
+            title="Targeted promotion"
+            description="Special pricing for a customer segment (F38)"
+          >
             <form className="owner-form" onSubmit={addPromotion}>
               <input
                 className="owner-input"
@@ -260,7 +258,11 @@ export function CouponsPage() {
                 onChange={(e) => setPromoDays(Number(e.target.value))}
                 placeholder="Days"
               />
-              <button type="submit" className="btn btn--primary" disabled={busy || dishes.length === 0}>
+              <button
+                type="submit"
+                className="btn btn--primary"
+                disabled={busy || dishes.length === 0}
+              >
                 Launch promotion
               </button>
             </form>
@@ -276,9 +278,9 @@ export function CouponsPage() {
                 ))}
               </ul>
             )}
-          </section>
+          </OwnerPanel>
         </>
       )}
-    </div>
+    </OwnerPageShell>
   );
 }

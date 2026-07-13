@@ -157,21 +157,27 @@ class GuidePDF(FPDF):
             self.multi_cell(165, 5, ascii_safe(item))
         self.ln(2)
 
-    def mono(self, text: str, size: int = 7):
-        if self.get_y() > 230:
-            self.add_page()
-        y = self.get_y()
+    def mono(self, text: str, size: int = 7, max_lines: int = 36, line_h: float = 3.5):
+        """Render monospaced diagram/code block. Splits across pages if tall."""
         lines = ascii_safe(text.strip()).split("\n")
-        h = min(len(lines) * 3.8 + 5, 85)
-        self.set_fill_color(*LIGHT_BG)
-        self.rect(20, y, 170, h, "F")
-        self.set_xy(22, y + 2)
-        self.set_font("Courier", "", size)
-        self.set_text_color(*DARK)
-        for line in lines[:22]:
-            self.cell(166, 3.8, line[:98])
-            self.ln(3.8)
-        self.set_y(y + h + 2)
+        remaining = lines
+        while remaining:
+            if self.get_y() > 250:
+                self.add_page()
+            avail = min(max_lines, max(8, int((275 - self.get_y()) / line_h) - 1))
+            chunk = remaining[:avail]
+            remaining = remaining[avail:]
+            y = self.get_y()
+            h = len(chunk) * line_h + 5
+            self.set_fill_color(*LIGHT_BG)
+            self.rect(20, y, 170, h, "F")
+            self.set_xy(22, y + 2)
+            self.set_font("Courier", "", size)
+            self.set_text_color(*DARK)
+            for line in chunk:
+                self.cell(166, line_h, line[:100])
+                self.ln(line_h)
+            self.set_y(y + h + 2)
 
     def table(
         self,

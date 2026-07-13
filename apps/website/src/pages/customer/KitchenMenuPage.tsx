@@ -1,7 +1,10 @@
 import { Link, useParams } from "react-router-dom";
 import { useEffect, useState } from "react";
-import { fetchMenu, type CuisineMenuGroup, type Dish, type Menu } from "../../shared/api";
-import { fetchKitchenRatingSummaries, type DishRatingSummary } from "../../shared/customerRatingsApi";import { addToCart, cartItemCount, getCart } from "../../shared/customerCart";
+import { RichHtml } from "../../components/RichTextEditor";
+import type { CuisineMenuGroup, Dish, Menu } from "../../shared/api";
+import { fetchKitchenRatingSummaries, type DishRatingSummary } from "../../shared/customerRatingsApi";
+import { fetchPublicMenu } from "../../shared/publicApi";
+import { addToCart, cartItemCount, getCart } from "../../shared/customerCart";
 import { getCustomerSession } from "../../shared/customerSession";
 
 const DIET_LABELS: Record<string, string> = {
@@ -22,9 +25,11 @@ export function KitchenMenuPage() {
 
   useEffect(() => {
     if (!kitchenId) return;
-    fetchMenu(kitchenId)
+    fetchPublicMenu(kitchenId)
       .then(setMenu)
-      .catch(() => setError("Menu not available for this kitchen."));
+      .catch((err) =>
+        setError(err instanceof Error ? err.message : "Menu not available for this kitchen."),
+      );
     fetchKitchenRatingSummaries(kitchenId)
       .then(({ summaries }) => {
         const map: Record<string, DishRatingSummary> = {};
@@ -169,9 +174,12 @@ function DishCard({
             ★ {summary.overall_rating.toFixed(1)} home taste · {summary.rating_count} rating
             {summary.rating_count === 1 ? "" : "s"}
           </p>
-        )}        {dish.description && <p>{dish.description}</p>}
+        )}
+        {dish.description && <RichHtml html={dish.description} />}
         {hero?.is_live_capture && <span className="live-badge">Live capture</span>}
-        {dish.ingredients_description && <small>{dish.ingredients_description}</small>}
+        {dish.ingredients_description && (
+          <RichHtml html={dish.ingredients_description} className="customer-dish__ingredients" />
+        )}
         <button type="button" className="btn btn--ghost btn--sm customer-dish__add" onClick={onAdd}>
           Add to cart
         </button>

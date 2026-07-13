@@ -1,5 +1,5 @@
 import { FormEvent, useState } from "react";
-import { Link, Navigate, useNavigate } from "react-router-dom";
+import { Link, Navigate, useNavigate, useSearchParams } from "react-router-dom";
 import { AnimatedMesh } from "../components/AnimatedMesh";
 import { images } from "../data/content";
 import { DEMO } from "../shared/demo";
@@ -13,6 +13,9 @@ type Mode = "login" | "register";
 export function LoginPage() {
   const { token, login } = useKitchenAuth();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const sessionExpired = searchParams.get("session") === "expired";
+  const nextPath = searchParams.get("next") || "/dashboard";
   const [mode, setMode] = useState<Mode>("login");
   const [phone, setPhone] = useState("");
   const [name, setName] = useState("");
@@ -22,7 +25,7 @@ export function LoginPage() {
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
 
-  if (token) return <Navigate to="/dashboard" replace />;
+  if (token) return <Navigate to={nextPath.startsWith("/") ? nextPath : "/dashboard"} replace />;
 
   const handleRegister = async (e: FormEvent) => {
     e.preventDefault();
@@ -61,7 +64,7 @@ export function LoginPage() {
     try {
       const { access_token } = await verifyOtp(phone, otp);
       await login(access_token);
-      navigate("/dashboard");
+      navigate(nextPath.startsWith("/") ? nextPath : "/dashboard");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Invalid OTP");
     } finally {
@@ -80,7 +83,7 @@ export function LoginPage() {
       setOtpSent(true);
       const { access_token } = await verifyOtp(DEMO.phone, DEMO.otp);
       await login(access_token);
-      navigate("/dashboard");
+      navigate(nextPath.startsWith("/") ? nextPath : "/dashboard");
     } catch (err) {
       setError(
         err instanceof Error
@@ -144,6 +147,12 @@ export function LoginPage() {
               Register
             </button>
           </div>
+
+          {sessionExpired && (
+            <div className="auth-card__hint auth-card__error">
+              Your session expired. Sign in again to view reports and dashboard data.
+            </div>
+          )}
 
           {error && <div className="auth-card__error">{error}</div>}
 

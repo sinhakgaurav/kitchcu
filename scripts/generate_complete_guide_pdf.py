@@ -1,12 +1,11 @@
 #!/usr/bin/env python3
-"""Generate Kitchcu Complete Executive Guide PDF — CEO + CPO + CTO."""
+"""Generate Kitchcu Complete Executive Guide PDF v2.0 — CEO + CPO + CTO."""
 
 from pathlib import Path
 
-from pdf_common import DARK, GRAY, ORANGE
 from pdf_guide import GuidePDF
 
-GUIDE_VERSION = "1.1"
+GUIDE_VERSION = "2.0"
 GUIDE_DATE = "July 2026"
 OUTPUT = Path(__file__).resolve().parent.parent / "docs" / "CKAC-COMPLETE-GUIDE.pdf"
 
@@ -22,547 +21,522 @@ def build() -> GuidePDF:
         subtitle="Complete Executive Guide — CEO, CPO & CTO",
         audience="Audience: CEO, CPO, CTO, Product, Engineering, Investors",
         lenses=[
-            "CEO — vision, market, business model, GTM, metrics, risks",
-            "CPO — personas, pains, 48 features, modules, flows, KPIs",
-            "CTO — architecture, services, DB, events, APIs, build status",
+            "CEO — positioning, subscription economics, risks, current platform scale",
+            "CPO — every module defined with challenges solved + journeys + KPIs",
+            "CTO — architecture, event/data flows, logical ER, APIs, security",
         ],
         bullets=[
-            "Full strategic positioning vs food aggregators and POS systems",
-            "48-feature catalog with implementation status (Sprints S1-S4 backend complete)",
-            "Owner and customer pain points mapped to modules and live code",
-            "Event-driven microservices, outbox pattern, and API reference",
-            "Subscription tiers, unit economics, and development phases",
-            "90+ automated tests; PWAs on customer.kitchcu.in / kitchen.kitchcu.in / admin.kitchcu.in",
-            "Marketing portal with parallax UI, AI support chat, and admin ticketing",
+            "18 product modules (Gateway through Live Stream + GST + Quality Loop design)",
+            "Sprints S1-S18 shipped: microservices, PWAs, billing, GST, ratings, growth",
+            "Challenge map: owner P1-P12 and customer C1-C6 mapped to modules",
+            "CTO diagrams: system architecture, order/payment/GST/quality flows, ER",
+            "Zero per-order food commission; owner-owned CRM; live-capture truth",
+            "Next: E1 purchase inventory + E2 chef standard lock (design pack ready)",
         ],
     )
 
     pdf.toc([
         ("PART I — CEO Lens", [
-            "1. Executive Summary",
-            "2. Market & Strategic Positioning",
-            "3. Business Model & Unit Economics",
-            "4. Go-to-Market & Development Phases",
-            "5. North-Star Metrics & Investment Thesis",
-            "6. Risks & Mitigations",
+            "1. Executive Summary & Current State",
+            "2. Market Positioning & Business Model",
+            "3. Go-to-Market Phases & Risks",
         ]),
         ("PART II — CPO Lens", [
-            "7. Product Vision & Personas",
-            "8. Pain Points to Solutions",
-            "9. Platform Modules & Feature Catalog",
-            "10. Application Flows",
-            "11. Product Principles & KPIs",
+            "4. Vision, Personas & Principles",
+            "5. Challenges to Module Solutions",
+            "6. Module Catalog (full definitions)",
+            "7. Product Journeys & Capability Ladder",
+            "8. Product KPIs",
         ]),
         ("PART III — CTO Lens", [
-            "12. Architecture Overview",
-            "13. Services, Events & Data Flow",
-            "14. Database & Caching",
-            "15. API Reference & Security",
-            "16. Build Status & Engineering Standards",
+            "9. System Architecture Diagram",
+            "10. Event & Data Flow Diagrams",
+            "11. Logical ER / Schema Diagram",
+            "12. Services, APIs, Security & Standards",
+            "13. Build Status Matrix",
         ]),
         ("Appendices", [
-            "A. Feature Implementation Matrix",
-            "B. Document Index",
+            "A. Feature bands F01-F48",
+            "B. Document index",
         ]),
     ])
 
     # ── PART I: CEO ──────────────────────────────────────────────────────
     pdf.lens_part("CEO", 1, "Executive Strategy")
 
-    pdf.chapter("Executive Summary")
+    pdf.chapter("Executive Summary & Current State")
     pdf.body(
-        "Kitchcu is a B2B2C cloud kitchen operating system — not a food aggregator. "
-        "It gives kitchen owners full control over orders, quality, marketing, and "
-        "customer relationships while giving diners real-time transparency into their food."
+        "Kitchcu is a B2B2C cloud kitchen operating system — not a food aggregator "
+        "and not a restaurant POS. Owners run orders, menu, quality, CRM, payments, "
+        "GST, and growth from one PWA. Customers get live-capture honesty, fair fees, "
+        "home-taste ratings, and multi-kitchen checkout without surrendering ownership "
+        "or paying per-order commission."
     )
     pdf.table(
-        ["Stakeholder", "Pain Today", "Kitchcu Answer"],
+        ["Stakeholder", "Challenge", "Kitchcu answer"],
         [
-            ["Owner", "WhatsApp chaos, commissions", "Unified hub, zero commission"],
-            ["Customer", "Stock photos, opaque delivery", "Live-capture, fair fees"],
-            ["Market", "No quality benchmark", "Chef rankings (Phase 3)"],
+            ["Owner/chef", "WhatsApp chaos, commissions", "Unified hub + subscription SaaS"],
+            ["Customer", "Fake photos, opaque fees", "Live media + fee quotes + tracking"],
+            ["Platform", "Capital-efficient SaaS", "PWA-first event-driven services"],
         ],
-        [28, 58, 84],
+        [32, 58, 80],
         size=7,
     )
     pdf.quote(
-        "Keep the product simple for the owner on day one. "
-        "First WhatsApp order in under 5 minutes of onboarding."
+        "Keep day-one simple: accept an order and see revenue in minutes. "
+        "Growth layers unlock after traction."
     )
+    pdf.stat_boxes([
+        ("Sprints shipped", "S1-S18"),
+        ("Domain services", "13"),
+        ("GST finance", "Live"),
+        ("E1/E2 quality loop", "Design"),
+    ])
 
-    pdf.chapter("Market & Strategic Positioning")
+    pdf.chapter("Market Positioning & Business Model")
     pdf.mono(
-        "Aggregators          vs    Kitchcu\n"
-        "Per-order commission       Monthly subscription\n"
-        "Platform owns customer     Owner owns CRM\n"
-        "Stock photos               Live-capture media\n"
-        "Speed-first delivery       Quality-first SLA\n"
-        "Single kitchen per cart    Multi-kitchen cart"
+        "Aggregators (marketplace)          Kitchcu (operating system)\n"
+        "-------------------------          -------------------------\n"
+        "Per-order commission 18-30%        Flat subscription\n"
+        "Platform owns the customer         Owner owns CRM + data\n"
+        "Stock / studio photos              Live-capture dish media\n"
+        "Speed race delivery timers         Owner-set quality SLA\n"
+        "Single kitchen cart                Multi-kitchen master checkout\n"
+        "No GST / quality OS                GST + ingredients + standards"
     )
-    pdf.body(
-        "Competitive moat: WhatsApp-native ops + live-capture integrity + "
-        "owner-owned CRM + quality-first lifecycle."
-    )
-
-    pdf.chapter("Business Model & Unit Economics")
+    pdf.body("Non-negotiable: zero per-order food commission. Kitchen keeps food revenue.")
     pdf.table(
-        ["Tier", "Monthly", "Includes"],
+        ["Tier", "Monthly", "Role"],
         [
-            ["Starter", "Rs 499", "1 kitchen, WhatsApp, basic reports"],
-            ["Pro", "Rs 1,499", "CRM, coupons, tiffin, marketing"],
-            ["Enterprise", "Rs 3,999", "Live stream, API, branches"],
+            ["Starter", "Rs 499", "Operations + basic reports"],
+            ["Growth", "Rs 999", "CRM, coupons, deeper insight"],
+            ["Pro", "Rs 1,999", "Multi-kitchen, priority support"],
         ],
-        [35, 30, 105],
+        [40, 35, 95],
         size=8,
     )
-    pdf.body("Zero per-order food commission. Kitchen keeps 100% of food revenue.")
     pdf.table(
-        ["Metric", "Year 1 Goal"],
+        ["Metric", "Year 1 target"],
         [
             ["CAC (owner)", "< Rs 2,000"],
             ["Owner LTV", "> Rs 18,000"],
             ["LTV:CAC", "> 3:1"],
-            ["Gross margin", "> 75%"],
+            ["Gross margin", "> 75% SaaS"],
         ],
         [85, 85],
         size=8,
     )
 
-    pdf.chapter("Go-to-Market & Development Phases")
+    pdf.chapter("Go-to-Market Phases & Risks")
     pdf.table(
-        ["Phase", "Timeline", "Goal"],
+        ["Phase", "Goal", "Status"],
         [
-            ["1 Foundation", "Mo 1-3", "10 pilot kitchens, daily orders"],
-            ["2 Growth", "Mo 4-6", "Customer PWA, CRM, multi-kitchen"],
-            ["3 Differentiation", "Mo 7-10", "Rankings, live stream"],
-            ["4 Scale", "Mo 11-12+", "National platform, white-label"],
+            ["1 Foundation", "Owner runs kitchen end-to-end", "COMPLETE S1-S18"],
+            ["2 Growth polish", "Offline PWA, CRM automation", "Continuous"],
+            ["3 Quality loop", "Purchases + locked chef standards", "Design pack"],
+            ["4 Scale", "National / white-label", "Future"],
         ],
-        [40, 25, 105],
+        [35, 85, 50],
         size=7,
     )
-    pdf.section("Phase 1 Milestones (Current)")
-    pdf.table(
-        ["Milestone", "Deliverable", "Status"],
-        [
-            ["M1.1", "Identity, gateway, Docker", "COMPLETE"],
-            ["M1.2", "Catalog + live photo", "COMPLETE"],
-            ["M1.3", "Order + WhatsApp intake", "COMPLETE"],
-            ["M1.4", "Lifecycle + notifications", "PARTIAL"],
-            ["M1.5", "Owner/customer/admin PWAs + portal", "S5 PARTIAL"],
-            ["M1.6", "Razorpay billing", "S6"],
-        ],
-        [22, 88, 60],
-        size=7,
-    )
-
-    pdf.chapter("North-Star Metrics & Investment Thesis")
-    pdf.bullets([
-        "Owner GMV managed on platform (primary north star)",
-        "Repeat order rate (customer loyalty proxy)",
-        "Dish rating consistency (quality standardization)",
-        "Owner NPS (aggregator dependency reduction)",
-    ])
-    pdf.table(
-        ["KPI", "MVP", "12-Month"],
-        [
-            ["Active kitchens", "10", "500"],
-            ["Orders/day", "50", "5,000"],
-            ["Owner retention", "80%", "90%"],
-            ["Repeat rate (30d)", "25%", "40%"],
-        ],
-        [55, 55, 60],
-        size=8,
-    )
-    pdf.body(
-        "Investment thesis: Kitchcu captures the operating system layer for India's "
-        "cloud kitchens — subscription SaaS with zero food commission. Phase 1 "
-        "proves order throughput; Phase 2 unlocks customer network effects; "
-        "Phase 3 builds community moats. Capital-efficient PWA-first approach."
-    )
-
-    pdf.chapter("Risks & Mitigations")
     pdf.table(
         ["Risk", "Mitigation"],
         [
-            ["WhatsApp API changes", "Manual input always available"],
-            ["Live stream complexity", "Managed provider; opt-in only"],
-            ["Multi-kitchen disputes", "Per-kitchen sub-order IDs"],
-            ["Scope creep", "Strict MoSCoW; Phase 1 sacred"],
-            ["Onboarding friction", "WhatsApp-first; 5-min setup"],
+            ["WhatsApp API change", "Manual + PWA intake always on"],
+            ["Scope creep", "Design pack gate before code"],
+            ["Rating fraud", "Verified purchase only"],
+            ["Multi-kitchen refunds", "Sub-orders + Route settlements"],
+            ["Onboarding friction", "5-min kitchen -> dish -> order"],
         ],
         [55, 115],
         size=7,
     )
 
     # ── PART II: CPO ─────────────────────────────────────────────────────
-    pdf.lens_part("CPO", 2, "Product Depth")
+    pdf.lens_part("CPO", 2, "Product Modules & Challenges")
 
-    pdf.chapter("Product Vision & Personas")
+    pdf.chapter("Vision, Personas & Principles")
     pdf.body(
-        "Empower every cloud kitchen to scale like a brand — with data, quality "
-        "standards, and direct customer relationships — while giving diners honest "
-        "visibility into their food."
+        "Every cloud kitchen scales like a brand — with data, taste standards, and "
+        "direct customers — while diners see honest, real-time food truth."
     )
     pdf.table(
-        ["Persona", "Goals", "Surface"],
+        ["Persona", "Promise", "Surface"],
         [
-            ["Owner/Chef", "Orders, quality, marketing", "kitchen.kitchcu.in PWA"],
-            ["Customer", "Discover, order, rate", "Customer PWA (Ph 2)"],
-            ["Staff", "Lifecycle, inventory", "Staff PWA subset"],
-            ["Admin", "Moderate, support tickets", "admin.kitchcu.in"],
+            ["Owner / Chef", "WhatsApp -> revenue same day", "kitchen.kitchcu.in"],
+            ["Customer", "Trust, fair delivery, rate taste", "customer.kitchcu.in"],
+            ["Admin", "Support + attention queue", "admin.kitchcu.in"],
+            ["Market visitor", "Brand story & signup", "portal kitchcu.in"],
         ],
-        [30, 70, 70],
+        [32, 70, 68],
         size=7,
     )
-    pdf.section("PWA-First Strategy")
     pdf.bullets([
-        "One codebase: Android, iOS, desktop",
-        "WhatsApp links open directly — critical for order capture",
-        "Offline: menu, orders, draft queue via service workers",
-        "Live dish photo via getUserMedia in browser",
-        "Target: Lighthouse PWA score >= 90",
+        "Quality over speed — owner-set prep/delivery windows",
+        "Truth in media — live-capture heroes; no stock photo deception",
+        "Owner owns CRM — spend, coupons, patterns stay with kitchen",
+        "Progressive complexity — hide advanced until traction",
+        "Growth OS, not restaurant POS / dine-in / KDS",
     ])
 
-    pdf.chapter("Pain Points to Solutions")
-    pdf.section("Owner Pains (P1-P8)")
+    pdf.chapter("Challenges to Module Solutions")
+    pdf.section("Owner challenges (P1-P12)")
     pdf.table(
-        ["#", "Pain", "Module", "Status"],
+        ["ID", "Challenge", "Modules"],
         [
-            ["P1", "WhatsApp chaos", "Order+Notify", "Partial"],
-            ["P2", "Aggregator commission", "Billing", "S6"],
-            ["P3", "No profit visibility", "Analytics", "Partial"],
-            ["P4", "Stock photo deception", "Catalog", "Done"],
-            ["P5", "Taste inconsistency", "Catalog", "Partial"],
-            ["P6", "No owner CRM", "Marketing", "Ph 2"],
-            ["P7", "Promotion guesswork", "Growth", "Ph 2"],
-            ["P8", "Multi-channel chaos", "Order", "Partial"],
+            ["P1", "Orders trapped in WhatsApp/calls", "Order + Notification"],
+            ["P2", "Aggregator commission kills margin", "Billing subscription"],
+            ["P3", "No daily revenue / segments", "Analytics + Growth + Reports"],
+            ["P4", "Stock photos erode trust", "Catalog live-capture"],
+            ["P5", "Taste drifts batch to batch", "Recipes + Ratings + E2"],
+            ["P6", "Customer data owned by platforms", "Marketing CRM"],
+            ["P7", "Promotions are guesswork", "Growth + daily menu"],
+            ["P8", "Multi-channel lifecycle chaos", "Order status machine"],
+            ["P9", "Stock unknown mid-service", "Ingredients + E1 purchases"],
+            ["P10", "GST / monthly audit pain", "Billing GST"],
+            ["P11", "Skills & trials hard to run", "Learning + Community"],
+            ["P12", "Trust without ad spend", "Streaming live opt-in"],
         ],
-        [12, 58, 45, 55],
-        size=7,
+        [12, 78, 80],
+        size=6,
     )
-    pdf.section("Customer Pains (C1-C6)")
+    pdf.section("Customer challenges (C1-C6)")
     pdf.table(
-        ["#", "Pain", "Solution", "Status"],
+        ["ID", "Challenge", "Modules"],
         [
-            ["C1", "Untrustworthy photos", "Live-capture media", "Done"],
-            ["C2", "Opaque delivery fees", "PostGIS + rules", "Fields only"],
-            ["C3", "No tracking", "Lifecycle + notify", "Partial"],
-            ["C4", "Generic ratings", "Home-taste score", "Ph 2"],
-            ["C5", "Single-kitchen cart", "Multi-kitchen cart", "Ph 2"],
-            ["C6", "No tiffin", "Meal plans", "Ph 2"],
+            ["C1", "Cannot trust menu photos", "Catalog"],
+            ["C2", "Opaque delivery fees", "Delivery"],
+            ["C3", "Weak tracking", "Order + Notify + Delivery"],
+            ["C4", "Generic star ratings", "Ratings home-taste"],
+            ["C5", "One kitchen per cart", "Master checkout + Billing"],
+            ["C6", "Hard to re-find local kitchens", "Identity nearby discovery"],
         ],
-        [12, 48, 55, 55],
+        [12, 88, 70],
         size=7,
     )
 
-    pdf.chapter("Platform Modules & Feature Catalog")
-    pdf.table(
-        ["Module", "Schema", "Sprint", "Status"],
-        [
-            ["Gateway", "-", "S1", "Live"],
-            ["Identity", "ckac_identity", "S1", "Live"],
-            ["Catalog", "ckac_catalog", "S2", "Live"],
-            ["Order", "ckac_orders", "S3", "Live"],
-            ["Notification", "ckac_support", "S4", "Live"],
-            ["Billing", "ckac_billing", "S6", "Planned"],
-            ["Analytics", "order svc", "S5", "Partial"],
-            ["Marketing", "ckac_marketing", "Ph 2", "Planned"],
-        ],
-        [35, 50, 25, 60],
-        size=7,
+    pdf.chapter("Module Catalog — Definitions & Challenges")
+    pdf.body(
+        "Each module is a bounded product context. Definition = what it is. "
+        "Description = what it does. Challenge = kitchen/customer pain it removes."
     )
-    pdf.section("48 Features by Phase")
+
+    modules = [
+        ("M01 API Gateway", "Public edge for /api/v1.",
+         "Path proxy, CORS, correlation IDs; no business logic.",
+         "Clients never hit internals; unified auth surface."),
+        ("M02 Identity & Kitchen", "Auth + tenant roots.",
+         "Owner OTP/JWT; customer OAuth/OTP; PostGIS kitchens; codes CKPNQ001.",
+         "Onboarding bootstrap; nearby discovery; multi-kitchen ownership."),
+        ("M03 Catalog & Live Media", "Menu of truth.",
+         "Categories, dishes, prices; hero must be live-capture; menu cache.",
+         "Ends stock-photo deception; consistent menus across PWAs."),
+        ("M04 Ingredients & Recipes", "Pantry + dish standards (F19).",
+         "Stock, thresholds, recipe lines, prep steps; deduct on accept.",
+         "Stops mid-service stock outs; foundation for taste standards."),
+        ("M05 Order Operations", "Intake, lifecycle, bills, analytics.",
+         "Manual/WA/PWA; status machine; PDF bills; revenue/peak/segments.",
+         "Single operational truth for chaotic multi-channel demand."),
+        ("M06 Multi-Kitchen Checkout", "One cart, many kitchens (F06).",
+         "Master order + atomic sub-orders + master receipt PDF.",
+         "Removes aggregator-style one-kitchen cart limit without commission."),
+        ("M07 Billing & Settlements", "Money movement.",
+         "Payments, UPI, subscriptions; Route splits (F44).",
+         "Subscription replaces commission; fair multi-kitchen payouts."),
+        ("M08 GST Finance", "Tax profile, invoices, monthly audit.",
+         "GSTIN profiles; sync from delivered orders; balance sheet close.",
+         "Accountant-ready monthly GST for home/cloud kitchens."),
+        ("M09 Notification & Support", "WhatsApp + tickets + tracking nudges.",
+         "Webhook intake; F45 updates; F29 reminders; AI support tickets.",
+         "Closes communication gaps owners cannot staff manually."),
+        ("M10 Marketing & CRM", "Owner-owned relationships.",
+         "Customer spend history, coupons, targeted promotions.",
+         "Recaptures customers aggregators monopolized."),
+        ("M11 Ratings & Tips", "Verified home-taste + F20 tips.",
+         "0.6 taste + 0.4 quality; A/V reviews; owner tip workflow.",
+         "Quality benchmark customers believe; fuel for chef briefs."),
+        ("M12 Growth Intelligence", "Actionable suggestions, not vanity charts.",
+         "Combos, patterns, grow cards, daily menu WhatsApp push.",
+         "Ends promotion guesswork with evidence-backed actions."),
+        ("M13 Delivery & Tracking", "Distance fees + shareable track.",
+         "PostGIS quotes; free/max radius; tracking tokens/links.",
+         "Transparent fees and journey visibility."),
+        ("M14 Learning & Trials", "Skills + controlled experiments.",
+         "Curated learning; dish trials with promote-to-menu path.",
+         "Helps home chefs professionalize without outside help."),
+        ("M15 Community & Rankings", "Recipes + chef leagues.",
+         "Recipe rewards; rankings from quality/activity signals.",
+         "Differentiation and motivation vs pure marketplaces."),
+        ("M16 Live Streaming", "Owner opt-in LiveKit sessions.",
+         "Go-live controls; customer live kitchen filter.",
+         "Trust and engagement without paid advertising."),
+        ("M17 Website PWAs", "Installable surfaces for all personas.",
+         "React+Vite; Workbox; owner command-center UX; maps; RTE.",
+         "App-store-free distribution; WhatsApp-native deep links."),
+        ("M18 Quality Loop E1+E2", "Purchases + lock winning standards.",
+         "Purchase ledger stock-in; chef brief from volume/ratings; lock.",
+         "Closes taste drift + pantry truth as one product loop."),
+    ]
+    for title, definition, description, challenge in modules:
+        pdf.section(title)
+        pdf.bullets([
+            f"Definition: {definition}",
+            f"Description: {description}",
+            f"Challenges solved: {challenge}",
+        ], size=8)
+
+    pdf.chapter("Product Journeys & Capability Ladder")
+    pdf.section("Owner day-1")
+    pdf.mono(
+        "Register -> OTP -> JWT -> Create kitchen (geo + code)\n"
+        "-> Add dish (live hero) -> Optional GST profile\n"
+        "-> First manual / WhatsApp order -> Accept -> Deduct stock\n"
+        "-> Same-day revenue report"
+    )
+    pdf.section("Customer trust -> rate")
+    pdf.mono(
+        "Nearby map -> Menu (live photos) -> Fee quote -> Checkout\n"
+        "-> Pay (single or multi-kitchen) -> Track -> Delivered\n"
+        "-> Home-taste rating (+ optional tip)"
+    )
+    pdf.section("Capability ladder (progressive complexity)")
     pdf.bullets([
-        "Phase 1 (Must): F01-F05, F07, F13-F15, F26, F30, F42-F43, F45",
-        "Phase 2 (Growth): F06, F08-F12, F16-F18, F25, F27-F33, F34-F41, F44",
-        "Phase 3 (Differentiation): F19-F24, F46-F48",
-        "Done: 8 features | Partial: 4 | Total spec: 48",
+        "1. Menu + Orders + Reports",
+        "2. CRM + Coupons + Delivery quotes",
+        "3. Ingredients + GST + Growth suggestions",
+        "4. Learning + Community + Live stream",
+        "5. Quality loop lock (E1 purchases + E2 chef standards)",
     ])
 
-    pdf.chapter("Application Flows")
-    pdf.section("Owner Day-1 Onboarding")
-    pdf.mono(
-        "Register -> OTP -> JWT -> Create kitchen (CKPNQ001)\n"
-        "-> Add dishes (live photo required)\n"
-        "-> Connect WhatsApp -> First order in inbox"
-    )
-    pdf.section("Order Lifecycle (F04)")
-    pdf.mono(
-        "received -> accepted -> preparing -> ready\n"
-        "-> out_for_delivery -> delivered\n"
-        "(cancelled with reason at any stage)"
-    )
-    pdf.section("WhatsApp Order (F01)")
-    pdf.mono(
-        "Meta webhook -> notification (lookup kitchen)\n"
-        "-> whatsapp.message.received event\n"
-        "-> order internal API -> parse -> draft\n"
-        "-> owner confirms -> order.placed"
-    )
-    pdf.section("Multi-Kitchen Checkout (F06, Phase 2)")
-    pdf.mono(
-        "Cart: Kitchen A + Kitchen B items\n"
-        "-> master_orders (1 payment)\n"
-        "-> order A + order B (separate lifecycle)\n"
-        "-> Razorpay Route split settlement"
-    )
-
-    pdf.chapter("Product Principles & KPIs")
-    pdf.bullets([
-        "WhatsApp-native order intake",
-        "Quality over speed — owner-set prep windows",
-        "Trust through media — live capture required",
-        "Owner-owned CRM — customer data belongs to kitchen",
-        "Progressive complexity — MVP first, growth layers later",
-    ])
+    pdf.chapter("Product KPIs")
     pdf.table(
-        ["Metric", "Phase 1 Target"],
+        ["KPI", "Near-term", "12-month"],
         [
-            ["Time to first order", "< 5 min"],
-            ["Owner daily active", "80% paying kitchens"],
-            ["Order capture rate", "95% parsed or manual"],
-            ["Menu trust score", "100% live-capture heroes"],
-            ["Owner retention M6", "80%"],
+            ["Active kitchens", "10 pilots", "500"],
+            ["Platform orders/day", "50", "5,000"],
+            ["Owner monthly retention", "80%", "90%"],
+            ["30-day customer repeat", "25%", "40%"],
+            ["Locked standards / kitchen", "-", ">= 3 post-E2"],
+            ["GST audits closed on time", "-", ">= 80% GST kitchens"],
         ],
-        [85, 85],
-        size=8,
+        [70, 45, 55],
+        size=7,
     )
 
     # ── PART III: CTO ────────────────────────────────────────────────────
-    pdf.lens_part("CTO", 3, "Technical Architecture")
+    pdf.lens_part("CTO", 3, "Architecture, Flows & Data")
 
-    pdf.chapter("Architecture Overview")
-    pdf.mono(
-        "Experience: kitchcu.in portal | customer.kitchcu.in | kitchen.kitchcu.in | admin.kitchcu.in\n"
-        "    |\n"
-        "Edge: API Gateway :18000 (JWT, routing)\n"
-        "    |\n"
-        "Application: identity | catalog | order | notification\n"
-        "    |\n"
-        "Data: PostgreSQL 16 + PostGIS | Redis Streams + cache\n"
-        "    |\n"
-        "Media: MinIO / S3 (live-capture URLs)"
-    )
+    pdf.chapter("System Architecture Diagram")
     pdf.body(
-        "Event-driven microservices on Python 3.12 + FastAPI. "
-        "Schema-per-bounded-context. Transactional outbox on all writes."
+        "Rule: one bounded context per container; cross-service writes via events; "
+        "cross-schema reads only for ownership/evidence; gateway is sole public edge."
     )
-    pdf.table(
-        ["Layer", "Technology"],
-        [
-            ["API", "Python 3.12, FastAPI, Pydantic v2"],
-            ["Database", "PostgreSQL 16 + PostGIS"],
-            ["Events/Cache", "Redis 7 Streams + menu cache 300s"],
-            ["Frontend", "React + Vite + TypeScript PWA"],
-            ["Payments", "Razorpay (S6)"],
-            ["WhatsApp", "Meta Business Cloud API"],
-            ["Infra", "Docker Compose -> Kubernetes"],
-        ],
-        [45, 125],
-        size=8,
-    )
-
-    pdf.chapter("Services, Events & Data Flow")
-    pdf.table(
-        ["Service", "Port", "Key Events"],
-        [
-            ["gateway", "18000", "-"],
-            ["identity", "18001", "kitchen.created"],
-            ["catalog", "18002", "dish.created/updated"],
-            ["order", "18003", "order.placed, status.changed"],
-            ["notification", "18005", "whatsapp.message.received, support.ticket.*"],
-        ],
-        [35, 25, 110],
-        size=7,
-    )
-    pdf.section("Event Catalog")
-    pdf.table(
-        ["Event", "Producer", "Stream"],
-        [
-            ["kitchen.created", "identity", "ckac:identity:kitchen"],
-            ["dish.created/updated", "catalog", "ckac:catalog:dish"],
-            ["order.placed", "order", "ckac:orders:order"],
-            ["order.status.changed", "order", "ckac:orders:order"],
-            ["order.draft.created", "order", "ckac:orders:draft"],
-            ["whatsapp.message.received", "notification", "ckac:notify:whatsapp"],
-        ],
-        [55, 40, 75],
-        size=7,
-    )
-    pdf.section("Outbox Pattern (Critical)")
-    pdf.bullets([
-        "Domain write + outbox in same DB transaction",
-        "flush_pending() after commit — no Redis-before-commit bug",
-        "Relay worker for retry / Kafka migration — Phase 4",
-        "pg_advisory_xact_lock for kitchen codes and bill IDs",
-    ])
-
-    pdf.chapter("Database & Caching")
-    pdf.table(
-        ["Schema", "Tables", "Status"],
-        [
-            ["ckac_identity", "owners, kitchens", "LIVE"],
-            ["ckac_catalog", "categories, dishes, dish_media", "LIVE"],
-            ["ckac_orders", "orders, items, events, drafts", "LIVE"],
-            ["ckac_events", "outbox, processed_events", "LIVE"],
-            ["ckac_support", "support_tickets, messages", "LIVE"],
-            ["ckac_billing", "payments, subscriptions", "S6"],
-            ["ckac_marketing", "customers, coupons", "Ph 2"],
-        ],
-        [45, 85, 40],
-        size=7,
-    )
-    pdf.section("Naming Conventions")
     pdf.mono(
-        "Kitchen code: CKPNQ001\n"
-        "Bill ID: BILL-20260712-0001\n"
-        "Order code: CKPNQ001-BILL-20260712-0001"
-    )
-    pdf.section("Cache Keys")
-    pdf.table(
-        ["Key", "TTL", "Invalidation"],
-        [
-            ["menu:{kitchen_id}", "5 min", "dish.updated"],
-            ["dish:{dish_id}", "10 min", "rating update"],
-            ["kitchen:{id}:profile", "15 min", "settings change"],
-        ],
-        [55, 25, 90],
-        size=7,
-    )
-    pdf.section("SLO Targets")
-    pdf.table(
-        ["Metric", "Target"],
-        [
-            ["API p95 read", "< 200 ms"],
-            ["API p95 write", "< 500 ms"],
-            ["Order E2E", "< 3 s"],
-            ["WhatsApp notify", "< 10 s from event"],
-            ["Uptime", "99.9% (Ph 2+)"],
-        ],
-        [85, 85],
-        size=8,
+        "             PWAs / Portal\n"
+        "   portal · customer · kitchen · admin\n"
+        "                    |\n"
+        "                    v  HTTPS /api/v1\n"
+        "             +----------------------+\n"
+        "             |     API GATEWAY      |\n"
+        "             | route CORS corr-ID   |\n"
+        "             +--+---+---+---+--+----+\n"
+        "                |   |   |   |  |\n"
+        "     +----------+   |   |   |  +-----------+\n"
+        "     v              v   v   v              v\n"
+        " IDENTITY      CATALOG ORDER BILLING   STREAMING\n"
+        " kitchens         |     |      |            +\n"
+        " customers        v     v      v            |\n"
+        "              MARKET RATING DELIV LEARN COMMUNITY GROWTH\n"
+        "                    |      |      |      |      |\n"
+        "                    +------+------+------+------+\n"
+        "                    |             |             |\n"
+        "                    v             v             v\n"
+        "           PostgreSQL+PostGIS   Redis 7      MinIO\n"
+        "           schema-per-domain   Streams+cache  media\n"
+        "           + ckac_events.outbox",
+        size=6,
+        max_lines=40,
+        line_h=3.2,
     )
 
-    pdf.chapter("API Reference & Security")
-    pdf.section("Gateway Routes (:18000/api/v1)")
+    pdf.chapter("Event & Data Flow Diagrams")
+    pdf.section("Order + stock + notify")
     pdf.mono(
-        "Identity: /auth/* /owners/* /kitchens\n"
-        "Catalog: /kitchens/{id}/categories|menu|dishes\n"
-        "Order: /kitchens/{id}/orders/* /orders/{id}/status /analytics/*\n"
-        "Notification: /webhooks/whatsapp /support/chat /support/tickets\n"
-        "Admin: /admin/tickets/* (notification service)\n"
-        "Internal: /internal/... (X-Internal-Key)"
+        "Owner/Customer place|accept\n"
+        "        |\n"
+        "        v\n"
+        "   ORDER SERVICE\n"
+        "   - persist order + status_events\n"
+        "   - publish order.placed / order.status.changed\n"
+        "   - on accept --internal HTTP--> CATALOG deduct\n"
+        "                                   publish stock.deducted\n"
+        "        |\n"
+        "        v Redis ckac:orders:order\n"
+        "        +--> NOTIFICATION (WhatsApp F45, tracking nudge)",
+        size=6.5,
     )
-    pdf.section("Security")
-    pdf.table(
-        ["Area", "Implementation"],
-        [
-            ["Auth", "JWT + OTP; Bearer on owner routes"],
-            ["Tenant isolation", "kitchen_id + RLS (prod)"],
-            ["Media", "Live-capture validator; signed URLs"],
-            ["Internal", "X-Internal-Key header"],
-            ["WhatsApp", "Verify token required outside dev"],
-            ["Health", "/health/live + /health/ready"],
-        ],
-        [45, 125],
+    pdf.section("Multi-kitchen payment (F06/F44)")
+    pdf.mono(
+        "Cart [K1, K2] -> ORDER master_order + sub-orders\n"
+        "             -> BILLING master payment capture\n"
+        "             -> settlements[] net_to_owner per kitchen\n"
+        "             -> events payment.captured / settlement.*\n"
+        "             -> master bill PDF for customer",
+        size=6.5,
+    )
+    pdf.section("GST monthly loop")
+    pdf.mono(
+        "GSTIN profile -> kitchen_gst_profiles\n"
+        "Delivered orders --sync--> gst_tax_invoices\n"
+        "Monthly report + balance sheet\n"
+        "Close audit -> gst_monthly_audits snapshot",
         size=7,
+    )
+    pdf.section("Quality loop E1/E2 (planned)")
+    pdf.mono(
+        "Purchase post -> stock_movements(+) -> pantry\n"
+        "Accept order  -> stock_movements(-) via recipe\n"
+        "Ratings+volume+F20 tips -> GROWTH chef_brief\n"
+        "Owner Lock -> recipe_standard_versions + dish_ingredients",
+        size=7,
+    )
+    pdf.section("Representative Redis streams")
+    pdf.table(
+        ["Stream", "Example events"],
+        [
+            ["ckac:orders:order", "placed, status.changed"],
+            ["ckac:catalog:*", "dish/ingredient stock.*"],
+            ["ckac:billing:gst", "profile, invoice, audit"],
+            ["ckac:ratings:*", "created, aggregate.updated"],
+            ["ckac:growth:suggestion", "generated (+ chef_standard)"],
+            ["ckac:notify:*", "whatsapp, tracking"],
+        ],
+        [55, 115],
+        size=7,
+    )
+    pdf.body("Every write publish uses transactional outbox (ckac_events.outbox).")
+
+    pdf.chapter("Logical ER / Schema Diagram")
+    pdf.body(
+        "Schemas are separate Postgres schemas (no cross-schema FKs). "
+        "Lines below are logical relationships only. Tenant tables carry kitchen_id."
+    )
+    pdf.mono(
+        "ckac_identity              ckac_catalog                 ckac_orders\n"
+        "------------              ------------                 -----------\n"
+        "owners 1--* kitchens      categories 1--* dishes       master_orders\n"
+        "customers                 dishes 1--* dish_media         1--* orders\n"
+        "                          dishes *--* ingredients       orders 1--*\n"
+        "                          dish_prep_steps               order_items\n"
+        "                                                       status_events\n"
+        "\n"
+        "ckac_billing              ckac_ratings                 ckac_marketing\n"
+        "------------              ------------                 --------------\n"
+        "subscriptions             dish_ratings                 kitchen_customers\n"
+        "payments 1--* settlements dish_rating_aggregates       coupons\n"
+        "gst_profiles/invoices     dish_suggestions             promotions\n"
+        "gst_monthly_audits\n"
+        "\n"
+        "ckac_growth  delivery  learning  community  streaming  |  ckac_events\n"
+        "suggestions  quotes*   trials    rewards    sessions   |  outbox\n"
+        "seasonal_*   track*    lessons   rankings              |  processed",
+        size=6,
+        max_lines=42,
+        line_h=3.2,
     )
 
-    pdf.chapter("Build Status & Engineering Standards")
-    pdf.stat_boxes([
-        ("90+", "Tests passing"),
-        ("S1-S5", "Backend + PWAs partial"),
-        ("5+1", "Services + gateway"),
-        ("48", "Features spec"),
-    ])
+    pdf.chapter("Services, APIs, Security & Standards")
     pdf.table(
-        ["Sprint", "Deliverable", "Status"],
+        ["Service", "Port", "Highlights"],
         [
-            ["S1", "Identity, gateway, JWT", "COMPLETE"],
-            ["S2", "Catalog, live-capture, EDD", "COMPLETE"],
-            ["S3", "Order, lifecycle, history", "COMPLETE"],
-            ["S4", "WhatsApp webhook + parser", "COMPLETE"],
-            ["S5", "PWAs + analytics + support/tickets", "PARTIAL"],
-            ["S6", "Billing + revenue", "Planned"],
+            ["gateway", "18000", "/api/v1/* edge"],
+            ["identity", "18001", "auth, kitchens, customers"],
+            ["catalog", "18002", "menu, dishes, ingredients"],
+            ["order", "18003", "orders, analytics, PDF"],
+            ["billing", "18004", "payments, GST"],
+            ["notification", "18005", "webhooks, support"],
+            ["marketing", "18006", "CRM, coupons, promos"],
+            ["ratings", "18007", "ratings, suggestions"],
+            ["growth", "18008", "suggestions, daily menu"],
+            ["delivery", "18009", "fees, tracking"],
+            ["learning", "18010", "portal, trials"],
+            ["community", "18011", "recipes, rankings"],
+            ["streaming", "18012", "LiveKit sessions"],
         ],
-        [22, 98, 50],
-        size=7,
+        [35, 22, 113],
+        size=6,
     )
-    pdf.section("Engineering Standards")
     pdf.bullets([
-        "TDD: RED -> GREEN -> REFACTOR for every feature",
-        "EDD: DB commit first; session-bound EventPublisher",
-        "Service template: main, routes, schemas, models",
-        "No cross-schema writes; Alembic per service",
-        "Run tests: scripts/run-tests.ps1",
+        "Security: JWT Bearer, tenant filters, Pydantic, env secrets, mask PII, X-Internal-Key",
+        "Health: /health/live + /health/ready on every service",
+        "Method: TDD + EDD; MODULE-DESIGN-PACK before new features; Alembic only",
+        "Forbidden: per-order commission, restaurant POS/dine-in/KDS, cross-schema writes",
     ])
 
-    # ── APPENDIX ─────────────────────────────────────────────────────────
-    pdf.lens_part("APPENDIX", 4, "Reference Tables")
-
-    pdf.chapter("Feature Implementation Matrix (Phase 1)")
+    pdf.chapter("Build Status Matrix")
     pdf.table(
-        ["ID", "Feature", "Status"],
+        ["Module band", "Sprint", "Status"],
         [
-            ["F01", "WhatsApp capture", "Partial"],
-            ["F02", "Message parser", "Done"],
-            ["F03", "Manual order", "Done"],
-            ["F04", "Lifecycle", "Done"],
-            ["F05", "Order history", "Done"],
-            ["F07", "Revenue report", "Partial"],
-            ["F13", "Dish + live photo", "Done"],
-            ["F14", "Price/quality fields", "Done"],
-            ["F15", "Categories", "Done"],
-            ["F26", "Subscription", "Partial"],
-            ["F30", "Prep time", "Done"],
-            ["F42-F43", "Payments", "S6"],
-            ["F45", "Notify + AI chat + tickets", "Partial"],
+            ["Gateway / Identity / Catalog / Order / Notify", "S1-S4", "DONE"],
+            ["PWAs + checkout + analytics", "S5", "DONE"],
+            ["Billing + GST", "S6+GST", "DONE"],
+            ["Discovery / history", "S7", "DONE"],
+            ["Multi-kitchen cart", "S8", "DONE"],
+            ["Split payment Route", "S9", "DONE"],
+            ["CRM / coupons / promos", "S10", "DONE"],
+            ["Ratings", "S11", "DONE"],
+            ["Growth", "S12", "DONE"],
+            ["Delivery", "S13", "DONE"],
+            ["Tracking notify", "S14", "DONE"],
+            ["Ingredients", "S15", "DONE"],
+            ["Learning / Community / Streaming", "S16-S18", "DONE"],
+            ["E1 Purchases + E2 Chef lock", "S19", "DESIGN"],
         ],
-        [18, 102, 50],
+        [95, 25, 50],
+        size=6,
+    )
+
+    # ── Appendices ───────────────────────────────────────────────────────
+    pdf.lens_part("APPENDIX", 4, "Reference")
+
+    pdf.chapter("Feature bands F01-F48")
+    pdf.table(
+        ["Band", "Features", "Status"],
+        [
+            ["Orders & lifecycle", "F01-F05, F30, F45", "Done / WA AI partial"],
+            ["Multi-kitchen & pay", "F06, F42-F44", "Done"],
+            ["Analytics & growth", "F07-F12, F39", "Done"],
+            ["Catalog & media", "F13-F15", "Done"],
+            ["Ratings", "F16-F18, F20", "Done (F20 UI thin)"],
+            ["Ingredients", "F19", "Done (E1 extends)"],
+            ["Delivery / discover", "F27-F33", "Done"],
+            ["Marketing", "F34-F41", "Core done"],
+            ["Learning / community", "F21-F24", "Done"],
+            ["Live", "F46-F48", "Done"],
+            ["GST finance", "Billing extension", "Done"],
+            ["Quality loop", "E1/E2", "Design pack"],
+        ],
+        [50, 60, 60],
+        size=6,
+    )
+    pdf.body("Full acceptance criteria: docs/CKAC-COMPLETE-PLANNING-BENCHMARK.md")
+
+    pdf.chapter("Document index")
+    pdf.table(
+        ["Document", "Role"],
+        [
+            ["CKAC-COMPLETE-GUIDE.md/.pdf", "This master CEO/CPO/CTO guide"],
+            ["E1-E2-*-DESIGN.md", "Next sprint quality-loop design"],
+            ["CKAC-IMPLEMENTATION-GUIDE.md", "Built features mapped to code"],
+            ["KITCHCU-ENGINEERING-STANDARDS.md", "Engineering constitution"],
+            ["MODULE-DESIGN-PACK.md", "Mandatory pre-code template"],
+            ["AGENTS.md", "Agent/engineer quick spec"],
+            ["Feature packs F*.md", "Per-sprint design packs"],
+        ],
+        [70, 100],
         size=7,
     )
-
-    pdf.chapter("Document Index")
-    pdf.table(
-        ["Document", "Audience"],
-        [
-            ["CKAC-COMPLETE-GUIDE.md", "CEO, CPO, CTO (this guide)"],
-            ["CKAC-IMPLEMENTATION-GUIDE.md", "Engineering (live code map)"],
-            ["CKAC-ARCHITECTURE-CTO.md", "CTO, EM (layers + traceability)"],
-            ["CKAC-SYSTEM-BENCHMARK.md", "CTO, DBA (deep spec)"],
-            ["CKAC-CPO-PRODUCT-BLUEPRINT.md", "CPO, Product"],
-            ["CKAC-PITCH-DECK.pdf", "CEO, Investors (33 slides)"],
-            ["AGENTS.md", "Developers, AI agents"],
-        ],
-        [85, 85],
-        size=7,
-    )
-
-    # Back cover
-    pdf.add_page()
-    pdf.set_xy(20, 50)
-    pdf.set_font("Helvetica", "B", 22)
-    pdf.set_text_color(*ORANGE)
-    pdf.cell(0, 10, "Kitchcu")
-    pdf.ln(14)
-    pdf.set_x(20)
-    pdf.set_font("Helvetica", "", 11)
-    pdf.set_text_color(*DARK)
-    pdf.multi_cell(
-        170,
-        6,
-        "Kitchcu cloud kitchen platform",
-    )
-    pdf.ln(8)
-    pdf.set_x(20)
-    pdf.set_font("Helvetica", "I", 9)
-    pdf.set_text_color(*GRAY)
-    pdf.multi_cell(
-        170,
-        5,
-        f"Complete Executive Guide v{GUIDE_VERSION} | {GUIDE_DATE} | Confidential\n"
-        "Regenerate: python scripts/generate_complete_guide_pdf.py",
-    )
+    pdf.quote("Kitchcu Complete Executive Guide v2.0 — Confidential — July 2026")
 
     return pdf
 
@@ -571,7 +545,7 @@ def main():
     pdf = build()
     OUTPUT.parent.mkdir(parents=True, exist_ok=True)
     pdf.output(str(OUTPUT))
-    print(f"Generated: {OUTPUT} ({OUTPUT.stat().st_size // 1024} KB)")
+    print(f"Wrote {OUTPUT} ({OUTPUT.stat().st_size // 1024} KB)")
 
 
 if __name__ == "__main__":

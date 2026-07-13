@@ -1,6 +1,8 @@
 import { FormEvent, useEffect, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { LiveCapturePhotoField } from "../../components/LiveCapturePhotoField";
+import { RichTextEditor } from "../../components/RichTextEditor";
+import { OwnerPageShell } from "../../components/owner/OwnerPageShell";
 import { createDish, fetchCategories, fetchCuisines, type Category, type Cuisine } from "../../lib/api";
 import { useKitchen } from "../../lib/kitchen";
 
@@ -12,6 +14,8 @@ export function AddDishPage() {
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [heroUrl, setHeroUrl] = useState("");
+  const [descriptionHtml, setDescriptionHtml] = useState("");
+  const [ingredientsHtml, setIngredientsHtml] = useState("");
 
   useEffect(() => {
     if (!kitchen) return;
@@ -40,8 +44,8 @@ export function AddDishPage() {
         prep_time_min: Number(fd.get("prep_time_min") || 30),
         cuisine_id: String(fd.get("cuisine_id")),
         category_id: String(fd.get("category_id")),
-        description: String(fd.get("description") || "") || undefined,
-        ingredients_description: String(fd.get("ingredients") || "") || undefined,
+        description: descriptionHtml.trim() || undefined,
+        ingredients_description: ingredientsHtml.trim() || undefined,
         media: {
           url: heroUrl,
           is_hero: true,
@@ -60,11 +64,14 @@ export function AddDishPage() {
   if (!kitchen) return null;
 
   return (
-    <div className="owner-page">
-      <Link to="/dashboard/menu" className="owner-back">← Back to menu</Link>
-      <header className="owner-page__head"><h1>Add dish</h1></header>
-
-      <form className="glass owner-form owner-form--narrow" onSubmit={handleSubmit}>
+    <OwnerPageShell
+      eyebrow="Operations"
+      title="Add dish"
+      description="Live-capture hero photo required — customers trust what they see"
+      backTo="/dashboard/menu"
+      backLabel="← Back to menu"
+    >
+      <form className="dash-card owner-form owner-form--narrow" onSubmit={handleSubmit}>
         {error && <div className="auth-card__error">{error}</div>}
         <label>Dish name<input name="name" required placeholder="Butter Chicken" /></label>
         <div className="form-row">
@@ -87,8 +94,25 @@ export function AddDishPage() {
             ))}
           </select>
         </label>
-        <label>Description<textarea name="description" rows={2} /></label>
-        <label>Ingredients<textarea name="ingredients" rows={2} placeholder="Optional quality notes" /></label>
+        <label>Description</label>
+        <RichTextEditor
+          value={descriptionHtml}
+          onChange={setDescriptionHtml}
+          kitchenId={kitchen.id}
+          uploadContext="dish"
+          placeholder="What makes this dish special — texture, spice level, serving size…"
+          minHeight={100}
+        />
+
+        <label>Ingredients & quality notes</label>
+        <RichTextEditor
+          value={ingredientsHtml}
+          onChange={setIngredientsHtml}
+          kitchenId={kitchen.id}
+          uploadContext="dish"
+          placeholder="Key ingredients, allergens, quality notes — add photos inline if helpful"
+          minHeight={100}
+        />
 
         <LiveCapturePhotoField
           kitchenId={kitchen.id}
@@ -106,6 +130,6 @@ export function AddDishPage() {
           {busy ? "Saving..." : "Add to menu"}
         </button>
       </form>
-    </div>
+    </OwnerPageShell>
   );
 }

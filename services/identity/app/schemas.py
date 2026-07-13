@@ -92,6 +92,8 @@ class KitchenResponse(BaseModel):
     delivery_fee_flat_beyond: float
     min_order_for_free_delivery: float | None
     tracking_notify_interval_min: int
+    address_line: str | None = None
+    pincode: str | None = None
     latitude: float
     longitude: float
 
@@ -242,6 +244,8 @@ async def kitchen_to_response(session: AsyncSession, kitchen: Kitchen) -> Kitche
             else None
         ),
         tracking_notify_interval_min=int(kitchen.tracking_notify_interval_min),
+        address_line=kitchen.address_line,
+        pincode=kitchen.pincode,
         latitude=float(row.lat),
         longitude=float(row.lng),
     )

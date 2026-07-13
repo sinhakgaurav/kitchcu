@@ -40,8 +40,10 @@ export type Kitchen = {
   owner_id: string;
   code: string;
   name: string;
+  address_line: string | null;
   city: string | null;
   state: string | null;
+  pincode: string | null;
   status: string;
   free_delivery_radius_km: number;
   max_delivery_radius_km: number;
@@ -339,6 +341,15 @@ async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
   const body = await res.json().catch(() => ({}));
   if (!res.ok) {
     const detail = typeof body.detail === "string" ? body.detail : "Request failed";
+    if (
+      res.status === 401 &&
+      (detail === "Invalid token" || detail === "Not authenticated" || detail === "Invalid token type")
+    ) {
+      clearToken();
+      const next = encodeURIComponent(window.location.pathname + window.location.search);
+      window.location.href = `/login?session=expired&next=${next}`;
+      throw new Error("Session expired — please sign in again");
+    }
     throw new Error(detail);
   }
   return body as T;
@@ -985,6 +996,32 @@ export async function fetchOrderStockWarnings(orderId: string): Promise<OrderSto
   return apiFetch(`/api/v1/orders/${orderId}/stock-warnings`);
 }
 
+async function downloadPdf(path: string, filename: string): Promise<void> {
+  const token = getToken();
+  const res = await fetch(path, {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    const detail = typeof body.detail === "string" ? body.detail : "Could not download bill";
+    throw new Error(detail);
+  }
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = filename;
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  URL.revokeObjectURL(url);
+}
+
+export function downloadOwnerOrderBillPdf(orderId: string, orderCode: string): Promise<void> {
+  const safe = orderCode.replace(/[^\w.-]+/g, "_");
+  return downloadPdf(`/api/v1/orders/${orderId}/bill.pdf`, `${safe}.pdf`);
+}
+
 export type CuratedRecipe = {
   id: string;
   title: string;
@@ -1253,3 +1290,168 @@ export const STATUS_LABELS: Record<string, string> = {
   delivered: "Delivered",
   cancelled: "Cancelled",
 };
+
+export type GstProfile = {
+  id: string;
+  kitchen_id: string;
+  gstin: string;
+  legal_name: string;
+  trade_name: string | null;
+  state_code: string;
+  registered_address: string;
+  default_tax_rate: number;
+  is_active: boolean;
+  invoice_prefix: string | null;
+  created_at: string;
+  updated_at: string | null;
+};
+
+export type GstTaxInvoice = {
+  id: string;
+  kitchen_id: string;
+  order_id: string;
+  invoice_number: string;
+  invoice_date: string;
+  order_code: string;
+  customer_name: string | null;
+  place_of_supply_state_code: string;
+  supply_type: string;
+  taxable_value: number;
+  cgst_amount: number;
+  sgst_amount: number;
+  igst_amount: number;
+  tax_rate: number;
+  gross_total: number;
+};
+
+export type GstMonthlyReport = {
+  kitchen_id: string;
+  period_year: number;
+  period_month: number;
+  gstin: string;
+  legal_name: string;
+  invoice_count: number;
+  total_taxable: number;
+  total_cgst: number;
+  total_sgst: number;
+  total_igst: number;
+  total_tax: number;
+  total_gross_sales: number;
+  audit_status: string;
+  invoices: GstTaxInvoice[];
+};
+
+export type GstBalanceSheetLine = {
+  label: string;
+  amount: number;
+};
+
+export type GstBalanceSheet = {
+  kitchen_id: string;
+  period_year: number;
+  period_month: number;
+  assets: GstBalanceSheetLine[];
+  liabilities: GstBalanceSheetLine[];
+  equity: GstBalanceSheetLine[];
+  total_assets: number;
+  total_liabilities: number;
+  total_equity: number;
+};
+
+export type GstAudit = {
+  id: string;
+  kitchen_id: string;
+  period_year: number;
+  period_month: number;
+  status: string;
+  invoice_count: number;
+  total_taxable: number;
+  total_cgst: number;
+  total_sgst: number;
+  total_igst: number;
+  total_tax: number;
+  total_gross_sales: number;
+  closed_at: string | null;
+  balance_sheet: GstBalanceSheet | null;
+  invoices: GstTaxInvoice[];
+};
+
+export async function fetchGstProfile(kitchenId: string): Promise<GstProfile | null> {
+  try {
+    return await apiFetch(`/api/v1/kitchens/${kitchenId}/gst/profile`);
+  } catch (err) {
+    if (err instanceof Error && err.message.includes("GST profile not found")) return null;
+    throw err;
+  }
+}
+
+export async function upsertGstProfile(
+  kitchenId: string,
+  data: {
+    gstin: string;
+    legal_name: string;
+    trade_name?: string | null;
+    registered_address: string;
+    default_tax_rate?: number;
+    is_active?: boolean;
+    invoice_prefix?: string | null;
+  },
+): Promise<GstProfile> {
+  return apiFetch(`/api/v1/kitchens/${kitchenId}/gst/profile`, {
+    method: "PUT",
+    body: JSON.stringify(data),
+  });
+}
+
+export async function syncGstInvoices(
+  kitchenId: string,
+  year?: number,
+  month?: number,
+): Promise<{ synced_count: number; invoices: GstTaxInvoice[] }> {
+  const params = new URLSearchParams();
+  if (year) params.set("year", String(year));
+  if (month) params.set("month", String(month));
+  const qs = params.toString();
+  return apiFetch(`/api/v1/kitchens/${kitchenId}/gst/sync${qs ? `?${qs}` : ""}`, {
+    method: "POST",
+  });
+}
+
+export async function fetchGstMonthlyReport(
+  kitchenId: string,
+  year: number,
+  month: number,
+): Promise<GstMonthlyReport> {
+  return apiFetch(
+    `/api/v1/kitchens/${kitchenId}/gst/reports/monthly?year=${year}&month=${month}`,
+  );
+}
+
+export async function fetchGstBalanceSheet(
+  kitchenId: string,
+  year: number,
+  month: number,
+): Promise<GstBalanceSheet> {
+  return apiFetch(
+    `/api/v1/kitchens/${kitchenId}/gst/reports/balance-sheet?year=${year}&month=${month}`,
+  );
+}
+
+export async function fetchGstAudit(
+  kitchenId: string,
+  year: number,
+  month: number,
+): Promise<GstAudit> {
+  return apiFetch(`/api/v1/kitchens/${kitchenId}/gst/audit?year=${year}&month=${month}`);
+}
+
+export async function closeGstAudit(
+  kitchenId: string,
+  year: number,
+  month: number,
+): Promise<GstAudit> {
+  return apiFetch(
+    `/api/v1/kitchens/${kitchenId}/gst/audit/close?year=${year}&month=${month}`,
+    { method: "POST" },
+  );
+}

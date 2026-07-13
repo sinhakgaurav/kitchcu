@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { useParams } from "react-router-dom";
+import { OwnerPageShell, OwnerPanel } from "../../components/owner/OwnerPageShell";
 import {
   fetchCrmCustomers,
   fetchDishTrial,
@@ -115,7 +116,18 @@ export function TrialDetailPage() {
     }
   };
 
-  if (!trial) return <div className="owner-page app-loading">{error || "Loading trial…"}</div>;
+  if (!trial) {
+    return (
+      <OwnerPageShell
+        eyebrow="Growth"
+        title="Dish trial"
+        backTo="/dashboard/learning"
+        backLabel="← Back to learning"
+      >
+        <div className="app-loading">{error || "Loading trial…"}</div>
+      </OwnerPageShell>
+    );
+  }
 
   const canPromote =
     trial.status !== "promoted" &&
@@ -123,70 +135,68 @@ export function TrialDetailPage() {
     trial.avg_rating >= trial.rating_threshold;
 
   return (
-    <div className="owner-page">
-      <Link to="/dashboard/learning" className="owner-back">← Back to learning</Link>
-
-      <header className="owner-page__head">
-        <div>
-          <h1>{trial.dish_name}</h1>
-          <p>
-            Trial dish (inactive on public menu until promoted) ·{" "}
-            <span className={`status-badge status-badge--${trial.status === "promoted" ? "delivered" : "preparing"}`}>
-              {trial.status}
-            </span>
-          </p>
+    <OwnerPageShell
+      eyebrow="Growth"
+      title={trial.dish_name}
+      description="Trial dish — inactive on public menu until promoted"
+      backTo="/dashboard/learning"
+      backLabel="← Back to learning"
+      meta={
+        <div className="od-board__pills" style={{ marginTop: "0.75rem" }}>
+          <span className={`status-badge status-badge--${trial.status === "promoted" ? "delivered" : "preparing"}`}>
+            {trial.status}
+          </span>
           {trial.avg_rating != null && (
-            <p className="owner-page__code">
-              Avg rating {trial.avg_rating} / threshold {trial.rating_threshold}
-            </p>
+            <span className="od-pill od-pill--sub">
+              Avg {trial.avg_rating} / threshold {trial.rating_threshold}
+            </span>
           )}
         </div>
-      </header>
-
-      {error && <p className="owner-error">{error}</p>}
+      }
+    >
+      {error && <p className="form-error">{error}</p>}
 
       {trial.status === "draft" && (
-        <section className="glass owner-section">
-          <h2>Select sample customers (5–20)</h2>
-          <p className="owner-page__code">Pick regulars from your CRM for WhatsApp sample offers.</p>
+        <OwnerPanel
+          title="Select sample customers"
+          description="Pick 5–20 regulars from your CRM for WhatsApp sample offers"
+        >
           <ul className="owner-crm-list">
             {customers.map((c) => {
               const cid = c.customer_id ?? c.id;
               return (
-              <li key={c.id}>
-                <label>
-                  <input
-                    type="checkbox"
-                    checked={selected.has(cid)}
-                    onChange={() => toggleCustomer(cid)}
-                  />
-                  {c.customer_name ?? "Customer"} · {c.order_count} orders
-                </label>
-              </li>
-            );
+                <li key={c.id}>
+                  <label>
+                    <input
+                      type="checkbox"
+                      checked={selected.has(cid)}
+                      onChange={() => toggleCustomer(cid)}
+                    />
+                    {c.customer_name ?? "Customer"} · {c.order_count} orders
+                  </label>
+                </li>
+              );
             })}
           </ul>
           <button type="button" className="btn btn--primary" disabled={busy} onClick={saveInvites}>
             Save invites ({selected.size})
           </button>
-        </section>
+        </OwnerPanel>
       )}
 
       {trial.invite_count >= 5 && trial.status !== "promoted" && !trial.whatsapp_sent_at && (
-        <section className="glass owner-section">
-          <h2>Send sample offers</h2>
-          <p className="owner-page__code">
+        <OwnerPanel title="Send sample offers">
+          <p className="owner-muted">
             WhatsApp blast to {trial.invite_count} customers — free sample trial.
           </p>
           <button type="button" className="btn btn--primary" disabled={busy} onClick={sendSamples}>
             Send via WhatsApp
           </button>
-        </section>
+        </OwnerPanel>
       )}
 
       {trial.invites.length > 0 && (
-        <section className="glass owner-section">
-          <h2>Sample feedback</h2>
+        <OwnerPanel title="Sample feedback">
           <ul className="owner-detail-items">
             {trial.invites.map((inv) => (
               <li key={inv.id}>
@@ -207,24 +217,25 @@ export function TrialDetailPage() {
               </li>
             ))}
           </ul>
-        </section>
+        </OwnerPanel>
       )}
 
       {canPromote && (
-        <section className="glass owner-section">
-          <h2>Promote to official menu</h2>
-          <p className="owner-page__code">
+        <OwnerPanel title="Promote to official menu">
+          <p className="owner-muted">
             Average home-taste rating meets your threshold — activate this dish on your public menu.
           </p>
           <button type="button" className="btn btn--primary" disabled={busy} onClick={promote}>
             Promote dish
           </button>
-        </section>
+        </OwnerPanel>
       )}
 
       {trial.status === "promoted" && (
-        <p className="owner-success">Promoted to your menu — customers can now order {trial.dish_name}.</p>
+        <div className="auth-card__success">
+          Promoted to your menu — customers can now order {trial.dish_name}.
+        </div>
       )}
-    </div>
+    </OwnerPageShell>
   );
 }

@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { OwnerEmpty, OwnerPageShell, OwnerPanel } from "../../components/owner/OwnerPageShell";
 import {
   dismissGrowthSuggestion,
   fetchDishCombos,
@@ -105,31 +106,25 @@ export function GrowthPage() {
   if (!kitchen) return null;
 
   return (
-    <div className="owner-page">
-      <header className="owner-page__head">
-        <div>
-          <h1>Growth intelligence</h1>
-          <p className="owner-page__code">
-            Actionable suggestions, dish combos & daily menu WhatsApp push
-          </p>
-        </div>
+    <OwnerPageShell
+      eyebrow="Growth"
+      title="Growth intelligence"
+      description="Actionable suggestions, dish combos & daily menu WhatsApp push"
+      actions={
         <button type="button" className="btn btn--primary" onClick={onGenerate} disabled={generating}>
           {generating ? "Generating…" : "Generate suggestions"}
         </button>
-      </header>
-
+      }
+    >
       {error && <div className="auth-card__error">{error}</div>}
-      {pushResult && <div className="owner-stat glass">{pushResult}</div>}
-      {loading && <p className="owner-empty">Loading growth insights…</p>}
-
-      {!loading && (
+      {pushResult && <div className="auth-card__success">{pushResult}</div>}
+      {loading ? (
+        <div className="app-loading">Loading growth insights…</div>
+      ) : (
         <>
-          <section className="glass report-card">
-            <h2>Suggestions</h2>
+          <OwnerPanel title="Suggestions" description="AI-powered actions from your order data">
             {suggestions.length === 0 ? (
-              <p className="owner-empty">
-                No active suggestions — click Generate to analyze your orders.
-              </p>
+              <OwnerEmpty message="No active suggestions — click Generate to analyze your orders." />
             ) : (
               <ul className="report-rank">
                 {suggestions.map((s) => (
@@ -148,13 +143,12 @@ export function GrowthPage() {
                 ))}
               </ul>
             )}
-          </section>
+          </OwnerPanel>
 
           <div className="report-grid">
-            <section className="glass report-card">
-              <h2>Top dish combos</h2>
+            <OwnerPanel title="Top dish combos" description="Frequently ordered together">
               {combos.length === 0 ? (
-                <p className="owner-empty">Need more multi-item orders to detect combos.</p>
+                <OwnerEmpty message="Need more multi-item orders to detect combos." />
               ) : (
                 <ul className="report-rank">
                   {combos.map((c) => (
@@ -170,10 +164,9 @@ export function GrowthPage() {
                   ))}
                 </ul>
               )}
-            </section>
+            </OwnerPanel>
 
-            <section className="glass report-card">
-              <h2>Order patterns</h2>
+            <OwnerPanel title="Order patterns" description="Busiest days of the week">
               {patterns ? (
                 <>
                   <p className="report-hint">{patterns.insight}</p>
@@ -191,16 +184,15 @@ export function GrowthPage() {
                   )}
                 </>
               ) : (
-                <p className="owner-empty">No pattern data yet.</p>
+                <OwnerEmpty message="No pattern data yet." />
               )}
-            </section>
+            </OwnerPanel>
           </div>
 
-          <section className="glass report-card">
-            <h2>Daily menu WhatsApp push (F39)</h2>
-            <p className="report-hint">
-              Select today&apos;s dishes — we queue a blast to your CRM contacts.
-            </p>
+          <OwnerPanel
+            title="Daily menu WhatsApp push"
+            description="Select today's dishes — we queue a blast to your CRM contacts (F39)"
+          >
             <div className="owner-tabs" style={{ flexWrap: "wrap", gap: "0.5rem" }}>
               {dishOptions.map((d) => (
                 <button
@@ -222,9 +214,9 @@ export function GrowthPage() {
             >
               {pushing ? "Queuing…" : "Push to WhatsApp contacts"}
             </button>
-          </section>
+          </OwnerPanel>
         </>
       )}
-    </div>
+    </OwnerPageShell>
   );
 }

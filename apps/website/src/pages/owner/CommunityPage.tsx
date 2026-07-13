@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { RichTextEditor } from "../../components/RichTextEditor";
+import { OwnerEmpty, OwnerPageShell, OwnerPanel } from "../../components/owner/OwnerPageShell";
 import {
   computeChefRankings,
   fetchChefRankings,
@@ -101,35 +102,42 @@ export function CommunityPage() {
   if (!kitchen) return null;
 
   return (
-    <div className="owner-page">
-      <header className="owner-page__head">
-        <div>
-          <h1>Community</h1>
-          <p className="owner-page__code">Share recipes, earn reward points, climb chef rankings (F23–F24)</p>
-        </div>
-      </header>
+    <OwnerPageShell
+      eyebrow="Community"
+      title="Community"
+      description="Share recipes, earn reward points, climb chef rankings (F23–F24)"
+    >
+      {error && <p className="form-error">{error}</p>}
+      {msg && <div className="auth-card__success">{msg}</div>}
 
-      {error && <p className="owner-error">{error}</p>}
-      {msg && <p className="owner-success">{msg}</p>}
-
-      <section className="glass owner-section">
-        <h2>Reward points</h2>
-        <p>
-          Balance: <strong>{rewards?.points_balance ?? 0}</strong> pts
-          <span className="owner-page__code"> · 10 pts per appreciation · 100 = subscription discount · 500 = featured listing</span>
-        </p>
+      <OwnerPanel
+        title="Reward points"
+        description="10 pts per appreciation · 100 = subscription discount · 500 = featured listing"
+        action={
+          <strong style={{ fontSize: "1.25rem" }}>{rewards?.points_balance ?? 0} pts</strong>
+        }
+      >
         <div className="owner-actions">
-          <button type="button" className="btn btn--ghost" disabled={busy} onClick={() => onRedeem("subscription_discount")}>
+          <button
+            type="button"
+            className="btn btn--ghost"
+            disabled={busy}
+            onClick={() => onRedeem("subscription_discount")}
+          >
             Redeem subscription discount (100)
           </button>
-          <button type="button" className="btn btn--ghost" disabled={busy} onClick={() => onRedeem("featured_listing")}>
+          <button
+            type="button"
+            className="btn btn--ghost"
+            disabled={busy}
+            onClick={() => onRedeem("featured_listing")}
+          >
             Redeem featured listing (500)
           </button>
         </div>
-      </section>
+      </OwnerPanel>
 
-      <section className="glass owner-section">
-        <h2>Share an original recipe</h2>
+      <OwnerPanel title="Share an original recipe">
         <form className="owner-form" onSubmit={onShare}>
           <label>
             Title
@@ -140,17 +148,22 @@ export function CommunityPage() {
             <input value={summary} onChange={(e) => setSummary(e.target.value)} placeholder="Short pitch for the community" />
           </label>
           <label>Recipe</label>
-          <RichTextEditor value={bodyHtml} onChange={setBodyHtml} placeholder="Steps, quality notes, tips…" />
+          <RichTextEditor
+            value={bodyHtml}
+            onChange={setBodyHtml}
+            kitchenId={kitchen.id}
+            uploadContext="general"
+            placeholder="Steps, quality notes, tips…"
+          />
           <button type="submit" className="btn btn--primary" disabled={busy}>
             Share to community
           </button>
         </form>
-      </section>
+      </OwnerPanel>
 
-      <section className="glass owner-section">
-        <h2>Your shared recipes</h2>
+      <OwnerPanel title="Your shared recipes">
         {recipes.length === 0 ? (
-          <p className="owner-page__code">No shared recipes yet.</p>
+          <OwnerEmpty message="No shared recipes yet — share your first original recipe above." />
         ) : (
           <ul className="owner-detail-items">
             {recipes.map((r) => (
@@ -160,17 +173,19 @@ export function CommunityPage() {
             ))}
           </ul>
         )}
-      </section>
+      </OwnerPanel>
 
-      <section className="glass owner-section">
-        <div className="owner-page__head">
-          <h2>City chef rankings</h2>
+      <OwnerPanel
+        title="City chef rankings"
+        description={`Top kitchens in ${kitchen.city ?? "your city"}`}
+        action={
           <button type="button" className="btn btn--ghost btn--sm" disabled={busy} onClick={onComputeRankings}>
             Refresh rankings
           </button>
-        </div>
+        }
+      >
         {rankings.length === 0 ? (
-          <p className="owner-page__code">No rankings yet — tap refresh after you have delivered orders this month.</p>
+          <OwnerEmpty message="No rankings yet — tap refresh after you have delivered orders this month." />
         ) : (
           <ol className="owner-rankings">
             {rankings.map((r) => (
@@ -182,7 +197,7 @@ export function CommunityPage() {
             ))}
           </ol>
         )}
-      </section>
-    </div>
+      </OwnerPanel>
+    </OwnerPageShell>
   );
 }

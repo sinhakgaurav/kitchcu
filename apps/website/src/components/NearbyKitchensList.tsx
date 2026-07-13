@@ -2,7 +2,8 @@ import { useCallback, useEffect, useMemo, useState, type CSSProperties, type Ref
 import { useNavigate } from "react-router-dom";
 import { sampleDishImages } from "../data/content";
 import { DEMO } from "../shared/demo";
-import { fetchNearbyKitchens, type KitchenNearby } from "../shared/api";
+import type { KitchenNearby } from "../shared/api";
+import { fetchPublicNearbyKitchens } from "../shared/publicApi";
 import { useCustomerAuth } from "../shared/customerAuth";
 import { saveKitchenToSession } from "../shared/customerSession";
 import { useGeolocation } from "../hooks/useGeolocation";
@@ -39,7 +40,7 @@ export function NearbyKitchensList() {
     setLoading(true);
     setFetchError("");
     try {
-      const data = await fetchNearbyKitchens({
+      const data = await fetchPublicNearbyKitchens({
         latitude: coords.latitude,
         longitude: coords.longitude,
         limit: 30,

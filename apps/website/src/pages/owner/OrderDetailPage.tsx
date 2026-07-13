@@ -5,6 +5,7 @@ import {
   capturePayment,
   createPayment,
   createUpiIntent,
+  downloadOwnerOrderBillPdf,
   fetchOrder,
   fetchOrderStockWarnings,
   ORDER_NEXT,
@@ -17,10 +18,25 @@ import {
 } from "../../lib/api";
 import { useKitchen } from "../../lib/kitchen";
 
+const inr = (n: number) => `₹${Math.round(n).toLocaleString("en-IN")}`;
+
+function OrderDetailSkeleton() {
+  return (
+    <div className="od-order-detail__loading">
+      <div className="od-skeleton od-skeleton--wide" />
+      <div className="od-order-detail__grid">
+        <div className="od-skeleton od-skeleton--chart" />
+        <div className="od-skeleton od-skeleton--chart" />
+      </div>
+    </div>
+  );
+}
+
 export function OrderDetailPage() {
   const { kitchen } = useKitchen();
   const { orderId } = useParams<{ orderId: string }>();
   const [order, setOrder] = useState<Order | null>(null);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [cancelReason, setCancelReason] = useState("");
@@ -32,7 +48,11 @@ export function OrderDetailPage() {
 
   useEffect(() => {
     if (!orderId) return;
-    fetchOrder(orderId).then(setOrder).catch(() => setError("Order not found"));
+    setLoading(true);
+    fetchOrder(orderId)
+      .then(setOrder)
+      .catch(() => setError("Order not found"))
+      .finally(() => setLoading(false));
   }, [orderId]);
 
   useEffect(() => {
@@ -107,45 +127,91 @@ export function OrderDetailPage() {
     }
   };
 
-  if (!order) return <div className="owner-page app-loading">{error || "Loading order..."}</div>;
+  if (loading) {
+    return (
+      <div className="owner-screen od-board od-order-detail">
+        <Link to="/dashboard/orders" className="owner-back">← Back to orders</Link>
+        <OrderDetailSkeleton />
+      </div>
+    );
+  }
+
+  if (!order) {
+    return (
+      <div className="owner-screen od-board od-order-detail">
+        <Link to="/dashboard/orders" className="owner-back">← Back to orders</Link>
+        <p className="od-panel__empty dash-card od-panel">{error || "Order not found"}</p>
+      </div>
+    );
+  }
 
   const next = ORDER_NEXT[order.status] ?? [];
   const needsPayment = ["online", "upi"].includes(order.payment_method);
   const paymentCaptured = payment?.status === "captured";
 
   return (
-    <div className="owner-page">
+    <div className="owner-screen od-board od-order-detail">
       <Link to="/dashboard/orders" className="owner-back">← Back to orders</Link>
 
-      <header className="owner-page__head">
-        <div>
+      <section className="od-board__hero dash-card">
+        <div className="od-board__hero-text">
+          <p className="od-board__eyebrow">Order detail</p>
           <h1>{order.order_code}</h1>
-          <p>{order.bill_id} · {new Date(order.created_at).toLocaleString()}</p>
+          <p className="od-board__meta">
+            <span className="od-board__code">{order.bill_id}</span>
+            <span>{new Date(order.created_at).toLocaleString("en-IN")}</span>
+            <span>{order.source} · {order.delivery_type}</span>
+          </p>
+          <div className="od-board__pills">
+            <span className={`status-badge status-badge--${order.status} status-badge--lg`}>
+              {STATUS_LABELS[order.status]}
+            </span>
+            <span className="od-pill od-pill--sub">{order.payment_method.toUpperCase()}</span>
+            {paymentCaptured && <span className="od-pill od-pill--active">Paid</span>}
+          </div>
         </div>
-        <span className={`status-badge status-badge--${order.status} status-badge--lg`}>
-          {STATUS_LABELS[order.status]}
-        </span>
-      </header>
+        <div className="od-board__hero-actions">
+          <strong className="od-order-detail__total">{inr(order.total)}</strong>
+          <span className="od-order-detail__total-label">Order total</span>
+          <button
+            type="button"
+            className="btn btn--ghost btn--sm"
+            style={{ marginTop: "0.75rem" }}
+            onClick={() => {
+              downloadOwnerOrderBillPdf(order.id, order.order_code).catch((err) =>
+                setError(err instanceof Error ? err.message : "Download failed"),
+              );
+            }}
+          >
+            Download PDF bill
+          </button>
+        </div>
+      </section>
 
-      <div className="owner-detail-grid">
-        <section className="glass">
-          <h2>Items</h2>
+      <div className="od-order-detail__grid">
+        <section className="dash-card od-panel">
+          <header className="od-panel__head">
+            <div>
+              <h2>Line items</h2>
+              <p>{order.items.length} dish{order.items.length !== 1 ? "es" : ""}</p>
+            </div>
+          </header>
           <ul className="owner-detail-items">
             {order.items.map((i) => (
               <li key={i.id}>
                 <span>{i.quantity}× {i.dish_name}</span>
-                <span>₹{(i.unit_price * i.quantity).toFixed(0)}</span>
+                <span>{inr(i.unit_price * i.quantity)}</span>
               </li>
             ))}
           </ul>
           <div className="owner-detail-total">
             <span>Total</span>
-            <strong>₹{order.total.toFixed(0)}</strong>
+            <strong>{inr(order.total)}</strong>
           </div>
-          {order.customer_name && <p><strong>Customer:</strong> {order.customer_name} {order.customer_phone}</p>}
-          <p><strong>Payment:</strong> {order.payment_method.toUpperCase()} · {order.delivery_type}</p>
-          {paymentCaptured && (
-            <p className="owner-pay-status owner-pay-status--ok">Payment captured · ₹{payment.amount.toFixed(0)}</p>
+          {(order.customer_name || order.customer_phone) && (
+            <p className="od-order-detail__customer">
+              <strong>Customer:</strong> {order.customer_name ?? "—"} {order.customer_phone ?? ""}
+            </p>
           )}
           {kitchen && order.status !== "cancelled" && order.status !== "delivered" && (
             <div className="owner-recipe-guide-list">
@@ -164,104 +230,130 @@ export function OrderDetailPage() {
           )}
         </section>
 
-        {needsPayment && !paymentCaptured && order.status !== "cancelled" && (
-          <section className="glass owner-pay-panel">
-            <h2>Collect payment</h2>
-            {payError && <div className="auth-card__error">{payError}</div>}
-            {order.payment_method === "upi" && (
-              <>
-                <p>Show this UPI link or QR to the customer, then confirm when paid.</p>
-                <button type="button" className="btn btn--primary" disabled={payBusy} onClick={startUpiPayment}>
-                  Generate UPI link
-                </button>
-                {upiIntent && (
-                  <div className="owner-upi-box">
-                    <code>{upiIntent.upi_uri}</code>
-                    <div className="owner-upi-actions">
-                      <button
-                        type="button"
-                        className="btn btn--ghost btn--sm"
-                        onClick={() => navigator.clipboard.writeText(upiIntent.upi_uri)}
-                      >
-                        Copy link
-                      </button>
-                      <button type="button" className="btn btn--primary btn--sm" disabled={payBusy} onClick={markUpiPaid}>
-                        Mark as paid
-                      </button>
+        <div className="od-order-detail__side">
+          {needsPayment && !paymentCaptured && order.status !== "cancelled" && (
+            <section className="dash-card od-panel owner-pay-panel">
+              <header className="od-panel__head">
+                <div>
+                  <h2>Collect payment</h2>
+                  <p>{order.payment_method === "upi" ? "UPI link or QR" : "Online checkout"}</p>
+                </div>
+              </header>
+              {payError && <div className="auth-card__error">{payError}</div>}
+              {order.payment_method === "upi" && (
+                <>
+                  <p className="od-panel__empty">Show UPI link to customer, then confirm when paid.</p>
+                  <button type="button" className="btn btn--primary" disabled={payBusy} onClick={startUpiPayment}>
+                    Generate UPI link
+                  </button>
+                  {upiIntent && (
+                    <div className="owner-upi-box">
+                      <code>{upiIntent.upi_uri}</code>
+                      <div className="owner-upi-actions">
+                        <button
+                          type="button"
+                          className="btn btn--ghost btn--sm"
+                          onClick={() => navigator.clipboard.writeText(upiIntent.upi_uri)}
+                        >
+                          Copy link
+                        </button>
+                        <button type="button" className="btn btn--primary btn--sm" disabled={payBusy} onClick={markUpiPaid}>
+                          Mark as paid
+                        </button>
+                      </div>
                     </div>
-                  </div>
-                )}
-              </>
-            )}
-            {order.payment_method === "online" && (
-              <>
-                <p>Collect card/UPI/wallet payment via Razorpay (dev: instant capture).</p>
-                <button type="button" className="btn btn--primary" disabled={payBusy} onClick={collectOnlinePayment}>
-                  Collect ₹{order.total.toFixed(0)}
-                </button>
-              </>
-            )}
-          </section>
-        )}
-
-        {stockWarnings && stockWarnings.warnings.length > 0 && (
-          <section className="glass owner-stock-warnings">
-            <h2>Ingredient stock (before accept)</h2>
-            <p className="owner-page__code">
-              {stockWarnings.has_shortfall
-                ? "Some ingredients may run short — review before accepting."
-                : "Some items are below your low-stock threshold."}
-            </p>
-            <ul className="owner-detail-items">
-              {stockWarnings.warnings.map((w) => (
-                <li key={w.ingredient_id}>
-                  <span>
-                    {w.ingredient_name}: need {w.required}
-                    {w.unit}, have {w.available}
-                    {w.unit}
-                    {w.shortfall > 0 ? ` (short ${w.shortfall}${w.unit})` : ""}
-                  </span>
-                  {w.is_low && <span className="status-badge status-badge--cancelled">Low</span>}
-                </li>
-              ))}
-            </ul>
-          </section>
-        )}
-
-        <section className="glass">
-          <h2>Update status</h2>
-          {error && <div className="auth-card__error">{error}</div>}
-          <div className="owner-status-actions">
-            {next.filter((s) => s !== "cancelled").map((s) => (
-              <button key={s} type="button" className="btn btn--primary" disabled={busy} onClick={() => advance(s)}>
-                Mark {STATUS_LABELS[s]}
-              </button>
-            ))}
-          </div>
-          {next.includes("cancelled") && (
-            <div className="owner-cancel">
-              <input
-                value={cancelReason}
-                onChange={(e) => setCancelReason(e.target.value)}
-                placeholder="Cancel reason"
-              />
-              <button type="button" className="btn btn--ghost" disabled={busy} onClick={() => advance("cancelled")}>
-                Cancel order
-              </button>
-            </div>
+                  )}
+                </>
+              )}
+              {order.payment_method === "online" && (
+                <>
+                  <p className="od-panel__empty">Collect via Razorpay (dev: instant capture).</p>
+                  <button type="button" className="btn btn--primary" disabled={payBusy} onClick={collectOnlinePayment}>
+                    Collect {inr(order.total)}
+                  </button>
+                </>
+              )}
+            </section>
           )}
-        </section>
 
-        <section className="glass owner-timeline">
-          <h2>Timeline</h2>
-          {order.status_events.map((e) => (
-            <div key={e.id} className="owner-timeline__item">
-              <time>{new Date(e.created_at).toLocaleTimeString()}</time>
-              <span>{STATUS_LABELS[e.to_status] ?? e.to_status}</span>
-              {e.note && <small>{e.note}</small>}
+          {stockWarnings && stockWarnings.warnings.length > 0 && (
+            <section className="dash-card od-panel owner-stock-warnings">
+              <header className="od-panel__head">
+                <div>
+                  <h2>Ingredient stock</h2>
+                  <p>Review before accepting</p>
+                </div>
+              </header>
+              <p className="od-order-detail__stock-hint">
+                {stockWarnings.has_shortfall
+                  ? "Some ingredients may run short."
+                  : "Some items are below low-stock threshold."}
+              </p>
+              <ul className="owner-detail-items">
+                {stockWarnings.warnings.map((w) => (
+                  <li key={w.ingredient_id}>
+                    <span>
+                      {w.ingredient_name}: need {w.required}{w.unit}, have {w.available}{w.unit}
+                      {w.shortfall > 0 ? ` (short ${w.shortfall}${w.unit})` : ""}
+                    </span>
+                    {w.is_low && <span className="status-badge status-badge--cancelled">Low</span>}
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
+
+          <section className="dash-card od-panel">
+            <header className="od-panel__head">
+              <div>
+                <h2>Update status</h2>
+                <p>Move order through the kitchen pipeline</p>
+              </div>
+            </header>
+            {error && <div className="auth-card__error">{error}</div>}
+            <div className="owner-status-actions">
+              {next.filter((s) => s !== "cancelled").map((s) => (
+                <button key={s} type="button" className="btn btn--primary" disabled={busy} onClick={() => advance(s)}>
+                  Mark {STATUS_LABELS[s]}
+                </button>
+              ))}
             </div>
-          ))}
-        </section>
+            {next.includes("cancelled") && (
+              <div className="owner-cancel">
+                <label className="kc-field owner-cancel__field">
+                  <span className="kc-field__label">Cancel reason</span>
+                  <input
+                    className="kc-input"
+                    value={cancelReason}
+                    onChange={(e) => setCancelReason(e.target.value)}
+                    placeholder="e.g. Out of stock, customer request"
+                  />
+                </label>
+                <button type="button" className="btn btn--ghost" disabled={busy} onClick={() => advance("cancelled")}>
+                  Cancel order
+                </button>
+              </div>
+            )}
+          </section>
+
+          <section className="dash-card od-panel owner-timeline">
+            <header className="od-panel__head">
+              <div>
+                <h2>Timeline</h2>
+                <p>Status history</p>
+              </div>
+            </header>
+            {order.status_events.map((e) => (
+              <div key={e.id} className="owner-timeline__item">
+                <time>{new Date(e.created_at).toLocaleString("en-IN")}</time>
+                <span className={`status-badge status-badge--${e.to_status}`}>
+                  {STATUS_LABELS[e.to_status] ?? e.to_status}
+                </span>
+                {e.note && <small>{e.note}</small>}
+              </div>
+            ))}
+          </section>
+        </div>
       </div>
     </div>
   );

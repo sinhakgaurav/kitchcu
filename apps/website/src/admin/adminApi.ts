@@ -60,7 +60,7 @@ export async function fetchAdminKitchens() {
   >("/api/v1/admin/kitchens");
 }
 
-export async function fetchAdminOrders() {
+export async function fetchAdminOrders(limit = 100) {
   return adminFetch<
     {
       id: string;
@@ -71,7 +71,7 @@ export async function fetchAdminOrders() {
       customer_name: string | null;
       created_at: string;
     }[]
-  >("/api/v1/admin/orders");
+  >(`/api/v1/admin/orders?limit=${limit}`);
 }
 
 export async function updateKitchenStatus(kitchenId: string, status: string) {

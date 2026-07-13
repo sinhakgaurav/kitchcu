@@ -1,4 +1,6 @@
 import { Link, useLocation, useParams } from "react-router-dom";
+import { useState } from "react";
+import { downloadCustomerOrderBillPdf } from "../../shared/customerCheckoutApi";
 import type { Order } from "../../shared/api";
 
 type ConfirmState = {
@@ -10,6 +12,8 @@ export function OrderConfirmPage() {
   const { orderId } = useParams<{ orderId: string }>();
   const location = useLocation();
   const state = location.state as ConfirmState | null;
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
 
   if (!state?.order || state.order.id !== orderId) {
     return (
@@ -22,6 +26,18 @@ export function OrderConfirmPage() {
   }
 
   const { order, paymentMethod } = state;
+
+  const onDownload = async () => {
+    setBusy(true);
+    setError("");
+    try {
+      await downloadCustomerOrderBillPdf(order.id, order.order_code);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Download failed");
+    } finally {
+      setBusy(false);
+    }
+  };
 
   return (
     <div className="container customer-checkout">
@@ -46,6 +62,10 @@ export function OrderConfirmPage() {
         </ul>
       </section>
 
+      {error && <div className="auth-card__error">{error}</div>}
+      <button type="button" className="btn btn--secondary" disabled={busy} onClick={onDownload}>
+        {busy ? "Preparing PDF…" : "Download PDF bill"}
+      </button>
       <Link to="/orders" className="btn btn--primary">View my orders</Link>
       <Link to="/" className="btn btn--ghost">Discover more kitchens</Link>
     </div>

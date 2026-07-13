@@ -1,284 +1,138 @@
 # Kitchcu — CPO Product Blueprint
 
-**Kitchcu cloud kitchen platform**
+**Growth Operating System for cloud kitchens & home food businesses**
 
 | Field | Value |
 |-------|-------|
-| Version | 3.0 — CPO Product Edition |
+| Version | **4.0** — Module encyclopedia edition |
 | Audience | CPO, CEO, Product, Engineering, Investors |
-| Companion | [`CKAC-COMPLETE-GUIDE.md`](./CKAC-COMPLETE-GUIDE.md) · [`CKAC-IMPLEMENTATION-GUIDE.md`](./CKAC-IMPLEMENTATION-GUIDE.md) · [`CKAC-COMPLETE-PLANNING-BENCHMARK.md`](./CKAC-COMPLETE-PLANNING-BENCHMARK.md) · [`CKAC-PITCH-DECK.pdf`](./CKAC-PITCH-DECK.pdf) |
+| Master guide | [`CKAC-COMPLETE-GUIDE.md`](./CKAC-COMPLETE-GUIDE.md) · [`CKAC-COMPLETE-GUIDE.pdf`](./CKAC-COMPLETE-GUIDE.pdf) |
+| Quality loop design | [`E1-E2-KITCHEN-QUALITY-LOOP-DESIGN.md`](./E1-E2-KITCHEN-QUALITY-LOOP-DESIGN.md) |
 | Last updated | July 2026 |
+
+> This blueprint is the **CPO lens extract**. Full CEO/CTO depth, architecture diagrams, ER, and flow charts live in the Complete Executive Guide v2.0.
 
 ---
 
 ## 1. Product North Star
 
-**Mission:** Give every cloud kitchen owner the operating system to run, grow, and trust their business — while giving customers honest visibility into what they eat.
+**Mission:** Give every cloud kitchen the operating system to run, grow, and standardize quality — while customers get honest visibility into food.
 
-| Stakeholder | One-line promise |
-|-------------|------------------|
+| Stakeholder | Promise |
+|-------------|---------|
 | Owner | WhatsApp order → revenue report same day |
 | Customer | Live photos, home-taste ratings, fair delivery |
-| Platform | Subscription SaaS — zero food commission |
+| Platform | Subscription SaaS — **zero food commission** |
+
+**Principles:** Quality over speed · Truth in media · Owner owns CRM · Progressive complexity · Not a restaurant POS.
 
 ---
 
-## 2. Current Market Pain Points → Kitchcu Solutions
+## 2. Challenges solved (CPO framing)
 
-### 2.1 Owner Pain Points
+### Owner
 
-| # | Pain Point | Impact | Kitchcu Module | Solution |
-|---|------------|--------|-------------|----------|
-| P1 | 70%+ orders on WhatsApp — no structure | Lost orders, no analytics | Order + Notification | Unified inbox, parser, manual fallback |
-| P2 | Aggregator 18–30% commission | Margin erosion | Billing (subscription) | Flat monthly fee; kitchen keeps food revenue |
-| P3 | No daily profit visibility | Cash flow guesswork | Analytics | Revenue, dish, pattern reports (Phase 1–2) |
-| P4 | Stock photos mislead customers | Refunds, bad reviews | Catalog + Media | Live-capture hero images enforced |
-| P5 | Batch-to-batch taste inconsistency | Repeat loss | Catalog + Ingredient (P3) | Per-dish standards, ingredient mapper |
-| P6 | Customer data owned by aggregators | No CRM, no coupons | Marketing | Owner CRM, coupons, tiffin plans |
-| P7 | Promotions are guesswork | Wasted discounts | Growth Engine | Seasonal, win-back, combo suggestions |
-| P8 | Multi-channel chaos (call, walk-in, chat) | Double-booking | Order Service | Single lifecycle for all sources |
+| ID | Challenge | Module answer |
+|----|-----------|---------------|
+| P1 | WhatsApp / call order chaos | Order + Notification |
+| P2 | Aggregator commissions | Billing subscription |
+| P3 | No daily profit / segment clarity | Analytics + Growth + Reports |
+| P4 | Stock photo distrust | Catalog live-capture |
+| P5 | Taste inconsistency | Recipes + Ratings (+ E2 lock) |
+| P6 | Lost customer ownership | Marketing CRM |
+| P7 | Promo guesswork | Growth suggestions + daily menu |
+| P8 | Multi-channel lifecycle chaos | Order status machine |
+| P9 | Unknown pantry mid-service | Ingredients (+ E1 purchases) |
+| P10 | GST / monthly audit | Billing GST |
+| P11 | Skills & trial management | Learning + Community |
+| P12 | Trust without ads | Live streaming |
 
-### 2.2 Customer Pain Points
+### Customer
 
-| # | Pain Point | Kitchcu Solution |
-|---|------------|---------------|
-| C1 | Cannot trust menu photos | Live-capture dish media with timestamp |
-| C2 | Opaque delivery fees | PostGIS distance + owner rules shown at checkout |
-| C3 | No real order tracking | Lifecycle + WhatsApp + push on every transition |
-| C4 | Star ratings feel generic | Home-taste benchmark (1–5) + optional A/V review |
-| C5 | One kitchen per cart on aggregators | Multi-kitchen cart + single payment (Phase 2) |
-| C6 | Cannot subscribe to home tiffin | Kitchen-defined meal plans (Phase 2) |
-
----
-
-## 3. Platform Modules (Bounded Contexts)
-
-### 3.1 Module Map
-
-```
-┌─────────────┐  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐
-│  Identity   │  │   Catalog   │  │    Order    │  │   Billing   │
-│  S1 ✅      │  │   S2 ✅     │  │   S3 ✅     │  │   S6 ⏳     │
-└──────┬──────┘  └──────┬──────┘  └──────┬──────┘  └──────┬──────┘
-       │                │                │                │
-       └────────────────┼────────────────┼────────────────┘
-                        ▼                ▼
-                 ┌─────────────┐  ┌─────────────┐
-                 │ Notification│  │  Analytics  │
-                 │ S4 ✅ +     │  │  S5 🟡      │
-                 │  support    │  │  (owner)    │
-                 └─────────────┘  └─────────────┘
-                        │
-       ┌────────────────┼────────────────┐
-       ▼                ▼                ▼
-┌─────────────┐  ┌─────────────┐  ┌─────────────┐
-│  Marketing  │  │   Rating    │  │  Delivery   │
-│  Phase 2    │  │  Phase 2    │  │  Phase 2    │
-└─────────────┘  └─────────────┘  └─────────────┘
-```
-
-### 3.2 Module Detail
-
-| Module | Responsibility | Key Features | DB Schema | Status |
-|--------|----------------|--------------|-----------|--------|
-| **Gateway** | Auth routing, rate limit | Path-based proxy to services | — | ✅ v0.3 |
-| **Identity** | Owners, kitchens, OTP, JWT | F26 onboarding, kitchen codes | `ckac_identity` | ✅ Sprint 1 |
-| **Catalog** | Menu, categories, media | F13–F15, live-capture rule | `ckac_catalog` | ✅ Sprint 2 |
-| **Order** | Intake, lifecycle, history | F03–F05, F30 | `ckac_orders` | ✅ Sprint 3 |
-| **Notification** | WhatsApp, push, SMS | F01–F02, F45 | — | ⏳ Sprint 4 |
-| **Billing** | Subscriptions, payments | F26, F42–F44 | `ckac_billing` | ⏳ Sprint 6 |
-| **Analytics** | Reports, patterns | F07–F12 | materialized views | ⏳ Sprint 6+ |
-| **Marketing** | CRM, coupons, tiffin | F34–F40 | `ckac_marketing` | Phase 2 |
-| **Rating** | Home taste, A/V | F16–F18 | `ckac_ratings` | Phase 2 |
-| **Delivery** | Radius, fees, tracking | F27–F31 | geo rules | Phase 2 |
-| **Growth** | AI-ready suggestions | F11 | `ckac_growth` | Phase 2–3 |
-| **Learning** | Recipes, trials | F21–F23 | `ckac_learning` | Phase 3 |
-| **Streaming** | Live prep | F46–F48 | session metadata | Phase 3 |
+| ID | Challenge | Module answer |
+|----|-----------|---------------|
+| C1 | Untrustworthy photos | Catalog |
+| C2 | Opaque fees | Delivery quotes |
+| C3 | Weak tracking | Order + Notify + tracking links |
+| C4 | Generic ratings | Home-taste ratings |
+| C5 | One kitchen per cart | Master checkout + split settlement |
+| C6 | Hard to rediscover locals | Nearby discovery |
 
 ---
 
-## 4. Application Flows
+## 3. Module encyclopedia (definitions)
 
-### 4.1 Owner — Day 1 Onboarding
+| Module | Definition (one line) | Status |
+|--------|----------------------|--------|
+| **Gateway** | Public API edge; never embeds domain logic | ✅ |
+| **Identity** | Owners, customers, kitchens, JWT/OTP, PostGIS | ✅ |
+| **Catalog** | Menu + live-capture media of truth | ✅ |
+| **Ingredients** | Pantry stock + recipes; deduct on accept | ✅ |
+| **Order** | Intake, lifecycle, PDF bills, owner analytics | ✅ |
+| **Multi-kitchen checkout** | One payment → many kitchen sub-orders | ✅ |
+| **Billing** | Payments, UPI, subscriptions, Route splits | ✅ |
+| **GST Finance** | GSTIN, tax invoices, monthly audit, balance sheet | ✅ |
+| **Notification** | WhatsApp, tracking nudges, support tickets | ✅ |
+| **Marketing** | Owner CRM, coupons, targeted promos | ✅ |
+| **Ratings** | Verified home-taste + tips | ✅ |
+| **Growth** | Combos, patterns, action suggestions | ✅ |
+| **Delivery** | Distance fees + tracking | ✅ |
+| **Learning** | Curated portal + dish trials | ✅ |
+| **Community** | Recipe rewards + chef rankings | ✅ |
+| **Streaming** | Owner opt-in LiveKit kitchen sessions | ✅ |
+| **PWAs** | Portal / customer / kitchen / admin surfaces | ✅ |
+| **Quality Loop E1+E2** | Purchases + lock winning ingredient standards | 📋 Design |
 
-```
-Register (phone) → OTP verify → JWT
-    → Create kitchen (name, geo, code CKPNQ001)
-    → Add dishes (live photo required for hero)
-    → Connect WhatsApp (Sprint 4)
-    → First order in inbox (< 5 min target)
-```
+Detailed description + challenge narrative for each: **Complete Guide §6**.
 
-### 4.2 Order Intake Flow (All Sources)
+---
 
-```
-Source: WhatsApp | Manual | Customer PWA
-              │
-              ▼
-        Draft or Placed order
-              │
-              ▼
-    order.placed → Redis Stream
-              │
-    ┌─────────┼─────────┐
-    ▼         ▼         ▼
- Notify   Analytics  Billing (future)
-```
-
-### 4.3 Order Lifecycle (F04)
-
-```
-received → accepted → preparing → ready → out_for_delivery → delivered
-   │          │           │          │            │
-   └──────────┴───────────┴──────────┴────────────┴──→ cancelled (reason required)
-
-Each transition:
-  • Persisted in order_status_events
-  • Publishes order.status.changed
-  • Triggers WhatsApp + push (Sprint 4+)
-```
-
-### 4.4 Customer Order Flow (Phase 2)
+## 4. Core journeys
 
 ```
-Discover (map) → Kitchen profile → Add to cart
-    → Multi-kitchen checkout → Delivery fee quote
-    → Pay UPI/COD → Track lifecycle → Rate home taste
-    → Repeat order (2 taps)
-```
+Owner day-1:
+  Register → OTP → Kitchen → Live dish → Order → Accept → Report
 
-### 4.5 Multi-Kitchen Checkout (F06 — Phase 2)
+Customer:
+  Nearby → Live menu → Fee quote → Checkout → Track → Rate home taste
 
-```
-Cart: [Kitchen A items] + [Kitchen B items]
-         │
-         ▼
-   master_orders (1 payment)
-         │
-    ┌────┴────┐
-    ▼         ▼
- order A   order B  (separate lifecycle, separate bills)
-         │
-         ▼
-Razorpay Route split settlement
+Progressive unlock:
+  Ops → CRM → Ingredients/GST/Growth → Learning/Community/Live → Quality loop
 ```
 
 ---
 
-## 5. Data Flow Architecture
+## 5. Surfaces
 
-### 5.1 Request Path
-
-```
-PWA / WhatsApp → API Gateway (:18000)
-    → Identity | Catalog | Order service
-    → PostgreSQL (schema-per-domain)
-    → Redis (cache + event streams)
-    → MinIO (media)
-```
-
-### 5.2 Event-Driven Data Flow (EDD)
-
-| Event | Producer | Stream | Consumers (future) |
-|-------|----------|--------|---------------------|
-| `kitchen.created` | identity | `ckac:identity:kitchen` | analytics |
-| `dish.created` | catalog | `ckac:catalog:dish` | search, cache invalidation |
-| `dish.updated` | catalog | `ckac:catalog:dish` | menu cache |
-| `order.placed` | order | `ckac:orders:order` | notification, analytics, billing |
-| `order.status.changed` | order | `ckac:orders:order` | notification, customer tracking |
-| `payment.captured` | billing | `ckac:billing:payment` | settlement, reports |
-
-**Contract:** DB commit first → publish `EventEnvelope` → outbox for reliability (Sprint 4+).
-
-### 5.3 Database Schema Roadmap
-
-| Schema | Tables | Phase |
-|--------|--------|-------|
-| `ckac_identity` | owners, kitchens | 1 ✅ |
-| `ckac_catalog` | categories, dishes, dish_media | 1 ✅ |
-| `ckac_orders` | orders, order_items, order_status_events | 1 ✅ |
-| `ckac_events` | outbox, processed_events | 1 ✅ |
-| `ckac_billing` | payments, subscriptions | 1 |
-| `ckac_marketing` | customers, coupons, plans | 2 |
-| `ckac_ratings` | dish_ratings, suggestions | 2 |
-| `ckac_growth` | suggestions, patterns | 2–3 |
+| Domain | Audience | Job |
+|--------|----------|-----|
+| kitchcu.in (portal) | Market | Brand, education, signup |
+| kitchen.kitchcu.in | Owner | Run & grow the kitchen |
+| customer.kitchcu.in | Diner | Discover, order, track, rate |
+| admin.kitchcu.in | Ops | Support, kitchens, attention |
 
 ---
 
-## 6. Feature Catalog (48 Features)
+## 6. KPIs
 
-### Phase 1 — Owner Can Run Kitchen (Months 1–3)
-
-| ID | Feature | Module | Sprint |
-|----|---------|--------|--------|
-| F01 | WhatsApp order capture | notification + order | S4 |
-| F02 | Normal message parser | notification | S4 |
-| F03 | Manual order input | order | S3 ✅ |
-| F04 | Order lifecycle | order | S3 ✅ |
-| F05 | Order history | order | S3 ✅ |
-| F07 | Revenue report | analytics | S6 |
-| F13 | Dish + live photo | catalog | S2 ✅ |
-| F14 | Price, ingredients, quality | catalog | S2 ✅ |
-| F15 | Categories | catalog | S2 ✅ |
-| F26 | Owner subscription | billing | S6 |
-| F30 | Per-dish prep time | order + catalog | S3 ✅ |
-| F42 | Online pay + COD | billing | S6 |
-| F43 | UPI scanner | billing | S6 |
-| F45 | App + WhatsApp notify | notification | S4 |
-
-### Phase 2 — Growth (Months 4–6)
-
-F06, F08–F11, F16–F18, F25, F27–F33, F34–F40, F41, F44
-
-### Phase 3 — Differentiation (Months 7–10)
-
-F12, F19–F24, F46–F48
+| KPI | Near-term | 12-month |
+|-----|-----------|----------|
+| Active kitchens | 10 | 500 |
+| Orders/day | 50 | 5,000 |
+| Owner retention | 80% | 90% |
+| 30d repeat | 25% | 40% |
+| Locked standards/kitchen | — | ≥ 3 (post-E2) |
 
 ---
 
-## 7. Current Build Status (July 2026)
+## 7. CTO pointer
 
-| Sprint | Deliverable | Tests |
-|--------|-------------|-------|
-| S1 ✅ | Identity, gateway, Docker, JWT | 25 |
-| S2 ✅ | Catalog, live-capture, EDD | 10 |
-| S3 ✅ | Order manual, lifecycle, history | 16 |
-| S4 ✅ | WhatsApp webhook + parser + AI support chat | +8 notification |
-| S5 🟡 | PWAs (portal, customer, kitchen, admin) + owner analytics + ticketing | Frontend + order analytics |
-| S6 ⏳ | Billing + revenue reports | — |
+For architecture, event flows, and ER diagrams see:
 
-**Total automated tests:** 90+ passing
+- Complete Guide **Part III** (PDF + markdown)
+- `CKAC-ARCHITECTURE-CTO.md`
+- `CKAC-SYSTEM-BENCHMARK.md`
 
 ---
 
-## 8. Success Metrics (CPO KPIs)
-
-| Metric | Phase 1 Target | Measurement |
-|--------|----------------|-------------|
-| Time to first order | < 5 min post-signup | Onboarding funnel |
-| Owner daily active | 80% of paying kitchens | PWA analytics |
-| Order capture rate | 95% WhatsApp parsed or manual | Parser accuracy |
-| Lifecycle update latency | < 2s to customer notify | Event → push SLA |
-| Menu trust score | 100% hero images live-capture | Catalog audit |
-| Owner retention M6 | 80% | Subscription churn |
-| Repeat customer rate | 40%+ | CRM aggregates |
-
----
-
-## 9. Product Principles (Non-Negotiable)
-
-1. **Truth in media** — hero dish photos must be live-capture
-2. **Quality over speed** — owner-set prep times, no fake ETAs
-3. **Owner sovereignty** — CRM and customer data belong to kitchen
-4. **Progressive complexity** — hide advanced features until 50+ orders
-5. **WhatsApp-native** — meet owners where they already work
-
----
-
-## 10. Regenerate PDF
-
-```bash
-python scripts/generate_pitch_pdf.py
-```
-
-Output: `docs/CKAC-PITCH-DECK.pdf`
+*CPO Product Blueprint v4.0 — aligned with Complete Guide v2.0 — July 2026*

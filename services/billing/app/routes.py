@@ -10,6 +10,7 @@ from app.deps import (
     load_customer_phone,
     load_order_for_customer,
     load_order_for_owner,
+    verify_kitchen_owner,
 )
 from app.schemas import (
     MasterPaymentCaptureResponse,
@@ -38,6 +39,23 @@ from app.schemas import (
     payment_to_response,
     settlement_to_response,
     subscription_to_response,
+)
+from app.gst import (
+    GstAuditResponse,
+    GstBalanceSheetResponse,
+    GstMonthlyReportResponse,
+    GstProfileResponse,
+    GstProfileUpsertRequest,
+    GstSyncResponse,
+    close_monthly_audit,
+    get_gst_profile,
+    get_monthly_audit,
+    get_monthly_gst_report,
+    profile_to_response,
+    invoice_to_response,
+    sync_gst_invoices,
+    upsert_gst_profile,
+    build_balance_sheet,
 )
 from ckac_common.database import get_db
 from ckac_common.event_bus import EventPublisher
@@ -306,3 +324,144 @@ async def razorpay_webhook(
     payment.razorpay_payment_id = razorpay_payment_id
     await capture_payment(session, payment, publisher)
     return {"status": "ok"}
+
+
+@router.get("/kitchens/{kitchen_id}/gst/profile", response_model=GstProfileResponse)
+async def gst_profile_get(
+    kitchen_id: uuid.UUID,
+    owner_id: Annotated[uuid.UUID, Depends(get_current_owner_id)],
+    session: Annotated[AsyncSession, Depends(get_db)],
+) -> GstProfileResponse:
+    await verify_kitchen_owner(kitchen_id, owner_id, session)
+    profile = await get_gst_profile(session, kitchen_id)
+    if not profile:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="GST profile not found")
+    return profile_to_response(profile)
+
+
+@router.put("/kitchens/{kitchen_id}/gst/profile", response_model=GstProfileResponse)
+async def gst_profile_upsert(
+    kitchen_id: uuid.UUID,
+    body: GstProfileUpsertRequest,
+    owner_id: Annotated[uuid.UUID, Depends(get_current_owner_id)],
+    session: Annotated[AsyncSession, Depends(get_db)],
+    publisher: Annotated[EventPublisher, Depends(get_publisher)],
+) -> GstProfileResponse:
+    await verify_kitchen_owner(kitchen_id, owner_id, session)
+    try:
+        profile = await upsert_gst_profile(session, kitchen_id, body, publisher)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    return profile_to_response(profile)
+
+
+@router.post("/kitchens/{kitchen_id}/gst/sync", response_model=GstSyncResponse)
+async def gst_sync_invoices(
+    kitchen_id: uuid.UUID,
+    owner_id: Annotated[uuid.UUID, Depends(get_current_owner_id)],
+    session: Annotated[AsyncSession, Depends(get_db)],
+    publisher: Annotated[EventPublisher, Depends(get_publisher)],
+    year: int | None = None,
+    month: int | None = None,
+) -> GstSyncResponse:
+    await verify_kitchen_owner(kitchen_id, owner_id, session)
+    try:
+        invoices = await sync_gst_invoices(
+            session,
+            kitchen_id,
+            publisher,
+            year=year,
+            month=month,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    return GstSyncResponse(
+        synced_count=len(invoices),
+        invoices=[invoice_to_response(i) for i in invoices],
+    )
+
+
+@router.get("/kitchens/{kitchen_id}/gst/reports/monthly", response_model=GstMonthlyReportResponse)
+async def gst_monthly_report(
+    kitchen_id: uuid.UUID,
+    owner_id: Annotated[uuid.UUID, Depends(get_current_owner_id)],
+    session: Annotated[AsyncSession, Depends(get_db)],
+    year: int,
+    month: int,
+) -> GstMonthlyReportResponse:
+    await verify_kitchen_owner(kitchen_id, owner_id, session)
+    if month < 1 or month > 12:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid month")
+    try:
+        report = await get_monthly_gst_report(session, kitchen_id, year, month)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    return report
+
+
+@router.get(
+    "/kitchens/{kitchen_id}/gst/reports/balance-sheet",
+    response_model=GstBalanceSheetResponse,
+)
+async def gst_balance_sheet(
+    kitchen_id: uuid.UUID,
+    owner_id: Annotated[uuid.UUID, Depends(get_current_owner_id)],
+    session: Annotated[AsyncSession, Depends(get_db)],
+    year: int,
+    month: int,
+) -> GstBalanceSheetResponse:
+    await verify_kitchen_owner(kitchen_id, owner_id, session)
+    if month < 1 or month > 12:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid month")
+    profile = await get_gst_profile(session, kitchen_id)
+    if not profile or not profile.is_active:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="GST profile not active")
+    audit = await get_monthly_audit(session, kitchen_id, year, month)
+    if audit.balance_sheet:
+        return audit.balance_sheet
+    sheet = await build_balance_sheet(
+        session,
+        kitchen_id,
+        year,
+        month,
+        gst_payable=audit.total_tax,
+        gross_sales=audit.total_gross_sales,
+    )
+    return sheet
+
+
+@router.get("/kitchens/{kitchen_id}/gst/audit", response_model=GstAuditResponse)
+async def gst_audit_get(
+    kitchen_id: uuid.UUID,
+    owner_id: Annotated[uuid.UUID, Depends(get_current_owner_id)],
+    session: Annotated[AsyncSession, Depends(get_db)],
+    year: int,
+    month: int,
+) -> GstAuditResponse:
+    await verify_kitchen_owner(kitchen_id, owner_id, session)
+    if month < 1 or month > 12:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid month")
+    try:
+        audit = await get_monthly_audit(session, kitchen_id, year, month)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    return audit
+
+
+@router.post("/kitchens/{kitchen_id}/gst/audit/close", response_model=GstAuditResponse)
+async def gst_audit_close(
+    kitchen_id: uuid.UUID,
+    owner_id: Annotated[uuid.UUID, Depends(get_current_owner_id)],
+    session: Annotated[AsyncSession, Depends(get_db)],
+    publisher: Annotated[EventPublisher, Depends(get_publisher)],
+    year: int,
+    month: int,
+) -> GstAuditResponse:
+    await verify_kitchen_owner(kitchen_id, owner_id, session)
+    if month < 1 or month > 12:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid month")
+    try:
+        audit = await close_monthly_audit(session, kitchen_id, owner_id, year, month, publisher)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    return audit

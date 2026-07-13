@@ -1,4 +1,6 @@
 import { Link, useLocation, useParams } from "react-router-dom";
+import { useState } from "react";
+import { downloadCustomerMasterBillPdf } from "../../shared/customerCheckoutApi";
 import type { MasterOrder, Settlement } from "../../shared/api";
 
 type ConfirmState = {
@@ -23,6 +25,20 @@ export function MasterOrderConfirmPage() {
   }
 
   const { master, paymentMethod, settlements } = state;
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+
+  const onDownload = async () => {
+    setBusy(true);
+    setError("");
+    try {
+      await downloadCustomerMasterBillPdf(master.id, master.master_order_code);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Download failed");
+    } finally {
+      setBusy(false);
+    }
+  };
 
   return (
     <div className="container customer-checkout">
@@ -71,6 +87,10 @@ export function MasterOrderConfirmPage() {
         </section>
       ))}
 
+      {error && <div className="auth-card__error">{error}</div>}
+      <button type="button" className="btn btn--secondary" disabled={busy} onClick={onDownload}>
+        {busy ? "Preparing PDF…" : "Download master PDF bill"}
+      </button>
       <Link to="/orders" className="btn btn--primary">Track sub-orders</Link>
       <Link to="/#nearby" className="btn btn--ghost">Discover more kitchens</Link>
     </div>

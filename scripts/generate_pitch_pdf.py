@@ -47,7 +47,7 @@ class CPOProductPDF(FPDF):
         self.set_y(-12)
         self.set_font("Helvetica", "I", 8)
         self.set_text_color(*GRAY)
-        self.cell(0, 8, "Kitchcu CPO Product Blueprint v3.0 | Confidential | July 2026", align="C")
+        self.cell(0, 8, "Kitchcu CPO Product Blueprint v4.0 | Confidential | July 2026", align="C")
 
     def new_slide(self, tag: str = ""):
         self.add_page()
@@ -852,7 +852,43 @@ Customer cart:
     pdf.set_text_color(*ACCENT)
     pdf.cell(0, 8, ascii_safe("Kitchcu is infrastructure - not the next food aggregator."))
 
-    # 33 — Contact
+    # 33 — Platform status S1-S18
+    pdf.new_slide("Status")
+    pdf.section_title("Shipped Module Status (July 2026)")
+    pdf.table(
+        ["Module", "Challenge solved", "Status"],
+        [
+            ["Identity + Catalog + Order", "Onboard, live menu, lifecycle", "DONE S1-S3"],
+            ["Notification + Support", "WhatsApp + tickets + tracking nudges", "DONE S4/S14"],
+            ["Billing + GST finance", "Subscription + monthly tax audit", "DONE S6+GST"],
+            ["Multi-kitchen + Route pay", "One cart, fair kitchen payouts", "DONE S8-S9"],
+            ["Marketing CRM / coupons", "Owner owns customers", "DONE S10"],
+            ["Ratings + Growth", "Home taste + actionable suggestions", "DONE S11-S12"],
+            ["Delivery + Ingredients", "Fair fees + pantry deduct", "DONE S13/S15"],
+            ["Learning/Community/Live", "Skills, rankings, opt-in stream", "DONE S16-S18"],
+            ["Quality loop E1+E2", "Purchases + lock chef standards", "DESIGN"],
+        ],
+        [70, 130, 57],
+        size=8,
+    )
+
+    # 34 — Architecture snapshot
+    pdf.new_slide("Architecture")
+    pdf.section_title("CTO Architecture Snapshot")
+    pdf.bullets([
+        "Edge: API Gateway routes /api/v1 to 13 domain services (ports 18001-18012)",
+        "Data: PostgreSQL schema-per-domain + PostGIS; Redis Streams + transactional outbox",
+        "Writes never cross schemas; Growth/Ratings read orders cross-schema for evidence only",
+        "PWAs: portal, customer.kitchcu.in, kitchen.kitchcu.in, admin.kitchcu.in",
+        "Full diagrams (architecture, flows, ER): CKAC-COMPLETE-GUIDE.pdf Part III",
+    ], size=10)
+    pdf.mono(
+        "PWAs -> Gateway -> Identity|Catalog|Order|Billing|Marketing|Ratings|\n"
+        "                   Growth|Delivery|Learning|Community|Streaming|Notify\n"
+        "                -> PostgreSQL schemas + Redis Streams + MinIO"
+    )
+
+    # 35 — Contact
     pdf.new_slide("Contact")
     pdf.set_xy(20, 55)
     pdf.set_font("Helvetica", "B", 36)
@@ -873,8 +909,8 @@ Customer cart:
     pdf.set_text_color(*GRAY)
     pdf.multi_cell(
         257, 6,
-        "Full specs: CKAC-COMPLETE-PLANNING-BENCHMARK.md | CKAC-SYSTEM-BENCHMARK.md | "
-        "CKAC-CPO-PRODUCT-BLUEPRINT.md",
+        "Full guide: CKAC-COMPLETE-GUIDE.md / .pdf (v2.0) | CPO blueprint v4.0 | "
+        "E1-E2 quality-loop design pack",
     )
 
     output_path.parent.mkdir(parents=True, exist_ok=True)

@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { OwnerPageShell, OwnerPanel } from "../../components/owner/OwnerPageShell";
 import { useKitchenAuth } from "../../shared/kitchenAuth";
 import {
   activateSubscription,
@@ -71,44 +72,42 @@ export function SubscriptionPage() {
     }
   };
 
-  if (loading) return <div className="owner-page app-loading">Loading plans...</div>;
+  if (loading) return <div className="owner-screen app-loading">Loading plans…</div>;
 
   const activeTier = subscription?.status === "active" ? subscription.plan_tier : owner?.subscription_tier;
   const activeStatus = subscription?.status ?? owner?.subscription_status ?? "trial";
 
   return (
-    <div className="owner-page">
-      <header className="owner-page__head">
-        <div>
-          <h1>Subscription</h1>
-          <p>No per-order commission — flat kitchen SaaS billing only.</p>
-        </div>
+    <OwnerPageShell
+      eyebrow="Billing"
+      title="Subscription"
+      description="No per-order commission — flat kitchen SaaS billing only"
+      actions={
         <span className={`status-badge status-badge--lg owner-sub-badge owner-sub-badge--${activeStatus}`}>
           {activeStatus} · {TIER_LABELS[activeTier ?? "starter"] ?? activeTier}
         </span>
-      </header>
-
+      }
+    >
       {error && <div className="auth-card__error">{error}</div>}
 
       {subscription && subscription.status !== "active" && (
-        <section className="glass owner-sub-activate">
-          <h2>Complete payment</h2>
+        <OwnerPanel title="Complete payment">
           <p>
             {TIER_LABELS[subscription.plan_tier]} plan · ₹{subscription.amount.toFixed(0)} / {subscription.billing_cycle}
           </p>
           <button type="button" className="btn btn--primary" disabled={busy} onClick={activate}>
             Activate subscription (dev)
           </button>
-        </section>
+        </OwnerPanel>
       )}
 
       {subscription?.status === "active" && subscription.current_period_end && (
-        <section className="glass owner-sub-active">
+        <OwnerPanel title="Current plan">
           <p>
             Active until {new Date(subscription.current_period_end).toLocaleDateString()} ·
             ₹{subscription.amount.toFixed(0)} / {subscription.billing_cycle}
           </p>
-        </section>
+        </OwnerPanel>
       )}
 
       <div className="owner-tabs">
@@ -125,7 +124,7 @@ export function SubscriptionPage() {
           const amount = cycle === "monthly" ? plan.monthly_amount : plan.yearly_amount;
           const isCurrent = activeTier === plan.tier && activeStatus === "active";
           return (
-            <article key={plan.tier} className={`glass owner-plan-card${isCurrent ? " owner-plan-card--current" : ""}`}>
+            <article key={plan.tier} className={`dash-card owner-plan-card${isCurrent ? " owner-plan-card--current" : ""}`}>
               <h2>{TIER_LABELS[plan.tier] ?? plan.tier}</h2>
               <p className="owner-plan-card__price">
                 <strong>₹{amount.toFixed(0)}</strong>
@@ -148,6 +147,6 @@ export function SubscriptionPage() {
           );
         })}
       </div>
-    </div>
+    </OwnerPageShell>
   );
 }

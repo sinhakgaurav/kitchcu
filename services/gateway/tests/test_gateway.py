@@ -82,6 +82,10 @@ def test_resolve_service_url_order():
         resolve_service_url("/api/v1/kitchens/abc/analytics/summary")
         == settings.order_service_url
     )
+    assert (
+        resolve_service_url("/api/v1/kitchens/abc/analytics/customers")
+        == settings.order_service_url
+    )
 
 
 def test_resolve_service_url_customer_orders():

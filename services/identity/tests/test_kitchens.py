@@ -37,6 +37,8 @@ async def test_create_kitchen_success(client: AsyncClient, auth_headers: dict):
     assert data["max_delivery_radius_km"] == 10.0
     assert data["latitude"] == pytest.approx(18.5362, rel=1e-4)
     assert data["longitude"] == pytest.approx(73.8958, rel=1e-4)
+    assert data["address_line"] == KITCHEN_PAYLOAD["address_line"]
+    assert data["pincode"] == KITCHEN_PAYLOAD["pincode"]
     assert "id" in data
     assert "owner_id" in data
 
