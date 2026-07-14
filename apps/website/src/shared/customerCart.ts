@@ -16,6 +16,9 @@ export type KitchenCart = {
   updatedAt: string;
 };
 
+/** Alias used by checkout — same shape as KitchenCart */
+export type KitchenCartGroup = KitchenCart;
+
 export type CustomerCart = {
   kitchens: KitchenCart[];
   updatedAt: string;

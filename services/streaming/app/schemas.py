@@ -22,61 +22,75 @@ from ckac_common.event_bus import EventPublisher
 
 
 class StreamSettingsResponse(BaseModel):
-    kitchen_id: uuid.UUID
-    live_sharing_enabled: bool
-    q_and_a_enabled: bool
-    is_live: bool
-    livekit_configured: bool
+    """A kitchen's live-streaming opt-in settings and current live status (F47)."""
+
+    kitchen_id: uuid.UUID = Field(..., description="Kitchen UUID.")
+    live_sharing_enabled: bool = Field(..., description="Owner opt-in — must be true before the kitchen can go live.")
+    q_and_a_enabled: bool = Field(..., description="Whether live Q&A is enabled during streams (reserved for future use in the viewer UI).")
+    is_live: bool = Field(..., description="Whether the kitchen currently has an active live session.")
+    livekit_configured: bool = Field(..., description="Whether this deployment has LiveKit credentials configured. False means go-live/viewer-token calls will return sessions without usable tokens.")
 
     model_config = {"from_attributes": True}
 
 
 class StreamSettingsUpdate(BaseModel):
-    live_sharing_enabled: bool | None = None
-    q_and_a_enabled: bool | None = None
+    """Owner partial update to stream settings."""
+
+    live_sharing_enabled: bool | None = Field(default=None, description="Opt in/out of live streaming entirely.")
+    q_and_a_enabled: bool | None = Field(default=None, description="Enable/disable live Q&A.")
 
 
 class GoLiveRequest(BaseModel):
-    title: str = Field(default="Live kitchen prep", max_length=255)
-    order_id: uuid.UUID | None = None
+    """Owner request to start a live publisher session."""
+
+    title: str = Field(default="Live kitchen prep", max_length=255, description="Session title shown to viewers.")
+    order_id: uuid.UUID | None = Field(default=None, description="Optionally tie this stream to a specific order (e.g. showing live prep for that customer's order).")
 
 
 class LiveSessionResponse(BaseModel):
-    id: uuid.UUID
-    kitchen_id: uuid.UUID
-    title: str
-    room_name: str
-    status: str
-    order_id: uuid.UUID | None
-    viewer_count: int
-    started_at: datetime
-    ended_at: datetime | None
-    livekit_url: str | None = None
-    publisher_token: str | None = None
+    """A live (or just-ended) streaming session."""
+
+    id: uuid.UUID = Field(..., description="Session UUID.")
+    kitchen_id: uuid.UUID = Field(..., description="Streaming kitchen UUID.")
+    title: str = Field(..., description="Session title.")
+    room_name: str = Field(..., description="LiveKit room name, derived deterministically from the kitchen ID.")
+    status: str = Field(..., description="'live' or 'ended'.")
+    order_id: uuid.UUID | None = Field(default=None, description="Linked order, if this stream is tied to a specific order.")
+    viewer_count: int = Field(..., description="Running count of viewer tokens issued for this session.")
+    started_at: datetime = Field(..., description="Session start timestamp, UTC.")
+    ended_at: datetime | None = Field(default=None, description="Session end timestamp, UTC, once ended.")
+    livekit_url: str | None = Field(default=None, description="LiveKit server URL for the client SDK to connect to; null if LiveKit is not configured.")
+    publisher_token: str | None = Field(default=None, description="Short-lived LiveKit publish token for the owner's broadcasting client; only returned to the owner (go-live/current-session calls), never to viewers.")
 
     model_config = {"from_attributes": True}
 
 
 class ViewerTokenResponse(BaseModel):
-    session_id: uuid.UUID
-    room_name: str
-    livekit_url: str | None
-    token: str | None
-    kitchen_name: str | None = None
+    """A short-lived, viewer-only LiveKit token for watching a live session."""
+
+    session_id: uuid.UUID = Field(..., description="Live session UUID this token grants access to.")
+    room_name: str = Field(..., description="LiveKit room name to join.")
+    livekit_url: str | None = Field(default=None, description="LiveKit server URL; null if LiveKit is not configured.")
+    token: str | None = Field(default=None, description="Viewer (subscribe-only, cannot publish) LiveKit token; null if LiveKit is not configured.")
+    kitchen_name: str | None = Field(default=None, description="Streaming kitchen's display name, for the viewer UI.")
 
 
 class LiveKitchenSummary(BaseModel):
-    kitchen_id: uuid.UUID
-    kitchen_code: str
-    kitchen_name: str
-    session_id: uuid.UUID
-    title: str
-    started_at: datetime
+    """One currently-live, opted-in, active kitchen (public discovery — F48)."""
+
+    kitchen_id: uuid.UUID = Field(..., description="Kitchen UUID.")
+    kitchen_code: str = Field(..., description="Kitchen code.")
+    kitchen_name: str = Field(..., description="Kitchen display name.")
+    session_id: uuid.UUID = Field(..., description="Active live session UUID.")
+    title: str = Field(..., description="Current session title.")
+    started_at: datetime = Field(..., description="Session start timestamp, UTC.")
 
 
 class LiveKitchenListResponse(BaseModel):
-    kitchens: list[LiveKitchenSummary]
-    total: int
+    """Public directory of kitchens currently streaming."""
+
+    kitchens: list[LiveKitchenSummary] = Field(..., description="Live kitchens, most recently started first.")
+    total: int = Field(..., description="Number of live kitchens returned.")
 
 
 async def _get_settings_row(session: AsyncSession, kitchen_id: uuid.UUID) -> KitchenStreamSettings:

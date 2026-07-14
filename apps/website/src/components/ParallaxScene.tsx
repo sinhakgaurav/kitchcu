@@ -25,11 +25,11 @@ export function ParallaxScene({ variant = "hero" }: Props) {
   const ref = useRef<HTMLDivElement>(null);
   const { scrollY } = useScrollProgress();
   const sectionOffset = useSectionParallax(ref);
-  const mouse = useMouseParallax(variant === "hero" ? 0.28 : 0.14);
+  const mouse = useMouseParallax(variant === "hero" ? 0.42 : 0.14);
 
   const baseOffset =
     variant === "hero" ? scrollY * 1.2 + sectionOffset * 0.45 : sectionOffset;
-  const intensity = variant === "hero" ? 1.8 : 1.1;
+  const intensity = variant === "hero" ? 2.15 : 1.1;
 
   return (
     <div

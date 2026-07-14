@@ -20,7 +20,9 @@ python scripts/seed-dev-data.py
 # Kitchen app:   http://localhost:13002  (kitchen.kitchcu.in)
 # Admin app:     http://localhost:13003  (admin.kitchcu.in)
 # Portal:        http://localhost:13000  (kitchcu.in)
-# API Gateway:   http://localhost:18000/docs
+# API Gateway:   http://localhost:18000/docs  (aggregated OpenAPI)
+# Portal OpenAPI: http://localhost:13000/openapi
+# Identity:      http://localhost:18001/docs
 ```
 
 ## Demo credentials (after seed)

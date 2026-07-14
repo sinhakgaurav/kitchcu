@@ -22,38 +22,65 @@ _CUSTOMER_OTP: dict[str, str] = {}
 
 
 class CustomerResponse(BaseModel):
-    id: uuid.UUID
-    name: str
-    email: str | None
-    phone: str | None
-    avatar_url: str | None
-    status: str
+    """Customer profile returned by `GET /customers/me` and embedded in auth responses."""
+
+    id: uuid.UUID = Field(..., description="Customer UUID primary key.")
+    name: str = Field(..., description="Customer display name.", examples=["Anjali Rao"])
+    email: str | None = Field(default=None, description="Customer email (set via OAuth or optionally later).")
+    phone: str | None = Field(default=None, description="Customer phone in E.164, if logged in via WhatsApp OTP.", examples=["+919123456789"])
+    avatar_url: str | None = Field(default=None, description="Profile picture URL from the OAuth provider, if any.")
+    status: str = Field(..., description="Customer account status.", examples=["active"])
 
     model_config = {"from_attributes": True}
 
 
 class CustomerAuthResponse(BaseModel):
-    access_token: str
-    token_type: str = "bearer"
-    expires_in: int
-    customer: CustomerResponse
+    """Bearer token + profile returned after successful OAuth or WhatsApp OTP login.
+
+    `access_token` is a JWT with `type: "customer"` and `sub` set to the customer UUID.
+    """
+
+    access_token: str = Field(
+        ...,
+        description='JWT bearer token, payload `{"sub": "<customer_id>", "type": "customer", "exp": ...}`.',
+        examples=["eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."],
+    )
+    token_type: str = Field(default="bearer", description="Always `bearer`.", examples=["bearer"])
+    expires_in: int = Field(..., description="Token lifetime in seconds from issuance.", examples=[3600])
+    customer: CustomerResponse = Field(..., description="The authenticated customer's profile.")
 
 
 class OAuthStartResponse(BaseModel):
-    provider: str
-    state: str
-    authorization_url: str | None = None
-    dev_mode: bool = False
+    """Response for `GET /auth/customer/oauth/{provider}/start` — begin a social login."""
+
+    provider: str = Field(..., description="Normalized OAuth provider id.", examples=["google"])
+    state: str = Field(..., description="Opaque CSRF state token; echo it back unchanged in `/complete`.", examples=["a1b2c3d4"])
+    authorization_url: str | None = Field(
+        default=None, description="URL to redirect the customer to for provider consent. Null in dev mode."
+    )
+    dev_mode: bool = Field(
+        default=False, description="True when OAuth client credentials are not configured and a simulated dev profile will be used."
+    )
 
 
 class OAuthCompleteRequest(BaseModel):
-    code: str
-    state: str
-    redirect_uri: str
+    """Body for `POST /auth/customer/oauth/{provider}/complete` — finishes a social login."""
+
+    code: str = Field(..., description="Authorization code returned by the provider callback.", examples=["4/0AY0e-g7..."])
+    state: str = Field(..., description="The `state` value returned from the `/start` call — validated against stored OAuth state.", examples=["a1b2c3d4"])
+    redirect_uri: str = Field(..., description="Must exactly match the redirect_uri used in `/start`.", examples=["https://customer.kitchcu.in/oauth/callback"])
 
 
 class CustomerPhoneRequest(BaseModel):
-    phone: str = Field(..., min_length=10, max_length=15)
+    """Body for `POST /auth/customer/whatsapp/request` — initiates WhatsApp OTP login."""
+
+    phone: str = Field(
+        ...,
+        min_length=10,
+        max_length=15,
+        description="Customer WhatsApp/mobile number as 10 digits or E.164. Normalized to E.164 (+91XXXXXXXXXX).",
+        examples=["9123456789"],
+    )
 
     @field_validator("phone")
     @classmethod
@@ -67,7 +94,15 @@ class CustomerPhoneRequest(BaseModel):
 
 
 class CustomerPhoneVerifyRequest(CustomerPhoneRequest):
-    otp: str = Field(..., min_length=4, max_length=6)
+    """Body for `POST /auth/customer/whatsapp/verify` — exchanges OTP for a customer JWT."""
+
+    otp: str = Field(
+        ...,
+        min_length=4,
+        max_length=6,
+        description="One-time password sent via WhatsApp. Dev/staging value is always `123456`.",
+        examples=["123456"],
+    )
 
 
 def create_customer_access_token(customer_id: uuid.UUID) -> tuple[str, int]:

@@ -31,7 +31,13 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="kitchCU Ratings Service",
     version="0.1.0",
-    description="Home taste ratings, aggregates, A/V reviews — Sprint 11",
+    description=(
+        "Owns dish rating integrity (F16-F18): **only verified, delivered-order purchases** may "
+        "rate a dish (no drive-by reviews). Each rating pairs a home-taste score with a quality "
+        "score (weighted 60/40 into `overall_rating`), optionally attaching an anonymous audio/"
+        "video review. Aggregates roll up per dish/kitchen in real time. Also hosts customer dish "
+        "**suggestions** — freeform feedback an owner can accept/reject and respond to."
+    ),
     lifespan=lifespan,
 )
 

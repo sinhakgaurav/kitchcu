@@ -1,8 +1,8 @@
 import { FormEvent, useState } from "react";
 import { Link, Navigate, useNavigate, useSearchParams } from "react-router-dom";
 import { AnimatedMesh } from "../components/AnimatedMesh";
-import { images } from "../data/content";
-import { DEMO } from "../shared/demo";
+import { BrandAuthArt, BrandLogo } from "../components/BrandLogo";
+import { DEMO, DEMO_OWNERS, type DemoOwnerAccount } from "../shared/demo";
 import { registerOwner, requestOtp, verifyOtp } from "../shared/api";
 import { KITCHEN_HOST, CUSTOMER_HOST } from "../shared/brand";
 import { useKitchenAuth } from "../shared/kitchenAuth";
@@ -24,6 +24,7 @@ export function LoginPage() {
   const [otpSent, setOtpSent] = useState(false);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [busyPhone, setBusyPhone] = useState<string | null>(null);
 
   if (token) return <Navigate to={nextPath.startsWith("/") ? nextPath : "/dashboard"} replace />;
 
@@ -72,16 +73,17 @@ export function LoginPage() {
     }
   };
 
-  const handleDemoLogin = async () => {
+  const handleDemoLogin = async (account: DemoOwnerAccount) => {
     setError("");
     setBusy(true);
+    setBusyPhone(account.phone);
     setMode("login");
-    setPhone(DEMO.phone);
+    setPhone(account.phone);
     setOtp(DEMO.otp);
     try {
-      await requestOtp(DEMO.phone);
+      await requestOtp(account.phone);
       setOtpSent(true);
-      const { access_token } = await verifyOtp(DEMO.phone, DEMO.otp);
+      const { access_token } = await verifyOtp(account.phone, DEMO.otp);
       await login(access_token);
       navigate(nextPath.startsWith("/") ? nextPath : "/dashboard");
     } catch (err) {
@@ -93,6 +95,7 @@ export function LoginPage() {
       setOtpSent(true);
     } finally {
       setBusy(false);
+      setBusyPhone(null);
     }
   };
 
@@ -100,10 +103,10 @@ export function LoginPage() {
     <div className="auth-page auth-page--kitchen">
       <AnimatedMesh variant="kitchen" />
       <div className="auth-page__visual">
-        <img src={images.login.src} alt={images.login.alt} className="auth-page__img" />
         <div className="auth-page__overlay" />
-        <div className="auth-page__visual-text">
-          <Link to="/" className="nav__logo">kitchCU</Link>
+        <div className="auth-page__brand-stack">
+          <BrandLogo variant="wordmark" className="brand-logo--lg" />
+          <BrandAuthArt surface="kitchen" />
           <h1>Kitchen owner portal</h1>
           <p>Sign in on {KITCHEN_HOST} to manage orders, menu, and customer links.</p>
         </div>
@@ -112,20 +115,30 @@ export function LoginPage() {
       <div className="auth-page__form-wrap">
         <div className="auth-card glass">
           <div className="auth-card__demo">
-            <strong>Demo owner account</strong>
-            <dl>
-              <div><dt>Phone</dt><dd>{DEMO.phone}</dd></div>
-              <div><dt>OTP</dt><dd>{DEMO.otp}</dd></div>
-              <div><dt>Kitchen</dt><dd>{DEMO.kitchenCode}</dd></div>
-            </dl>
-            <button
-              type="button"
-              className="btn btn--primary btn--lg auth-card__demo-btn"
-              disabled={busy}
-              onClick={handleDemoLogin}
-            >
-              {busy ? "Signing in..." : "Sign in as demo owner"}
-            </button>
+            <strong>Demo owner accounts</strong>
+            <p className="auth-card__demo-otp">Dev OTP for all: <code>{DEMO.otp}</code></p>
+            <ul className="auth-card__demo-list">
+              {DEMO_OWNERS.map((account) => (
+                <li key={account.phone}>
+                  <div className="auth-card__demo-meta">
+                    <span className="auth-card__demo-name">
+                      {account.name}
+                      {account.primary ? " · primary" : ""}
+                    </span>
+                    <span>{account.phone} · {account.kitchenLabel}</span>
+                    {account.kitchenCode && <span className="auth-card__demo-code">{account.kitchenCode}</span>}
+                  </div>
+                  <button
+                    type="button"
+                    className="btn btn--primary btn--sm"
+                    disabled={busy}
+                    onClick={() => handleDemoLogin(account)}
+                  >
+                    {busyPhone === account.phone ? "Signing in…" : "Sign in"}
+                  </button>
+                </li>
+              ))}
+            </ul>
             <p className="auth-card__demo-note">
               Requires backend + <code>python scripts/seed-dev-data.py</code>
             </p>

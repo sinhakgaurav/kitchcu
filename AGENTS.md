@@ -2,6 +2,8 @@
 
 **Read this document before any code change, feature implementation, or refactor.**
 
+**Operating charter (strict):** `.cursor/rules/kitchcu-executive-operating-charter.mdc` — always on. Act as CEO · CPO · CTO · Senior Full-Stack · UX · DBA · QA Lead. Target **100k+ concurrent sessions**. TDD + EDD + microservices + tenant-safe DB + brand UX are mandatory.
+
 **kitchCU** = Growth Operating System for cloud kitchens & home food businesses (internal repo/schemas use `ckac_*` identifiers).
 
 **Engineering gate:** New modules/features require [`docs/templates/MODULE-DESIGN-PACK.md`](docs/templates/MODULE-DESIGN-PACK.md) before code. Full constitution: [`docs/KITCHCU-ENGINEERING-STANDARDS.md`](docs/KITCHCU-ENGINEERING-STANDARDS.md). Never ship TODO/dummy/placeholder logic or restaurant POS features.
@@ -11,15 +13,17 @@
 | **This file (`AGENTS.md`)** | Agent rules for every implementation |
 | **`docs/KITCHCU-ENGINEERING-STANDARDS.md`** | **Engineering constitution — DDD, EDD, quality, security, phase targets** |
 | **`docs/templates/MODULE-DESIGN-PACK.md`** | **Required pre-code design template (10-step gate)** |
-| `docs/CKAC-COMPLETE-GUIDE.md` | **Master guide — CEO + CPO + CTO (markdown + PDF source)** |
+| `docs/CKAC-COMPLETE-GUIDE.md` | **Master guide v3.1** — CEO + CPO + CTO encyclopedia (definitions, how/why, flows, UI Catalog, aggregated OpenAPI reference + PDF) |
+| `docs/CKAC-USERFLOWS.md` | **Full user journey pack** — every persona, every screen, every API call, step-by-step (+ PDF) |
+| `docs/API.md` | **Public API reference** — auth, body/response examples; live aggregated OpenAPI at gateway `/openapi.json`/`/docs`/`/redoc` + portal `/openapi` |
 | `docs/CKAC-ARCHITECTURE-CTO.md` | **CTO layers + CPO product ↔ code map** |
 | `docs/CKAC-PRODUCT-DEPTH-GUIDE.md` | Product depth guide (superseded by Complete Guide) |
 | `docs/CKAC-IMPLEMENTATION-GUIDE.md` | **What's built — mapped to planning & system benchmarks** |
 | `docs/DEVELOPMENT-PHASES.md` | **Phased roadmap — TDD, EDD, DB schemas, sprints** |
 | `docs/CKAC-COMPLETE-PLANNING-BENCHMARK.md` | Full 48-feature spec + acceptance criteria |
 | `docs/CKAC-SYSTEM-BENCHMARK.md` | Architecture, DB, caching, SLOs |
-| `docs/CKAC-PITCH-DECK.pdf` | CPO Product Blueprint PDF (modules, flows, pain points) |
-| `docs/CKAC-CPO-PRODUCT-BLUEPRINT.md` | CPO blueprint source (markdown) |
+| `docs/CKAC-PITCH-DECK.pdf` | CPO Product Blueprint PDF v4.2 (modules, flows, pain points, OpenAPI) |
+| `docs/CKAC-CPO-PRODUCT-BLUEPRINT.md` | CPO blueprint source v4.2 (markdown) |
 
 ---
 
@@ -420,7 +424,8 @@ Delivered order only → home_taste (1–5) + quality (1–5) → optional anony
 | Where does business logic go? | `schemas.py` domain functions or `domain/` package — not in routes |
 | How to handle phone numbers? | Normalize to E.164 (`+91...`) via Pydantic validator |
 | Default OTP in dev? | `123456` (replace with Redis + WhatsApp in prod) |
-| Demo owner / kitchen? | Run `python scripts/seed-dev-data.py` → phone `9876543210`, OTP `123456`, kitchen `CKPNQ001` |
+| Demo owner / kitchen? | Run `python scripts/seed-dev-data.py` → phones `9876543210`–`9876543213`, OTP `123456`, primary kitchen `CKPNQ001` |
+| Demo customers? | WhatsApp OTP `123456` — `9123456789`, `9123456780`, `9988776655` |
 | Platform admin? | `admin@kitchcu.dev` / `admin123456` (dev default) |
 | Primary user for Phase 1? | Owner — optimize owner flows before customer PWA |
 
@@ -440,4 +445,4 @@ Delivered order only → home_taste (1–5) + quality (1–5) → optional anony
 
 ---
 
-*Last updated: Phase 1 Sprint 1 complete — identity + gateway + tests. Update this file when new services or conventions are added.*
+*Last updated: Phase 1 S1–S18 complete (gateway + 13 domain services + PWAs + GST). Docs: Complete Guide v3.0 + UI Catalog. Next design: E1–E2 Quality Loop.*

@@ -12,7 +12,7 @@ export function LandingPage() {
     <>
       <Navbar />
       <main>
-        <Hero />
+        <Hero variant="kitchen" />
         <ParallaxDivider />
         <ForOwners />
         <ParallaxDivider />

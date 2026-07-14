@@ -47,7 +47,7 @@ class CPOProductPDF(FPDF):
         self.set_y(-12)
         self.set_font("Helvetica", "I", 8)
         self.set_text_color(*GRAY)
-        self.cell(0, 8, "Kitchcu CPO Product Blueprint v4.0 | Confidential | July 2026", align="C")
+        self.cell(0, 8, "Kitchcu CPO Product Blueprint v4.2 | Confidential | July 2026", align="C")
 
     def new_slide(self, tag: str = ""):
         self.add_page()
@@ -108,6 +108,32 @@ class CPOProductPDF(FPDF):
             self.cell(253, 4.5, line)
             self.ln(4.5)
         self.set_y(y + min(h, 120) + 2)
+
+    def figure(self, path: Path, caption: str, max_h: float = 95, max_w: float = 180):
+        """Embed a UI screenshot (landscape slides — centered under caption)."""
+        if not path.is_file():
+            self.body(f"[Missing figure: {path.name}] — {caption}", size=9)
+            return
+        self.set_x(20)
+        self.set_font("Helvetica", "B", 9)
+        self.set_text_color(*ACCENT)
+        self.multi_cell(257, 5, ascii_safe(caption))
+        self.ln(1)
+        y = self.get_y()
+        try:
+            from PIL import Image as PILImage
+
+            with PILImage.open(path) as im:
+                w_px, h_px = im.size
+            aspect = h_px / max(w_px, 1)
+            w_mm = min(max_w, 257)
+            h_mm = min(max_h, w_mm * aspect)
+            x = 20 + (257 - w_mm) / 2
+            self.image(str(path), x=x, y=y, w=w_mm, h=h_mm)
+            self.set_y(y + h_mm + 3)
+        except Exception:
+            self.image(str(path), x=20, w=max_w)
+            self.ln(2)
 
     def table(self, headers: list[str], rows: list[list[str]], widths: list[int] | None = None, size: int = 8):
         if not widths:
@@ -209,9 +235,18 @@ def build_pdf(output_path: Path) -> None:
     pdf.set_x(20)
     pdf.set_font("Helvetica", "", 11)
     pdf.cell(0, 7, "Kitchcu cloud kitchen platform")
+    pdf.ln(8)
+    pdf.set_x(20)
+    pdf.set_font("Helvetica", "B", 11)
+    pdf.set_text_color(*ACCENT)
+    pdf.multi_cell(
+        257, 6,
+        "India's first - and the world's third - platform with this feature stack",
+    )
     pdf.set_xy(20, 168)
     pdf.set_font("Helvetica", "I", 10)
-    pdf.cell(0, 7, "Version 3.0  |  July 2026  |  Confidential")
+    pdf.set_text_color(*GRAY)
+    pdf.cell(0, 7, "Version 4.2  |  July 2026  |  Confidential")
 
     # 2 — North Star
     pdf.new_slide("Strategy")
@@ -219,7 +254,8 @@ def build_pdf(output_path: Path) -> None:
     pdf.body(
         "Kitchcu is the operating system for cloud kitchens — not an aggregator. "
         "Subscription SaaS with zero food commission. Owners run everything from one PWA; "
-        "customers trust what they order through live media and home-taste ratings.",
+        "customers trust what they order through live media and home-taste ratings. "
+        "Positioning: India's first - and the world's third - platform with this feature stack.",
     )
     pdf.stat_row([
         ("Owner promise", "WhatsApp to revenue same day"),
@@ -872,7 +908,59 @@ Customer cart:
         size=8,
     )
 
-    # 34 — Architecture snapshot
+    # UI Catalog — five reference surfaces (from docs/assets/ui/)
+    ui = Path(__file__).resolve().parent.parent / "docs" / "assets" / "ui"
+
+    pdf.new_slide("UI")
+    pdf.section_title("UI Catalog — Portal & Customer (Light Theme)")
+    pdf.body(
+        "Marketing and discovery surfaces use cream/teal/orange. Brand first, one composition, "
+        "appetite-forward — not ops dashboards.",
+        size=10,
+    )
+    pdf.figure(
+        ui / "01-portal-home-pdf.jpg",
+        "Portal home (kitchcu.in) — brand hero + positioning claim + pricing entry",
+        max_h=70,
+        max_w=160,
+    )
+    pdf.figure(
+        ui / "02-customer-home-pdf.jpg",
+        "Customer home (customer.kitchcu.in) — nearby kitchens, live-capture cards, filters",
+        max_h=70,
+        max_w=160,
+    )
+
+    pdf.new_slide("UI")
+    pdf.section_title("UI Catalog — Kitchen Login & Owner Ops (Dark Theme)")
+    pdf.figure(
+        ui / "03-kitchen-login-pdf.jpg",
+        "Kitchen login — OTP phone auth; light cream sheet into dark ops after login",
+        max_h=65,
+        max_w=150,
+    )
+    pdf.figure(
+        ui / "04-owner-dashboard-pdf.jpg",
+        "Owner dashboard — dark ops command center; inbox-first, today's revenue + orders",
+        max_h=65,
+        max_w=150,
+    )
+
+    pdf.new_slide("UI")
+    pdf.section_title("UI Catalog — Admin Overview")
+    pdf.body(
+        "Admin is platform-scope only (never owner-scope mutations). Shares dark ops visual language "
+        "with the kitchen PWA.",
+        size=10,
+    )
+    pdf.figure(
+        ui / "05-admin-overview-pdf.jpg",
+        "Admin overview (admin.kitchcu.in) — kitchens, orders, tickets at platform scope",
+        max_h=95,
+        max_w=200,
+    )
+
+    # Architecture snapshot
     pdf.new_slide("Architecture")
     pdf.section_title("CTO Architecture Snapshot")
     pdf.bullets([
@@ -880,7 +968,7 @@ Customer cart:
         "Data: PostgreSQL schema-per-domain + PostGIS; Redis Streams + transactional outbox",
         "Writes never cross schemas; Growth/Ratings read orders cross-schema for evidence only",
         "PWAs: portal, customer.kitchcu.in, kitchen.kitchcu.in, admin.kitchcu.in",
-        "Full diagrams (architecture, flows, ER): CKAC-COMPLETE-GUIDE.pdf Part III",
+        "Full diagrams (architecture, flows, ER, UI anatomy): CKAC-COMPLETE-GUIDE.pdf v3.1",
     ], size=10)
     pdf.mono(
         "PWAs -> Gateway -> Identity|Catalog|Order|Billing|Marketing|Ratings|\n"
@@ -888,7 +976,33 @@ Customer cart:
         "                -> PostgreSQL schemas + Redis Streams + MinIO"
     )
 
-    # 35 — Contact
+    # API & OpenAPI
+    pdf.new_slide("API")
+    pdf.section_title("API & OpenAPI — One Live Contract, Not a Slide Deck")
+    pdf.body(
+        "The gateway aggregates every domain service's own FastAPI OpenAPI spec into one "
+        "contract at request time — the public API docs can never drift from shipped code.",
+        size=11,
+    )
+    pdf.table(
+        ["Surface", "URL", "Purpose"],
+        [
+            ["Aggregated spec (JSON)", "gateway /openapi.json", "Merged, service-prefixed schema"],
+            ["Swagger UI", "gateway /docs", "Interactive explorer over aggregated spec"],
+            ["ReDoc", "gateway /redoc", "Read-only reference rendering"],
+            ["Portal explorer", "portal /openapi (+ /api-docs)", "Same schema inside the marketing shell"],
+            ["Human index", "docs/API.md", "Auth cheat-sheet + quick-start examples"],
+        ],
+        [55, 90, 112],
+        size=8,
+    )
+    pdf.bullets([
+        "Every route ships explicit summary/description/responses + Field descriptions — not auto-only",
+        "?refresh=true on /openapi.json force-refreshes the aggregate after a route change",
+        "Full journey pack for every persona/screen/API call: CKAC-USERFLOWS.md / .pdf",
+    ], size=10)
+
+    # Contact
     pdf.new_slide("Contact")
     pdf.set_xy(20, 55)
     pdf.set_font("Helvetica", "B", 36)
@@ -899,9 +1013,18 @@ Customer cart:
     pdf.set_font("Helvetica", "", 15)
     pdf.set_text_color(*DARK)
     pdf.cell(0, 9, "Kitchcu cloud kitchen platform")
-    pdf.ln(14)
+    pdf.ln(10)
+    pdf.set_x(20)
+    pdf.set_font("Helvetica", "B", 12)
+    pdf.set_text_color(*ACCENT)
+    pdf.multi_cell(
+        257, 7,
+        "India's first - and the world's third - platform with this feature stack",
+    )
+    pdf.ln(6)
     pdf.set_x(20)
     pdf.set_font("Helvetica", "", 12)
+    pdf.set_text_color(*DARK)
     pdf.cell(0, 8, "hello@kitchcu.in  |  kitchcu.in  |  Pilot waitlist open")
     pdf.ln(10)
     pdf.set_x(20)
@@ -909,8 +1032,9 @@ Customer cart:
     pdf.set_text_color(*GRAY)
     pdf.multi_cell(
         257, 6,
-        "Full guide: CKAC-COMPLETE-GUIDE.md / .pdf (v2.0) | CPO blueprint v4.0 | "
-        "E1-E2 quality-loop design pack",
+        "Full guide: CKAC-COMPLETE-GUIDE.md / .pdf (v3.1) | CPO blueprint v4.2 | "
+        "User journeys: CKAC-USERFLOWS.md / .pdf | API: docs/API.md + gateway /docs "
+        "(aggregated OpenAPI) | UI shots: docs/assets/ui/ | E1-E2 quality-loop design pack",
     )
 
     output_path.parent.mkdir(parents=True, exist_ok=True)

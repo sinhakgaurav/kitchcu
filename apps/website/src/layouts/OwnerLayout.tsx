@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Navigate, Outlet, Link, useLocation } from "react-router-dom";
-import { APP_NAME, KITCHEN_HOST } from "../shared/brand";
+import { BrandNavMark } from "../components/BrandNavMark";
+import { KITCHEN_HOST } from "../shared/brand";
 import { useKitchenAuth } from "../shared/kitchenAuth";
 import { useKitchen } from "../shared/kitchenContext";
 import { customerUrl } from "../shared/urls";
@@ -81,10 +82,9 @@ export function OwnerLayout() {
 
       <aside className="owner-app__sidebar" aria-label="Owner navigation">
         <div className="owner-app__sidebar-top">
-          <Link to="/" className="nav__brand owner-app__brand">
-            <span className="nav__logo">{APP_NAME}</span>
-            <span className="nav__tagline">{KITCHEN_HOST}</span>
-          </Link>
+          <div className="owner-app__brand">
+            <BrandNavMark to="/" subtitle={KITCHEN_HOST} height={28} />
+          </div>
           <button
             type="button"
             className="owner-app__nav-close"

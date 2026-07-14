@@ -22,91 +22,118 @@ DAY_NAMES = ("Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "
 
 
 class DishCombo(BaseModel):
-    dish_a_id: uuid.UUID
-    dish_a_name: str
-    dish_b_id: uuid.UUID
-    dish_b_name: str
-    pair_count: int
-    support_pct: float
-    suggested_bundle_price: float | None = None
+    """One dish pair frequently ordered together, mined from delivered multi-item orders (F09)."""
+
+    dish_a_id: uuid.UUID = Field(..., description="First dish in the pair.")
+    dish_a_name: str = Field(..., description="First dish's name.")
+    dish_b_id: uuid.UUID = Field(..., description="Second dish in the pair.")
+    dish_b_name: str = Field(..., description="Second dish's name.")
+    pair_count: int = Field(..., description="Number of multi-item orders containing both dishes.", examples=[14])
+    support_pct: float = Field(..., description="`pair_count` / total multi-item orders in the window, as a percent.", examples=[32.5])
+    suggested_bundle_price: float | None = Field(default=None, description="Reserved for a future suggested combo price; currently always null.")
 
 
 class DishCombosResponse(BaseModel):
-    window_days: int
-    multi_item_orders: int
-    combos: list[DishCombo]
+    """Top dish-pairing opportunities for a kitchen over a lookback window."""
+
+    window_days: int = Field(..., description="Lookback window in days used for this analysis.")
+    multi_item_orders: int = Field(..., description="Total delivered orders with 2+ distinct dishes in the window — the denominator for `support_pct`.")
+    combos: list[DishCombo] = Field(..., description="Top dish pairs by pair count, most frequent first.")
 
 
 class DayPattern(BaseModel):
-    day_of_week: int
-    day_name: str
-    orders: int
-    revenue: float
+    """Order volume/revenue for one day of the week within the analysis window."""
+
+    day_of_week: int = Field(..., description="0=Sunday .. 6=Saturday (IST).")
+    day_name: str = Field(..., description="Day name, e.g. 'Saturday'.")
+    orders: int = Field(..., description="Non-cancelled order count on this weekday within the window.")
+    revenue: float = Field(..., description="Total order value (INR) on this weekday within the window.")
 
 
 class HourPattern(BaseModel):
-    hour: int
-    orders: int
+    """Order volume for one hour of the day (IST) within the analysis window."""
+
+    hour: int = Field(..., description="Hour of day, 0-23 (IST).")
+    orders: int = Field(..., description="Non-cancelled order count in this hour within the window.")
 
 
 class OrderPatternsResponse(BaseModel):
-    window_days: int
-    days: list[DayPattern]
-    peak_hours: list[HourPattern]
-    insight: str
+    """Day/hour order distribution + a plain-language operational insight (F10)."""
+
+    window_days: int = Field(..., description="Lookback window in days used for this analysis.")
+    days: list[DayPattern] = Field(..., description="Per-weekday order/revenue breakdown.")
+    peak_hours: list[HourPattern] = Field(..., description="Per-hour order counts.")
+    insight: str = Field(..., description="Auto-generated, human-readable takeaway, e.g. staffing/prep guidance.", examples=["Mostly orders on Saturday — peak around 20:00 (dinner). Consider prepping more for Saturday dinner rush."])
 
 
 class SuggestionResponse(BaseModel):
-    id: uuid.UUID
-    kitchen_id: uuid.UUID
-    suggestion_type: str
-    title: str
-    description: str
-    action_payload: dict
-    priority: int
-    dismissed: bool
-    created_at: datetime
+    """An actionable, auto-generated growth suggestion for the owner (F11)."""
+
+    id: uuid.UUID = Field(..., description="Suggestion UUID.")
+    kitchen_id: uuid.UUID = Field(..., description="Kitchen this suggestion was generated for.")
+    suggestion_type: str = Field(
+        ..., description="Category: 'customer_winback', 'combo_opportunity', 'peak_staffing', 'seasonal', or 'dish_promo'.",
+        examples=["combo_opportunity"],
+    )
+    title: str = Field(..., description="Short suggestion headline.")
+    description: str = Field(..., description="Full human-readable explanation and recommended action.")
+    action_payload: dict = Field(..., description="Structured data backing the suggestion (e.g. dish IDs, counts) for the owner UI to act on directly.")
+    priority: int = Field(..., description="Relative priority score, higher = more urgent/impactful. Used for display ordering.", examples=[80])
+    dismissed: bool = Field(..., description="Whether the owner has dismissed this suggestion.")
+    created_at: datetime = Field(..., description="Generation timestamp, UTC.")
 
     model_config = {"from_attributes": True}
 
 
 class SuggestionListResponse(BaseModel):
-    suggestions: list[SuggestionResponse]
-    total: int
+    """Roster of growth suggestions for a kitchen."""
+
+    suggestions: list[SuggestionResponse] = Field(..., description="Suggestions ordered by priority descending, then newest first.")
+    total: int = Field(..., description="Number of suggestions returned.")
 
 
 class SuggestionUpdateRequest(BaseModel):
-    dismissed: bool = True
+    """Owner request to dismiss (or un-dismiss) a suggestion."""
+
+    dismissed: bool = Field(default=True, description="Set true to hide the suggestion from the default list view.")
 
 
 class SeasonalPatternResponse(BaseModel):
-    id: uuid.UUID
-    region: str
-    season_event: str
-    dish_category: str
-    demand_multiplier: float
-    sample_dishes: list[str]
+    """Reference data — seasonal/regional demand uplift for a dish category (used to generate seasonal suggestions)."""
+
+    id: uuid.UUID = Field(..., description="Pattern row UUID.")
+    region: str = Field(..., description="Region this pattern applies to, e.g. 'india'.")
+    season_event: str = Field(..., description="Named season/event, e.g. 'monsoon', 'diwali'.")
+    dish_category: str = Field(..., description="Dish category expected to see uplift.")
+    demand_multiplier: float = Field(..., description="Expected demand multiplier vs baseline (e.g. 1.3 = +30%).", examples=[1.3])
+    sample_dishes: list[str] = Field(..., description="Example dish names illustrating the category.")
 
     model_config = {"from_attributes": True}
 
 
 class SeasonalPatternListResponse(BaseModel):
-    patterns: list[SeasonalPatternResponse]
-    total: int
+    """Reference seasonal patterns for a region, ranked by demand multiplier."""
+
+    patterns: list[SeasonalPatternResponse] = Field(..., description="Patterns ordered by `demand_multiplier` descending.")
+    total: int = Field(..., description="Number of patterns returned.")
 
 
 class DailyMenuPushRequest(BaseModel):
-    dish_ids: list[uuid.UUID] = Field(min_length=1, max_length=20)
-    message: str | None = Field(default=None, max_length=500)
+    """Owner request to WhatsApp-blast today's menu to the kitchen's CRM roster (F39)."""
+
+    dish_ids: list[uuid.UUID] = Field(min_length=1, max_length=20, description="1-20 active dish IDs to feature; each must belong to and be active on this kitchen.")
+    message: str | None = Field(default=None, max_length=500, description="Custom blast message; auto-generated from the dish list if omitted.")
 
 
 class DailyMenuPushResponse(BaseModel):
-    kitchen_id: uuid.UUID
-    dish_ids: list[uuid.UUID]
-    dish_names: list[str]
-    recipient_count: int
-    message: str
-    status: str
+    """Result of queuing a daily-menu WhatsApp blast."""
+
+    kitchen_id: uuid.UUID = Field(..., description="Kitchen the blast was sent for.")
+    dish_ids: list[uuid.UUID] = Field(..., description="Dish IDs included in the blast.")
+    dish_names: list[str] = Field(..., description="Resolved dish names, in the same order as `dish_ids`.")
+    recipient_count: int = Field(..., description="Number of CRM-known customers targeted.", examples=[42])
+    message: str = Field(..., description="Final WhatsApp message text sent (custom or auto-generated).")
+    status: str = Field(..., description="Always 'queued' — the notification service dispatches asynchronously.")
 
 
 def _window_start(days: int) -> datetime:

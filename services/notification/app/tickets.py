@@ -100,59 +100,69 @@ async def _resolve_order(session: AsyncSession, order_code: str | None) -> tuple
 
 
 class TicketCreateRequest(BaseModel):
-    audience: Audience
-    category: Category
-    subject: str = Field(..., min_length=3, max_length=255)
-    description: str = Field(..., min_length=10, max_length=4000)
-    customer_name: str | None = Field(None, max_length=255)
-    customer_phone: str | None = Field(None, max_length=20)
-    customer_email: EmailStr | None = None
-    order_code: str | None = Field(None, max_length=64)
-    kitchen_id: uuid.UUID | None = None
-    source: Literal["ai_chat", "web_form"] = "ai_chat"
-    chat_history: list[ChatMessage] = Field(default_factory=list, max_length=30)
+    """Create a support ticket — from the AI chat widget ('Raise ticket') or a standalone web form."""
+
+    audience: Audience = Field(..., description="'owner' or 'customer' — routes triage to the right team context.")
+    category: Category = Field(..., description="Ticket category: order_issue, delivery, quality, billing, technical, complaint, or general.")
+    subject: str = Field(..., min_length=3, max_length=255, description="Short ticket subject line.", examples=["Order not delivered"])
+    description: str = Field(..., min_length=10, max_length=4000, description="Full description of the issue.")
+    customer_name: str | None = Field(None, max_length=255, description="Reporter's name, if provided.")
+    customer_phone: str | None = Field(None, max_length=20, description="Reporter's phone, if provided (never logged elsewhere as PII).")
+    customer_email: EmailStr | None = Field(default=None, description="Reporter's email, if provided.")
+    order_code: str | None = Field(None, max_length=64, description="Related order code, if this is order-related; resolved server-side to `order_id`/`kitchen_id`.", examples=["CKPNQ001-BILL-20260712-0042"])
+    kitchen_id: uuid.UUID | None = Field(default=None, description="Related kitchen UUID; auto-filled from `order_code` if omitted and the order resolves.")
+    source: Literal["ai_chat", "web_form"] = Field(default="ai_chat", description="Where the ticket originated.")
+    chat_history: list[ChatMessage] = Field(default_factory=list, max_length=30, description="Prior AI-chat turns for context (last 10 attached to the ticket timeline).")
 
 
 class TicketMessageResponse(BaseModel):
-    id: uuid.UUID
-    author_type: str
-    message: str
-    created_at: datetime
+    """One message in a ticket's timeline (customer, AI, system, or admin authored)."""
+
+    id: uuid.UUID = Field(..., description="Message UUID.")
+    author_type: str = Field(..., description="'customer', 'ai', 'system', or 'admin'.")
+    message: str = Field(..., description="Message text.")
+    created_at: datetime = Field(..., description="Timestamp, UTC.")
 
 
 class TicketResponse(BaseModel):
-    id: uuid.UUID
-    ticket_number: str
-    audience: str
-    category: str
-    status: str
-    priority: str
-    subject: str
-    description: str
-    customer_name: str | None
-    customer_phone: str | None
-    customer_email: str | None
-    order_id: uuid.UUID | None
-    order_code: str | None
-    kitchen_id: uuid.UUID | None
-    source: str
-    assigned_admin_id: uuid.UUID | None
-    resolution_note: str | None
-    created_at: datetime
-    updated_at: datetime
-    messages: list[TicketMessageResponse] = []
+    """A support ticket with its full message timeline."""
+
+    id: uuid.UUID = Field(..., description="Ticket UUID.")
+    ticket_number: str = Field(..., description="Human-facing ticket number.", examples=["TKT-20260712-0007"])
+    audience: str = Field(..., description="'owner' or 'customer'.")
+    category: str = Field(..., description="Ticket category.")
+    status: str = Field(..., description="'open', 'in_progress', 'waiting_customer', 'resolved', or 'closed'.")
+    priority: str = Field(..., description="'low', 'normal', 'high', or 'urgent' — defaulted by category, adjustable by admin.")
+    subject: str = Field(..., description="Ticket subject line.")
+    description: str = Field(..., description="Original issue description.")
+    customer_name: str | None = Field(default=None, description="Reporter's name, if provided.")
+    customer_phone: str | None = Field(default=None, description="Reporter's phone, if provided.")
+    customer_email: str | None = Field(default=None, description="Reporter's email, if provided.")
+    order_id: uuid.UUID | None = Field(default=None, description="Resolved order UUID, if `order_code` matched an order.")
+    order_code: str | None = Field(default=None, description="Order code as provided/resolved.")
+    kitchen_id: uuid.UUID | None = Field(default=None, description="Related kitchen UUID, if known.")
+    source: str = Field(..., description="'ai_chat' or 'web_form'.")
+    assigned_admin_id: uuid.UUID | None = Field(default=None, description="Platform admin currently assigned, if any.")
+    resolution_note: str | None = Field(default=None, description="Admin's resolution note, once resolved.")
+    created_at: datetime = Field(..., description="Creation timestamp, UTC.")
+    updated_at: datetime = Field(..., description="Last update timestamp, UTC.")
+    messages: list[TicketMessageResponse] = Field(default=[], description="Full timeline (included on create/get; omitted on list views).")
 
 
 class TicketListResponse(BaseModel):
-    tickets: list[TicketResponse]
-    total: int
+    """Admin ticket roster (list view — timelines omitted for brevity)."""
+
+    tickets: list[TicketResponse] = Field(..., description="Tickets ordered newest first.")
+    total: int = Field(..., description="Number of tickets returned (capped at 500 per request).")
 
 
 class TicketUpdateRequest(BaseModel):
-    status: Status | None = None
-    priority: Priority | None = None
-    assigned_admin_id: uuid.UUID | None = None
-    resolution_note: str | None = Field(None, max_length=2000)
+    """Platform admin partial update to a ticket — at least one field required."""
+
+    status: Status | None = Field(default=None, description="New status.")
+    priority: Priority | None = Field(default=None, description="New priority.")
+    assigned_admin_id: uuid.UUID | None = Field(default=None, description="Reassign to a different admin. Auto-assigned to the caller when status moves to 'in_progress' without an explicit value.")
+    resolution_note: str | None = Field(None, max_length=2000, description="Resolution note, typically set alongside `status='resolved'`.")
 
     @model_validator(mode="after")
     def at_least_one_field(self) -> TicketUpdateRequest:
@@ -165,7 +175,9 @@ class TicketUpdateRequest(BaseModel):
 
 
 class TicketReplyRequest(BaseModel):
-    message: str = Field(..., min_length=1, max_length=4000)
+    """Platform admin reply appended to a ticket's timeline."""
+
+    message: str = Field(..., min_length=1, max_length=4000, description="Admin's reply text.")
 
 
 def _ticket_response(ticket: SupportTicket, messages: list[SupportTicketMessage] | None = None) -> TicketResponse:

@@ -15,8 +15,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models import Kitchen, Owner, PlatformAdmin
 from ckac_common.config import get_settings
 from ckac_common.database import get_db
+from ckac_common.openapi import RESP_401, RESP_422, auth_errors
 
-router = APIRouter(prefix="/admin", tags=["admin"])
+router = APIRouter(prefix="/admin", tags=["Admin"])
 security = HTTPBearer(auto_error=False)
 settings = get_settings()
 
@@ -33,66 +34,94 @@ def verify_password(password: str, password_hash: str) -> bool:
 
 
 class AdminLoginRequest(BaseModel):
-    email: EmailStr
-    password: str = Field(..., min_length=6)
+    """Body for `POST /admin/auth/login` — platform admin login."""
+
+    email: EmailStr = Field(..., description="Platform admin email.", examples=["admin@kitchcu.dev"])
+    password: str = Field(..., min_length=6, description="Platform admin password.", examples=["admin123456"])
 
 
 class AdminTokenResponse(BaseModel):
-    access_token: str
-    token_type: str = "bearer"
-    expires_in: int
+    """Bearer token issued after successful admin login.
+
+    `access_token` is a JWT with `type: "admin"` and `sub` set to the admin UUID.
+    """
+
+    access_token: str = Field(
+        ...,
+        description='JWT bearer token, payload `{"sub": "<admin_id>", "email": "...", "type": "admin", "exp": ...}`.',
+        examples=["eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."],
+    )
+    token_type: str = Field(default="bearer", description="Always `bearer`.", examples=["bearer"])
+    expires_in: int = Field(..., description="Token lifetime in seconds from issuance.", examples=[3600])
 
 
 class AdminProfile(BaseModel):
-    id: uuid.UUID
-    email: str
-    name: str
-    role: str
+    """Platform admin profile returned by `GET /admin/me`."""
+
+    id: uuid.UUID = Field(..., description="Admin UUID primary key.")
+    email: str = Field(..., description="Admin login email.", examples=["admin@kitchcu.dev"])
+    name: str = Field(..., description="Admin display name.", examples=["kitchCU Platform Admin"])
+    role: str = Field(..., description="Admin role.", examples=["superadmin"])
 
     model_config = {"from_attributes": True}
 
 
 class PlatformStats(BaseModel):
-    owners: int
-    kitchens: int
-    active_kitchens: int
-    orders: int
-    dishes: int
+    """Aggregate platform counters returned by `GET /admin/stats`."""
+
+    owners: int = Field(..., description="Total registered owners.", examples=[42])
+    kitchens: int = Field(..., description="Total kitchens across all owners.", examples=[57])
+    active_kitchens: int = Field(..., description="Kitchens with status=active.", examples=[49])
+    orders: int = Field(..., description="Total orders placed platform-wide.", examples=[1830])
+    dishes: int = Field(..., description="Total active dishes across all catalogs.", examples=[612])
 
 
 class AdminOwnerRow(BaseModel):
-    id: uuid.UUID
-    name: str
-    phone: str
-    email: str | None
-    subscription_tier: str
-    subscription_status: str
-    kitchen_count: int
+    """A single owner row in `GET /admin/owners`."""
+
+    id: uuid.UUID = Field(..., description="Owner UUID primary key.")
+    name: str = Field(..., description="Owner display name.", examples=["Priya Sharma"])
+    phone: str = Field(..., description="Owner phone (E.164).", examples=["+919876543210"])
+    email: str | None = Field(default=None, description="Owner email, if provided.")
+    subscription_tier: str = Field(..., description="Subscription plan tier.", examples=["trial"])
+    subscription_status: str = Field(..., description="Subscription lifecycle status.", examples=["trial", "active"])
+    kitchen_count: int = Field(..., description="Number of kitchens owned by this owner.", examples=[1])
 
 
 class AdminKitchenRow(BaseModel):
-    id: uuid.UUID
-    code: str
-    name: str
-    city: str | None
-    status: str
-    owner_name: str
-    owner_phone: str
+    """A single kitchen row in `GET /admin/kitchens`."""
+
+    id: uuid.UUID = Field(..., description="Kitchen UUID primary key.")
+    code: str = Field(..., description="Unique kitchen code.", examples=["CKPNQ001"])
+    name: str = Field(..., description="Kitchen brand name.", examples=["Spice Route Kitchen"])
+    city: str | None = Field(default=None, description="Kitchen city.", examples=["Pune"])
+    status: str = Field(..., description="Kitchen lifecycle status.", examples=["active", "suspended", "pending_verification"])
+    owner_name: str = Field(..., description="Name of the owning owner.", examples=["Priya Sharma"])
+    owner_phone: str = Field(..., description="Phone of the owning owner.", examples=["+919876543210"])
 
 
 class AdminOrderRow(BaseModel):
-    id: uuid.UUID
-    order_code: str
-    kitchen_id: uuid.UUID
-    kitchen_name: str
-    status: str
-    total: float
-    customer_name: str | None
-    created_at: datetime
+    """A single order row in `GET /admin/orders`."""
+
+    id: uuid.UUID = Field(..., description="Order UUID primary key.")
+    order_code: str = Field(..., description="Human-readable order code.", examples=["CKPNQ001-BILL-20260712-0042"])
+    kitchen_id: uuid.UUID = Field(..., description="UUID of the fulfilling kitchen.")
+    kitchen_name: str = Field(..., description="Name of the fulfilling kitchen.", examples=["Spice Route Kitchen"])
+    status: str = Field(..., description="Order lifecycle status.", examples=["delivered"])
+    total: float = Field(..., description="Order total in INR.", examples=[349.0])
+    customer_name: str | None = Field(default=None, description="Customer name captured on the order, if any.")
+    created_at: datetime = Field(..., description="Order creation timestamp (UTC).")
 
 
 class KitchenStatusUpdate(BaseModel):
-    status: str = Field(..., pattern="^(active|suspended|pending_verification)$")
+    """Body for `PATCH /admin/kitchens/{kitchen_id}/status` — platform moderation action."""
+
+    status: str = Field(
+        ...,
+        pattern="^(active|suspended|pending_verification)$",
+        description="New kitchen lifecycle status.",
+        examples=["suspended"],
+    )
 
 
 def create_admin_token(admin_id: uuid.UUID, email: str) -> AdminTokenResponse:
@@ -146,7 +175,21 @@ async def ensure_default_admin(session: AsyncSession) -> None:
     await session.flush()
 
 
-@router.post("/auth/login", response_model=AdminTokenResponse)
+@router.post(
+    "/auth/login",
+    response_model=AdminTokenResponse,
+    summary="Platform admin login",
+    description=(
+        "Authenticates a platform admin by email/password and issues an admin Bearer JWT. "
+        "Bootstraps the default admin account (from `ADMIN_EMAIL`/`ADMIN_PASSWORD` env vars) "
+        "on first call if it does not yet exist.\n\n"
+        "**Auth:** none — this is the admin login entry point.\n\n"
+        "**Response 200:** access_token (JWT type=admin), token_type=bearer, expires_in.\n\n"
+        "Use `Authorization: Bearer <access_token>` on subsequent `/admin/*` APIs."
+    ),
+    responses={401: RESP_401, 422: RESP_422},
+    tags=["Admin"],
+)
 async def admin_login(body: AdminLoginRequest, session: Annotated[AsyncSession, Depends(get_db)]) -> AdminTokenResponse:
     await ensure_default_admin(session)
     await session.commit()
@@ -162,12 +205,33 @@ async def admin_login(body: AdminLoginRequest, session: Annotated[AsyncSession, 
     return create_admin_token(admin.id, admin.email)
 
 
-@router.get("/me", response_model=AdminProfile)
+@router.get(
+    "/me",
+    response_model=AdminProfile,
+    summary="Get the authenticated admin's profile",
+    description=(
+        "Returns the profile of the platform admin identified by the Bearer JWT.\n\n"
+        "**Auth:** admin JWT (`type=admin`) required — platform scope only, no owner/customer JWTs accepted."
+    ),
+    responses=auth_errors(),
+    tags=["Admin"],
+)
 async def admin_me(admin: Annotated[PlatformAdmin, Depends(get_current_admin)]) -> AdminProfile:
     return AdminProfile.model_validate(admin)
 
 
-@router.get("/stats", response_model=PlatformStats)
+@router.get(
+    "/stats",
+    response_model=PlatformStats,
+    summary="Get platform-wide aggregate counters",
+    description=(
+        "Returns owner/kitchen/order/dish counts across the entire platform, for the admin "
+        "overview dashboard.\n\n"
+        "**Auth:** admin JWT required."
+    ),
+    responses=auth_errors(),
+    tags=["Admin"],
+)
 async def admin_stats(
     admin: Annotated[PlatformAdmin, Depends(get_current_admin)],
     session: Annotated[AsyncSession, Depends(get_db)],
@@ -193,7 +257,18 @@ async def admin_stats(
     )
 
 
-@router.get("/owners", response_model=list[AdminOwnerRow])
+@router.get(
+    "/owners",
+    response_model=list[AdminOwnerRow],
+    summary="List owners (platform admin)",
+    description=(
+        "Returns up to 200 most-recently-created owners with their kitchen counts, for the "
+        "admin owners table.\n\n"
+        "**Auth:** admin JWT required."
+    ),
+    responses=auth_errors(),
+    tags=["Admin"],
+)
 async def admin_owners(
     admin: Annotated[PlatformAdmin, Depends(get_current_admin)],
     session: Annotated[AsyncSession, Depends(get_db)],
@@ -220,7 +295,18 @@ async def admin_owners(
     return rows
 
 
-@router.get("/kitchens", response_model=list[AdminKitchenRow])
+@router.get(
+    "/kitchens",
+    response_model=list[AdminKitchenRow],
+    summary="List kitchens (platform admin)",
+    description=(
+        "Returns up to 300 most-recently-created kitchens with owner details, for the "
+        "admin kitchens table.\n\n"
+        "**Auth:** admin JWT required."
+    ),
+    responses=auth_errors(),
+    tags=["Admin"],
+)
 async def admin_kitchens(
     admin: Annotated[PlatformAdmin, Depends(get_current_admin)],
     session: Annotated[AsyncSession, Depends(get_db)],
@@ -246,7 +332,20 @@ async def admin_kitchens(
     ]
 
 
-@router.patch("/kitchens/{kitchen_id}/status", response_model=AdminKitchenRow)
+@router.patch(
+    "/kitchens/{kitchen_id}/status",
+    response_model=AdminKitchenRow,
+    summary="Update a kitchen's status (platform moderation)",
+    description=(
+        "Platform-level moderation action to set a kitchen's lifecycle status "
+        "(`active`, `suspended`, `pending_verification`) — e.g. suspending a kitchen for "
+        "policy violations.\n\n"
+        "**Auth:** admin JWT required.\n\n"
+        "**404:** kitchen does not exist."
+    ),
+    responses=auth_errors(include_404=True),
+    tags=["Admin"],
+)
 async def admin_kitchen_status(
     kitchen_id: uuid.UUID,
     body: KitchenStatusUpdate,
@@ -276,7 +375,18 @@ async def admin_kitchen_status(
     )
 
 
-@router.get("/orders", response_model=list[AdminOrderRow])
+@router.get(
+    "/orders",
+    response_model=list[AdminOrderRow],
+    summary="List orders (platform admin)",
+    description=(
+        "Returns the most recent orders across all kitchens (default 100, capped at 500), "
+        "for the admin orders table.\n\n"
+        "**Auth:** admin JWT required."
+    ),
+    responses=auth_errors(),
+    tags=["Admin"],
+)
 async def admin_orders(
     admin: Annotated[PlatformAdmin, Depends(get_current_admin)],
     session: Annotated[AsyncSession, Depends(get_db)],

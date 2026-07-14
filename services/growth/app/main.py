@@ -31,7 +31,16 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="kitchCU Growth Service",
     version="0.1.0",
-    description="Growth intelligence — combos, patterns, suggestions, daily menu push — Sprint 12",
+    description=(
+        "Owner-only growth intelligence mined from order history: **combos** (F09) — dish pairs "
+        "frequently ordered together, ranked by support %; **patterns** (F10) — day/hour order "
+        "distribution with a plain-language insight; **suggestions** (F11) — actionable, "
+        "auto-generated recommendations (win-back, combo bundling, peak-hour staffing, seasonal, "
+        "under-performing dish promo) that owners can dismiss; and **daily menu push** (F39) — a "
+        "WhatsApp blast of today's active dishes to the kitchen's CRM roster via the notification "
+        "service. All routes require the caller to own the kitchen, except the global seasonal "
+        "pattern reference data."
+    ),
     lifespan=lifespan,
 )
 

@@ -22,8 +22,11 @@ from app.schemas import (
 )
 from ckac_common.database import get_db
 from ckac_common.event_bus import EventPublisher
+from ckac_common.openapi import RESP_400, RESP_404, auth_errors
 
 router = APIRouter()
+
+TAG_STREAMING = "Live Streaming"
 
 
 def get_publisher() -> EventPublisher:
@@ -32,14 +35,36 @@ def get_publisher() -> EventPublisher:
     return event_publisher
 
 
-@router.get("/stream/live-kitchens", response_model=LiveKitchenListResponse)
+@router.get(
+    "/stream/live-kitchens",
+    response_model=LiveKitchenListResponse,
+    tags=[TAG_STREAMING],
+    summary="Discover currently-live kitchens (F48)",
+    description=(
+        "**Auth:** None — public discovery feed.\n\n"
+        "**Response:** `LiveKitchenListResponse` — active kitchens with `live_sharing_enabled=true` "
+        "and an in-progress session, most recently started first. Use "
+        "`POST /stream/sessions/{session_id}/viewer-token` to get a watch token for one."
+    ),
+)
 async def stream_live_kitchens_public(
     session: Annotated[AsyncSession, Depends(get_db)],
 ) -> LiveKitchenListResponse:
     return await list_live_kitchens(session)
 
 
-@router.get("/kitchens/{kitchen_id}/stream/settings", response_model=StreamSettingsResponse)
+@router.get(
+    "/kitchens/{kitchen_id}/stream/settings",
+    response_model=StreamSettingsResponse,
+    tags=[TAG_STREAMING],
+    summary="Get a kitchen's streaming settings",
+    description=(
+        "**Auth:** Owner JWT — caller must own `kitchen_id`.\n\n"
+        "**Response:** `StreamSettingsResponse` — opt-in flags, current live status, and whether "
+        "LiveKit is configured on this deployment."
+    ),
+    responses=auth_errors(include_403=True),
+)
 async def stream_settings_get(
     kitchen_id: uuid.UUID,
     owner_id: Annotated[uuid.UUID, Depends(get_current_owner_id)],
@@ -49,7 +74,20 @@ async def stream_settings_get(
     return await get_stream_settings(session, kitchen_id)
 
 
-@router.patch("/kitchens/{kitchen_id}/stream/settings", response_model=StreamSettingsResponse)
+@router.patch(
+    "/kitchens/{kitchen_id}/stream/settings",
+    response_model=StreamSettingsResponse,
+    tags=[TAG_STREAMING],
+    summary="Update a kitchen's streaming opt-in settings (F47)",
+    description=(
+        "**Auth:** Owner JWT — caller must own `kitchen_id`.\n\n"
+        "**Body:** `StreamSettingsUpdate` — toggle `live_sharing_enabled` and/or "
+        "`q_and_a_enabled`.\n\n"
+        "**Behavior:** Publishes `stream.settings_updated`.\n\n"
+        "**Response:** Updated `StreamSettingsResponse`."
+    ),
+    responses=auth_errors(include_403=True),
+)
 async def stream_settings_update(
     kitchen_id: uuid.UUID,
     body: StreamSettingsUpdate,
@@ -63,7 +101,22 @@ async def stream_settings_update(
     return result
 
 
-@router.post("/kitchens/{kitchen_id}/stream/go-live", response_model=LiveSessionResponse)
+@router.post(
+    "/kitchens/{kitchen_id}/stream/go-live",
+    response_model=LiveSessionResponse,
+    tags=[TAG_STREAMING],
+    summary="Start a live publisher session",
+    description=(
+        "**Auth:** Owner JWT — caller must own `kitchen_id`.\n\n"
+        "**Body:** `GoLiveRequest` — title, optional linked `order_id`. Rejects if "
+        "`live_sharing_enabled` is false or the kitchen already has an active session (400).\n\n"
+        "**Behavior:** Creates a `LiveSession` in a deterministic LiveKit room and issues the "
+        "owner's publish-capable token. Publishes `stream.started`.\n\n"
+        "**Response:** `LiveSessionResponse` including `publisher_token` (owner-only — never "
+        "share with viewers)."
+    ),
+    responses={**auth_errors(include_403=True), 400: RESP_400},
+)
 async def stream_go_live(
     kitchen_id: uuid.UUID,
     body: GoLiveRequest,
@@ -80,7 +133,19 @@ async def stream_go_live(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
 
 
-@router.post("/kitchens/{kitchen_id}/stream/end", response_model=LiveSessionResponse)
+@router.post(
+    "/kitchens/{kitchen_id}/stream/end",
+    response_model=LiveSessionResponse,
+    tags=[TAG_STREAMING],
+    summary="End the active live session",
+    description=(
+        "**Auth:** Owner JWT — caller must own `kitchen_id`.\n\n"
+        "**Behavior:** Rejects if there is no active session (400). Marks the session `ended`, "
+        "stamps `ended_at`, and publishes `stream.ended`.\n\n"
+        "**Response:** Updated `LiveSessionResponse` (no `publisher_token` on the ended response)."
+    ),
+    responses={**auth_errors(include_403=True), 400: RESP_400},
+)
 async def stream_end_live(
     kitchen_id: uuid.UUID,
     owner_id: Annotated[uuid.UUID, Depends(get_current_owner_id)],
@@ -96,7 +161,18 @@ async def stream_end_live(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
 
 
-@router.get("/kitchens/{kitchen_id}/stream/session", response_model=LiveSessionResponse | None)
+@router.get(
+    "/kitchens/{kitchen_id}/stream/session",
+    response_model=LiveSessionResponse | None,
+    tags=[TAG_STREAMING],
+    summary="Get the kitchen's current active session, if any",
+    description=(
+        "**Auth:** Owner JWT — caller must own `kitchen_id`.\n\n"
+        "**Response:** `LiveSessionResponse` (with a fresh `publisher_token` for the owner to "
+        "reconnect) if a session is active, otherwise `null`."
+    ),
+    responses=auth_errors(include_403=True),
+)
 async def stream_current_session(
     kitchen_id: uuid.UUID,
     owner_id: Annotated[uuid.UUID, Depends(get_current_owner_id)],
@@ -106,7 +182,20 @@ async def stream_current_session(
     return await get_current_session(session, kitchen_id)
 
 
-@router.post("/stream/sessions/{session_id}/viewer-token", response_model=ViewerTokenResponse)
+@router.post(
+    "/stream/sessions/{session_id}/viewer-token",
+    response_model=ViewerTokenResponse,
+    tags=[TAG_STREAMING],
+    summary="Get a viewer-only token to watch a live session",
+    description=(
+        "**Auth:** Customer JWT.\n\n"
+        "**Behavior:** 404 if the session does not exist or is not currently live. Increments "
+        "the session's `viewer_count` and issues a subscribe-only (cannot publish) LiveKit "
+        "token.\n\n"
+        "**Response:** `ViewerTokenResponse`."
+    ),
+    responses={**auth_errors(), 404: RESP_404},
+)
 async def stream_viewer_token(
     session_id: uuid.UUID,
     customer_id: Annotated[uuid.UUID, Depends(get_current_customer_id)],

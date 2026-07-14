@@ -22,7 +22,10 @@ import {
   buildTierBreakdown,
   buildTopKitchens,
 } from "./adminCharts";
-import { ADMIN_DEV_EMAIL, ADMIN_HOST, APP_NAME, CUSTOMER_HOST, KITCHEN_HOST } from "../shared/brand";
+import { ADMIN_DEV_EMAIL, ADMIN_HOST, CUSTOMER_HOST, KITCHEN_HOST } from "../shared/brand";
+import { DEMO_ADMIN, DEMO_OWNERS } from "../shared/demo";
+import { BrandAuthArt, BrandLogo } from "../components/BrandLogo";
+import { BrandNavMark } from "../components/BrandNavMark";
 import { customerUrl, kitchenUrl } from "../shared/urls";
 import "../owner-app.css";
 
@@ -105,8 +108,7 @@ export default function AdminApp() {
     <div className="admin-shell">
       <aside className="admin-shell__sidebar">
         <div className="admin-shell__brand">
-          <span className="admin-shell__logo">{APP_NAME} Admin</span>
-          <span className="admin-shell__host">{ADMIN_HOST}</span>
+          <BrandNavMark subtitle={ADMIN_HOST} height={28} />
           <p className="admin-shell__tagline">Super admin · platform control center</p>
         </div>
 
@@ -493,8 +495,8 @@ function AdminOverview({
 }
 
 function AdminLogin({ onSuccess }: { onSuccess: (token: string) => void }) {
-  const [email, setEmail] = useState(ADMIN_DEV_EMAIL);
-  const [password, setPassword] = useState("admin123456");
+  const [email, setEmail] = useState(DEMO_ADMIN.email || ADMIN_DEV_EMAIL);
+  const [password, setPassword] = useState(DEMO_ADMIN.password);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
 
@@ -515,10 +517,20 @@ function AdminLogin({ onSuccess }: { onSuccess: (token: string) => void }) {
 
   return (
     <div className="auth-page admin-login">
-      <form className="dash-card auth-card admin-login__card" onSubmit={submit}>
+      <div className="auth-page__visual admin-login__visual">
+        <div className="auth-page__overlay" />
+        <div className="auth-page__brand-stack">
+          <BrandLogo variant="badge" height={88} />
+          <BrandAuthArt surface="admin" />
+          <h1>Platform control</h1>
+          <p>Full visibility over kitchens, owners, orders, and support.</p>
+        </div>
+      </div>
+      <form className="auth-card admin-login__card" onSubmit={submit}>
         <p className="admin-login__eyebrow">Super admin</p>
-        <h1>Platform control</h1>
-        <p>Full visibility over cloud kitchens, owners, orders, and support tickets.</p>
+        <BrandLogo variant="wordmark" className="brand-logo--lg" />
+        <h1>Sign in</h1>
+        <p>Use the platform admin credentials for {ADMIN_HOST}.</p>
         {error && <div className="auth-card__error">{error}</div>}
         <label>
           Email
@@ -531,7 +543,13 @@ function AdminLogin({ onSuccess }: { onSuccess: (token: string) => void }) {
         <button type="submit" className="btn btn--primary btn--lg" disabled={busy}>
           {busy ? "Signing in..." : "Sign in"}
         </button>
-        <p className="auth-card__hint">Dev default: {ADMIN_DEV_EMAIL} / admin123456 · <a href={kitchenUrl("/")}>Owner app</a></p>
+        <p className="auth-card__hint">
+          Dev admin: {DEMO_ADMIN.email} / {DEMO_ADMIN.password}
+          <br />
+          Owner demos: {DEMO_OWNERS.map((o) => o.phone).join(", ")} (OTP 123456)
+          {" · "}
+          <a href={kitchenUrl("/login")}>Owner app</a>
+        </p>
       </form>
     </div>
   );

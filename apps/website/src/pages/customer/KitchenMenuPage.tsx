@@ -1,6 +1,7 @@
 import { Link, useParams } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { RichHtml } from "../../components/RichTextEditor";
+import { sampleDishImages } from "../../data/content";
 import type { CuisineMenuGroup, Dish, Menu } from "../../shared/api";
 import { fetchKitchenRatingSummaries, type DishRatingSummary } from "../../shared/customerRatingsApi";
 import { fetchPublicMenu } from "../../shared/publicApi";
@@ -26,7 +27,14 @@ export function KitchenMenuPage() {
   useEffect(() => {
     if (!kitchenId) return;
     fetchPublicMenu(kitchenId)
-      .then(setMenu)
+      .then((m) => {
+        setMenu(m);
+        const saved = getCustomerSession()?.savedKitchens.find((k) => k.id === kitchenId);
+        if (saved) {
+          setKitchenName(saved.name);
+          setKitchenCode(saved.code);
+        }
+      })
       .catch((err) =>
         setError(err instanceof Error ? err.message : "Menu not available for this kitchen."),
       );
@@ -37,11 +45,6 @@ export function KitchenMenuPage() {
         setRatingMap(map);
       })
       .catch(() => {});
-    const saved = getCustomerSession()?.savedKitchens.find((k) => k.id === kitchenId);
-    if (saved) {
-      setKitchenName(saved.name);
-      setKitchenCode(saved.code);
-    }
     const refreshCart = () => {
       const cart = getCart();
       setCartLines(cartItemCount(cart));
@@ -163,9 +166,13 @@ function DishCard({
   onAdd: () => void;
 }) {
   const hero = dish.media.find((m) => m.is_hero) ?? dish.media[0];
+  const placeholders = Object.values(sampleDishImages);
+  const fallback =
+    placeholders[Math.abs(hashCode(dish.name)) % placeholders.length];
+  const imageSrc = hero?.url || fallback;
   return (
     <article className="glass customer-dish">
-      {hero && <img src={hero.url} alt={dish.name} loading="lazy" />}
+      <img src={imageSrc} alt={dish.name} loading="lazy" className="customer-dish__img" />
       <div>
         <h4>{dish.name}</h4>
         <p className="customer-dish__price">₹{dish.price}</p>
@@ -186,4 +193,10 @@ function DishCard({
       </div>
     </article>
   );
+}
+
+function hashCode(value: string): number {
+  let h = 0;
+  for (let i = 0; i < value.length; i += 1) h = (h * 31 + value.charCodeAt(i)) | 0;
+  return h;
 }

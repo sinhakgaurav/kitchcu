@@ -31,7 +31,13 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="kitchCU Billing Service",
     version="0.1.0",
-    description="Payments, UPI intents, owner subscriptions — Sprint 6",
+    description=(
+        "Owns money movement for kitchCU: order payments (owner + customer-initiated), UPI intents, "
+        "Razorpay webhooks, multi-kitchen split settlements (Route), owner platform subscriptions, "
+        "and GST compliance (profiles, tax invoices, monthly reports, balance sheet, audit close). "
+        "kitchCU is an owner **subscription SaaS** with **zero per-order food commission** — "
+        "`platform_fee` on settlements is always 0; the platform's only revenue is subscriptions."
+    ),
     lifespan=lifespan,
 )
 

@@ -265,7 +265,7 @@ def render_order_bill_pdf(receipt: OrderReceipt) -> bytes:
             "No per-order food commission — owner subscription SaaS only."
         ),
     )
-    return pdf.output()
+    return bytes(pdf.output())
 
 
 def render_master_bill_pdf(receipt: MasterReceipt) -> bytes:
@@ -306,7 +306,7 @@ def render_master_bill_pdf(receipt: MasterReceipt) -> bytes:
     pdf.set_font("Helvetica", "B", 11)
     pdf.cell(150, 8, "Grand total", align="R")
     pdf.cell(40, 8, f"Rs {receipt.total:.0f}", align="R", ln=True)
-    return pdf.output()
+    return bytes(pdf.output())
 
 
 def bill_pdf_filename(order_code: str) -> str:

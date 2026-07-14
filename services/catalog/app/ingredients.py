@@ -37,11 +37,21 @@ def sanitize_html(value: str) -> str:
 
 
 class IngredientCreateRequest(BaseModel):
-    name: str = Field(..., min_length=1, max_length=255)
-    unit: str = Field(..., min_length=1, max_length=20)
-    current_stock: float = Field(default=0, ge=0)
-    low_stock_threshold: float = Field(default=0, ge=0)
-    photo_url: str | None = None
+    """Add a raw ingredient to the kitchen's stock ledger (F19 ingredient balance mapper)."""
+
+    name: str = Field(..., min_length=1, max_length=255, description="Ingredient name.", examples=["Paneer"])
+    unit: str = Field(
+        ...,
+        min_length=1,
+        max_length=20,
+        description=f"Unit of measure — one of: {', '.join(sorted(ALLOWED_UNITS))}.",
+        examples=["g"],
+    )
+    current_stock: float = Field(default=0, ge=0, description="Opening stock quantity, in `unit`.")
+    low_stock_threshold: float = Field(
+        default=0, ge=0, description="Stock level at or below which a low-stock warning is raised."
+    )
+    photo_url: str | None = Field(default=None, description="Optional reference photo URL.")
 
     @field_validator("unit")
     @classmethod
@@ -53,40 +63,56 @@ class IngredientCreateRequest(BaseModel):
 
 
 class IngredientUpdateRequest(BaseModel):
-    name: str | None = Field(default=None, min_length=1, max_length=255)
-    low_stock_threshold: float | None = Field(default=None, ge=0)
-    photo_url: str | None = None
+    """Partial update of an ingredient's name/threshold/photo (stock adjusts via a dedicated endpoint)."""
+
+    name: str | None = Field(default=None, min_length=1, max_length=255, description="New ingredient name.")
+    low_stock_threshold: float | None = Field(
+        default=None, ge=0, description="New low-stock warning threshold."
+    )
+    photo_url: str | None = Field(default=None, description="New reference photo URL.")
 
 
 class IngredientAdjustStockRequest(BaseModel):
-    delta: float
-    reason: str = Field(default="manual adjustment", max_length=255)
+    """Manually adjust ingredient stock (restock, wastage correction, etc.)."""
+
+    delta: float = Field(
+        ..., description="Signed quantity change — positive to add stock, negative to remove.", examples=[5.0]
+    )
+    reason: str = Field(
+        default="manual adjustment", max_length=255, description="Audit reason for the adjustment."
+    )
 
 
 class IngredientResponse(BaseModel):
-    id: uuid.UUID
-    kitchen_id: uuid.UUID
-    name: str
-    unit: str
-    current_stock: float
-    low_stock_threshold: float
-    photo_url: str | None = None
-    is_low: bool
+    """Current ingredient stock state."""
+
+    id: uuid.UUID = Field(..., description="Ingredient ID.")
+    kitchen_id: uuid.UUID = Field(..., description="Owning kitchen (tenant scope).")
+    name: str = Field(..., description="Ingredient name.")
+    unit: str = Field(..., description="Unit of measure.")
+    current_stock: float = Field(..., description="Current stock quantity, in `unit`.")
+    low_stock_threshold: float = Field(..., description="Low-stock warning threshold.")
+    photo_url: str | None = Field(default=None, description="Reference photo URL.")
+    is_low: bool = Field(..., description="True if current_stock <= low_stock_threshold.")
 
     model_config = {"from_attributes": True}
 
 
 class IngredientListResponse(BaseModel):
-    ingredients: list[IngredientResponse]
-    total: int
+    ingredients: list[IngredientResponse] = Field(..., description="Ingredients for this kitchen, alphabetical.")
+    total: int = Field(..., description="Total ingredient count.")
 
 
 class RecipeLineInput(BaseModel):
-    ingredient_id: uuid.UUID
-    quantity: float = Field(..., gt=0)
-    unit: str = Field(..., min_length=1, max_length=20)
-    photo_url: str | None = None
-    sort_order: int = Field(default=0, ge=0)
+    """One ingredient line in a dish recipe (quantity required per dish unit)."""
+
+    ingredient_id: uuid.UUID = Field(..., description="Ingredient (must exist for this kitchen).")
+    quantity: float = Field(..., gt=0, description="Quantity of this ingredient required per dish unit.")
+    unit: str = Field(
+        ..., min_length=1, max_length=20, description=f"Unit — one of: {', '.join(sorted(ALLOWED_UNITS))}."
+    )
+    photo_url: str | None = Field(default=None, description="Optional step/ingredient photo.")
+    sort_order: int = Field(default=0, ge=0, description="Display order within the recipe.")
 
     @field_validator("unit")
     @classmethod
@@ -98,76 +124,92 @@ class RecipeLineInput(BaseModel):
 
 
 class RecipeLineResponse(BaseModel):
-    ingredient_id: uuid.UUID
-    ingredient_name: str
-    quantity: float
-    unit: str
-    photo_url: str | None = None
-    sort_order: int = 0
+    ingredient_id: uuid.UUID = Field(..., description="Ingredient ID.")
+    ingredient_name: str = Field(..., description="Resolved ingredient name.")
+    quantity: float = Field(..., description="Quantity required per dish unit.")
+    unit: str = Field(..., description="Unit of measure.")
+    photo_url: str | None = Field(default=None, description="Optional reference photo.")
+    sort_order: int = Field(default=0, description="Display order within the recipe.")
 
 
 class PrepStepInput(BaseModel):
-    step_order: int = Field(..., ge=1)
-    title: str | None = Field(default=None, max_length=255)
-    body_html: str = Field(default="")
-    photo_url: str | None = None
-    duration_min: int | None = Field(default=None, ge=0)
+    """One step of a dish's preparation method (sanitized HTML body)."""
+
+    step_order: int = Field(..., ge=1, description="1-indexed step order.")
+    title: str | None = Field(default=None, max_length=255, description="Short step title.")
+    body_html: str = Field(
+        default="", description="Step instructions as sanitized HTML (script/style/inline-handlers stripped)."
+    )
+    photo_url: str | None = Field(default=None, description="Optional step photo.")
+    duration_min: int | None = Field(default=None, ge=0, description="Estimated duration for this step, in minutes.")
 
 
 class PrepStepResponse(BaseModel):
-    id: uuid.UUID
-    step_order: int
-    title: str | None
-    body_html: str
-    photo_url: str | None = None
-    duration_min: int | None = None
+    id: uuid.UUID = Field(..., description="Prep step ID.")
+    step_order: int = Field(..., description="1-indexed step order.")
+    title: str | None = Field(default=None, description="Short step title.")
+    body_html: str = Field(..., description="Sanitized step instructions (HTML).")
+    photo_url: str | None = Field(default=None, description="Optional step photo.")
+    duration_min: int | None = Field(default=None, description="Estimated duration, in minutes.")
 
 
 class DishRecipeRequest(BaseModel):
-    lines: list[RecipeLineInput]
-    prep_steps: list[PrepStepInput] = Field(default_factory=list)
+    """Set (replace) a dish's recipe — ingredient lines + prep steps."""
+
+    lines: list[RecipeLineInput] = Field(..., description="Ingredient lines that make up this dish.")
+    prep_steps: list[PrepStepInput] = Field(
+        default_factory=list, description="Ordered preparation steps for the kitchen."
+    )
 
 
 class DishRecipeResponse(BaseModel):
-    dish_id: uuid.UUID
-    dish_name: str
-    lines: list[RecipeLineResponse]
-    prep_steps: list[PrepStepResponse] = Field(default_factory=list)
+    dish_id: uuid.UUID = Field(..., description="Dish ID.")
+    dish_name: str = Field(..., description="Resolved dish name.")
+    lines: list[RecipeLineResponse] = Field(..., description="Ingredient lines, in sort order.")
+    prep_steps: list[PrepStepResponse] = Field(default_factory=list, description="Preparation steps, in order.")
 
 
 class OrderItemStockInput(BaseModel):
-    dish_id: uuid.UUID
-    quantity: int = Field(..., ge=1)
+    dish_id: uuid.UUID = Field(..., description="Dish being ordered.")
+    quantity: int = Field(..., ge=1, description="Quantity of this dish in the order.")
 
 
 class LowStockWarning(BaseModel):
-    ingredient_id: uuid.UUID
-    ingredient_name: str
-    unit: str
-    required: float
-    available: float
-    shortfall: float
-    is_low: bool
+    """A projected or actual ingredient shortage for a given order."""
+
+    ingredient_id: uuid.UUID = Field(..., description="Ingredient ID.")
+    ingredient_name: str = Field(..., description="Resolved ingredient name.")
+    unit: str = Field(..., description="Unit of measure.")
+    required: float = Field(..., description="Quantity required to fulfil the order line(s).")
+    available: float = Field(..., description="Current stock available.")
+    shortfall: float = Field(..., description="Amount short (0 if sufficient stock, but projected as low).")
+    is_low: bool = Field(..., description="True if stock is at/below threshold after this order.")
 
 
 class LowStockCheckRequest(BaseModel):
-    order_id: uuid.UUID | None = None
-    items: list[OrderItemStockInput]
+    """Pre-flight check for ingredient availability before accepting an order (does not deduct stock)."""
+
+    order_id: uuid.UUID | None = Field(default=None, description="Order being checked, if already created.")
+    items: list[OrderItemStockInput] = Field(..., description="Dish/quantity lines to check.")
 
 
 class LowStockCheckResponse(BaseModel):
-    warnings: list[LowStockWarning]
-    has_shortfall: bool
+    warnings: list[LowStockWarning] = Field(..., description="Ingredients projected to run short or low.")
+    has_shortfall: bool = Field(..., description="True if any ingredient has an actual shortfall (required > available).")
 
 
 class StockDeductRequest(BaseModel):
-    order_id: uuid.UUID
-    items: list[OrderItemStockInput]
+    """Deduct ingredient stock for an accepted order (called on order acceptance)."""
+
+    order_id: uuid.UUID = Field(..., description="Order whose ingredients are being deducted.")
+    items: list[OrderItemStockInput] = Field(..., description="Dish/quantity lines to deduct.")
 
 
 class StockDeductResponse(BaseModel):
-    deducted: list[dict]
-    low_stock_alerts: list[LowStockWarning]
+    deducted: list[dict] = Field(..., description="Per-ingredient deduction detail (previous/new stock).")
+    low_stock_alerts: list[LowStockWarning] = Field(
+        ..., description="Ingredients that fell to/below their low-stock threshold after deduction."
+    )
 
 
 def _ingredient_response(row: Ingredient) -> IngredientResponse:

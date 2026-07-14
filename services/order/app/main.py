@@ -31,7 +31,33 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="kitchCU Order Service",
     version="0.1.0",
-    description="Manual orders, lifecycle, order history — Sprint 3",
+    description=(
+        "Order lifecycle for cloud kitchens — the system of record for every order placed "
+        "against a kitchen, whether entered by the owner, checked out by a customer, or "
+        "parsed from WhatsApp.\n\n"
+        "**Surface areas**\n"
+        "- **Owner Orders** — manual order entry, WhatsApp/pasted-message parsing into review "
+        "drafts, draft confirmation, order listing, status lifecycle transitions, and "
+        "ingredient stock-shortfall warnings (F19).\n"
+        "- **Customer Checkout** — single-kitchen cart checkout, order history (F33), repeat "
+        "order.\n"
+        "- **Master Orders** — multi-kitchen checkout (F06): one payment, idempotent creation, "
+        "grouped into per-kitchen sub-orders with an aggregated receipt (F44 split settlement "
+        "happens downstream in billing).\n"
+        "- **Analytics** — owner revenue summary/timeseries, top dishes, peak hours, and "
+        "customer segments (F07-F08).\n"
+        "- **Bills** — PDF receipt generation for orders and master orders.\n\n"
+        "**Status machine:** `received -> accepted -> preparing -> ready -> out_for_delivery "
+        "-> delivered`, with `cancelled` reachable from any non-terminal status; `delivered` "
+        "and `cancelled` are terminal.\n\n"
+        "**Order sources:** `manual` (owner-keyed), `customer_app`/`customer_pwa` (customer "
+        "checkout), `customer_pwa_multi` (master order sub-order), `whatsapp` (parsed inbound "
+        "message), `manual_message` (parsed pasted message).\n\n"
+        "**Pricing:** every order's `total` is always `subtotal + delivery_fee`, computed "
+        "server-side from live catalog prices and kitchen delivery-radius rules.\n\n"
+        "**Auth:** Owner JWT (Bearer) on owner routes, Customer JWT (Bearer) on checkout/"
+        "history routes, `X-Internal-Key` on service-to-service intake routes."
+    ),
     lifespan=lifespan,
 )
 

@@ -4,10 +4,13 @@
 
 | Field | Value |
 |-------|-------|
-| Version | 1.1 |
-| Status | Sprints S1–S4 backend complete; PWAs + portal + analytics + support (partial S5) |
+| Version | **2.0** |
+| Status | **S1–S18 shipped** (13 domain services + gateway + 4 PWAs + GST); E1/E2 quality loop = design pack only |
 | Last updated | July 2026 |
-| Companion docs | [Planning Benchmark](./CKAC-COMPLETE-PLANNING-BENCHMARK.md) · [System Benchmark](./CKAC-SYSTEM-BENCHMARK.md) · [CPO Blueprint](./CKAC-CPO-PRODUCT-BLUEPRINT.md) · [CTO Architecture](./CKAC-ARCHITECTURE-CTO.md) · [Development Phases](./DEVELOPMENT-PHASES.md) · [AGENTS.md](../AGENTS.md) |
+| Encyclopedia | **[CKAC-COMPLETE-GUIDE.md](./CKAC-COMPLETE-GUIDE.md) v3.1** — definitions, how/why, flows, ER, **UI Catalog**, aggregated OpenAPI reference |
+| Companion docs | [Planning Benchmark](./CKAC-COMPLETE-PLANNING-BENCHMARK.md) · [System Benchmark](./CKAC-SYSTEM-BENCHMARK.md) · [CPO Blueprint v4.2](./CKAC-CPO-PRODUCT-BLUEPRINT.md) · [CTO Architecture](./CKAC-ARCHITECTURE-CTO.md) · [Development Phases](./DEVELOPMENT-PHASES.md) · [User Flows](./CKAC-USERFLOWS.md) · [API.md](./API.md) · [AGENTS.md](../AGENTS.md) · [UI shots](./assets/ui/) |
+
+> For deep definitions, module logic, Mermaid flows, and annotated screenshots, prefer the Complete Guide. This file remains the **code ↔ feature map** (what's wired where).
 
 ---
 
@@ -15,13 +18,15 @@
 
 | If you need… | Read section |
 |--------------|--------------|
+| Full definitions / how & why / UI screens | [Complete Guide v3.1](./CKAC-COMPLETE-GUIDE.md) |
+| Full step-by-step user journeys (every persona, every screen, every API call) | [CKAC-USERFLOWS.md](./CKAC-USERFLOWS.md) / [.pdf](./CKAC-USERFLOWS.pdf) |
 | What Kitchcu is and who it serves | [§1 Product Overview](#1-product-overview) |
 | What's built vs planned (48 features) | [§2 Feature Implementation Matrix](#2-feature-implementation-matrix) |
 | Services, ports, routing | [§3 Architecture](#3-architecture) |
 | Tables, schemas, indexes | [§4 Database Design](#4-database-design) |
 | Events and data flows | [§5 Event-Driven Design](#5-event-driven-design) |
 | End-to-end user flows | [§6 Application Flows](#6-application-flows) |
-| Every API endpoint | [§7 API Reference](#7-api-reference) |
+| Every API endpoint + aggregated OpenAPI / gateway `/docs` | [§7 API Reference](#7-api-reference) · [API.md](./API.md) |
 | Map to System Benchmark sections | [§8 Benchmark Cross-Reference](#8-benchmark-cross-reference) |
 | CTO layers + CPO product ↔ code | [CKAC-ARCHITECTURE-CTO.md](./CKAC-ARCHITECTURE-CTO.md) |
 | Map to Planning Benchmark parts | [§9 Planning Benchmark Cross-Reference](#9-planning-benchmark-cross-reference) |
@@ -463,7 +468,7 @@ Base URL (dev): `http://localhost:18000/api/v1`
 | GET | `/webhooks/whatsapp` | Verify token | Meta setup |
 | POST | `/webhooks/whatsapp` | Meta | F01 intake |
 
-OpenAPI: `http://localhost:18000/docs` (via gateway; route to service docs per path)
+OpenAPI (aggregated): `http://localhost:18000/docs` · portal `http://localhost:13000/openapi` · raw `http://localhost:18000/openapi.json` · human index [`API.md`](./API.md)
 
 ---
 

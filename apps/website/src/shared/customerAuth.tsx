@@ -123,5 +123,6 @@ export function useCustomerAuth() {
 }
 
 export function isCustomerSignedIn(session: CustomerSession | null): boolean {
-  return Boolean(session?.customerId || (session?.name && session?.phone));
+  // Prefer JWT-backed session so checkout never gets stuck in a soft-login loop
+  return Boolean(session?.customerId && getCustomerToken());
 }

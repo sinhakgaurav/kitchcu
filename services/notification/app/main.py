@@ -41,7 +41,15 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="kitchCU Notification Service",
     version="0.1.0",
-    description="WhatsApp webhooks, order notifications, tracking intervals — Sprint 14",
+    description=(
+        "Owns all customer-facing messaging: **WhatsApp inbound** (Meta Cloud API webhook — "
+        "verification + message parsing into draft orders), the **AI support assistant** "
+        "(knowledge-base + optional LLM chat for the marketing site) and **support tickets** "
+        "(public creation, platform-admin triage/reply), and **order/tracking dispatch** "
+        "(F29/F45 — WhatsApp order-status updates and interval-based delivery tracking reminders, "
+        "**internal-only**, called by the order/growth/learning services via `X-Internal-Key`). "
+        "Never logs OTPs, tokens, or full phone numbers."
+    ),
     lifespan=lifespan,
 )
 

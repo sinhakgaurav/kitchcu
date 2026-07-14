@@ -6,7 +6,7 @@ import math
 import random
 from datetime import UTC, datetime
 
-from demo_data import CAPTURED_AT, DEMO_OTP, DEMO_OWNER, unsplash
+from demo_data import CAPTURED_AT, DEMO_OTP, DEMO_OWNER, DEMO_OWNERS_EXTRA, unsplash
 
 random.seed(42)
 
@@ -48,11 +48,16 @@ KITCHEN_SUFFIXES = [
 ]
 
 EXTRA_OWNERS = [
-    {"phone": "9876543211", "phone_e164": "+919876543211", "name": "Priya Mehta", "email": "priya@ckac.dev"},
-    {"phone": "9876543212", "phone_e164": "+919876543212", "name": "Amit Desai", "email": "amit@ckac.dev"},
-    {"phone": "9876543213", "phone_e164": "+919876543213", "name": "Sneha Kulkarni", "email": "sneha@ckac.dev"},
-    {"phone": "9876543214", "phone_e164": "+919876543214", "name": "Vikram Patil", "email": "vikram@ckac.dev"},
-    {"phone": "9876543215", "phone_e164": "+919876543215", "name": "Ananya Joshi", "email": "ananya@ckac.dev"},
+    {
+        "phone": o["phone"],
+        "phone_e164": o["phone_e164"],
+        "name": o["name"],
+        "email": o["email"],
+    }
+    for o in DEMO_OWNERS_EXTRA
+] + [
+    {"phone": "9876543214", "phone_e164": "+919876543214", "name": "Vikram Patil", "email": "vikram@kitchcu.dev"},
+    {"phone": "9876543215", "phone_e164": "+919876543215", "name": "Ananya Joshi", "email": "ananya@kitchcu.dev"},
 ]
 
 CUSTOMER_NAMES = [

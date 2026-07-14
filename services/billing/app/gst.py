@@ -21,13 +21,33 @@ DEFAULT_FOOD_TAX_RATE = 5.0
 
 
 class GstProfileUpsertRequest(BaseModel):
-    gstin: str = Field(min_length=15, max_length=15)
-    legal_name: str = Field(min_length=2, max_length=255)
-    trade_name: str | None = Field(default=None, max_length=255)
-    registered_address: str = Field(min_length=5, max_length=2000)
-    default_tax_rate: float = Field(default=DEFAULT_FOOD_TAX_RATE, ge=0, le=28)
-    is_active: bool = True
-    invoice_prefix: str | None = Field(default=None, max_length=20)
+    """Register or update a kitchen's GST registration — required before GST invoice sync/reports.
+
+    Kitchens under India's GST threshold may skip this entirely; the GST subsystem only
+    activates once a profile with `is_active=true` exists.
+    """
+
+    gstin: str = Field(
+        min_length=15,
+        max_length=15,
+        description="15-character GSTIN. Validated against the standard GSTIN format; normalized to uppercase.",
+        examples=["27AAAPL1234C1Z5"],
+    )
+    legal_name: str = Field(min_length=2, max_length=255, description="Legal business name as per GST registration.")
+    trade_name: str | None = Field(default=None, max_length=255, description="Trade/brand name, if different from legal name.")
+    registered_address: str = Field(min_length=5, max_length=2000, description="Registered business address for GST filings.")
+    default_tax_rate: float = Field(
+        default=DEFAULT_FOOD_TAX_RATE,
+        ge=0,
+        le=28,
+        description="Default GST rate (%) applied to invoices, unless overridden per-invoice.",
+    )
+    is_active: bool = Field(default=True, description="Whether GST invoicing/sync is active for this kitchen.")
+    invoice_prefix: str | None = Field(
+        default=None,
+        max_length=20,
+        description="Prefix for generated invoice numbers (defaults to the kitchen code).",
+    )
 
     @field_validator("gstin")
     @classmethod
@@ -39,97 +59,113 @@ class GstProfileUpsertRequest(BaseModel):
 
 
 class GstProfileResponse(BaseModel):
-    id: uuid.UUID
-    kitchen_id: uuid.UUID
-    gstin: str
-    legal_name: str
-    trade_name: str | None
-    state_code: str
-    registered_address: str
-    default_tax_rate: float
-    is_active: bool
-    invoice_prefix: str | None
-    created_at: datetime
-    updated_at: datetime | None
+    """A kitchen's GST registration profile."""
+
+    id: uuid.UUID = Field(..., description="Profile ID.")
+    kitchen_id: uuid.UUID = Field(..., description="Owning kitchen (tenant scope).")
+    gstin: str = Field(..., description="15-character GSTIN.")
+    legal_name: str = Field(..., description="Legal business name.")
+    trade_name: str | None = Field(default=None, description="Trade/brand name.")
+    state_code: str = Field(..., description="2-digit GST state code, derived from the GSTIN.")
+    registered_address: str = Field(..., description="Registered business address.")
+    default_tax_rate: float = Field(..., description="Default GST rate (%) applied to invoices.")
+    is_active: bool = Field(..., description="Whether GST invoicing/sync is active.")
+    invoice_prefix: str | None = Field(default=None, description="Invoice number prefix.")
+    created_at: datetime = Field(..., description="Profile creation timestamp.")
+    updated_at: datetime | None = Field(default=None, description="Last update timestamp.")
 
     model_config = {"from_attributes": True}
 
 
 class GstTaxInvoiceResponse(BaseModel):
-    id: uuid.UUID
-    kitchen_id: uuid.UUID
-    order_id: uuid.UUID
-    invoice_number: str
-    invoice_date: datetime
-    order_code: str
-    customer_name: str | None
-    place_of_supply_state_code: str
-    supply_type: str
-    taxable_value: float
-    cgst_amount: float
-    sgst_amount: float
-    igst_amount: float
-    tax_rate: float
-    gross_total: float
+    """A tax invoice generated for a delivered order (CGST+SGST for intra-state supply, IGST for inter-state)."""
+
+    id: uuid.UUID = Field(..., description="Invoice ID.")
+    kitchen_id: uuid.UUID = Field(..., description="Owning kitchen (tenant scope).")
+    order_id: uuid.UUID = Field(..., description="Delivered order this invoice covers.")
+    invoice_number: str = Field(..., description="Sequential invoice number.", examples=["CKPNQ001-GST-202607-0001"])
+    invoice_date: datetime = Field(..., description="Invoice date (order delivery timestamp).")
+    order_code: str = Field(..., description="Human-readable order code.")
+    customer_name: str | None = Field(default=None, description="Customer name on the invoice.")
+    place_of_supply_state_code: str = Field(..., description="2-digit GST state code for place of supply.")
+    supply_type: str = Field(..., description="Supply type.", examples=["intra_state", "inter_state"])
+    taxable_value: float = Field(..., description="Order value excluding tax.")
+    cgst_amount: float = Field(..., description="Central GST amount (intra-state only).")
+    sgst_amount: float = Field(..., description="State GST amount (intra-state only).")
+    igst_amount: float = Field(..., description="Integrated GST amount (inter-state only).")
+    tax_rate: float = Field(..., description="GST rate (%) applied.")
+    gross_total: float = Field(..., description="Total invoice value including tax.")
 
     model_config = {"from_attributes": True}
 
 
 class GstMonthlyReportResponse(BaseModel):
-    kitchen_id: uuid.UUID
-    period_year: int
-    period_month: int
-    gstin: str
-    legal_name: str
-    invoice_count: int
-    total_taxable: float
-    total_cgst: float
-    total_sgst: float
-    total_igst: float
-    total_tax: float
-    total_gross_sales: float
-    audit_status: str
-    invoices: list[GstTaxInvoiceResponse]
+    """Monthly GST summary — invoice totals for a filing period, refreshed from the live audit."""
+
+    kitchen_id: uuid.UUID = Field(..., description="Kitchen this report covers.")
+    period_year: int = Field(..., description="Report year.", examples=[2026])
+    period_month: int = Field(..., description="Report month (1-12).", examples=[7])
+    gstin: str = Field(..., description="Kitchen's GSTIN.")
+    legal_name: str = Field(..., description="Kitchen's legal business name.")
+    invoice_count: int = Field(..., description="Number of tax invoices in the period.")
+    total_taxable: float = Field(..., description="Sum of taxable values across invoices.")
+    total_cgst: float = Field(..., description="Sum of CGST across invoices.")
+    total_sgst: float = Field(..., description="Sum of SGST across invoices.")
+    total_igst: float = Field(..., description="Sum of IGST across invoices.")
+    total_tax: float = Field(..., description="Total tax (CGST+SGST+IGST) across invoices.")
+    total_gross_sales: float = Field(..., description="Total gross sales (taxable + tax) across invoices.")
+    audit_status: str = Field(..., description="Monthly audit status.", examples=["open", "closed"])
+    invoices: list[GstTaxInvoiceResponse] = Field(..., description="Invoices included in this report.")
 
 
 class GstBalanceSheetLine(BaseModel):
-    label: str
-    amount: float
+    """A single labeled line item on the balance sheet (asset, liability, or equity)."""
+
+    label: str = Field(..., description="Human-readable line item label.")
+    amount: float = Field(..., description="Line item amount in INR.")
 
 
 class GstBalanceSheetResponse(BaseModel):
-    kitchen_id: uuid.UUID
-    period_year: int
-    period_month: int
-    assets: list[GstBalanceSheetLine]
-    liabilities: list[GstBalanceSheetLine]
-    equity: list[GstBalanceSheetLine]
-    total_assets: float
-    total_liabilities: float
-    total_equity: float
+    """Simplified monthly balance sheet — cash/settlements as assets, GST payable as liability, retained earnings as equity."""
+
+    kitchen_id: uuid.UUID = Field(..., description="Kitchen this balance sheet covers.")
+    period_year: int = Field(..., description="Period year.")
+    period_month: int = Field(..., description="Period month (1-12).")
+    assets: list[GstBalanceSheetLine] = Field(..., description="Asset line items (cash & bank from settlements/COD).")
+    liabilities: list[GstBalanceSheetLine] = Field(..., description="Liability line items (GST payable, accrued platform fees).")
+    equity: list[GstBalanceSheetLine] = Field(..., description="Equity line items (retained earnings).")
+    total_assets: float = Field(..., description="Sum of all asset lines.")
+    total_liabilities: float = Field(..., description="Sum of all liability lines.")
+    total_equity: float = Field(..., description="Sum of all equity lines (assets − liabilities).")
 
 
 class GstAuditResponse(BaseModel):
-    id: uuid.UUID
-    kitchen_id: uuid.UUID
-    period_year: int
-    period_month: int
-    status: str
-    invoice_count: int
-    total_taxable: float
-    total_cgst: float
-    total_sgst: float
-    total_igst: float
-    total_tax: float
-    total_gross_sales: float
-    closed_at: datetime | None
-    balance_sheet: GstBalanceSheetResponse | None
-    invoices: list[GstTaxInvoiceResponse]
+    """A kitchen's monthly GST audit — running totals until closed; immutable once closed."""
+
+    id: uuid.UUID = Field(..., description="Audit record ID.")
+    kitchen_id: uuid.UUID = Field(..., description="Kitchen this audit covers.")
+    period_year: int = Field(..., description="Period year.")
+    period_month: int = Field(..., description="Period month (1-12).")
+    status: str = Field(..., description="Audit status.", examples=["open", "closed"])
+    invoice_count: int = Field(..., description="Number of invoices in the period.")
+    total_taxable: float = Field(..., description="Sum of taxable values.")
+    total_cgst: float = Field(..., description="Sum of CGST.")
+    total_sgst: float = Field(..., description="Sum of SGST.")
+    total_igst: float = Field(..., description="Sum of IGST.")
+    total_tax: float = Field(..., description="Total tax across invoices.")
+    total_gross_sales: float = Field(..., description="Total gross sales across invoices.")
+    closed_at: datetime | None = Field(default=None, description="Timestamp the audit was closed (immutable after).")
+    balance_sheet: GstBalanceSheetResponse | None = Field(
+        default=None, description="Snapshot balance sheet for this period (frozen once closed)."
+    )
+    invoices: list[GstTaxInvoiceResponse] = Field(..., description="Invoices included in this audit period.")
 
 
 class GstSyncResponse(BaseModel):
-    synced_count: int
-    invoices: list[GstTaxInvoiceResponse]
+    """Result of syncing delivered orders into GST tax invoices."""
+
+    synced_count: int = Field(..., description="Number of new invoices created in this sync run.")
+    invoices: list[GstTaxInvoiceResponse] = Field(..., description="Newly created invoices.")
 
 
 def _money(value: float) -> float:

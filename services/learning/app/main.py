@@ -31,7 +31,14 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="kitchCU Learning Service",
     version="0.1.0",
-    description="Learning portal + dish trials — Sprint 16 (F21–F22)",
+    description=(
+        "Helps owners grow their menu with confidence: a **curated recipe portal** (F21, public "
+        "read) of vetted recipes owners can browse, and **dish trials** (F22, owner-only) — the "
+        "workflow to turn a curated recipe into a draft dish, sample it with 5-20 CRM customers "
+        "via WhatsApp, collect home-taste/quality ratings, and promote it to the live menu only "
+        "once it clears a rating threshold (or is force-promoted by the owner). Trial dish/promote "
+        "writes call the catalog service on the owner's behalf using their own Bearer token."
+    ),
     lifespan=lifespan,
 )
 

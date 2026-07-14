@@ -1,4 +1,18 @@
-"""Delivery domain — fee quotes, tracking (F27–F31, F29)."""
+"""Delivery domain — fee quotes, tracking (F27-F31, F29).
+
+Fee rule (evaluated per kitchen, in order):
+1. `distance_km > max_delivery_radius_km` -> `status="out_of_range"`, fee `0` — kitchen
+   does not deliver this far; the customer must choose pickup or another kitchen.
+2. `distance_km <= free_delivery_radius_km` -> within free radius, fee `0`.
+3. Otherwise -> chargeable distance is `ceil(distance_km - free_delivery_radius_km)` whole
+   km, fee = `delivery_fee_flat_beyond + chargeable_km * delivery_fee_per_km`.
+4. If the kitchen has `min_order_for_free_delivery` set and `subtotal` meets/exceeds it,
+   any non-zero fee computed above is waived back to `0`.
+
+Every quote is persisted (`ckac_delivery.delivery_quotes`) and an audit `breakdown` of
+which rule applied is returned alongside the fee, so owners/customers can see exactly why
+a fee was (or wasn't) charged.
+"""
 
 from __future__ import annotations
 
@@ -16,37 +30,63 @@ from ckac_common.event_bus import EventPublisher
 
 
 class DeliveryQuoteRequest(BaseModel):
-    kitchen_id: uuid.UUID
-    latitude: float = Field(..., ge=-90, le=90)
-    longitude: float = Field(..., ge=-180, le=180)
-    subtotal: float = Field(default=0, ge=0)
+    """Request a delivery fee quote for a kitchen + customer location before checkout."""
+
+    kitchen_id: uuid.UUID = Field(
+        ..., description="UUID of the active kitchen to quote delivery for.", examples=["8f14e45f-ceea-467e-9f1c-1234567890ab"]
+    )
+    latitude: float = Field(..., ge=-90, le=90, description="Customer's delivery destination latitude.")
+    longitude: float = Field(..., ge=-180, le=180, description="Customer's delivery destination longitude.")
+    subtotal: float = Field(
+        default=0, ge=0, description="Cart subtotal in INR — used to evaluate the kitchen's minimum-order-for-free-delivery rule.", examples=[350.0]
+    )
 
 
 class DeliveryQuoteResponse(BaseModel):
-    kitchen_id: uuid.UUID
-    distance_km: float
-    fee: float
-    status: str
-    within_free_radius: bool
-    free_delivery_radius_km: float
-    max_delivery_radius_km: float
-    breakdown: dict
-    quote_id: uuid.UUID | None = None
+    """Computed delivery fee + full rule breakdown for a kitchen/location/subtotal combination."""
+
+    kitchen_id: uuid.UUID = Field(..., description="Kitchen this quote was computed for.")
+    distance_km: float = Field(..., description="Straight-line distance from kitchen to customer, in km (PostGIS geography distance).", examples=[3.4])
+    fee: float = Field(..., description="Quoted delivery fee in INR. `0` when within the free radius, out of range, or waived by a minimum-order rule.", examples=[20.0])
+    status: str = Field(
+        ..., description="'ok' — deliverable, fee as quoted. 'out_of_range' — beyond the kitchen's max delivery radius; fee is always `0` and delivery is not offered.", examples=["ok", "out_of_range"]
+    )
+    within_free_radius: bool = Field(..., description="Whether `distance_km` is within the kitchen's free-delivery radius.")
+    free_delivery_radius_km: float = Field(..., description="Kitchen's configured free-delivery radius, in km.")
+    max_delivery_radius_km: float = Field(..., description="Kitchen's configured maximum delivery radius, in km. Beyond this, `status` is `out_of_range`.")
+    breakdown: dict = Field(
+        ...,
+        description="Audit of which fee rule applied, e.g. `{'rule': 'within_free_radius'}`, "
+        "`{'rule': 'per_km_beyond_free', 'chargeable_km': ..., 'fee_per_km': ..., 'flat_beyond': ...}`, "
+        "`{'rule': 'min_order_free_delivery', ...}`, or `{'reason': 'beyond_max_radius', ...}`.",
+    )
+    quote_id: uuid.UUID | None = Field(default=None, description="Persisted quote UUID (`ckac_delivery.delivery_quotes`), for audit/analytics.")
 
 
 class TrackingResponse(BaseModel):
-    tracking_token: str
-    order_id: uuid.UUID
-    order_code: str
-    kitchen_id: uuid.UUID
-    kitchen_name: str | None
-    status: str
-    delivery_type: str
-    distance_km: float | None
-    delivery_fee: float
-    estimated_ready_at: datetime | None
-    tracking_notify_interval_min: int
-    updated_at: datetime | None = None
+    """Public, token-authenticated order tracking view — no login required.
+
+    Deliberately minimal: exposes only what a customer following a shared tracking
+    link needs (status, ETA, distance), never customer PII belonging to *other*
+    orders and never kitchen-internal data.
+    """
+
+    tracking_token: str = Field(..., description="The opaque tracking token used to fetch this view.")
+    order_id: uuid.UUID = Field(..., description="Tracked order's UUID.")
+    order_code: str = Field(..., description="Human-facing order code.", examples=["CKPNQ001-BILL-20260712-0042"])
+    kitchen_id: uuid.UUID = Field(..., description="Kitchen UUID fulfilling the order.")
+    kitchen_name: str | None = Field(default=None, description="Kitchen display name, if available.")
+    status: str = Field(
+        ..., description="Current order status.", examples=["received", "accepted", "preparing", "ready", "out_for_delivery", "delivered", "cancelled"]
+    )
+    delivery_type: str = Field(..., description="'pickup' or 'delivery'.")
+    distance_km: float | None = Field(default=None, description="Distance from kitchen to customer, in km, when `delivery_type` is 'delivery'.")
+    delivery_fee: float = Field(..., description="Delivery fee charged on this order, in INR.")
+    estimated_ready_at: datetime | None = Field(default=None, description="Predicted ready time, UTC.")
+    tracking_notify_interval_min: int = Field(
+        ..., description="Kitchen-configured interval (minutes) at which the notification service sends WhatsApp tracking updates for this order."
+    )
+    updated_at: datetime | None = Field(default=None, description="Timestamp of the order's last status update, UTC.")
 
 
 def _compute_fee(

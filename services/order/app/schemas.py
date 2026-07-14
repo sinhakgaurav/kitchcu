@@ -1,3 +1,26 @@
+"""Order domain — manual/customer/master orders, status lifecycle, WhatsApp intake.
+
+Order status machine (owner-driven, one-way except cancellation):
+
+    received -> accepted -> preparing -> ready -> out_for_delivery -> delivered
+                   \\_________________________________________________/
+                                         -> cancelled (from any non-terminal state)
+
+`delivered` and `cancelled` are terminal — no further transitions allowed.
+See `app.models.VALID_TRANSITIONS` / `can_transition` for the enforced graph.
+
+Order sources (`Order.source`):
+    - "manual"        — owner keyed the order in directly (walk-in/phone)
+    - "customer_pwa"  — placed via the customer PWA checkout (single kitchen)
+    - "customer_pwa_multi" — a sub-order of a multi-kitchen master order
+    - "whatsapp"      — parsed from an inbound WhatsApp message (via a draft)
+    - "manual_message" — parsed from a manually pasted order message (via a draft)
+
+Pricing invariant: `total == subtotal + delivery_fee` on every order, always
+computed server-side from live catalog prices and kitchen delivery-radius rules
+— client-supplied totals are never trusted.
+"""
+
 import secrets
 import uuid
 from datetime import UTC, datetime, timedelta
@@ -13,50 +36,152 @@ from ckac_common.event_bus import EventPublisher
 
 
 class OrderItemInput(BaseModel):
-    dish_id: uuid.UUID
-    quantity: int = Field(..., gt=0)
-    special_instructions: str | None = None
+    """A single ordered dish + quantity, used in manual, customer, and master order requests."""
+
+    dish_id: uuid.UUID = Field(
+        ...,
+        description="UUID of an active dish in the kitchen's catalog. Must belong to the same kitchen as the order.",
+        examples=["3fa85f64-5717-4562-b3fc-2c963f66afa6"],
+    )
+    quantity: int = Field(..., gt=0, description="Number of units ordered. Must be a positive integer.", examples=[2])
+    special_instructions: str | None = Field(
+        default=None,
+        description="Free-text preparation note for the kitchen (e.g. spice level, allergies).",
+        examples=["Less spicy, no onions"],
+    )
 
 
 class ManualOrderCreateRequest(BaseModel):
-    items: list[OrderItemInput] = Field(..., min_length=1)
-    delivery_type: Literal["pickup", "delivery"] = "pickup"
-    payment_method: Literal["cod", "online", "upi"] = "cod"
-    customer_name: str | None = None
-    customer_phone: str | None = None
-    delivery_fee: float = Field(default=0, ge=0)
-    distance_km: float | None = Field(default=None, ge=0)
-    delivery_fee_accepted: bool | None = None
-    customer_latitude: float | None = Field(default=None, ge=-90, le=90)
-    customer_longitude: float | None = Field(default=None, ge=-180, le=180)
+    """Owner-entered order for a single kitchen — walk-in, phone call, or manual confirmation.
+
+    `total` is always computed server-side as `subtotal + delivery_fee`. When
+    `delivery_type` is `"delivery"` and customer coordinates are supplied, the
+    delivery fee is recomputed from the kitchen's radius rules and must match
+    `delivery_fee`, or the request is rejected as a business-rule error (400).
+    """
+
+    items: list[OrderItemInput] = Field(
+        ..., min_length=1, description="Order line items. At least one item is required."
+    )
+    delivery_type: Literal["pickup", "delivery"] = Field(
+        default="pickup",
+        description="'pickup' — no delivery fee, customer collects. 'delivery' — fee computed from kitchen radius rules.",
+    )
+    payment_method: Literal["cod", "online", "upi"] = Field(
+        default="cod",
+        description="Payment method the customer will use. 'cod' = cash/pay on pickup or delivery.",
+    )
+    customer_name: str | None = Field(
+        default=None, description="Walk-in or phone customer's name, if known.", examples=["Rahul Sharma"]
+    )
+    customer_phone: str | None = Field(
+        default=None,
+        description="Customer phone number (E.164 preferred) for order tracking/notifications, if known.",
+        examples=["+919876543210"],
+    )
+    delivery_fee: float = Field(
+        default=0,
+        ge=0,
+        description=(
+            "Delivery fee to charge. When customer lat/lng are provided, must exactly match the "
+            "fee quoted by the kitchen's delivery-radius rules (free radius, per-km beyond, flat charge)."
+        ),
+        examples=[0, 40],
+    )
+    distance_km: float | None = Field(
+        default=None,
+        ge=0,
+        description="Straight-line distance to the customer, in km. Recomputed and overridden server-side when lat/lng are supplied.",
+    )
+    delivery_fee_accepted: bool | None = Field(
+        default=None,
+        description="Whether the customer has acknowledged a non-zero delivery fee. Required (must be true) whenever the quoted fee is greater than zero.",
+    )
+    customer_latitude: float | None = Field(
+        default=None, ge=-90, le=90, description="Delivery destination latitude, used to compute the delivery fee and distance server-side."
+    )
+    customer_longitude: float | None = Field(
+        default=None, ge=-180, le=180, description="Delivery destination longitude, used to compute the delivery fee and distance server-side."
+    )
 
 
 class CustomerOrderCreateRequest(BaseModel):
-    items: list[OrderItemInput] = Field(..., min_length=1)
-    delivery_type: Literal["pickup", "delivery"] = "pickup"
-    payment_method: Literal["cod", "online", "upi"] = "cod"
-    delivery_fee: float = Field(default=0, ge=0)
-    customer_phone: str | None = None
-    distance_km: float | None = Field(default=None, ge=0)
-    delivery_fee_accepted: bool | None = None
-    customer_latitude: float | None = Field(default=None, ge=-90, le=90)
-    customer_longitude: float | None = Field(default=None, ge=-180, le=180)
+    """Customer PWA checkout order for a single kitchen (customer identity comes from the JWT)."""
+
+    items: list[OrderItemInput] = Field(
+        ..., min_length=1, description="Cart line items. At least one item is required."
+    )
+    delivery_type: Literal["pickup", "delivery"] = Field(
+        default="pickup",
+        description="'pickup' — no delivery fee, customer collects. 'delivery' — fee computed from kitchen radius rules.",
+    )
+    payment_method: Literal["cod", "online", "upi"] = Field(
+        default="cod", description="Payment method the customer will use at checkout."
+    )
+    delivery_fee: float = Field(
+        default=0,
+        ge=0,
+        description="Delivery fee to charge; must match the fee quoted from kitchen radius rules when location is supplied.",
+        examples=[0, 40],
+    )
+    customer_phone: str | None = Field(
+        default=None,
+        description="Overrides the phone on the customer's profile, if provided. One of profile phone / this field is required.",
+        examples=["+919876543210"],
+    )
+    distance_km: float | None = Field(
+        default=None, ge=0, description="Straight-line distance to the customer, in km. Recomputed server-side when lat/lng are supplied."
+    )
+    delivery_fee_accepted: bool | None = Field(
+        default=None, description="Customer has acknowledged a non-zero delivery fee. Required (true) whenever the quoted fee is greater than zero."
+    )
+    customer_latitude: float | None = Field(
+        default=None, ge=-90, le=90, description="Delivery destination latitude, used to compute the delivery fee server-side."
+    )
+    customer_longitude: float | None = Field(
+        default=None, ge=-180, le=180, description="Delivery destination longitude, used to compute the delivery fee server-side."
+    )
 
 
 class MasterOrderGroupInput(BaseModel):
-    kitchen_id: uuid.UUID
-    items: list[OrderItemInput] = Field(..., min_length=1, max_length=50)
-    delivery_type: Literal["pickup", "delivery"] = "pickup"
-    delivery_fee: float = Field(default=0, ge=0)
-    distance_km: float | None = Field(default=None, ge=0)
-    delivery_fee_accepted: bool | None = None
-    customer_latitude: float | None = Field(default=None, ge=-90, le=90)
-    customer_longitude: float | None = Field(default=None, ge=-180, le=180)
+    """One kitchen's sub-cart within a multi-kitchen master order checkout (F06)."""
+
+    kitchen_id: uuid.UUID = Field(
+        ..., description="UUID of an active kitchen this group's items are ordered from.", examples=["8f14e45f-ceea-467e-9f1c-1234567890ab"]
+    )
+    items: list[OrderItemInput] = Field(
+        ..., min_length=1, max_length=50, description="Line items for this kitchen. 1-50 items per group."
+    )
+    delivery_type: Literal["pickup", "delivery"] = Field(
+        default="pickup", description="Delivery type for this kitchen's sub-order specifically."
+    )
+    delivery_fee: float = Field(
+        default=0, ge=0, description="Delivery fee for this kitchen's sub-order; validated against radius rules when location is supplied."
+    )
+    distance_km: float | None = Field(
+        default=None, ge=0, description="Straight-line distance to the customer for this kitchen, in km."
+    )
+    delivery_fee_accepted: bool | None = Field(
+        default=None, description="Customer has acknowledged this sub-order's non-zero delivery fee."
+    )
+    customer_latitude: float | None = Field(default=None, ge=-90, le=90, description="Delivery destination latitude for this sub-order.")
+    customer_longitude: float | None = Field(default=None, ge=-180, le=180, description="Delivery destination longitude for this sub-order.")
 
 
 class MasterOrderCreateRequest(BaseModel):
-    groups: list[MasterOrderGroupInput] = Field(..., min_length=2, max_length=10)
-    payment_method: Literal["cod", "online", "upi"]
+    """Multi-kitchen checkout — one payment, grouped sub-orders per kitchen (F06, F44).
+
+    Requires an `Idempotency-Key` header (8-128 chars); replaying the same key
+    for the same customer returns the original master order instead of creating
+    a duplicate. Each kitchen may appear in at most one group.
+    """
+
+    groups: list[MasterOrderGroupInput] = Field(
+        ..., min_length=2, max_length=10, description="Per-kitchen sub-carts. 2-10 distinct kitchens required (single-kitchen checkout uses the regular order endpoints)."
+    )
+    payment_method: Literal["cod", "online", "upi"] = Field(
+        ..., description="Single payment method applied to the aggregated master order total."
+    )
 
     @model_validator(mode="after")
     def kitchens_must_be_distinct(self) -> "MasterOrderCreateRequest":
@@ -67,78 +192,122 @@ class MasterOrderCreateRequest(BaseModel):
 
 
 class OrderItemResponse(BaseModel):
-    id: uuid.UUID
-    dish_id: uuid.UUID
-    dish_name: str
-    quantity: int
-    unit_price: float
-    special_instructions: str | None
-    prep_time_min: int
+    """A priced, resolved line item as persisted on the order (snapshot of dish name/price at order time)."""
+
+    id: uuid.UUID = Field(..., description="Order item UUID.")
+    dish_id: uuid.UUID = Field(..., description="Referenced dish UUID (from `ckac_catalog.dishes`).")
+    dish_name: str = Field(..., description="Dish name snapshotted at order time (unaffected by later menu edits).", examples=["Paneer Butter Masala"])
+    quantity: int = Field(..., description="Units ordered.", examples=[2])
+    unit_price: float = Field(..., description="Price per unit snapshotted at order time, in INR.", examples=[220.0])
+    special_instructions: str | None = Field(default=None, description="Prep note supplied at order time.")
+    prep_time_min: int = Field(..., description="Dish prep time in minutes, used to compute the order's `estimated_ready_at`.")
 
     model_config = {"from_attributes": True}
 
 
 class StatusEventResponse(BaseModel):
-    id: uuid.UUID
-    from_status: str | None
-    to_status: str
-    note: str | None
-    created_at: datetime
+    """One entry in an order's status-change audit trail (`ckac_orders.order_status_events`)."""
+
+    id: uuid.UUID = Field(..., description="Status event UUID.")
+    from_status: str | None = Field(
+        default=None, description="Status before this transition. `null` for the initial 'received' event."
+    )
+    to_status: str = Field(..., description="Status after this transition.", examples=["accepted"])
+    note: str | None = Field(default=None, description="Optional note attached by the owner when changing status.")
+    created_at: datetime = Field(..., description="Timestamp the transition was recorded, UTC.")
 
     model_config = {"from_attributes": True}
 
 
 class OrderResponse(BaseModel):
-    id: uuid.UUID
-    kitchen_id: uuid.UUID
-    master_order_id: uuid.UUID | None
-    bill_id: str
-    order_code: str
-    status: str
-    source: str
-    delivery_type: str
-    payment_method: str
-    customer_name: str | None
-    customer_phone: str | None
-    subtotal: float
-    delivery_fee: float
-    distance_km: float | None = None
-    delivery_fee_accepted: bool | None = None
-    tracking_token: str | None = None
-    total: float
-    estimated_prep_min: int | None
-    estimated_ready_at: datetime | None
-    cancel_reason: str | None
-    created_at: datetime
-    items: list[OrderItemResponse] = []
-    status_events: list[StatusEventResponse] = []
+    """Full order read model — header, computed totals, line items, and status history.
+
+    Status machine: `received -> accepted -> preparing -> ready -> out_for_delivery
+    -> delivered`, with `cancelled` reachable from any non-terminal state.
+    `delivered`/`cancelled` are terminal. `total` always equals `subtotal + delivery_fee`.
+    """
+
+    id: uuid.UUID = Field(..., description="Order UUID — the canonical order identifier used by other services/events.")
+    kitchen_id: uuid.UUID = Field(..., description="Owning kitchen UUID (tenant scope).")
+    master_order_id: uuid.UUID | None = Field(
+        default=None, description="Parent master order UUID if this order is a sub-order of a multi-kitchen checkout, else `null`."
+    )
+    bill_id: str = Field(..., description="Per-kitchen daily sequential bill number.", examples=["BILL-20260712-0042"])
+    order_code: str = Field(..., description="Human-facing order code: `{kitchen_code}-{bill_id}`.", examples=["CKPNQ001-BILL-20260712-0042"])
+    status: str = Field(
+        ...,
+        description="Current lifecycle status.",
+        examples=["received", "accepted", "preparing", "ready", "out_for_delivery", "delivered", "cancelled"],
+    )
+    source: str = Field(
+        ...,
+        description="How the order was created.",
+        examples=["manual", "customer_pwa", "customer_pwa_multi", "whatsapp", "manual_message"],
+    )
+    delivery_type: str = Field(..., description="'pickup' or 'delivery'.", examples=["delivery"])
+    payment_method: str = Field(..., description="'cod', 'online', or 'upi'.", examples=["cod"])
+    customer_name: str | None = Field(default=None, description="Customer's name, if known.")
+    customer_phone: str | None = Field(default=None, description="Customer's phone number, if known.")
+    subtotal: float = Field(..., description="Sum of `unit_price * quantity` across all line items, in INR.", examples=[440.0])
+    delivery_fee: float = Field(..., description="Delivery fee charged; 0 for pickup orders.", examples=[40.0])
+    distance_km: float | None = Field(default=None, description="Distance from kitchen to customer, in km, when `delivery_type` is 'delivery'.")
+    delivery_fee_accepted: bool | None = Field(
+        default=None, description="Whether the customer acknowledged a non-zero delivery fee before checkout."
+    )
+    tracking_token: str | None = Field(
+        default=None, description="Opaque public tracking token for `GET /api/v1/delivery/track/{token}` on the delivery service. Set only for delivery orders."
+    )
+    total: float = Field(..., description="Amount charged to the customer: `subtotal + delivery_fee`.", examples=[480.0])
+    estimated_prep_min: int | None = Field(default=None, description="Max prep time across line items, in minutes.")
+    estimated_ready_at: datetime | None = Field(
+        default=None, description="Predicted ready time: order creation time + prep time (+ dish delivery time if `delivery_type` is 'delivery')."
+    )
+    cancel_reason: str | None = Field(default=None, description="Reason supplied when the order was cancelled. `null` unless `status == 'cancelled'`.")
+    created_at: datetime = Field(..., description="Order creation timestamp, UTC.")
+    items: list[OrderItemResponse] = Field(default=[], description="Ordered dishes with quantities and snapshotted prices.")
+    status_events: list[StatusEventResponse] = Field(default=[], description="Full status-change audit trail, oldest first.")
 
 
 class MasterOrderResponse(BaseModel):
-    id: uuid.UUID
-    master_order_code: str
-    status: str
-    payment_method: str
-    currency: str
-    subtotal: float
-    delivery_fee: float
-    total: float
-    created_at: datetime
-    orders: list[OrderResponse]
+    """Aggregated multi-kitchen checkout — one payment/receipt spanning several per-kitchen sub-orders (F06, F44)."""
+
+    id: uuid.UUID = Field(..., description="Master order UUID.")
+    master_order_code: str = Field(..., description="Human-facing master order code.", examples=["MORD-20260712-A7F3"])
+    status: str = Field(..., description="Master order status.", examples=["created"])
+    payment_method: str = Field(..., description="Single payment method applied to the whole master order.", examples=["upi"])
+    currency: str = Field(..., description="ISO 4217 currency code.", examples=["INR"])
+    subtotal: float = Field(..., description="Sum of all sub-orders' subtotals.")
+    delivery_fee: float = Field(..., description="Sum of all sub-orders' delivery fees.")
+    total: float = Field(..., description="Grand total charged: `subtotal + delivery_fee` across all sub-orders.")
+    created_at: datetime = Field(..., description="Master order creation timestamp, UTC.")
+    orders: list[OrderResponse] = Field(..., description="Per-kitchen sub-orders, each independently trackable through the status machine.")
 
 
 class OrderListResponse(BaseModel):
-    kitchen_id: uuid.UUID
-    orders: list[OrderResponse]
-    total: int
+    """Paginated-free list wrapper for kitchen or customer order history."""
+
+    kitchen_id: uuid.UUID = Field(
+        ..., description="Kitchen UUID for owner listings. For customer order history spanning multiple kitchens, this is the most recent order's kitchen (or a nil UUID if the list is empty)."
+    )
+    orders: list[OrderResponse] = Field(..., description="Orders matching the query, newest first.")
+    total: int = Field(..., description="Number of orders returned in `orders`.")
 
 
 class OrderStatusUpdateRequest(BaseModel):
+    """Owner-driven status transition. Only forward moves in the status machine (or cancellation) are accepted.
+
+    Valid transitions: `received -> accepted -> preparing -> ready -> out_for_delivery
+    -> delivered`; `cancelled` is reachable from any non-terminal status. Any other
+    transition is rejected with 400. `cancel_reason` is required when `status` is `"cancelled"`.
+    """
+
     status: Literal[
         "accepted", "preparing", "ready", "out_for_delivery", "delivered", "cancelled"
-    ]
-    note: str | None = None
-    cancel_reason: str | None = None
+    ] = Field(..., description="Target status. Must be a valid forward transition from the order's current status.")
+    note: str | None = Field(default=None, description="Optional note recorded on the status event (e.g. reason for delay).")
+    cancel_reason: str | None = Field(
+        default=None, description="Required when `status` is `'cancelled'`; explains why the order was cancelled.", examples=["Out of stock"]
+    )
 
     @model_validator(mode="after")
     def cancel_requires_reason(self) -> "OrderStatusUpdateRequest":
@@ -745,40 +914,52 @@ async def list_kitchen_orders(
 
 
 class ParseMessageRequest(BaseModel):
-    message_text: str = Field(..., min_length=1)
-    source: Literal["whatsapp", "manual_message"] = "manual_message"
-    customer_phone: str | None = None
+    """Free-text order message to parse into line items against the kitchen's live menu."""
+
+    message_text: str = Field(
+        ..., min_length=1, description="Raw order text, one item per line (e.g. WhatsApp message body).", examples=["2x paneer butter masala\n1 naan\nno onions please"]
+    )
+    source: Literal["whatsapp", "manual_message"] = Field(
+        default="manual_message", description="Origin of the message. Set to 'whatsapp' automatically on the internal WhatsApp intake route."
+    )
+    customer_phone: str | None = Field(default=None, description="Customer phone associated with the message, if known.")
 
 
 class ParsedItemResponse(BaseModel):
-    raw: str
-    dish_id: uuid.UUID | None = None
-    dish_name: str | None = None
-    quantity: int
-    matched: bool
-    unit_price: float | None = None
+    """One parsed line from the raw message, matched (or not) against the kitchen menu."""
+
+    raw: str = Field(..., description="Original text of this line, unmodified.")
+    dish_id: uuid.UUID | None = Field(default=None, description="Matched dish UUID, or `null` if unmatched.")
+    dish_name: str | None = Field(default=None, description="Matched dish name, or `null` if unmatched.")
+    quantity: int = Field(..., description="Parsed quantity for this line.")
+    matched: bool = Field(..., description="Whether this line was successfully matched to an active menu dish.")
+    unit_price: float | None = Field(default=None, description="Matched dish's current price, or `null` if unmatched.")
 
 
 class OrderDraftResponse(BaseModel):
-    id: uuid.UUID
-    kitchen_id: uuid.UUID
-    status: str
-    source: str
-    raw_message: str
-    customer_phone: str | None
-    parsed_items: list[ParsedItemResponse]
-    unmatched_lines: list[str]
-    special_notes: list[str]
-    order_id: uuid.UUID | None = None
-    created_at: datetime
+    """A parsed-but-unconfirmed order awaiting owner review (`ckac_orders.order_drafts`)."""
+
+    id: uuid.UUID = Field(..., description="Draft UUID.")
+    kitchen_id: uuid.UUID = Field(..., description="Owning kitchen UUID.")
+    status: str = Field(..., description="'draft' (awaiting confirmation) or 'confirmed' (converted to an order).", examples=["draft"])
+    source: str = Field(..., description="'whatsapp' or 'manual_message'.")
+    raw_message: str = Field(..., description="Original unparsed message text.")
+    customer_phone: str | None = Field(default=None, description="Customer phone associated with the message, if known.")
+    parsed_items: list[ParsedItemResponse] = Field(..., description="All parsed lines, matched and unmatched.")
+    unmatched_lines: list[str] = Field(..., description="Raw lines that could not be matched to any active dish.")
+    special_notes: list[str] = Field(..., description="Free-text notes extracted from the message (not tied to a specific item).")
+    order_id: uuid.UUID | None = Field(default=None, description="UUID of the order created once this draft is confirmed, else `null`.")
+    created_at: datetime = Field(..., description="Draft creation timestamp, UTC.")
 
     model_config = {"from_attributes": True}
 
 
 class OrderDraftListResponse(BaseModel):
-    kitchen_id: uuid.UUID
-    drafts: list[OrderDraftResponse]
-    total: int
+    """List of pending (unconfirmed) drafts for a kitchen."""
+
+    kitchen_id: uuid.UUID = Field(..., description="Kitchen UUID.")
+    drafts: list[OrderDraftResponse] = Field(..., description="Pending drafts, newest first.")
+    total: int = Field(..., description="Number of drafts returned.")
 
 
 async def _load_kitchen_menu(session: AsyncSession, kitchen_id: uuid.UUID) -> list[dict]:
@@ -945,19 +1126,23 @@ async def confirm_draft(
 
 
 class StockWarning(BaseModel):
-    ingredient_id: uuid.UUID
-    ingredient_name: str
-    unit: str
-    required: float
-    available: float
-    shortfall: float
-    is_low: bool
+    """Ingredient shortfall projected from this order's dishes against current stock (F19)."""
+
+    ingredient_id: uuid.UUID = Field(..., description="Ingredient UUID (from `ckac_catalog.ingredients`).")
+    ingredient_name: str = Field(..., description="Ingredient name.", examples=["Paneer"])
+    unit: str = Field(..., description="Unit of measure.", examples=["kg"])
+    required: float = Field(..., description="Quantity this order would consume.")
+    available: float = Field(..., description="Quantity currently in stock.")
+    shortfall: float = Field(..., description="`max(0, required - available)` — amount missing to fulfil the order.")
+    is_low: bool = Field(..., description="Whether stock falls below the kitchen's configured low-stock threshold after this order.")
 
 
 class OrderStockWarningsResponse(BaseModel):
-    order_id: uuid.UUID
-    warnings: list[StockWarning]
-    has_shortfall: bool
+    """Best-effort stock check for an order's ingredients. Returns an empty/false result if catalog is unreachable — never blocks order flow."""
+
+    order_id: uuid.UUID = Field(..., description="Order UUID this check was run for.")
+    warnings: list[StockWarning] = Field(..., description="Per-ingredient shortfall/low-stock warnings. Empty if all ingredients are sufficiently stocked.")
+    has_shortfall: bool = Field(..., description="True if any ingredient has `shortfall > 0`.")
 
 
 async def get_order_stock_warnings(session: AsyncSession, order: Order) -> OrderStockWarningsResponse:

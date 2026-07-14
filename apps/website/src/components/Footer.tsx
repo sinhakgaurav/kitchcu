@@ -1,4 +1,5 @@
 import { Link } from "react-router-dom";
+import { BrandNavMark } from "./BrandNavMark";
 import { APP_NAME } from "../shared/brand";
 
 export function Footer() {
@@ -6,7 +7,7 @@ export function Footer() {
     <footer className="footer">
       <div className="container footer__inner">
         <div className="footer__brand">
-          <span className="nav__logo">{APP_NAME}</span>
+          <BrandNavMark height={36} />
           <p>Cloud kitchen platform for owners and customers.</p>
         </div>
         <div className="footer__links">

@@ -72,6 +72,13 @@
   width: 100%; justify-content: flex-start; min-height: 2.5rem; margin-top: 0.15rem;
 }
 .owner-app__brand { min-width: 0; }
+.owner-app__brand .brand-logo--wordmark {
+  display: block;
+  height: 32px;
+  width: auto;
+  max-width: 140px;
+  object-fit: contain;
+}
 .owner-app__brand .nav__logo { display: block; line-height: 1.2; }
 .owner-app__brand .nav__tagline {
   display: block; font-size: 0.72rem; letter-spacing: 0.04em;
@@ -291,15 +298,24 @@
 .owner-timeline__item:last-child { border-bottom: none; }
 .owner-timeline__item time { color: var(--text-muted); font-size: 0.75rem; grid-row: span 2; }
 .owner-timeline__item small { grid-column: 2; color: var(--text-muted); font-size: 0.75rem; }
-.owner-cancel { display: flex; gap: 0.65rem; margin-top: 0.75rem; flex-wrap: wrap; align-items: flex-end; }
+.owner-cancel { display: flex; gap: 0.75rem; margin-top: 0.85rem; flex-wrap: wrap; align-items: flex-end; }
 .owner-cancel__field { flex: 1; min-width: min(100%, 12rem); margin-bottom: 0 !important; }
-.od-orders__parse-field { margin-bottom: 0.75rem; }
+.od-orders__parse-field { margin-bottom: 0; }
 
-.owner-form { padding: 1.5rem; max-width: 560px; }
-.owner-form label, .owner-form select { display: flex; flex-direction: column; gap: 0.4rem; font-size: 0.8rem; color: var(--text-muted); margin-bottom: 1rem; }
-.owner-form input, .owner-form select, .owner-form textarea { margin-bottom: 0; }
-.owner-tabs { display: flex; gap: 0.5rem; margin-bottom: 1rem; }
-.owner-tabs button { padding: 0.5rem 1rem; border-radius: 999px; border: 1px solid var(--surface-border); background: transparent; color: var(--text-muted); cursor: pointer; }
+.owner-form { padding: 1.5rem; max-width: 560px; box-sizing: border-box; }
+.owner-form input,
+.owner-form select,
+.owner-form textarea { margin-bottom: 0; }
+.owner-tabs { display: flex; gap: 0.5rem; margin-bottom: 1.15rem; }
+.owner-tabs button {
+  min-height: 2.75rem;
+  padding: 0.55rem 1.15rem;
+  border-radius: 999px;
+  border: 1px solid var(--surface-border);
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+}
 .owner-tabs button.active { background: rgba(230,81,0,0.15); color: var(--orange-light); }
 .owner-parse { padding: 1.25rem; margin-bottom: 1.5rem; }
 .owner-parse textarea { width: 100%; margin: 0.75rem 0; padding: 0.75rem; border-radius: 10px; border: 1px solid var(--surface-border); background: rgba(0,0,0,0.3); color: var(--text); resize: vertical; }
@@ -360,11 +376,14 @@
 .customer-page__hero-overlay { position: absolute; inset: 0; background: linear-gradient(to top, var(--dark), transparent 60%); }
 .customer-page__hero-content { position: absolute; bottom: 2rem; left: 0; right: 0; }
 .customer-page__body { padding: 2rem 0 4rem; }
-.customer-search { max-width: 480px; margin: 0 auto 2.5rem; padding: 2rem; }
-.customer-search label { display: flex; flex-direction: column; gap: 0.4rem; margin: 1rem 0; font-size: 0.85rem; color: var(--text-muted); }
-.customer-search input { padding: 0.85rem; border-radius: 10px; border: 1px solid var(--surface-border); background: rgba(0,0,0,0.3); color: var(--text); font-family: ui-monospace, monospace; }
-.customer-search__actions { display: flex; flex-direction: column; gap: 0.75rem; margin-top: 0.5rem; }
-.customer-search__demo-hint { font-size: 0.8rem; color: var(--text-muted); margin: 1rem 0 0; text-align: center; }
+.customer-search { max-width: 480px; margin: 0 auto 2.5rem; padding: 2rem; box-sizing: border-box; }
+.customer-search label { display: flex; flex-direction: column; gap: 0.45rem; margin: 0; font-size: 0.85rem; color: var(--text-muted); }
+.customer-search form { display: flex; flex-direction: column; gap: 1.1rem; }
+.customer-search__actions { display: flex; flex-direction: column; gap: 0.85rem; margin-top: 0.15rem; }
+.customer-search input {
+  font-family: ui-monospace, monospace;
+}
+.customer-search__demo-hint { font-size: 0.8rem; color: var(--text-muted); margin: 0.25rem 0 0; text-align: center; }
 .customer-benefits { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; }
 .customer-benefits article { padding: 1.25rem; }
 .customer-benefit-card { overflow: hidden; padding: 0 !important; }

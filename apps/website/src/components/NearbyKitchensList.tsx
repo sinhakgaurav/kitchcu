@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState, type CSSProperties, type RefObject } from "react";
 import { useNavigate } from "react-router-dom";
-import { sampleDishImages } from "../data/content";
+import { kitchenCardImage } from "../data/content";
 import { DEMO } from "../shared/demo";
 import type { KitchenNearby } from "../shared/api";
 import { fetchPublicNearbyKitchens } from "../shared/publicApi";
@@ -8,8 +8,6 @@ import { useCustomerAuth } from "../shared/customerAuth";
 import { saveKitchenToSession } from "../shared/customerSession";
 import { useGeolocation } from "../hooks/useGeolocation";
 import { useInView } from "../hooks/useParallax";
-
-const CARD_IMAGES = Object.values(sampleDishImages);
 
 type SortOrder = "asc" | "desc";
 type DietFilter = "" | "veg" | "non_veg" | "vegan";
@@ -165,7 +163,7 @@ export function NearbyKitchensList() {
               <li key={k.id} style={{ "--i": i } as CSSProperties}>
                 <button type="button" className="nearby-kitchens__card glass" onClick={() => openKitchen(k)}>
                   <div className="nearby-kitchens__card-img">
-                    <img src={CARD_IMAGES[i % CARD_IMAGES.length]} alt="" loading="lazy" />
+                    <img src={kitchenCardImage(k.id)} alt="" loading="lazy" />
                     <span className="nearby-kitchens__distance">{formatDistance(k.distance_km)}</span>
                   </div>
                   <div className="nearby-kitchens__card-body">

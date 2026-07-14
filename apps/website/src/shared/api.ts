@@ -389,7 +389,17 @@ export async function fetchKitchens(): Promise<Kitchen[]> {
 }
 
 export async function fetchKitchenByCode(code: string): Promise<KitchenPublic> {
-  return apiFetch(`/api/v1/kitchens/public/by-code/${encodeURIComponent(code.trim().toUpperCase())}`);
+  // Public lookup — never attach owner JWT or redirect to owner login
+  const res = await fetch(
+    `/api/v1/kitchens/public/by-code/${encodeURIComponent(code.trim().toUpperCase())}`,
+    { headers: { Accept: "application/json" } },
+  );
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    const detail = typeof body.detail === "string" ? body.detail : "Kitchen not found";
+    throw new Error(detail);
+  }
+  return body as KitchenPublic;
 }
 
 export async function fetchNearbyKitchens(params: {

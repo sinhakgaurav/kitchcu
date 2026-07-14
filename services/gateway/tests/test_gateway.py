@@ -250,6 +250,65 @@ async def test_proxy_generates_correlation_id_when_missing(gateway_client):
 
 
 @pytest.mark.asyncio
+async def test_openapi_json_aggregates_upstream_specs(gateway_client):
+    client, clients = gateway_client
+    sample = {
+        "openapi": "3.1.0",
+        "info": {"title": "identity", "version": "0.1"},
+        "paths": {
+            "/api/v1/owners/register": {
+                "post": {
+                    "tags": ["owners"],
+                    "summary": "Register",
+                    "responses": {"201": {"description": "created"}},
+                }
+            }
+        },
+        "components": {"schemas": {}},
+    }
+    empty = {
+        "openapi": "3.1.0",
+        "info": {"title": "empty", "version": "0.1"},
+        "paths": {},
+        "components": {"schemas": {}},
+    }
+
+    async def identity_get(url, **_kwargs):
+        if url == "/openapi.json":
+            return Response(200, json=sample)
+        return Response(404, json={"detail": "missing"})
+
+    async def empty_get(url, **_kwargs):
+        if url == "/openapi.json":
+            return Response(200, json=empty)
+        return Response(404, json={"detail": "missing"})
+
+    for name, mock in clients.items():
+        if name == "identity":
+            mock.get = AsyncMock(side_effect=identity_get)
+        else:
+            mock.get = AsyncMock(side_effect=empty_get)
+
+    gateway_main._openapi_cache = None
+    response = await client.get("/openapi.json")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["info"]["title"] == "kitchCU Public API"
+    assert "/api/v1/owners/register" in data["paths"]
+    assert data["paths"]["/api/v1/owners/register"]["post"]["tags"] == [
+        "Identity: owners"
+    ]
+
+
+@pytest.mark.asyncio
+async def test_docs_page_serves_swagger_ui(gateway_client):
+    client, _ = gateway_client
+    response = await client.get("/docs")
+    assert response.status_code == 200
+    assert "swagger" in response.text.lower() or "openapi" in response.text.lower()
+
+
+@pytest.mark.asyncio
 async def test_proxy_not_ready_when_clients_empty():
     gateway_main.http_clients = {}
     gateway_main.redis_client = None

@@ -1,6 +1,7 @@
 import { Link, useLocation } from "react-router-dom";
 import { useEffect, useState } from "react";
-import { APP_NAME, KITCHEN_HOST } from "../shared/brand";
+import { BrandNavMark } from "./BrandNavMark";
+import { KITCHEN_HOST } from "../shared/brand";
 import { useKitchenAuth } from "../shared/kitchenAuth";
 import { customerUrl } from "../shared/urls";
 
@@ -22,10 +23,7 @@ export function KitchenNavbar() {
   return (
     <header className={`nav nav--kitchen ${scrolled ? "nav--scrolled" : ""}`}>
       <div className="nav__inner container">
-        <Link to="/" className="nav__brand">
-          <span className="nav__logo">{APP_NAME}</span>
-          <span className="nav__tagline">{KITCHEN_HOST}</span>
-        </Link>
+        <BrandNavMark to="/" subtitle={KITCHEN_HOST} height={32} />
 
         <nav className={`nav__links ${open ? "nav__links--open" : ""}`}>
           <a href={hashLink("/#features")} onClick={() => setOpen(false)}>Features</a>

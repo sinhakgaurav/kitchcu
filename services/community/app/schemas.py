@@ -31,10 +31,12 @@ MIN_ORDERS_FOR_RANKING = int(os.environ.get("COMMUNITY_MIN_ORDERS_RANKING", "3")
 
 
 class ShareRecipeRequest(BaseModel):
-    title: str = Field(min_length=3, max_length=255)
-    summary: str | None = Field(default=None, max_length=500)
-    recipe_html: str = Field(min_length=10, max_length=20000)
-    dish_id: uuid.UUID | None = None
+    """Owner request to publish a recipe to the public community feed (F23)."""
+
+    title: str = Field(min_length=3, max_length=255, description="Recipe title.", examples=["My Grandmother's Dal Makhani"])
+    summary: str | None = Field(default=None, max_length=500, description="Short teaser shown in recipe lists.")
+    recipe_html: str = Field(min_length=10, max_length=20000, description="Full recipe body HTML (script tags and inline event handlers are stripped server-side).")
+    dish_id: uuid.UUID | None = Field(default=None, description="Optional linked catalog dish this recipe is based on.")
 
     @field_validator("recipe_html")
     @classmethod
@@ -46,71 +48,89 @@ class ShareRecipeRequest(BaseModel):
 
 
 class SharedRecipeResponse(BaseModel):
-    id: uuid.UUID
-    kitchen_id: uuid.UUID
-    title: str
-    summary: str | None
-    recipe_html: str
-    dish_id: uuid.UUID | None
-    appreciation_count: int
-    points_earned: int
-    kitchen_name: str | None = None
-    kitchen_code: str | None = None
-    created_at: datetime
+    """A published community recipe."""
+
+    id: uuid.UUID = Field(..., description="Recipe UUID.")
+    kitchen_id: uuid.UUID = Field(..., description="Publishing kitchen UUID.")
+    title: str = Field(..., description="Recipe title.")
+    summary: str | None = Field(default=None, description="Short teaser text.")
+    recipe_html: str = Field(..., description="Sanitized recipe body HTML.")
+    dish_id: uuid.UUID | None = Field(default=None, description="Linked catalog dish, if any.")
+    appreciation_count: int = Field(..., description="Number of unique customers who appreciated this recipe.")
+    points_earned: int = Field(..., description=f"Total reward points this recipe has earned its kitchen ({POINTS_PER_APPRECIATION} per appreciation).")
+    kitchen_name: str | None = Field(default=None, description="Publishing kitchen's display name.")
+    kitchen_code: str | None = Field(default=None, description="Publishing kitchen's code.", examples=["CKPNQ001"])
+    created_at: datetime = Field(..., description="Publish timestamp, UTC.")
 
     model_config = {"from_attributes": True}
 
 
 class SharedRecipeListResponse(BaseModel):
-    recipes: list[SharedRecipeResponse]
-    total: int
+    """Public feed of shared recipes."""
 
-
-class RewardBalanceResponse(BaseModel):
-    kitchen_id: uuid.UUID
-    points_balance: int
-    ledger: list["RewardLedgerEntry"]
+    recipes: list[SharedRecipeResponse] = Field(..., description="Published recipes, newest first.")
+    total: int = Field(..., description="Number of recipes returned.")
 
 
 class RewardLedgerEntry(BaseModel):
-    id: uuid.UUID
-    delta: int
-    reason: str
-    balance_after: int
-    created_at: datetime
+    """One entry in a kitchen's reward point ledger (audit trail of every earn/spend)."""
+
+    id: uuid.UUID = Field(..., description="Ledger entry UUID.")
+    delta: int = Field(..., description="Points change — positive for earns, negative for redemptions.", examples=[10, -100])
+    reason: str = Field(..., description="Reason code, e.g. 'recipe_appreciation', 'redeem_subscription_discount'.")
+    balance_after: int = Field(..., description="Running point balance immediately after this entry.")
+    created_at: datetime = Field(..., description="Timestamp, UTC.")
 
     model_config = {"from_attributes": True}
 
 
+class RewardBalanceResponse(BaseModel):
+    """A kitchen's current reward point balance + recent ledger history."""
+
+    kitchen_id: uuid.UUID = Field(..., description="Kitchen UUID.")
+    points_balance: int = Field(..., description="Current spendable point balance.")
+    ledger: list[RewardLedgerEntry] = Field(..., description="Most recent 20 ledger entries, newest first.")
+
+
 class RedeemRewardsRequest(BaseModel):
-    redemption_type: Literal["subscription_discount", "featured_listing"]
+    """Owner request to redeem reward points for a growth perk."""
+
+    redemption_type: Literal["subscription_discount", "featured_listing"] = Field(
+        ..., description=f"'subscription_discount' costs {SUBSCRIPTION_DISCOUNT_COST} points; 'featured_listing' costs {FEATURED_LISTING_COST} points."
+    )
 
 
 class RedeemRewardsResponse(BaseModel):
-    redemption_id: uuid.UUID
-    redemption_type: str
-    points_spent: int
-    points_balance: int
-    status: str
+    """Result of a reward redemption."""
+
+    redemption_id: uuid.UUID = Field(..., description="Redemption UUID.")
+    redemption_type: str = Field(..., description="Type redeemed.")
+    points_spent: int = Field(..., description="Points deducted for this redemption.")
+    points_balance: int = Field(..., description="Remaining point balance after redemption.")
+    status: str = Field(..., description="Redemption status, e.g. 'approved'.")
 
 
 class ChefRankingEntry(BaseModel):
-    rank: int
-    kitchen_id: uuid.UUID
-    kitchen_code: str
-    kitchen_name: str
-    score: float
-    metrics: dict
+    """One kitchen's position on the chef leaderboard for a given period/scope/region."""
+
+    rank: int = Field(..., description="1-based rank within the scope/region for this period.")
+    kitchen_id: uuid.UUID = Field(..., description="Kitchen UUID.")
+    kitchen_code: str = Field(..., description="Kitchen code.")
+    kitchen_name: str = Field(..., description="Kitchen display name.")
+    score: float = Field(..., description="Composite score (0-100), weighted from ratings, review volume, order volume, repeat rate, and community engagement.")
+    metrics: dict = Field(..., description="Raw underlying metrics used to compute the score (avg_dish_rating, review_volume, monthly_orders, repeat_order_rate, recipe_appreciations, community_votes).")
 
     model_config = {"from_attributes": True}
 
 
 class ChefRankingListResponse(BaseModel):
-    period: str
-    scope: str
-    region_key: str
-    rankings: list[ChefRankingEntry]
-    total: int
+    """Leaderboard for a period/scope/region."""
+
+    period: str = Field(..., description="Ranking period, 'YYYY-MM'.", examples=["2026-07"])
+    scope: str = Field(..., description="'city', 'state', or 'national'.")
+    region_key: str = Field(..., description="Region value for the scope (city/state name, 'india' for national, or 'all').")
+    rankings: list[ChefRankingEntry] = Field(..., description="Top kitchens by score, up to 50, ordered by rank.")
+    total: int = Field(..., description="Number of ranking entries returned.")
 
 
 async def _kitchen_meta(session: AsyncSession, kitchen_id: uuid.UUID) -> tuple[str, str, str | None, str | None]:

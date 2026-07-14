@@ -1,5 +1,7 @@
 """Shared PDF layout helpers for Kitchcu guide documents."""
 
+from pathlib import Path
+
 from fpdf import FPDF
 
 from pdf_common import ACCENT, DARK, GRAY, LIGHT_BG, ORANGE, WHITE, ascii_safe
@@ -116,35 +118,38 @@ class GuidePDF(FPDF):
         self.set_x(20)
         self.set_font("Helvetica", "B", 20)
         self.cell(0, 10, ascii_safe(title))
+        self.ln(4)
         self._chapter = 0
 
     def chapter(self, title: str):
         self._chapter += 1
         if self.get_y() > 245:
             self.add_page()
+            self.set_y(18)
         else:
-            self.ln(5)
+            self.ln(2.5)
         self.set_x(20)
         self.set_font("Helvetica", "B", 13)
         self.set_text_color(*ORANGE)
         self.multi_cell(170, 7, ascii_safe(f"{self._chapter}. {title}"))
-        self.ln(2)
+        self.ln(1)
 
     def section(self, title: str):
         if self.get_y() > 265:
             self.add_page()
+            self.set_y(18)
         self.set_x(20)
         self.set_font("Helvetica", "B", 10)
         self.set_text_color(*ACCENT)
         self.multi_cell(170, 6, ascii_safe(title))
-        self.ln(1)
+        self.ln(0.5)
 
     def body(self, text: str, size: int = 9):
         self.set_x(20)
         self.set_font("Helvetica", "", size)
         self.set_text_color(*DARK)
         self.multi_cell(170, 5, ascii_safe(text))
-        self.ln(2)
+        self.ln(1)
 
     def bullets(self, items: list[str], size: int = 9):
         self.set_font("Helvetica", "", size)
@@ -152,10 +157,11 @@ class GuidePDF(FPDF):
         for item in items:
             if self.get_y() > 272:
                 self.add_page()
+                self.set_y(18)
             self.set_x(22)
             self.cell(3, 5, "-")
             self.multi_cell(165, 5, ascii_safe(item))
-        self.ln(2)
+        self.ln(1)
 
     def mono(self, text: str, size: int = 7, max_lines: int = 36, line_h: float = 3.5):
         """Render monospaced diagram/code block. Splits across pages if tall."""
@@ -243,8 +249,45 @@ class GuidePDF(FPDF):
         self.set_y(y + 24)
 
     def quote(self, text: str):
-        self.set_x(24)
+        if self.get_y() > 260:
+            self.add_page()
+        self.set_x(20)
         self.set_font("Helvetica", "I", 9)
-        self.set_text_color(*GRAY)
-        self.multi_cell(162, 5, ascii_safe(f'"{text}"'))
+        self.set_text_color(*DARK)
+        self.multi_cell(170, 5, ascii_safe(f'"{text}"'))
         self.ln(3)
+
+    def figure(self, path: str | Path, caption: str, max_h: float = 88):
+        """Embed a screenshot/diagram with caption. Leaves top padding; tight gap after image."""
+        img = Path(path)
+        if not img.is_file():
+            self.body(f"[Missing figure: {img.name}] — {caption}", size=8)
+            return
+        if self.get_y() > 230 - min(max_h, 36):
+            self.add_page()
+            self.set_y(18)
+        elif self.get_y() < 16:
+            self.set_y(18)
+        self.set_x(20)
+        self.set_font("Helvetica", "B", 8)
+        self.set_text_color(*ACCENT)
+        self.multi_cell(170, 4, ascii_safe(caption))
+        self.ln(0.5)
+        y = self.get_y()
+        try:
+            from PIL import Image as PILImage
+
+            with PILImage.open(img) as im:
+                w_px, h_px = im.size
+            aspect = h_px / max(w_px, 1)
+            w_mm = 170.0
+            h_mm = min(max_h, w_mm * aspect)
+            if y + h_mm > 272:
+                self.add_page()
+                self.set_y(18)
+                y = self.get_y()
+            self.image(str(img), x=20, y=y, w=w_mm, h=h_mm)
+            self.set_y(y + h_mm + 2.5)
+        except Exception:
+            self.image(str(img), x=20, w=170)
+            self.ln(2)

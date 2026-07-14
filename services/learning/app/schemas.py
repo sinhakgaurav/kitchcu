@@ -22,76 +22,90 @@ DEFAULT_RATING_THRESHOLD = 4.0
 
 
 class CuratedRecipeResponse(BaseModel):
-    id: uuid.UUID
-    title: str
-    slug: str
-    category: str
-    cuisine: str
-    description: str
-    ingredients: list
-    prep_steps: list
-    image_url: str
-    source_name: str
-    source_url: str | None
+    """A vetted recipe in kitchCU's curated learning portal (F21) — publicly browsable by owners."""
+
+    id: uuid.UUID = Field(..., description="Recipe UUID.")
+    title: str = Field(..., description="Recipe title.", examples=["Butter Chicken"])
+    slug: str = Field(..., description="URL-friendly slug.")
+    category: str = Field(..., description="Recipe category, e.g. 'non_veg', 'desserts'.")
+    cuisine: str = Field(..., description="Cuisine, e.g. 'North Indian'.")
+    description: str = Field(..., description="Short recipe description.")
+    ingredients: list = Field(..., description="Ingredient list (strings).")
+    prep_steps: list = Field(..., description="Ordered preparation steps (strings).")
+    image_url: str = Field(..., description="Reference dish photo URL.")
+    source_name: str = Field(..., description="Attribution — where the recipe was curated from.")
+    source_url: str | None = Field(default=None, description="Source URL, if available.")
 
     model_config = {"from_attributes": True}
 
 
 class CuratedRecipeListResponse(BaseModel):
-    recipes: list[CuratedRecipeResponse]
-    total: int
+    """Page of curated recipes."""
+
+    recipes: list[CuratedRecipeResponse] = Field(..., description="Active recipes, alphabetical by title.")
+    total: int = Field(..., description="Number of recipes returned.")
 
 
 class LearnRecipeRequest(BaseModel):
-    recipe_id: uuid.UUID
-    dish_name: str | None = Field(default=None, max_length=255)
-    price: float = Field(default=99.0, gt=0)
-    cuisine_id: uuid.UUID | None = None
-    category_id: uuid.UUID | None = None
-    prep_time_min: int = Field(default=30, gt=0)
+    """Owner request to turn a curated recipe into a draft trial dish (F22)."""
+
+    recipe_id: uuid.UUID = Field(..., description="Curated recipe to base the trial dish on.")
+    dish_name: str | None = Field(default=None, max_length=255, description="Custom dish name; defaults to the recipe title.")
+    price: float = Field(default=99.0, gt=0, description="Price (INR) for the new draft dish.", examples=[149.0])
+    cuisine_id: uuid.UUID | None = Field(default=None, description="Catalog cuisine to file the dish under, if applicable.")
+    category_id: uuid.UUID | None = Field(default=None, description="Catalog diet category to file the dish under, if applicable.")
+    prep_time_min: int = Field(default=30, gt=0, description="Estimated prep time in minutes.")
 
 
 class TrialInviteResponse(BaseModel):
-    id: uuid.UUID
-    customer_id: uuid.UUID
-    customer_name: str | None
-    customer_phone_masked: str
-    status: str
-    home_taste_score: int | None = None
-    quality_score: int | None = None
+    """One customer invited to sample a trial dish."""
+
+    id: uuid.UUID = Field(..., description="Invite UUID.")
+    customer_id: uuid.UUID = Field(..., description="Invited customer's UUID (must be a known CRM customer of the kitchen).")
+    customer_name: str | None = Field(default=None, description="Customer's name, if on record.")
+    customer_phone_masked: str = Field(..., description="Customer phone, masked for display (e.g. '+9198***10').", examples=["+9198***10"])
+    status: str = Field(..., description="'pending' (added, not yet sent), 'sent' (WhatsApp dispatched), or 'rated'.")
+    home_taste_score: int | None = Field(default=None, description="1-5 home-taste score, once rated.")
+    quality_score: int | None = Field(default=None, description="1-5 quality score, once rated.")
 
     model_config = {"from_attributes": True}
 
 
 class DishTrialResponse(BaseModel):
-    id: uuid.UUID
-    kitchen_id: uuid.UUID
-    curated_recipe_id: uuid.UUID | None
-    catalog_dish_id: uuid.UUID
-    dish_name: str
-    status: str
-    promo_type: str
-    sample_price: float | None
-    rating_threshold: float
-    avg_rating: float | None
-    invite_count: int
-    whatsapp_sent_at: datetime | None
-    promoted_at: datetime | None
-    created_at: datetime
-    invites: list[TrialInviteResponse] = Field(default_factory=list)
+    """A dish trial's full state — draft dish, sampling progress, ratings, and promotion status (F22)."""
+
+    id: uuid.UUID = Field(..., description="Trial UUID.")
+    kitchen_id: uuid.UUID = Field(..., description="Owning kitchen UUID.")
+    curated_recipe_id: uuid.UUID | None = Field(default=None, description="Source curated recipe, if the trial started from the portal.")
+    catalog_dish_id: uuid.UUID = Field(..., description="The draft (initially inactive) dish created in the catalog service.")
+    dish_name: str = Field(..., description="Dish name.")
+    status: str = Field(..., description="'draft' -> 'sampling'/'collecting_ratings' -> 'promoted'.", examples=["collecting_ratings"])
+    promo_type: str = Field(..., description="'free' or 'paid_sample' — how the trial sample is offered to invitees.")
+    sample_price: float | None = Field(default=None, description="Sample price (INR), required when `promo_type='paid_sample'`.")
+    rating_threshold: float = Field(..., description="Minimum average rating (0-5) required to promote without `force=true`.", examples=[4.0])
+    avg_rating: float | None = Field(default=None, description="Weighted average rating (60% home-taste + 40% quality) across all ratings so far, or null before the first rating.")
+    invite_count: int = Field(..., description="Number of customers invited to this trial.")
+    whatsapp_sent_at: datetime | None = Field(default=None, description="Timestamp the sample-offer WhatsApp blast was sent, UTC.")
+    promoted_at: datetime | None = Field(default=None, description="Timestamp the dish was promoted to the live menu, UTC.")
+    created_at: datetime = Field(..., description="Trial creation timestamp, UTC.")
+    invites: list[TrialInviteResponse] = Field(default_factory=list, description="Invited customers with status/ratings; included on detail views, omitted on list views.")
 
     model_config = {"from_attributes": True}
 
 
 class DishTrialListResponse(BaseModel):
-    trials: list[DishTrialResponse]
-    total: int
+    """Trial roster for a kitchen."""
+
+    trials: list[DishTrialResponse] = Field(..., description="Trials ordered newest first (invites omitted for brevity).")
+    total: int = Field(..., description="Number of trials returned.")
 
 
 class TrialInvitesRequest(BaseModel):
-    customer_ids: list[uuid.UUID] = Field(min_length=MIN_INVITES, max_length=MAX_INVITES)
-    promo_type: Literal["free", "paid_sample"] = "free"
-    sample_price: float | None = Field(default=None, gt=0)
+    """Owner request to set/replace the customer invite list for a trial."""
+
+    customer_ids: list[uuid.UUID] = Field(min_length=MIN_INVITES, max_length=MAX_INVITES, description=f"{MIN_INVITES}-{MAX_INVITES} customer UUIDs from the kitchen's CRM roster.")
+    promo_type: Literal["free", "paid_sample"] = Field(default="free", description="How the sample is offered.")
+    sample_price: float | None = Field(default=None, gt=0, description="Required when `promo_type='paid_sample'`.")
 
     @model_validator(mode="after")
     def paid_requires_price(self) -> TrialInvitesRequest:
@@ -101,10 +115,12 @@ class TrialInvitesRequest(BaseModel):
 
 
 class TrialRatingRequest(BaseModel):
-    invite_id: uuid.UUID
-    home_taste_score: int = Field(ge=1, le=5)
-    quality_score: int = Field(ge=1, le=5)
-    feedback: str | None = Field(default=None, max_length=2000)
+    """A single invitee's rating of the sampled trial dish."""
+
+    invite_id: uuid.UUID = Field(..., description="The invite being rated — each invite can be rated only once.")
+    home_taste_score: int = Field(ge=1, le=5, description="1-5 home-taste score.")
+    quality_score: int = Field(ge=1, le=5, description="1-5 quality score.")
+    feedback: str | None = Field(default=None, max_length=2000, description="Optional freeform feedback text.")
 
 
 def _mask_phone(phone: str) -> str:

@@ -6,14 +6,74 @@ from datetime import UTC, datetime
 
 # ── Demo owner & kitchen ────────────────────────────────────────────────────
 
+DEMO_OTP = "123456"
+
 DEMO_OWNER = {
     "phone": "9876543210",
     "phone_e164": "+919876543210",
     "name": "Raj Sharma",
     "email": "demo@kitchcu.dev",
+    "kitchen_label": "Sharma Home Kitchen",
+    "kitchen_code": "CKPNQ001",
+    "role": "primary",
 }
 
-DEMO_OTP = "123456"
+# Additional owner logins (same OTP). Seeded by seed-dev-data / seed-bulk-data.
+DEMO_OWNERS_EXTRA = [
+    {
+        "phone": "9876543211",
+        "phone_e164": "+919876543211",
+        "name": "Priya Mehta",
+        "email": "priya@kitchcu.dev",
+        "kitchen_label": "Mehta Tiffins",
+        "role": "growth",
+    },
+    {
+        "phone": "9876543212",
+        "phone_e164": "+919876543212",
+        "name": "Amit Desai",
+        "email": "amit@kitchcu.dev",
+        "kitchen_label": "Desai Cloud Kitchen",
+        "role": "non_veg",
+    },
+    {
+        "phone": "9876543213",
+        "phone_e164": "+919876543213",
+        "name": "Sneha Kulkarni",
+        "email": "sneha@kitchcu.dev",
+        "kitchen_label": "Kulkarni Home Food",
+        "role": "veg",
+    },
+]
+
+DEMO_OWNERS = [DEMO_OWNER, *DEMO_OWNERS_EXTRA]
+
+DEMO_ADMIN = {
+    "email": "admin@kitchcu.dev",
+    "password": "admin123456",
+}
+
+# Customer WhatsApp OTP demos (dev OTP always DEMO_OTP)
+DEMO_CUSTOMERS = [
+    {
+        "phone": "9123456789",
+        "phone_e164": "+919123456789",
+        "name": "Priya Customer",
+        "note": "Default diner",
+    },
+    {
+        "phone": "9123456780",
+        "phone_e164": "+919123456780",
+        "name": "Rahul Menon",
+        "note": "Repeat buyer",
+    },
+    {
+        "phone": "9988776655",
+        "phone_e164": "+919988776655",
+        "name": "Ananya Guest",
+        "note": "Guest checkout",
+    },
+]
 
 DEMO_KITCHEN = {
     "name": "Sharma Home Kitchen",

@@ -31,7 +31,15 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="kitchCU Streaming Service",
     version="0.1.0",
-    description="Live kitchen prep streaming — Sprint 18 (F46–F48)",
+    description=(
+        "Opt-in live video from the kitchen (F46-F48), built on LiveKit: owners **opt in** "
+        "per-kitchen (`live_sharing_enabled`) before they can go live (F47), can start/end a "
+        "publisher session tied optionally to a specific order, and customers discover currently "
+        "live kitchens (F48) and receive a viewer-only LiveKit token to watch. All video "
+        "infrastructure is externalized to LiveKit — this service only manages session "
+        "lifecycle/authorization and issues short-lived room tokens; `livekit_configured=false` "
+        "when the deployment has no LiveKit credentials set."
+    ),
     lifespan=lifespan,
 )
 

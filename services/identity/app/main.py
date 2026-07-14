@@ -33,7 +33,17 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="kitchCU Identity Service",
     version="0.2.0",
-    description="Owner registration, kitchen onboarding, customer OAuth, authentication",
+    description=(
+        "Owner registration, kitchen onboarding, customer OAuth/WhatsApp login, and platform "
+        "admin authentication for kitchCU.\n\n"
+        "Endpoints are grouped by tag — **Auth** (owner OTP), **Owners**, **Kitchens**, "
+        "**Discovery** (public nearby/by-code search), **Customer Auth** (OAuth + WhatsApp OTP), "
+        "and **Admin** (platform moderation).\n\n"
+        "Every request/response model documents its fields with `description` + `examples`, "
+        "and every route documents `summary`, auth requirements, and the error `responses` it "
+        "can return — see the schema definitions below for exact JWT payload shapes "
+        "(`type=owner` / `type=customer` / `type=admin`)."
+    ),
     lifespan=lifespan,
 )
 

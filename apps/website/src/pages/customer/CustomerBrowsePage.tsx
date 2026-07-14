@@ -1,7 +1,9 @@
 import { FormEvent, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { BrandTextLogo } from "../../components/BrandLogo";
 import { images, sampleDishImages } from "../../data/content";
-import { DEMO } from "../../data/demo";import { fetchKitchenByCode } from "../../lib/api";
+import { DEMO } from "../../data/demo";
+import { fetchKitchenByCode } from "../../lib/api";
 
 export function CustomerBrowsePage() {
   const navigate = useNavigate();
@@ -40,9 +42,8 @@ export function CustomerBrowsePage() {
   return (
     <div className="customer-page">
       <header className="customer-page__nav container">
-        <Link to="/" className="nav__brand">
-          <span className="nav__logo">kitchCU</span>
-          <span className="nav__tagline">For Customers</span>
+        <Link to="/" className="nav__brand nav__brand--row">
+          <BrandTextLogo subtitle="For Customers" />
         </Link>
         <Link to="/login" className="btn btn--ghost btn--sm">Owner Login</Link>
       </header>

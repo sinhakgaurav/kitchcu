@@ -5,6 +5,8 @@ alwaysApply: true
 
 # KitchCu Agent Rules (Always Apply)
 
+**Also enforce:** `kitchcu-executive-operating-charter.mdc` (CEO/CPO/CTO/UX/DBA/QA · 100k sessions · TDD/EDD).
+
 Before implementing or modifying code, read:
 
 1. **`AGENTS.md`** — quick spec + current build status

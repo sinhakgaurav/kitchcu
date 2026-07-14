@@ -1,3 +1,5 @@
+import { BrandNavMark } from "./BrandNavMark";
+import { APP_NAME, SUPPORT_EMAIL } from "../shared/brand";
 import { customerUrl, kitchenUrl } from "../shared/urls";
 
 export function PortalFooter() {
@@ -5,10 +7,11 @@ export function PortalFooter() {
     <footer className="footer">
       <div className="container footer__inner">
         <div className="footer__brand">
-          <span className="nav__logo">kitchCU</span>
+          <BrandNavMark height={40} />
           <p>
-            Cloud Kitchen Analytics &amp; Control — built for home food businesses,
-            tiffin services, and delivery-only kitchens. Zero food commission.
+            Cloud Kitchen Analytics &amp; Control — India's first (and the world's third)
+            Growth OS for home food businesses, tiffin services, and delivery-only kitchens.
+            Zero food commission.
           </p>
         </div>
         <div className="footer__links">
@@ -16,11 +19,12 @@ export function PortalFooter() {
           <a href="#pricing">Pricing</a>
           <a href="#support">Support</a>
           <a href="#contact">Contact</a>
+          <a href="/openapi">API / OpenAPI</a>
           <a href={customerUrl("/")}>Customer app</a>
           <a href={kitchenUrl("/")}>Kitchen app</a>
         </div>
         <p className="footer__copy">
-          © {new Date().getFullYear()} kitchCU · hello@kitchCU.in · Pune, India
+          © {new Date().getFullYear()} {APP_NAME} · {SUPPORT_EMAIL} · Pune, India
         </p>
       </div>
     </footer>

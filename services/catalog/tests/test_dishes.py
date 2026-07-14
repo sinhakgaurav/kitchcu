@@ -45,7 +45,8 @@ async def test_create_dish_rejects_non_live_hero(client: AsyncClient, kitchen_ct
         json=payload,
         headers={"Authorization": f"Bearer {token}"},
     )
-    assert response.status_code == 422
+    assert response.status_code == 400
+    assert "live capture" in response.json()["detail"].lower()
 
 
 @pytest.mark.asyncio

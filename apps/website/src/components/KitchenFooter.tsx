@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
-import { KITCHEN_HOST } from "../shared/brand";
+import { BrandNavMark } from "./BrandNavMark";
+import { APP_NAME, KITCHEN_HOST } from "../shared/brand";
 import { customerUrl } from "../shared/urls";
 
 export function KitchenFooter() {
@@ -7,7 +8,7 @@ export function KitchenFooter() {
     <footer className="footer footer--kitchen">
       <div className="container footer__inner">
         <div className="footer__brand">
-          <span className="nav__logo">kitchCU</span>
+          <BrandNavMark height={36} />
           <p>Run your cloud kitchen — orders, menu, and customers.</p>
           <span className="footer__host">{KITCHEN_HOST}</span>
         </div>
@@ -16,7 +17,9 @@ export function KitchenFooter() {
           <Link to="/login">Owner sign in</Link>
           <a href={customerUrl("/")}>Customer app</a>
         </div>
-        <p className="footer__copy">© {new Date().getFullYear()} kitchCU Kitchen</p>
+        <p className="footer__copy">
+          © {new Date().getFullYear()} {APP_NAME} · Kitchen
+        </p>
       </div>
     </footer>
   );

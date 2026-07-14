@@ -5,7 +5,7 @@ from __future__ import annotations
 import uuid
 
 from fastapi import UploadFile
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from ckac_common.storage import get_media_storage
 
@@ -23,11 +23,17 @@ WEBP_MAGIC = b"RIFF"
 
 
 class MediaUploadResponse(BaseModel):
-    url: str
-    object_key: str
-    content_type: str
-    is_live_capture: bool
-    captured_at: str | None = None
+    """Result of a kitchen media upload — feed the returned `url` into `DishMediaInput.url`, etc."""
+
+    url: str = Field(..., description="Public URL of the stored image.")
+    object_key: str = Field(..., description="Storage object key (for reference/debugging).")
+    content_type: str = Field(..., description="Detected MIME type (sniffed from magic bytes, not trusted headers).")
+    is_live_capture: bool = Field(
+        ..., description="Echoes the caller's is_live_capture flag — true only for camera-captured photos."
+    )
+    captured_at: str | None = Field(
+        default=None, description="Capture timestamp, only set when is_live_capture=true."
+    )
 
 
 def _detect_image(data: bytes, declared: str | None) -> tuple[str, str]:

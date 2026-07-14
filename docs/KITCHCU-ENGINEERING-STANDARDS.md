@@ -16,7 +16,9 @@
 
 ## 1. System role
 
-Act as the **founding engineering organization** — not a code generator.
+Act as the **founding engineering organization** — not a coding assistant.
+
+**Strict always-on agent charter:** [`.cursor/rules/kitchcu-executive-operating-charter.mdc`](../.cursor/rules/kitchcu-executive-operating-charter.mdc) — CEO · CPO · CTO · Full-Stack · UX · DBA · QA Lead; **100k concurrent sessions** scale lens; TDD/EDD/microservices obligatory.
 
 Responsibilities: design, build, test, secure, observe, and maintain a **production SaaS** for millions of users globally.
 
@@ -219,7 +221,7 @@ Redis Streams now → Kafka (events) + RabbitMQ/ARQ (tasks) at scale. Choose per
 | Rule | Phase 1 | Target |
 |------|---------|--------|
 | Prefix | `/api/v1/` | Versioned; v2 when breaking |
-| OpenAPI | FastAPI auto + review | Contract-first for gateway |
+| OpenAPI | **Live** — gateway aggregates every service's `/openapi.json` into one contract (`services/gateway/app/openapi_aggregate.py`) at `/openapi.json`, `/docs`, `/redoc`; portal explorer `/openapi` (+`/api-docs`); human index `docs/API.md`. FastAPI auto-generation is the mechanism, but every route **must** set explicit `summary`/`description`/`responses=` (via `ckac_common.openapi.error_response`/`auth_errors`) and every Pydantic field **must** carry `Field(..., description=...)` — auto-only schemas without these are a review-blocking gap, not "done". Force-refresh the gateway cache with `?refresh=true` after route changes. | Same contract, OpenAPI 3.1 fully typed; contract tests against the aggregated spec |
 | Auth | JWT Bearer (owner); admin JWT | + refresh tokens, RBAC |
 | Idempotency | `Idempotency-Key` on POST orders/payments | All financial writes |
 | Pagination | `limit`/`offset`; cursor for large lists | Cursor default |
@@ -418,7 +420,7 @@ Then: production code · unit/API/event tests · update `AGENTS.md` / implementa
 | TDD | ✅ 90+ tests | Add tests before implementation |
 | No cross-schema writes | ✅ | Keep |
 | Tenant `kitchen_id` | ✅ orders, catalog | All new tenant tables |
-| OpenAPI | ✅ FastAPI auto | Review on new routes |
+| OpenAPI | ✅ Aggregated at gateway (`/openapi.json`, `/docs`, `/redoc`, portal `/openapi`) + `docs/API.md`; `summary`/`description`/`Field` descriptions/`responses` required on every route (not auto-only) | Review new routes against §7 checklist before merge |
 | Idempotency header | ⏳ orders/payments S6 | Implement with billing |
 | Refresh tokens | ⏳ | Phase 2 identity |
 | PWA offline | ⏳ | S5 |

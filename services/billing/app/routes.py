@@ -1,7 +1,7 @@
 import uuid
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.deps import (
@@ -59,8 +59,16 @@ from app.gst import (
 )
 from ckac_common.database import get_db
 from ckac_common.event_bus import EventPublisher
+from ckac_common.openapi import RESP_400, RESP_404, auth_errors
 
 router = APIRouter()
+
+TAG_PAYMENTS = "Payments"
+TAG_CUSTOMER_PAYMENTS = "Customer Payments"
+TAG_SETTLEMENTS = "Settlements"
+TAG_SUBSCRIPTIONS = "Subscriptions"
+TAG_GST = "GST"
+TAG_WEBHOOKS = "Webhooks"
 
 
 def get_publisher() -> EventPublisher:
@@ -69,12 +77,29 @@ def get_publisher() -> EventPublisher:
     return event_publisher
 
 
-@router.get("/billing/subscriptions/plans", response_model=SubscriptionPlansResponse)
+@router.get(
+    "/billing/subscriptions/plans",
+    response_model=SubscriptionPlansResponse,
+    tags=[TAG_SUBSCRIPTIONS],
+    summary="List subscription plans",
+    description=(
+        "Public — the platform's subscription tiers (starter/growth/pro). kitchCU is an owner "
+        "**subscription SaaS**: this is the platform's only revenue source — there is **zero "
+        "per-order food commission**."
+    ),
+)
 async def subscription_plans() -> SubscriptionPlansResponse:
     return list_subscription_plans()
 
 
-@router.get("/billing/subscriptions/me", response_model=SubscriptionResponse)
+@router.get(
+    "/billing/subscriptions/me",
+    response_model=SubscriptionResponse,
+    tags=[TAG_SUBSCRIPTIONS],
+    summary="Get my subscription",
+    description="Owner-only — the caller's current (most recent) platform subscription.",
+    responses={**auth_errors(), 404: RESP_404},
+)
 async def subscription_me(
     owner_id: Annotated[uuid.UUID, Depends(get_current_owner_id)],
     session: Annotated[AsyncSession, Depends(get_db)],
@@ -89,6 +114,14 @@ async def subscription_me(
     "/billing/subscriptions",
     response_model=SubscriptionResponse,
     status_code=status.HTTP_201_CREATED,
+    tags=[TAG_SUBSCRIPTIONS],
+    summary="Start a subscription",
+    description=(
+        "Owner-only — start a platform SaaS subscription (starter/growth/pro, monthly or yearly). "
+        "Created in `trial` status; call the activate endpoint (or await the Razorpay subscription "
+        "webhook in production) to move to `active`. Publishes `subscription.created`."
+    ),
+    responses=auth_errors(),
 )
 async def subscription_create(
     body: SubscriptionCreateRequest,
@@ -100,7 +133,18 @@ async def subscription_create(
     return subscription_to_response(sub)
 
 
-@router.post("/billing/subscriptions/{subscription_id}/activate", response_model=SubscriptionResponse)
+@router.post(
+    "/billing/subscriptions/{subscription_id}/activate",
+    response_model=SubscriptionResponse,
+    tags=[TAG_SUBSCRIPTIONS],
+    summary="Activate a subscription",
+    description=(
+        "Owner-only — activate the caller's own trial/past-due subscription, extending "
+        "`current_period_end` by the plan's billing cycle and syncing the owner's tier. "
+        "Publishes `subscription.activated`."
+    ),
+    responses={**auth_errors(), 400: RESP_400, 404: RESP_404},
+)
 async def subscription_activate(
     subscription_id: uuid.UUID,
     owner_id: Annotated[uuid.UUID, Depends(get_current_owner_id)],
@@ -121,6 +165,15 @@ async def subscription_activate(
     "/billing/payments",
     response_model=PaymentResponse,
     status_code=status.HTTP_201_CREATED,
+    tags=[TAG_PAYMENTS],
+    summary="Create a payment (owner)",
+    description=(
+        "Owner-only — create a payment for an order the caller owns. COD orders are rejected (400); "
+        "idempotent per order+method (returns the existing in-flight payment if one exists). "
+        "Publishes `payment.created`. This is a pass-through charge to the kitchen — kitchCU takes "
+        "**zero per-order food commission**."
+    ),
+    responses={**auth_errors(include_404=True), 400: RESP_400},
 )
 async def payment_create(
     body: PaymentCreateRequest,
@@ -140,6 +193,13 @@ async def payment_create(
     "/billing/payments/upi-intent",
     response_model=UpiIntentResponse,
     status_code=status.HTTP_201_CREATED,
+    tags=[TAG_PAYMENTS],
+    summary="Create a UPI intent (owner)",
+    description=(
+        "Owner-only — create a payment in `pending` status and return a `upi://pay` deep link/QR "
+        "payload for the customer to complete via their UPI app."
+    ),
+    responses={**auth_errors(include_404=True), 400: RESP_400},
 )
 async def payment_upi_intent(
     body: UpiIntentRequest,
@@ -162,7 +222,14 @@ async def payment_upi_intent(
     )
 
 
-@router.get("/billing/payments/{payment_id}", response_model=PaymentResponse)
+@router.get(
+    "/billing/payments/{payment_id}",
+    response_model=PaymentResponse,
+    tags=[TAG_PAYMENTS],
+    summary="Get a payment (owner)",
+    description="Owner-only — fetch a payment the caller owns.",
+    responses={**auth_errors(), 404: RESP_404},
+)
 async def payment_get(
     payment_id: uuid.UUID,
     owner_id: Annotated[uuid.UUID, Depends(get_current_owner_id)],
@@ -175,7 +242,18 @@ async def payment_get(
     return payment_to_response(payment)
 
 
-@router.post("/billing/payments/{payment_id}/capture", response_model=PaymentResponse)
+@router.post(
+    "/billing/payments/{payment_id}/capture",
+    response_model=PaymentResponse,
+    tags=[TAG_PAYMENTS],
+    summary="Capture a payment (owner)",
+    description=(
+        "Owner-only — mark a payment as `captured` (dev-mocked Razorpay capture; in production this "
+        "is normally driven by the Razorpay webhook instead). Idempotent — returns the payment "
+        "unchanged if already captured. Publishes `payment.captured`."
+    ),
+    responses={**auth_errors(), 400: RESP_400},
+)
 async def payment_capture(
     payment_id: uuid.UUID,
     owner_id: Annotated[uuid.UUID, Depends(get_current_owner_id)],
@@ -194,6 +272,13 @@ async def payment_capture(
     "/billing/payments/customer",
     response_model=PaymentResponse,
     status_code=status.HTTP_201_CREATED,
+    tags=[TAG_CUSTOMER_PAYMENTS],
+    summary="Create a payment (customer)",
+    description=(
+        "Customer-only (JWT `type: customer`) — create a payment for the caller's own single-kitchen "
+        "order. COD orders are rejected (400); idempotent per order+method."
+    ),
+    responses={**auth_errors(include_404=True), 400: RESP_400},
 )
 async def customer_payment_create(
     body: PaymentCreateRequest,
@@ -214,6 +299,10 @@ async def customer_payment_create(
     "/billing/payments/customer/upi-intent",
     response_model=UpiIntentResponse,
     status_code=status.HTTP_201_CREATED,
+    tags=[TAG_CUSTOMER_PAYMENTS],
+    summary="Create a UPI intent (customer)",
+    description="Customer-only — create a payment and return a `upi://pay` deep link for the caller's own order.",
+    responses={**auth_errors(include_404=True), 400: RESP_400},
 )
 async def customer_payment_upi_intent(
     body: UpiIntentRequest,
@@ -237,7 +326,17 @@ async def customer_payment_upi_intent(
     )
 
 
-@router.post("/billing/payments/customer/{payment_id}/capture", response_model=PaymentResponse)
+@router.post(
+    "/billing/payments/customer/{payment_id}/capture",
+    response_model=PaymentResponse,
+    tags=[TAG_CUSTOMER_PAYMENTS],
+    summary="Capture a payment (customer)",
+    description=(
+        "Customer-only — mark the caller's own single-order payment as `captured` (dev-mocked). "
+        "Publishes `payment.captured`."
+    ),
+    responses={**auth_errors(), 400: RESP_400},
+)
 async def customer_payment_capture(
     payment_id: uuid.UUID,
     customer_id: Annotated[uuid.UUID, Depends(get_current_customer_id)],
@@ -257,6 +356,14 @@ async def customer_payment_capture(
     "/billing/payments/customer/master",
     response_model=PaymentResponse,
     status_code=status.HTTP_201_CREATED,
+    tags=[TAG_CUSTOMER_PAYMENTS, TAG_SETTLEMENTS],
+    summary="Create an aggregated payment for a multi-kitchen cart",
+    description=(
+        "Customer-only — create a single aggregated payment for a multi-kitchen master order (F44 "
+        "split payment). Requires at least two sub-orders; COD master orders are rejected (400). "
+        "Capture this payment to trigger the per-kitchen Razorpay Route split (see settlements below)."
+    ),
+    responses={**auth_errors(), 400: RESP_400},
 )
 async def customer_master_payment_create(
     body: MasterPaymentCreateRequest,
@@ -276,6 +383,15 @@ async def customer_master_payment_create(
 @router.post(
     "/billing/payments/customer/master/{payment_id}/capture",
     response_model=MasterPaymentCaptureResponse,
+    tags=[TAG_CUSTOMER_PAYMENTS, TAG_SETTLEMENTS],
+    summary="Capture an aggregated payment and split settlements",
+    description=(
+        "Customer-only — capture the aggregated master payment, splitting the charge into one "
+        "settlement per kitchen via Razorpay Route (`net_to_owner` per sub-order, `platform_fee` "
+        "always 0 — zero per-order food commission). Publishes `payment.captured` and "
+        "`payment.split.completed`."
+    ),
+    responses={**auth_errors(), 400: RESP_400},
 )
 async def customer_master_payment_capture(
     payment_id: uuid.UUID,
@@ -295,7 +411,19 @@ async def customer_master_payment_capture(
     )
 
 
-@router.post("/webhooks/razorpay")
+@router.post(
+    "/webhooks/razorpay",
+    tags=[TAG_WEBHOOKS],
+    summary="Razorpay payment webhook",
+    description=(
+        "Unauthenticated Razorpay callback endpoint. Only `payment.captured` is processed — other "
+        "event types are acknowledged with `{\"status\": \"ignored\"}` and no side effects. Matches "
+        "the inbound payment to a `Payment` row by `razorpay_order_id` and marks it captured, "
+        "publishing `payment.captured`. **Do not rely on this in place of gateway-level webhook "
+        "signature verification in production.**"
+    ),
+    responses={400: RESP_400, 404: RESP_404},
+)
 async def razorpay_webhook(
     body: RazorpayWebhookPayload,
     session: Annotated[AsyncSession, Depends(get_db)],
@@ -326,7 +454,14 @@ async def razorpay_webhook(
     return {"status": "ok"}
 
 
-@router.get("/kitchens/{kitchen_id}/gst/profile", response_model=GstProfileResponse)
+@router.get(
+    "/kitchens/{kitchen_id}/gst/profile",
+    response_model=GstProfileResponse,
+    tags=[TAG_GST],
+    summary="Get GST profile",
+    description="Owner-only — the kitchen's GST registration profile, if one has been set up.",
+    responses={**auth_errors(include_403=True), 404: RESP_404},
+)
 async def gst_profile_get(
     kitchen_id: uuid.UUID,
     owner_id: Annotated[uuid.UUID, Depends(get_current_owner_id)],
@@ -339,7 +474,17 @@ async def gst_profile_get(
     return profile_to_response(profile)
 
 
-@router.put("/kitchens/{kitchen_id}/gst/profile", response_model=GstProfileResponse)
+@router.put(
+    "/kitchens/{kitchen_id}/gst/profile",
+    response_model=GstProfileResponse,
+    tags=[TAG_GST],
+    summary="Create or update GST profile",
+    description=(
+        "Owner-only — register or update the kitchen's GST profile (GSTIN, legal name, address, tax "
+        "rate). Required before invoice sync or reports; publishes `gst.profile.created`/`gst.profile.updated`."
+    ),
+    responses={**auth_errors(include_403=True), 400: RESP_400},
+)
 async def gst_profile_upsert(
     kitchen_id: uuid.UUID,
     body: GstProfileUpsertRequest,
@@ -355,14 +500,26 @@ async def gst_profile_upsert(
     return profile_to_response(profile)
 
 
-@router.post("/kitchens/{kitchen_id}/gst/sync", response_model=GstSyncResponse)
+@router.post(
+    "/kitchens/{kitchen_id}/gst/sync",
+    response_model=GstSyncResponse,
+    tags=[TAG_GST],
+    summary="Sync delivered orders into GST invoices",
+    description=(
+        "Owner-only — generate tax invoices for delivered orders that don't yet have one. Part of the "
+        "**GST monthly close flow**: sync → review the monthly report → close the audit. Optionally "
+        "scope to a single year/month; omit both to sync all outstanding delivered orders. Requires an "
+        "active GST profile (400 otherwise). Publishes `gst.invoice.created` per invoice."
+    ),
+    responses={**auth_errors(include_403=True), 400: RESP_400},
+)
 async def gst_sync_invoices(
     kitchen_id: uuid.UUID,
     owner_id: Annotated[uuid.UUID, Depends(get_current_owner_id)],
     session: Annotated[AsyncSession, Depends(get_db)],
     publisher: Annotated[EventPublisher, Depends(get_publisher)],
-    year: int | None = None,
-    month: int | None = None,
+    year: Annotated[int | None, Query(description="Restrict sync to this year (requires month).")] = None,
+    month: Annotated[int | None, Query(description="Restrict sync to this month, 1-12 (requires year).")] = None,
 ) -> GstSyncResponse:
     await verify_kitchen_owner(kitchen_id, owner_id, session)
     try:
@@ -381,13 +538,23 @@ async def gst_sync_invoices(
     )
 
 
-@router.get("/kitchens/{kitchen_id}/gst/reports/monthly", response_model=GstMonthlyReportResponse)
+@router.get(
+    "/kitchens/{kitchen_id}/gst/reports/monthly",
+    response_model=GstMonthlyReportResponse,
+    tags=[TAG_GST],
+    summary="Get the monthly GST report",
+    description=(
+        "Owner-only — invoice totals for a filing period (step 2 of the **GST monthly close flow**: "
+        "sync → review this report → close the audit). Refreshes running totals if the audit is still open."
+    ),
+    responses={**auth_errors(include_403=True), 400: RESP_400},
+)
 async def gst_monthly_report(
     kitchen_id: uuid.UUID,
     owner_id: Annotated[uuid.UUID, Depends(get_current_owner_id)],
     session: Annotated[AsyncSession, Depends(get_db)],
-    year: int,
-    month: int,
+    year: Annotated[int, Query(description="Report year.", examples=[2026])],
+    month: Annotated[int, Query(description="Report month, 1-12.", examples=[7])],
 ) -> GstMonthlyReportResponse:
     await verify_kitchen_owner(kitchen_id, owner_id, session)
     if month < 1 or month > 12:
@@ -402,13 +569,21 @@ async def gst_monthly_report(
 @router.get(
     "/kitchens/{kitchen_id}/gst/reports/balance-sheet",
     response_model=GstBalanceSheetResponse,
+    tags=[TAG_GST],
+    summary="Get the monthly balance sheet",
+    description=(
+        "Owner-only — simplified balance sheet for a period (cash/settlements as assets, GST payable "
+        "as liability, retained earnings as equity). Returns the frozen snapshot if the audit for that "
+        "period is already closed, otherwise a live-computed sheet."
+    ),
+    responses={**auth_errors(include_403=True), 400: RESP_400},
 )
 async def gst_balance_sheet(
     kitchen_id: uuid.UUID,
     owner_id: Annotated[uuid.UUID, Depends(get_current_owner_id)],
     session: Annotated[AsyncSession, Depends(get_db)],
-    year: int,
-    month: int,
+    year: Annotated[int, Query(description="Period year.")],
+    month: Annotated[int, Query(description="Period month, 1-12.")],
 ) -> GstBalanceSheetResponse:
     await verify_kitchen_owner(kitchen_id, owner_id, session)
     if month < 1 or month > 12:
@@ -430,13 +605,23 @@ async def gst_balance_sheet(
     return sheet
 
 
-@router.get("/kitchens/{kitchen_id}/gst/audit", response_model=GstAuditResponse)
+@router.get(
+    "/kitchens/{kitchen_id}/gst/audit",
+    response_model=GstAuditResponse,
+    tags=[TAG_GST],
+    summary="Get the monthly audit",
+    description=(
+        "Owner-only — the monthly GST audit record (running totals + balance sheet) for a period. "
+        "Open audits refresh their totals on read; closed audits are immutable."
+    ),
+    responses={**auth_errors(include_403=True), 400: RESP_400},
+)
 async def gst_audit_get(
     kitchen_id: uuid.UUID,
     owner_id: Annotated[uuid.UUID, Depends(get_current_owner_id)],
     session: Annotated[AsyncSession, Depends(get_db)],
-    year: int,
-    month: int,
+    year: Annotated[int, Query(description="Period year.")],
+    month: Annotated[int, Query(description="Period month, 1-12.")],
 ) -> GstAuditResponse:
     await verify_kitchen_owner(kitchen_id, owner_id, session)
     if month < 1 or month > 12:
@@ -448,14 +633,25 @@ async def gst_audit_get(
     return audit
 
 
-@router.post("/kitchens/{kitchen_id}/gst/audit/close", response_model=GstAuditResponse)
+@router.post(
+    "/kitchens/{kitchen_id}/gst/audit/close",
+    response_model=GstAuditResponse,
+    tags=[TAG_GST],
+    summary="Close the monthly audit",
+    description=(
+        "Owner-only — final step of the **GST monthly close flow**: freezes the period's totals and "
+        "balance sheet snapshot, marking the audit `closed` (immutable thereafter). Rejects if already "
+        "closed (400). Publishes `gst.audit.closed`."
+    ),
+    responses={**auth_errors(include_403=True), 400: RESP_400},
+)
 async def gst_audit_close(
     kitchen_id: uuid.UUID,
     owner_id: Annotated[uuid.UUID, Depends(get_current_owner_id)],
     session: Annotated[AsyncSession, Depends(get_db)],
     publisher: Annotated[EventPublisher, Depends(get_publisher)],
-    year: int,
-    month: int,
+    year: Annotated[int, Query(description="Period year to close.")],
+    month: Annotated[int, Query(description="Period month to close, 1-12.")],
 ) -> GstAuditResponse:
     await verify_kitchen_owner(kitchen_id, owner_id, session)
     if month < 1 or month > 12:

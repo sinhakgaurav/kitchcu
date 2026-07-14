@@ -33,8 +33,8 @@ def test_render_order_bill_pdf_bytes():
         payment=ReceiptPayment(method="upi", status="captured", amount=398.0, reference="pay_dev_1"),
     )
     pdf = render_order_bill_pdf(receipt)
-    assert isinstance(pdf, (bytes, bytearray))
-    assert bytes(pdf)[:4] == b"%PDF"
+    assert isinstance(pdf, bytes)
+    assert pdf[:4] == b"%PDF"
 
 
 def test_bill_pdf_filename_sanitizes():

@@ -31,7 +31,14 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="kitchCU Community Service",
     version="0.1.0",
-    description="Recipe rewards + chef rankings — Sprint 17 (F23–F24)",
+    description=(
+        "Peer-to-peer growth loops across kitchens: **recipe sharing rewards** (F23) — owners "
+        "publish recipes publicly, earn points when customers appreciate them, and redeem points "
+        "for a subscription discount (100 pts) or a featured listing (500 pts); and **chef "
+        "rankings** (F24) — a monthly, region-scoped leaderboard scored from dish ratings, order "
+        "volume/repeat-rate, and community engagement, computed on demand by any owner and cached "
+        "per period/scope/region."
+    ),
     lifespan=lifespan,
 )
 

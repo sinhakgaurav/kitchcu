@@ -28,49 +28,61 @@ STATUS_LABELS = {
 
 
 class OrderPlacedNotifyRequest(BaseModel):
-    order_id: uuid.UUID
-    kitchen_id: uuid.UUID
-    order_code: str
-    customer_phone: str | None = None
-    delivery_type: str = "pickup"
-    total: float = 0
-    tracking_token: str | None = None
+    """Internal request from the order service to send an order-confirmation notification (F45)."""
+
+    order_id: uuid.UUID = Field(..., description="Order UUID.")
+    kitchen_id: uuid.UUID = Field(..., description="Fulfilling kitchen UUID.")
+    order_code: str = Field(..., description="Human-facing order code.", examples=["CKPNQ001-BILL-20260712-0042"])
+    customer_phone: str | None = Field(default=None, description="Customer phone (E.164) to notify; skipped if absent.")
+    delivery_type: str = Field(default="pickup", description="'pickup' or 'delivery' — delivery orders with a tracking token get a tracking link + interval reminders.")
+    total: float = Field(default=0, description="Order total in INR, shown in the confirmation message.")
+    tracking_token: str | None = Field(default=None, description="Opaque public tracking token, if issued (delivery orders only).")
 
 
 class OrderStatusChangedNotifyRequest(BaseModel):
-    order_id: uuid.UUID
-    kitchen_id: uuid.UUID
-    order_code: str
-    customer_phone: str | None = None
-    from_status: str
-    to_status: str
-    tracking_token: str | None = None
+    """Internal request from the order service on any status transition (F29/F45)."""
+
+    order_id: uuid.UUID = Field(..., description="Order UUID.")
+    kitchen_id: uuid.UUID = Field(..., description="Fulfilling kitchen UUID.")
+    order_code: str = Field(..., description="Human-facing order code.")
+    customer_phone: str | None = Field(default=None, description="Customer phone to notify; skipped if absent.")
+    from_status: str = Field(..., description="Previous order status.")
+    to_status: str = Field(..., description="New order status.")
+    tracking_token: str | None = Field(default=None, description="Public tracking token, if issued.")
 
 
 class DailyMenuBlastRequest(BaseModel):
-    kitchen_id: uuid.UUID
-    message: str
-    recipient_count: int = Field(ge=0)
+    """Internal request from the growth service to dispatch a daily-menu WhatsApp blast (F39)."""
+
+    kitchen_id: uuid.UUID = Field(..., description="Kitchen the blast is for.")
+    message: str = Field(..., description="Pre-composed blast message text.")
+    recipient_count: int = Field(ge=0, description="Number of CRM-known recipients targeted (logged for audit).")
 
 
 class TrialSampleBlastRequest(BaseModel):
-    kitchen_id: uuid.UUID
-    trial_id: uuid.UUID
-    dish_name: str
-    message: str
-    recipient_count: int = Field(ge=1, le=20)
+    """Internal request from the learning service to notify customers of a dish trial sample offer (S16)."""
+
+    kitchen_id: uuid.UUID = Field(..., description="Kitchen running the trial.")
+    trial_id: uuid.UUID = Field(..., description="Dish trial UUID.")
+    dish_name: str = Field(..., description="Trial dish name.")
+    message: str = Field(..., description="Pre-composed blast message text.")
+    recipient_count: int = Field(ge=1, le=20, description="Number of recipients targeted (trial blasts are capped small).")
 
 
 class NotificationDispatchResponse(BaseModel):
-    notification_id: uuid.UUID
-    template_id: str
-    channel: str
-    status: str
+    """Result of dispatching a single notification."""
+
+    notification_id: uuid.UUID = Field(..., description="Persisted notification log row UUID.")
+    template_id: str = Field(..., description="Template used, e.g. 'order_confirmed', 'order_status_update', 'daily_menu_blast', 'trial_sample_offer', 'delivery_progress'.")
+    channel: str = Field(..., description="Delivery channel, e.g. 'whatsapp'.")
+    status: str = Field(..., description="Dispatch status, e.g. 'sent'.")
 
 
 class TrackingTickResponse(BaseModel):
-    processed: int
-    sent: int
+    """Result of one tracking-interval scheduler tick (F29) — invoked periodically by a scheduled job."""
+
+    processed: int = Field(..., description="Reminders due for processing this tick.")
+    sent: int = Field(..., description="Reminders that resulted in a notification being sent (excludes reminders auto-deactivated because the order left an active tracking status).")
 
 
 def tracking_url(token: str | None) -> str | None:

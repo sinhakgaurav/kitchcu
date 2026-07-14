@@ -12,40 +12,67 @@ from ckac_common.event_bus import EventPublisher
 
 
 class CategoryResponse(BaseModel):
-    id: uuid.UUID
-    kitchen_id: uuid.UUID
-    name: str
-    slug: str
-    sort_order: int
+    """A diet category (e.g. veg, non-veg, vegan) — used to filter and group the menu."""
+
+    id: uuid.UUID = Field(..., description="Category ID.")
+    kitchen_id: uuid.UUID = Field(..., description="Owning kitchen (tenant scope).")
+    name: str = Field(..., description="Display name.", examples=["Vegetarian"])
+    slug: str = Field(..., description="Stable slug — one of the seed diet slugs.", examples=["veg"])
+    sort_order: int = Field(..., description="Display order on the menu (ascending).", examples=[0])
 
     model_config = {"from_attributes": True}
 
 
 class CuisineResponse(BaseModel):
-    id: uuid.UUID
-    kitchen_id: uuid.UUID
-    name: str
-    slug: str
-    sort_order: int
+    """A cuisine grouping (e.g. North Indian, Chinese) — used to organize the menu."""
+
+    id: uuid.UUID = Field(..., description="Cuisine ID.")
+    kitchen_id: uuid.UUID = Field(..., description="Owning kitchen (tenant scope).")
+    name: str = Field(..., description="Display name.", examples=["North Indian"])
+    slug: str = Field(..., description="Stable slug.", examples=["north_indian"])
+    sort_order: int = Field(..., description="Display order on the menu (ascending).", examples=[0])
 
     model_config = {"from_attributes": True}
 
 
 class CuisineMenuGroup(BaseModel):
-    cuisine: CuisineResponse
-    diets: list["DietMenuGroup"]
+    """Menu dishes grouped by cuisine, then by diet category — the customer-facing menu tree."""
+
+    cuisine: CuisineResponse = Field(..., description="The cuisine this group belongs to.")
+    diets: list["DietMenuGroup"] = Field(..., description="Dishes under this cuisine, split by diet category.")
 
 
 class DietMenuGroup(BaseModel):
-    diet: CategoryResponse
-    dishes: list["DishResponse"]
+    """Dishes of a single diet category within a cuisine group."""
+
+    diet: CategoryResponse = Field(..., description="The diet category this bucket belongs to.")
+    dishes: list["DishResponse"] = Field(..., description="Active dishes matching this cuisine + diet.")
 
 
 class DishMediaInput(BaseModel):
-    url: str
-    is_hero: bool = True
-    is_live_capture: bool = False
-    captured_at: datetime | None = None
+    """Hero/gallery photo for a dish.
+
+    Truth-in-media principle: dish hero images must be ``is_live_capture=true``
+    (photographed by the kitchen, never a stock photo) — enforced server-side in
+    ``create_dish`` for active dishes.
+    """
+
+    url: str = Field(..., description="Public media URL (from the media upload endpoint).")
+    is_hero: bool = Field(
+        default=True,
+        description="Whether this is the primary dish image shown on the menu card.",
+    )
+    is_live_capture: bool = Field(
+        default=False,
+        description=(
+            "True only if this photo was captured live by the kitchen (getUserMedia / camera capture), "
+            "never a stock photo. Required to be true when is_hero=true and the dish is active."
+        ),
+    )
+    captured_at: datetime | None = Field(
+        default=None,
+        description="Capture timestamp for live-capture photos (audit trail for truth-in-media).",
+    )
 
     @model_validator(mode="after")
     def hero_requires_live_capture(self) -> "DishMediaInput":
@@ -53,57 +80,76 @@ class DishMediaInput(BaseModel):
 
 
 class DishCreateRequest(BaseModel):
-    name: str = Field(..., min_length=2, max_length=255)
-    cuisine_id: uuid.UUID
-    category_id: uuid.UUID
-    description: str | None = None
-    price: float = Field(..., gt=0)
-    prep_time_min: int = Field(default=30, gt=0)
-    delivery_time_min: int | None = Field(default=None, ge=0)
-    ingredients_description: str | None = None
-    quality_measures: str | None = None
-    is_active: bool = True
-    media: DishMediaInput
+    """Create a new dish on the kitchen's menu.
+
+    **Truth in media:** if ``media.is_hero`` is true and the dish is created active
+    (``is_active=true``), ``media.is_live_capture`` must also be true — stock-photo
+    hero images are rejected (400) to protect customer trust.
+    """
+
+    name: str = Field(..., min_length=2, max_length=255, description="Dish name.", examples=["Paneer Butter Masala"])
+    cuisine_id: uuid.UUID = Field(..., description="Cuisine this dish belongs to (must exist for this kitchen).")
+    category_id: uuid.UUID = Field(..., description="Diet category (must exist for this kitchen).")
+    description: str | None = Field(default=None, description="Customer-facing dish description.")
+    price: float = Field(..., gt=0, description="Price in INR.", examples=[220.0])
+    prep_time_min: int = Field(default=30, gt=0, description="Owner-set preparation time in minutes.")
+    delivery_time_min: int | None = Field(
+        default=None, ge=0, description="Owner-set delivery time in minutes (never a fake speed guarantee)."
+    )
+    ingredients_description: str | None = Field(default=None, description="Free-text ingredient list for customers.")
+    quality_measures: str | None = Field(
+        default=None, description="Free-text hygiene/quality notes shown to build customer trust."
+    )
+    is_active: bool = Field(default=True, description="Whether the dish is visible on the live menu.")
+    media: DishMediaInput = Field(..., description="Hero image — see truth-in-media requirement above.")
 
 
 class DishMediaResponse(BaseModel):
-    id: uuid.UUID
-    url: str
-    is_hero: bool
-    is_live_capture: bool
-    captured_at: datetime | None
+    """A stored dish photo (hero or gallery)."""
+
+    id: uuid.UUID = Field(..., description="Media row ID.")
+    url: str = Field(..., description="Public media URL.")
+    is_hero: bool = Field(..., description="Whether this is the primary menu-card image.")
+    is_live_capture: bool = Field(..., description="Whether this photo was live-captured (truth in media).")
+    captured_at: datetime | None = Field(default=None, description="Capture timestamp, if live-captured.")
 
     model_config = {"from_attributes": True}
 
 
 class DishResponse(BaseModel):
-    id: uuid.UUID
-    kitchen_id: uuid.UUID
-    cuisine_id: uuid.UUID | None
-    category_id: uuid.UUID | None
-    cuisine_name: str | None = None
-    cuisine_slug: str | None = None
-    category_name: str | None = None
-    category_slug: str | None = None
-    name: str
-    price: float
-    prep_time_min: int
-    delivery_time_min: int | None = None
-    description: str | None
-    ingredients_description: str | None
-    quality_measures: str | None
-    is_active: bool
-    media: list[DishMediaResponse] = []
+    """A dish with resolved cuisine/category names and media, as shown to owners and customers."""
+
+    id: uuid.UUID = Field(..., description="Dish ID.")
+    kitchen_id: uuid.UUID = Field(..., description="Owning kitchen (tenant scope).")
+    cuisine_id: uuid.UUID | None = Field(default=None, description="Cuisine ID.")
+    category_id: uuid.UUID | None = Field(default=None, description="Diet category ID.")
+    cuisine_name: str | None = Field(default=None, description="Resolved cuisine display name.")
+    cuisine_slug: str | None = Field(default=None, description="Resolved cuisine slug.")
+    category_name: str | None = Field(default=None, description="Resolved diet category display name.")
+    category_slug: str | None = Field(default=None, description="Resolved diet category slug.")
+    name: str = Field(..., description="Dish name.")
+    price: float = Field(..., description="Price in INR.")
+    prep_time_min: int = Field(..., description="Owner-set preparation time in minutes.")
+    delivery_time_min: int | None = Field(default=None, description="Owner-set delivery time in minutes.")
+    description: str | None = Field(default=None, description="Customer-facing dish description.")
+    ingredients_description: str | None = Field(default=None, description="Free-text ingredient list.")
+    quality_measures: str | None = Field(default=None, description="Free-text hygiene/quality notes.")
+    is_active: bool = Field(..., description="Whether the dish is visible on the live menu.")
+    media: list[DishMediaResponse] = Field(default_factory=list, description="Hero + gallery photos.")
 
     model_config = {"from_attributes": True}
 
 
 class MenuResponse(BaseModel):
-    kitchen_id: uuid.UUID
-    dishes: list[DishResponse]
-    grouped: list[CuisineMenuGroup] = []
-    cuisines: list[CuisineResponse] = []
-    diet_categories: list[CategoryResponse] = []
+    """The full active menu for a kitchen — flat list plus cuisine/diet grouping for the menu UI."""
+
+    kitchen_id: uuid.UUID = Field(..., description="Kitchen this menu belongs to.")
+    dishes: list[DishResponse] = Field(..., description="All active dishes, flat list.")
+    grouped: list[CuisineMenuGroup] = Field(default_factory=list, description="Dishes grouped by cuisine → diet.")
+    cuisines: list[CuisineResponse] = Field(default_factory=list, description="Cuisines with at least one dish.")
+    diet_categories: list[CategoryResponse] = Field(
+        default_factory=list, description="Diet categories available for this kitchen."
+    )
 
 
 async def ensure_default_cuisines(session: AsyncSession, kitchen_id: uuid.UUID) -> None:
@@ -220,12 +266,14 @@ async def create_dish(
 
 
 class DishUpdateRequest(BaseModel):
-    name: str | None = Field(default=None, min_length=2, max_length=255)
-    price: float | None = Field(default=None, gt=0)
-    is_active: bool | None = None
-    prep_time_min: int | None = Field(default=None, gt=0)
-    delivery_time_min: int | None = Field(default=None, ge=0)
-    description: str | None = None
+    """Partial update of a dish — only supplied fields are changed."""
+
+    name: str | None = Field(default=None, min_length=2, max_length=255, description="New dish name.")
+    price: float | None = Field(default=None, gt=0, description="New price in INR.")
+    is_active: bool | None = Field(default=None, description="Toggle menu visibility.")
+    prep_time_min: int | None = Field(default=None, gt=0, description="New preparation time in minutes.")
+    delivery_time_min: int | None = Field(default=None, ge=0, description="New delivery time in minutes.")
+    description: str | None = Field(default=None, description="New customer-facing description.")
 
 
 async def update_dish(

@@ -40,22 +40,28 @@ FALLBACK_CUSTOMER = (
 
 
 class ChatMessage(BaseModel):
-    role: Literal["user", "assistant"]
-    content: str = Field(..., min_length=1, max_length=2000)
+    """One turn in a support chat history."""
+
+    role: Literal["user", "assistant"] = Field(..., description="Who sent this turn.")
+    content: str = Field(..., min_length=1, max_length=2000, description="Message text.")
 
 
 class SupportChatRequest(BaseModel):
-    audience: Audience
-    message: str = Field(..., min_length=1, max_length=2000)
-    history: list[ChatMessage] = Field(default_factory=list, max_length=20)
+    """Marketing-site AI support chat request."""
+
+    audience: Audience = Field(..., description="'owner' or 'customer' — selects the knowledge base and system prompt tone.")
+    message: str = Field(..., min_length=1, max_length=2000, description="The user's latest message.")
+    history: list[ChatMessage] = Field(default_factory=list, max_length=20, description="Prior turns in this conversation, oldest first (used for LLM context, last 8 kept).")
 
 
 class SupportChatResponse(BaseModel):
-    audience: Audience
-    reply: str
-    source: Literal["knowledge", "ai"]
-    suggest_ticket: bool = False
-    suggested_category: str | None = None
+    """AI/knowledge-base support reply, with an optional ticket-raising prompt."""
+
+    audience: Audience = Field(..., description="Echoes the request audience.")
+    reply: str = Field(..., description="Assistant's reply text (markdown-formatted).")
+    source: Literal["knowledge", "ai"] = Field(..., description="'knowledge' — deterministic curated answer (no LLM configured/available). 'ai' — LLM-augmented reply.")
+    suggest_ticket: bool = Field(default=False, description="True when the message pattern suggests escalation (complaint, refund, explicit request for a human) — the UI should offer 'Raise ticket'.")
+    suggested_category: str | None = Field(default=None, description="Pre-filled ticket category inferred from the message, when `suggest_ticket` is true.")
 
 
 def _match(text: str, *patterns: str) -> bool:

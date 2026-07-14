@@ -1,6 +1,7 @@
 import { Link, useLocation } from "react-router-dom";
 import { useEffect, useState } from "react";
-import { APP_NAME } from "../shared/brand";
+import { BrandNavMark } from "./BrandNavMark";
+import { APP_TAGLINE } from "../shared/brand";
 import { useAuth } from "../lib/auth";
 
 const links = [
@@ -28,10 +29,7 @@ export function Navbar() {
   return (
     <header className={`nav ${scrolled ? "nav--scrolled" : ""}`}>
       <div className="nav__inner container">
-        <Link to="/" className="nav__brand">
-          <span className="nav__logo">{APP_NAME}</span>
-          <span className="nav__tagline">Cloud Kitchen Platform</span>
-        </Link>
+        <BrandNavMark to="/" subtitle={APP_TAGLINE} height={34} />
 
         <nav className={`nav__links ${open ? "nav__links--open" : ""}`}>
           {links.map((l) => (

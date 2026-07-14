@@ -39,8 +39,14 @@ from app.media import MediaUploadResponse, upload_kitchen_media
 from ckac_common.cache import get_cached_menu, invalidate_menu_cache, set_cached_menu
 from ckac_common.database import get_db
 from ckac_common.event_bus import EventPublisher
+from ckac_common.openapi import RESP_400, RESP_422, auth_errors
 
 router = APIRouter()
+
+TAG_MENU = "Menu"
+TAG_DISHES = "Dishes"
+TAG_INGREDIENTS = "Ingredients"
+TAG_MEDIA = "Media"
 
 
 def get_publisher() -> EventPublisher:
@@ -49,7 +55,17 @@ def get_publisher() -> EventPublisher:
     return event_publisher
 
 
-@router.get("/kitchens/{kitchen_id}/cuisines", response_model=list[CuisineResponse])
+@router.get(
+    "/kitchens/{kitchen_id}/cuisines",
+    response_model=list[CuisineResponse],
+    tags=[TAG_MENU],
+    summary="List cuisines",
+    description=(
+        "Public — list cuisine groupings for a kitchen (e.g. North Indian, Chinese), seeded on first "
+        "access with kitchCU's default cuisine set. Used to organize the customer-facing menu."
+    ),
+    responses={422: RESP_422},
+)
 async def cuisines_list(
     kitchen_id: uuid.UUID,
     session: Annotated[AsyncSession, Depends(get_db)],
@@ -58,7 +74,17 @@ async def cuisines_list(
     return [CuisineResponse.model_validate(c) for c in items]
 
 
-@router.get("/kitchens/{kitchen_id}/categories", response_model=list[CategoryResponse])
+@router.get(
+    "/kitchens/{kitchen_id}/categories",
+    response_model=list[CategoryResponse],
+    tags=[TAG_MENU],
+    summary="List diet categories (owner)",
+    description=(
+        "Owner-only — list diet categories (veg/non-veg/vegan/etc.) for this kitchen, seeded on first "
+        "access. Requires the caller to own the kitchen."
+    ),
+    responses=auth_errors(include_403=True),
+)
 async def categories_list(
     kitchen_id: uuid.UUID,
     owner_id: Annotated[uuid.UUID, Depends(get_current_owner_id)],
@@ -69,7 +95,14 @@ async def categories_list(
     return cats
 
 
-@router.get("/kitchens/{kitchen_id}/menu/diet-categories", response_model=list[CategoryResponse])
+@router.get(
+    "/kitchens/{kitchen_id}/menu/diet-categories",
+    response_model=list[CategoryResponse],
+    tags=[TAG_MENU],
+    summary="List diet categories (public)",
+    description="Public — diet categories for customer-facing menu filters (veg/non-veg/vegan/etc.).",
+    responses={422: RESP_422},
+)
 async def diet_categories_public(
     kitchen_id: uuid.UUID,
     session: Annotated[AsyncSession, Depends(get_db)],
@@ -78,7 +111,17 @@ async def diet_categories_public(
     return [CategoryResponse.model_validate(c) for c in cats]
 
 
-@router.get("/kitchens/{kitchen_id}/menu", response_model=MenuResponse)
+@router.get(
+    "/kitchens/{kitchen_id}/menu",
+    response_model=MenuResponse,
+    tags=[TAG_MENU],
+    summary="Get the active menu",
+    description=(
+        "Public — the kitchen's active menu: flat dish list plus cuisine → diet grouping for the menu UI. "
+        "Cached in Redis for 5 minutes (`menu:{kitchen_id}`); invalidated on dish create/update."
+    ),
+    responses={422: RESP_422},
+)
 async def menu_get(
     kitchen_id: uuid.UUID,
     session: Annotated[AsyncSession, Depends(get_db)],
@@ -109,6 +152,15 @@ async def menu_get(
     "/kitchens/{kitchen_id}/dishes",
     response_model=DishResponse,
     status_code=status.HTTP_201_CREATED,
+    tags=[TAG_DISHES],
+    summary="Create a dish",
+    description=(
+        "Owner-only — add a dish to the kitchen's menu. **Truth in media:** if the hero image "
+        "(`media.is_hero=true`) is not live-captured (`media.is_live_capture=true`) and the dish is "
+        "created active, the request is rejected with 400 to protect customer trust. Invalidates the "
+        "menu cache and publishes `dish.created`."
+    ),
+    responses={**auth_errors(include_403=True), 400: RESP_400},
 )
 async def dish_create(
     kitchen_id: uuid.UUID,
@@ -128,7 +180,17 @@ async def dish_create(
     return await dish_with_media(session, dish)
 
 
-@router.patch("/kitchens/{kitchen_id}/dishes/{dish_id}", response_model=DishResponse)
+@router.patch(
+    "/kitchens/{kitchen_id}/dishes/{dish_id}",
+    response_model=DishResponse,
+    tags=[TAG_DISHES],
+    summary="Update a dish",
+    description=(
+        "Owner-only — partial update of a dish (price, name, active flag, prep/delivery time, "
+        "description). Invalidates the menu cache and publishes `dish.updated`."
+    ),
+    responses={**auth_errors(include_403=True, include_404=True), 400: RESP_400},
+)
 async def dish_update(
     kitchen_id: uuid.UUID,
     dish_id: uuid.UUID,
@@ -149,7 +211,14 @@ async def dish_update(
     return await dish_with_media(session, dish)
 
 
-@router.get("/kitchens/{kitchen_id}/ingredients", response_model=IngredientListResponse)
+@router.get(
+    "/kitchens/{kitchen_id}/ingredients",
+    response_model=IngredientListResponse,
+    tags=[TAG_INGREDIENTS],
+    summary="List ingredients",
+    description="Owner-only — list the kitchen's raw ingredient stock ledger (F19 ingredient balance mapper).",
+    responses=auth_errors(include_403=True),
+)
 async def ingredients_list(
     kitchen_id: uuid.UUID,
     owner_id: Annotated[uuid.UUID, Depends(get_current_owner_id)],
@@ -163,6 +232,10 @@ async def ingredients_list(
     "/kitchens/{kitchen_id}/ingredients",
     response_model=IngredientResponse,
     status_code=status.HTTP_201_CREATED,
+    tags=[TAG_INGREDIENTS],
+    summary="Add an ingredient",
+    description="Owner-only — add a raw ingredient with opening stock and low-stock threshold. Rejects duplicate names (400).",
+    responses={**auth_errors(include_403=True), 400: RESP_400},
 )
 async def ingredient_create(
     kitchen_id: uuid.UUID,
@@ -179,7 +252,14 @@ async def ingredient_create(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
 
 
-@router.patch("/kitchens/{kitchen_id}/ingredients/{ingredient_id}", response_model=IngredientResponse)
+@router.patch(
+    "/kitchens/{kitchen_id}/ingredients/{ingredient_id}",
+    response_model=IngredientResponse,
+    tags=[TAG_INGREDIENTS],
+    summary="Update an ingredient",
+    description="Owner-only — update an ingredient's name, low-stock threshold, or photo.",
+    responses={**auth_errors(include_403=True, include_404=True), 400: RESP_400},
+)
 async def ingredient_update(
     kitchen_id: uuid.UUID,
     ingredient_id: uuid.UUID,
@@ -200,6 +280,13 @@ async def ingredient_update(
 @router.post(
     "/kitchens/{kitchen_id}/ingredients/{ingredient_id}/adjust-stock",
     response_model=IngredientResponse,
+    tags=[TAG_INGREDIENTS],
+    summary="Adjust ingredient stock",
+    description=(
+        "Owner-only — manually adjust ingredient stock (restock, wastage correction). Stock never goes "
+        "negative; publishes `ingredient.stock.adjusted` and `ingredient.low_stock` if the threshold is crossed."
+    ),
+    responses={**auth_errors(include_403=True, include_404=True), 400: RESP_400},
 )
 async def ingredient_adjust_stock(
     kitchen_id: uuid.UUID,
@@ -218,15 +305,33 @@ async def ingredient_adjust_stock(
         raise HTTPException(status_code=status_code, detail=str(exc)) from exc
 
 
-@router.post("/kitchens/{kitchen_id}/media/upload", response_model=MediaUploadResponse)
+@router.post(
+    "/kitchens/{kitchen_id}/media/upload",
+    response_model=MediaUploadResponse,
+    tags=[TAG_MEDIA],
+    summary="Upload kitchen media",
+    description=(
+        "Owner-only — upload a dish/ingredient/prep-step photo (JPEG/PNG/WebP, max 10MB, content sniffed "
+        "from magic bytes). Set `is_live_capture=true` when the photo was captured live via the camera "
+        "(getUserMedia) — required for active dish hero images (truth in media). Returns the public URL "
+        "to feed into `DishMediaInput.url`."
+    ),
+    responses={**auth_errors(include_403=True), 400: RESP_400},
+)
 async def kitchen_media_upload(
     kitchen_id: uuid.UUID,
     owner_id: Annotated[uuid.UUID, Depends(get_current_owner_id)],
     session: Annotated[AsyncSession, Depends(get_db)],
-    file: Annotated[UploadFile, File(...)],
-    is_live_capture: Annotated[bool, Form()] = False,
-    context: Annotated[str, Form()] = "general",
-    captured_at: Annotated[str | None, Form()] = None,
+    file: Annotated[UploadFile, File(..., description="Image file — JPEG, PNG, or WebP, max 10MB.")],
+    is_live_capture: Annotated[
+        bool, Form(description="True only if captured live via camera (getUserMedia), never a stock photo.")
+    ] = False,
+    context: Annotated[
+        str, Form(description="Upload context — one of: dish, ingredient, prep_step, general.")
+    ] = "general",
+    captured_at: Annotated[
+        str | None, Form(description="ISO-8601 capture timestamp, required context for live-capture audit.")
+    ] = None,
 ) -> MediaUploadResponse:
     await verify_kitchen_owner(kitchen_id, owner_id, session)
     try:
@@ -241,7 +346,14 @@ async def kitchen_media_upload(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
 
 
-@router.get("/kitchens/{kitchen_id}/dishes/{dish_id}/recipe", response_model=DishRecipeResponse)
+@router.get(
+    "/kitchens/{kitchen_id}/dishes/{dish_id}/recipe",
+    response_model=DishRecipeResponse,
+    tags=[TAG_DISHES, TAG_INGREDIENTS],
+    summary="Get a dish's recipe",
+    description="Owner-only — ingredient lines + prep steps for a dish (F19 ingredient balance mapper).",
+    responses=auth_errors(include_403=True, include_404=True),
+)
 async def dish_recipe_get(
     kitchen_id: uuid.UUID,
     dish_id: uuid.UUID,
@@ -255,7 +367,17 @@ async def dish_recipe_get(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
 
 
-@router.put("/kitchens/{kitchen_id}/dishes/{dish_id}/recipe", response_model=DishRecipeResponse)
+@router.put(
+    "/kitchens/{kitchen_id}/dishes/{dish_id}/recipe",
+    response_model=DishRecipeResponse,
+    tags=[TAG_DISHES, TAG_INGREDIENTS],
+    summary="Set a dish's recipe",
+    description=(
+        "Owner-only — replace a dish's recipe (ingredient lines + prep steps) in full. Prep step HTML is "
+        "sanitized server-side. Used by stock deduction on order acceptance and low-stock warnings."
+    ),
+    responses={**auth_errors(include_403=True, include_404=True), 400: RESP_400},
+)
 async def dish_recipe_set(
     kitchen_id: uuid.UUID,
     dish_id: uuid.UUID,

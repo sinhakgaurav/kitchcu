@@ -6,6 +6,18 @@ const apiProxy = {
     target: "http://localhost:18000",
     changeOrigin: true,
   },
+  "/openapi.json": {
+    target: "http://localhost:18000",
+    changeOrigin: true,
+  },
+  "/docs": {
+    target: "http://localhost:18000",
+    changeOrigin: true,
+  },
+  "/redoc": {
+    target: "http://localhost:18000",
+    changeOrigin: true,
+  },
 };
 
 /** kitchCU portal homepage — choose customer.kitchcu.in or kitchen.kitchcu.in (port 13000) */

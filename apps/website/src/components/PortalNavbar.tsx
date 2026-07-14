@@ -1,4 +1,6 @@
 import { useEffect, useState } from "react";
+import { BrandNavMark } from "./BrandNavMark";
+import { APP_TAGLINE } from "../shared/brand";
 import { customerUrl, kitchenUrl } from "../shared/urls";
 
 const links = [
@@ -7,6 +9,7 @@ const links = [
   { href: "#support", label: "Support" },
   { href: "#contact", label: "Contact" },
   { href: "#apps", label: "Apps" },
+  { href: "/openapi", label: "API" },
 ];
 
 export function PortalNavbar() {
@@ -23,17 +26,17 @@ export function PortalNavbar() {
   return (
     <header className={`nav ${scrolled ? "nav--scrolled" : ""}`}>
       <div className="nav__inner container">
-        <a href="#top" className="nav__brand">
-          <span className="nav__logo">kitchCU</span>
-          <span className="nav__tagline">Cloud Kitchen Platform</span>
-        </a>
+        <BrandNavMark href="#top" subtitle={APP_TAGLINE} height={34} />
 
         <nav className={`nav__links ${open ? "nav__links--open" : ""}`}>
-          {links.map((l) => (
-            <a key={l.href} href={l.href} onClick={() => setOpen(false)}>
-              {l.label}
-            </a>
-          ))}
+          {links.map((l) => {
+            const href = l.href.startsWith("#") ? `/${l.href}` : l.href;
+            return (
+              <a key={l.href} href={href} onClick={() => setOpen(false)}>
+                {l.label}
+              </a>
+            );
+          })}
           <a href={customerUrl("/")} className="btn btn--ghost btn--sm" onClick={() => setOpen(false)}>
             Customer app
           </a>

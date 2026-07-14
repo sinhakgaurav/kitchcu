@@ -21,98 +21,144 @@ BILLING_CYCLE_DAYS = {"monthly": 30, "yearly": 365}
 
 
 class PaymentCreateRequest(BaseModel):
-    order_id: uuid.UUID
-    method: Literal["online", "upi"] = "online"
+    """Create a payment for a single-kitchen order (owner-initiated or customer self-checkout).
+
+    Only applies to online/UPI orders — COD orders never create a payment. kitchCU charges
+    **zero per-order food commission**; this is a pass-through payment to the kitchen, not
+    a platform revenue event (platform revenue comes from owner subscriptions, see
+    `SubscriptionCreateRequest`).
+    """
+
+    order_id: uuid.UUID = Field(..., description="Order to pay for (must belong to the caller).")
+    method: Literal["online", "upi"] = Field(
+        default="online", description="Payment rail — card/netbanking (`online`) or UPI intent (`upi`)."
+    )
 
 
 class MasterPaymentCreateRequest(BaseModel):
-    master_order_id: uuid.UUID
-    method: Literal["online", "upi"] = "online"
+    """Create a single aggregated payment for a multi-kitchen cart (F44 split payment).
+
+    The customer pays once; on capture, funds are split per sub-order via Razorpay Route
+    into each kitchen's linked account (see `MasterPaymentCaptureResponse`).
+    """
+
+    master_order_id: uuid.UUID = Field(..., description="Master order grouping the multi-kitchen sub-orders.")
+    method: Literal["online", "upi"] = Field(default="online", description="Payment rail for the aggregated charge.")
 
 
 class PaymentResponse(BaseModel):
-    id: uuid.UUID
-    order_id: uuid.UUID | None
-    master_order_id: uuid.UUID | None = None
-    kitchen_id: uuid.UUID | None
-    amount: float
-    currency: str
-    method: str
-    status: str
-    razorpay_order_id: str | None
-    razorpay_payment_id: str | None
-    created_at: datetime
+    """A payment record — for a single order or, if `master_order_id` is set, an aggregated multi-kitchen charge."""
+
+    id: uuid.UUID = Field(..., description="Payment ID.")
+    order_id: uuid.UUID | None = Field(default=None, description="Single order this payment is for (mutually exclusive with master_order_id).")
+    master_order_id: uuid.UUID | None = Field(
+        default=None, description="Master order this aggregated payment is for (multi-kitchen checkout)."
+    )
+    kitchen_id: uuid.UUID | None = Field(
+        default=None, description="Owning kitchen for single-order payments; null for master/aggregated payments."
+    )
+    amount: float = Field(..., description="Charge amount in `currency`.", examples=[499.0])
+    currency: str = Field(..., description="ISO 4217 currency code.", examples=["INR"])
+    method: str = Field(..., description="Payment rail used.", examples=["online", "upi"])
+    status: str = Field(
+        ...,
+        description="Lifecycle status.",
+        examples=["created", "pending", "authorized", "captured", "failed", "refunded"],
+    )
+    razorpay_order_id: str | None = Field(default=None, description="Razorpay order reference (dev-mocked).")
+    razorpay_payment_id: str | None = Field(
+        default=None, description="Razorpay payment reference, set once captured (dev-mocked)."
+    )
+    created_at: datetime = Field(..., description="Payment creation timestamp.")
 
     model_config = {"from_attributes": True}
 
 
 class SettlementResponse(BaseModel):
-    id: uuid.UUID
-    master_order_id: uuid.UUID
-    payment_id: uuid.UUID
-    kitchen_id: uuid.UUID
-    order_id: uuid.UUID
-    gross_amount: float
-    delivery_fee_amount: float
-    platform_fee: float
-    net_to_owner: float
-    razorpay_transfer_id: str | None
-    settlement_status: str
-    settled_at: datetime | None
+    """Per-kitchen settlement produced when a multi-kitchen master payment is captured (Razorpay Route split)."""
+
+    id: uuid.UUID = Field(..., description="Settlement ID.")
+    master_order_id: uuid.UUID = Field(..., description="Master order this settlement belongs to.")
+    payment_id: uuid.UUID = Field(..., description="Aggregated payment that funded this settlement.")
+    kitchen_id: uuid.UUID = Field(..., description="Kitchen receiving this settlement.")
+    order_id: uuid.UUID = Field(..., description="Sub-order this settlement pays out.")
+    gross_amount: float = Field(..., description="Sub-order total before deductions.")
+    delivery_fee_amount: float = Field(..., description="Delivery fee portion of the sub-order (owner-set, not commission).")
+    platform_fee: float = Field(..., description="kitchCU platform fee — always 0; zero per-order food commission.")
+    net_to_owner: float = Field(..., description="Amount transferred to the kitchen's linked account.")
+    razorpay_transfer_id: str | None = Field(default=None, description="Razorpay Route transfer reference (dev-mocked).")
+    settlement_status: str = Field(..., description="Settlement lifecycle status.", examples=["pending", "transferred"])
+    settled_at: datetime | None = Field(default=None, description="Timestamp the transfer was completed.")
 
     model_config = {"from_attributes": True}
 
 
 class MasterPaymentCaptureResponse(BaseModel):
-    payment: PaymentResponse
-    settlements: list[SettlementResponse]
+    """Result of capturing a multi-kitchen master payment — the charge plus one settlement per kitchen."""
+
+    payment: PaymentResponse = Field(..., description="The captured aggregated payment.")
+    settlements: list[SettlementResponse] = Field(..., description="One settlement per sub-order/kitchen (Route split).")
 
 
 class UpiIntentRequest(BaseModel):
-    order_id: uuid.UUID
+    """Request a UPI deep-link intent for an order (customer scans/taps to pay in their UPI app)."""
+
+    order_id: uuid.UUID = Field(..., description="Order to generate a UPI payment intent for.")
 
 
 class UpiIntentResponse(BaseModel):
-    payment_id: uuid.UUID
-    order_id: uuid.UUID
-    amount: float
-    currency: str
-    status: str
-    upi_uri: str
+    payment_id: uuid.UUID = Field(..., description="Payment created in `pending` status for this intent.")
+    order_id: uuid.UUID = Field(..., description="Order being paid.")
+    amount: float = Field(..., description="Charge amount.")
+    currency: str = Field(..., description="ISO 4217 currency code.")
+    status: str = Field(..., description="Payment status — `pending` until the UPI app confirms.")
+    upi_uri: str = Field(
+        ...,
+        description="`upi://pay?...` deep link — open in a UPI app or render as a QR code.",
+        examples=["upi://pay?pa=ckpnq001%40kitchCU&pn=kitchCU+Kitchen&am=499.00&cu=INR&tn=Order+CKPNQ001-BILL-20260712-0042"],
+    )
 
 
 class SubscriptionPlanResponse(BaseModel):
-    tier: str
-    monthly_amount: float
-    yearly_amount: float
+    """A platform subscription tier — kitchCU's only source of platform revenue (no food commission)."""
+
+    tier: str = Field(..., description="Plan tier identifier.", examples=["starter", "growth", "pro"])
+    monthly_amount: float = Field(..., description="Monthly price in INR.")
+    yearly_amount: float = Field(..., description="Yearly price in INR (discounted vs. 12x monthly).")
 
 
 class SubscriptionPlansResponse(BaseModel):
-    plans: list[SubscriptionPlanResponse]
+    plans: list[SubscriptionPlanResponse] = Field(..., description="All available subscription tiers.")
 
 
 class SubscriptionCreateRequest(BaseModel):
-    plan_tier: Literal["starter", "growth", "pro"]
-    billing_cycle: Literal["monthly", "yearly"] = "monthly"
+    """Start an owner's platform subscription — kitchCU's SaaS revenue model (zero per-order food commission)."""
+
+    plan_tier: Literal["starter", "growth", "pro"] = Field(..., description="Subscription tier to start.")
+    billing_cycle: Literal["monthly", "yearly"] = Field(default="monthly", description="Billing cadence.")
 
 
 class SubscriptionResponse(BaseModel):
-    id: uuid.UUID
-    owner_id: uuid.UUID
-    plan_tier: str
-    billing_cycle: str
-    amount: float
-    status: str
-    razorpay_subscription_id: str | None
-    current_period_end: datetime | None
-    created_at: datetime
+    """An owner's platform subscription — starts in `trial` status until activated."""
+
+    id: uuid.UUID = Field(..., description="Subscription ID.")
+    owner_id: uuid.UUID = Field(..., description="Owner this subscription belongs to.")
+    plan_tier: str = Field(..., description="Subscription tier.", examples=["starter", "growth", "pro"])
+    billing_cycle: str = Field(..., description="Billing cadence.", examples=["monthly", "yearly"])
+    amount: float = Field(..., description="Charge amount for the current billing cycle, in INR.")
+    status: str = Field(..., description="Lifecycle status.", examples=["trial", "active", "past_due", "cancelled"])
+    razorpay_subscription_id: str | None = Field(default=None, description="Razorpay subscription reference (dev-mocked).")
+    current_period_end: datetime | None = Field(default=None, description="End of the current active billing period.")
+    created_at: datetime = Field(..., description="Subscription creation timestamp.")
 
     model_config = {"from_attributes": True}
 
 
 class RazorpayWebhookPayload(BaseModel):
-    event: str
-    payload: dict = Field(default_factory=dict)
+    """Inbound Razorpay webhook envelope. Only `payment.captured` is currently handled; others are acknowledged and ignored."""
+
+    event: str = Field(..., description="Razorpay event type.", examples=["payment.captured"])
+    payload: dict = Field(default_factory=dict, description="Razorpay event payload (entity data).")
 
 
 def _mock_razorpay_order_id(payment_id: uuid.UUID) -> str:

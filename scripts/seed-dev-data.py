@@ -28,28 +28,73 @@ from demo_data import (  # noqa: E402
     DEMO_ORDERS,
     DEMO_OTP,
     DEMO_OWNER,
+    DEMO_OWNERS_EXTRA,
+    DEMO_ADMIN,
+    DEMO_CUSTOMERS,
 )
 from seed_common import ApiError, cuisine_map, dish_create_payload, ensure_dish_recipes, ensure_ingredients, login_owner, request, wait_for_gateway  # noqa: E402
 from ingredient_demo_data import DEMO_PANTRY, DISH_PREP_STEPS, DISH_RECIPES  # noqa: E402
 
 
-def ensure_owner() -> None:
+def _register_owner(owner: dict) -> None:
     try:
         request(
             "POST",
             "/api/v1/owners/register",
             {
-                "phone": DEMO_OWNER["phone"],
-                "name": DEMO_OWNER["name"],
-                "email": DEMO_OWNER["email"],
+                "phone": owner["phone"],
+                "name": owner["name"],
+                "email": owner.get("email"),
             },
         )
-        print(f"Registered demo owner {DEMO_OWNER['name']} ({DEMO_OWNER['phone_e164']})")
+        print(f"Registered owner {owner['name']} ({owner['phone_e164']})")
     except ApiError as exc:
         if "409" in str(exc) or "already" in str(exc).lower():
-            print(f"Demo owner already exists ({DEMO_OWNER['phone_e164']})")
+            print(f"Owner already exists ({owner['phone_e164']})")
         else:
             raise
+
+
+def ensure_owner() -> None:
+    _register_owner(DEMO_OWNER)
+
+
+def ensure_extra_owners() -> list[tuple[dict, dict]]:
+    """Register secondary demo owners with one kitchen each (for multi-login UI)."""
+    created: list[tuple[dict, dict]] = []
+    for owner in DEMO_OWNERS_EXTRA:
+        _register_owner(owner)
+        token = login_owner(owner["phone_e164"], DEMO_OTP)
+        kitchens = request("GET", "/api/v1/kitchens/me", token=token)
+        if kitchens:
+            kitchen = kitchens[0]
+            print(f"  {owner['name']} kitchen: {kitchen.get('code')} - {kitchen.get('name')}")
+        else:
+            lat = 18.5362 + (hash(owner["phone"]) % 100) * 0.0003
+            lon = 73.8958 + (hash(owner["phone"]) % 100) * 0.0003
+            kitchen = request(
+                "POST",
+                "/api/v1/kitchens",
+                {
+                    "name": owner.get("kitchen_label") or f"{owner['name'].split()[0]} Kitchen",
+                    "description": f"Demo kitchen for {owner['name']}",
+                    "address_line": "Pune demo lane",
+                    "city": "Pune",
+                    "state": "Maharashtra",
+                    "pincode": "411001",
+                    "latitude": lat,
+                    "longitude": lon,
+                },
+                token=token,
+            )
+            print(f"  Created {kitchen['code']} - {kitchen['name']}")
+            # Light menu so customer browse has something
+            try:
+                ensure_dishes(token, kitchen["id"])
+            except Exception as exc:  # noqa: BLE001
+                print(f"  (menu seed skipped: {exc})")
+        created.append((owner, kitchen))
+    return created
 
 
 def ensure_kitchens(token: str) -> dict:
@@ -167,11 +212,20 @@ def main() -> None:
     ensure_orders(token, kitchen["id"], dish_ids)
 
     print()
+    print("Extra demo owners")
+    print("-" * 40)
+    extra = ensure_extra_owners()
+
+    print()
     print("Demo credentials")
     print("-" * 40)
-    print(f"  Owner phone : {DEMO_OWNER['phone']}  (E.164: {DEMO_OWNER['phone_e164']})")
-    print(f"  OTP (dev)   : {DEMO_OTP}")
-    print(f"  Kitchen code: {kitchen.get('code', DEMO_KITCHEN_CODE)}")
+    print(f"  OTP (all owners/customers, dev): {DEMO_OTP}")
+    print(f"  Primary owner : {DEMO_OWNER['phone']} — {DEMO_OWNER['name']} ({kitchen.get('code', DEMO_KITCHEN_CODE)})")
+    for owner, k in extra:
+        print(f"  Owner         : {owner['phone']} — {owner['name']} ({k.get('code', '?')})")
+    print(f"  Admin         : {DEMO_ADMIN['email']} / {DEMO_ADMIN['password']}")
+    for c in DEMO_CUSTOMERS:
+        print(f"  Customer      : {c['phone']} — {c['name']} ({c.get('note', '')})")
     print(f"  Customer app: {os.environ.get('VITE_CUSTOMER_APP_URL', 'http://localhost:13001')}")
     print(f"  Kitchen app:  {os.environ.get('VITE_KITCHEN_APP_URL', 'http://localhost:13002')}/login")
     print()

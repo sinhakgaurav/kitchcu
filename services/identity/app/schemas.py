@@ -26,9 +26,30 @@ CITY_CODES: dict[str, str] = {
 
 
 class OwnerRegisterRequest(BaseModel):
-    phone: str = Field(..., min_length=10, max_length=15)
-    name: str = Field(..., min_length=2, max_length=255)
-    email: EmailStr | None = None
+    """Body for `POST /owners/register` — creates a kitchCU owner account."""
+
+    phone: str = Field(
+        ...,
+        min_length=10,
+        max_length=15,
+        description=(
+            "India mobile as 10 digits or E.164 (+91...). Normalized to E.164 "
+            "(+91XXXXXXXXXX) and used as the unique owner login identifier."
+        ),
+        examples=["9876543210"],
+    )
+    name: str = Field(
+        ...,
+        min_length=2,
+        max_length=255,
+        description="Owner's display name shown across owner dashboards and invoices.",
+        examples=["Priya Sharma"],
+    )
+    email: EmailStr | None = Field(
+        default=None,
+        description="Optional owner email for billing receipts and platform notices.",
+        examples=["priya@kitchcu.dev"],
+    )
 
     @field_validator("phone")
     @classmethod
@@ -42,106 +63,176 @@ class OwnerRegisterRequest(BaseModel):
 
 
 class OwnerResponse(BaseModel):
-    id: uuid.UUID
-    phone: str
-    name: str
-    email: str | None
-    subscription_tier: str
-    subscription_status: str
+    """Owner profile returned by registration and `GET /owners/me`."""
+
+    id: uuid.UUID = Field(..., description="Owner UUID primary key.")
+    phone: str = Field(..., description="Owner phone in E.164 format.", examples=["+919876543210"])
+    name: str = Field(..., description="Owner display name.", examples=["Priya Sharma"])
+    email: str | None = Field(default=None, description="Owner email, if provided.")
+    subscription_tier: str = Field(
+        ..., description="Owner SaaS subscription plan tier.", examples=["trial", "starter", "growth"]
+    )
+    subscription_status: str = Field(
+        ..., description="Current subscription lifecycle status.", examples=["trial", "active", "past_due"]
+    )
 
     model_config = {"from_attributes": True}
 
 
 class KitchenCreateRequest(BaseModel):
-    name: str = Field(..., min_length=2, max_length=255)
-    description: str | None = None
-    address_line: str
-    city: str
-    state: str
-    pincode: str | None = None
-    latitude: float = Field(..., ge=-90, le=90)
-    longitude: float = Field(..., ge=-180, le=180)
-    free_delivery_radius_km: float = Field(default=3.0, gt=0, le=50)
-    max_delivery_radius_km: float = Field(default=10.0, gt=0, le=100)
-    delivery_fee_per_km: float = Field(default=10.0, ge=0, le=500)
-    delivery_fee_flat_beyond: float = Field(default=0.0, ge=0, le=500)
-    min_order_for_free_delivery: float | None = Field(default=None, ge=0)
-    tracking_notify_interval_min: int = Field(default=5, ge=1, le=60)
+    """Body for `POST /kitchens` — onboards a new cloud kitchen for the authenticated owner."""
+
+    name: str = Field(
+        ..., min_length=2, max_length=255, description="Kitchen brand name shown to customers.", examples=["Spice Route Kitchen"]
+    )
+    description: str | None = Field(
+        default=None, description="Short kitchen bio/tagline shown on the public kitchen page.", examples=["Home-style North Indian tiffins"]
+    )
+    address_line: str = Field(..., description="Street address of the kitchen (not shown to customers by default).", examples=["221B, MG Road"])
+    city: str = Field(..., description="City name — used to derive the kitchen code prefix.", examples=["Pune"])
+    state: str = Field(..., description="State name.", examples=["Maharashtra"])
+    pincode: str | None = Field(default=None, description="Postal PIN code.", examples=["411001"])
+    latitude: float = Field(..., ge=-90, le=90, description="Kitchen latitude (WGS84) for delivery radius + discovery.", examples=[18.5204])
+    longitude: float = Field(..., ge=-180, le=180, description="Kitchen longitude (WGS84) for delivery radius + discovery.", examples=[73.8567])
+    free_delivery_radius_km: float = Field(
+        default=3.0, gt=0, le=50, description="Radius (km) within which delivery is free.", examples=[3.0]
+    )
+    max_delivery_radius_km: float = Field(
+        default=10.0, gt=0, le=100, description="Maximum radius (km) the kitchen delivers to; must be >= free radius.", examples=[10.0]
+    )
+    delivery_fee_per_km: float = Field(
+        default=10.0, ge=0, le=500, description="Delivery fee charged per km beyond the free radius.", examples=[10.0]
+    )
+    delivery_fee_flat_beyond: float = Field(
+        default=0.0, ge=0, le=500, description="Flat delivery fee add-on applied beyond the free radius.", examples=[0.0]
+    )
+    min_order_for_free_delivery: float | None = Field(
+        default=None, ge=0, description="Order subtotal (INR) at or above which delivery becomes free, regardless of distance.", examples=[299.0]
+    )
+    tracking_notify_interval_min: int = Field(
+        default=5, ge=1, le=60, description="Minutes between owner→customer delivery tracking notifications.", examples=[5]
+    )
 
 
 class KitchenDeliverySettingsUpdate(BaseModel):
-    free_delivery_radius_km: float | None = Field(default=None, gt=0, le=50)
-    max_delivery_radius_km: float | None = Field(default=None, gt=0, le=100)
-    delivery_fee_per_km: float | None = Field(default=None, ge=0, le=500)
-    delivery_fee_flat_beyond: float | None = Field(default=None, ge=0, le=500)
-    min_order_for_free_delivery: float | None = Field(default=None, ge=0)
-    tracking_notify_interval_min: int | None = Field(default=None, ge=1, le=60)
+    """Partial-update body for `PATCH /kitchens/{kitchen_id}/delivery-settings`. All fields optional."""
+
+    free_delivery_radius_km: float | None = Field(
+        default=None, gt=0, le=50, description="New free-delivery radius (km). Omit to leave unchanged.", examples=[3.0]
+    )
+    max_delivery_radius_km: float | None = Field(
+        default=None, gt=0, le=100, description="New max delivery radius (km); must stay >= free radius. Omit to leave unchanged.", examples=[12.0]
+    )
+    delivery_fee_per_km: float | None = Field(
+        default=None, ge=0, le=500, description="New per-km delivery fee beyond the free radius. Omit to leave unchanged.", examples=[12.0]
+    )
+    delivery_fee_flat_beyond: float | None = Field(
+        default=None, ge=0, le=500, description="New flat delivery fee add-on beyond the free radius. Omit to leave unchanged.", examples=[10.0]
+    )
+    min_order_for_free_delivery: float | None = Field(
+        default=None, ge=0, description="New order subtotal threshold (INR) for free delivery. Omit to leave unchanged.", examples=[349.0]
+    )
+    tracking_notify_interval_min: int | None = Field(
+        default=None, ge=1, le=60, description="New tracking notification interval in minutes. Omit to leave unchanged.", examples=[10]
+    )
 
 
 class KitchenResponse(BaseModel):
-    id: uuid.UUID
-    owner_id: uuid.UUID
-    code: str
-    name: str
-    city: str | None
-    state: str | None
-    status: str
-    free_delivery_radius_km: float
-    max_delivery_radius_km: float
-    delivery_fee_per_km: float
-    delivery_fee_flat_beyond: float
-    min_order_for_free_delivery: float | None
-    tracking_notify_interval_min: int
-    address_line: str | None = None
-    pincode: str | None = None
-    latitude: float
-    longitude: float
+    """Full kitchen record returned to the owning owner (create, list-mine, update)."""
+
+    id: uuid.UUID = Field(..., description="Kitchen UUID primary key.")
+    owner_id: uuid.UUID = Field(..., description="Owning owner's UUID.")
+    code: str = Field(..., description="Unique kitchen code: CK + city(3) + seq(3).", examples=["CKPNQ001"])
+    name: str = Field(..., description="Kitchen brand name.", examples=["Spice Route Kitchen"])
+    city: str | None = Field(default=None, description="Kitchen city.", examples=["Pune"])
+    state: str | None = Field(default=None, description="Kitchen state.", examples=["Maharashtra"])
+    status: str = Field(..., description="Kitchen lifecycle status.", examples=["active", "suspended", "pending_verification"])
+    free_delivery_radius_km: float = Field(..., description="Free delivery radius in km.")
+    max_delivery_radius_km: float = Field(..., description="Maximum delivery radius in km.")
+    delivery_fee_per_km: float = Field(..., description="Delivery fee per km beyond the free radius.")
+    delivery_fee_flat_beyond: float = Field(..., description="Flat delivery fee add-on beyond the free radius.")
+    min_order_for_free_delivery: float | None = Field(default=None, description="Order subtotal (INR) for automatic free delivery.")
+    tracking_notify_interval_min: int = Field(..., description="Minutes between delivery tracking notifications.")
+    address_line: str | None = Field(default=None, description="Kitchen street address (owner-only).")
+    pincode: str | None = Field(default=None, description="Kitchen postal PIN code.")
+    latitude: float = Field(..., description="Kitchen latitude (WGS84).", examples=[18.5204])
+    longitude: float = Field(..., description="Kitchen longitude (WGS84).", examples=[73.8567])
 
     model_config = {"from_attributes": True}
 
 
 class KitchenPublicResponse(BaseModel):
-    id: uuid.UUID
-    code: str
-    name: str
-    city: str | None
-    state: str | None
-    status: str
+    """Minimal public kitchen record — safe to expose to unauthenticated customers."""
+
+    id: uuid.UUID = Field(..., description="Kitchen UUID primary key.")
+    code: str = Field(..., description="Unique kitchen code.", examples=["CKPNQ001"])
+    name: str = Field(..., description="Kitchen brand name.", examples=["Spice Route Kitchen"])
+    city: str | None = Field(default=None, description="Kitchen city.", examples=["Pune"])
+    state: str | None = Field(default=None, description="Kitchen state.", examples=["Maharashtra"])
+    status: str = Field(..., description="Kitchen lifecycle status.", examples=["active"])
 
     model_config = {"from_attributes": True}
 
 
 class KitchenNearbyResponse(KitchenPublicResponse):
-    distance_km: float
-    latitude: float
-    longitude: float
-    has_veg: bool = False
-    has_non_veg: bool = False
-    has_live_capture: bool = False
-    is_live_now: bool = False
+    """A public kitchen entry with distance + discovery signals, for the nearby-search endpoint."""
+
+    distance_km: float = Field(..., description="Great-circle distance from the query point, in km.", examples=[1.42])
+    latitude: float = Field(..., description="Kitchen latitude (WGS84).", examples=[18.5204])
+    longitude: float = Field(..., description="Kitchen longitude (WGS84).", examples=[73.8567])
+    has_veg: bool = Field(default=False, description="True if the kitchen has an active veg-category dish.")
+    has_non_veg: bool = Field(default=False, description="True if the kitchen has an active non-veg-category dish.")
+    has_live_capture: bool = Field(default=False, description="True if the kitchen has a live-capture (non-stock-photo) hero dish image.")
+    is_live_now: bool = Field(default=False, description="True if the kitchen is currently streaming a live prep session.")
 
 
 class KitchenNearbyListResponse(BaseModel):
-    kitchens: list[KitchenNearbyResponse]
-    total: int
-    customer_latitude: float
-    customer_longitude: float
-    sort: str
+    """Response for `GET /kitchens/public/nearby` — a distance-sorted page of kitchens."""
+
+    kitchens: list[KitchenNearbyResponse] = Field(..., description="Kitchens within `max_km`, ordered by `sort`.")
+    total: int = Field(..., description="Number of kitchens returned in this response.", examples=[8])
+    customer_latitude: float = Field(..., description="Echo of the query latitude used for distance calc.", examples=[18.5204])
+    customer_longitude: float = Field(..., description="Echo of the query longitude used for distance calc.", examples=[73.8567])
+    sort: str = Field(..., description="Sort order applied.", examples=["asc", "desc"])
 
 
 class TokenResponse(BaseModel):
-    access_token: str
-    token_type: str = "bearer"
-    expires_in: int
+    """Bearer token issued after successful owner OTP verification.
+
+    `access_token` is a JWT with `type: "owner"` and `sub` set to the owner UUID.
+    Send it as `Authorization: Bearer <access_token>` on subsequent owner-scoped APIs.
+    """
+
+    access_token: str = Field(
+        ...,
+        description='JWT bearer token, payload `{"sub": "<owner_id>", "phone": "...", "type": "owner", "exp": ...}`.',
+        examples=["eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."],
+    )
+    token_type: str = Field(default="bearer", description="Always `bearer`.", examples=["bearer"])
+    expires_in: int = Field(..., description="Token lifetime in seconds from issuance.", examples=[3600])
 
 
 class OTPRequest(BaseModel):
-    phone: str
+    """Body for `POST /auth/otp/request` — initiates owner login."""
+
+    phone: str = Field(
+        ...,
+        description="Owner phone (10-digit India mobile or E.164). Dev mode always issues OTP 123456.",
+        examples=["9876543210"],
+    )
 
 
 class OTPVerifyRequest(BaseModel):
-    phone: str
-    otp: str = Field(..., min_length=4, max_length=6)
+    """Body for `POST /auth/otp/verify` — exchanges OTP for an owner JWT."""
+
+    phone: str = Field(..., description="Same phone used in the OTP request.", examples=["9876543210"])
+    otp: str = Field(
+        ...,
+        min_length=4,
+        max_length=6,
+        description="One-time password. Dev/staging value is always `123456`.",
+        examples=["123456"],
+    )
 
 
 def create_access_token(owner_id: uuid.UUID, phone: str) -> TokenResponse:

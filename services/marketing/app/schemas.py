@@ -20,42 +20,54 @@ CHURN_INACTIVE_DAYS = 21
 
 
 class FavoriteDish(BaseModel):
-    dish_id: uuid.UUID
-    dish_name: str
-    quantity: int
+    """One of a customer's top-5 most-ordered dishes at this kitchen."""
+
+    dish_id: uuid.UUID = Field(..., description="Dish UUID.")
+    dish_name: str = Field(..., description="Dish name at time of aggregation.", examples=["Paneer Butter Masala"])
+    quantity: int = Field(..., description="Total quantity ordered across all non-cancelled orders.", examples=[12])
 
 
 class OrderPatterns(BaseModel):
-    peak_hours: list[int] = Field(default_factory=list)
-    weekday_orders: int = 0
-    weekend_orders: int = 0
+    """Derived ordering-behavior signals used for segmentation and promotions."""
+
+    peak_hours: list[int] = Field(
+        default_factory=list, description="Up to 3 hours-of-day (0-23, IST) with the most orders from this customer.", examples=[[13, 20, 21]]
+    )
+    weekday_orders: int = Field(default=0, description="Count of non-cancelled orders placed Mon-Fri (IST).")
+    weekend_orders: int = Field(default=0, description="Count of non-cancelled orders placed Sat-Sun (IST).")
 
 
 class KitchenCustomerResponse(BaseModel):
-    id: uuid.UUID
-    kitchen_id: uuid.UUID
-    customer_id: uuid.UUID | None
-    customer_phone: str
-    customer_name: str | None
-    total_spend: float
-    monthly_spend: float
-    order_count: int
-    favorite_dishes: list[FavoriteDish]
-    order_patterns: OrderPatterns
-    tags: list[str]
-    last_order_at: datetime | None
+    """A kitchen's CRM profile for one customer (F37) — owner-only, per-kitchen (never shared across kitchens)."""
+
+    id: uuid.UUID = Field(..., description="CRM profile row UUID.")
+    kitchen_id: uuid.UUID = Field(..., description="Owning kitchen UUID.")
+    customer_id: uuid.UUID | None = Field(default=None, description="Linked platform customer UUID, if the phone matches a registered customer account.")
+    customer_phone: str = Field(..., description="Customer phone (E.164), the CRM join key.", examples=["+919876543210"])
+    customer_name: str | None = Field(default=None, description="Most recent name on record for this phone.")
+    total_spend: float = Field(..., description="Lifetime spend (INR) across non-cancelled orders at this kitchen.", examples=[4250.0])
+    monthly_spend: float = Field(..., description="Spend (INR) since the start of the current calendar month (Asia/Kolkata).", examples=[620.0])
+    order_count: int = Field(..., description="Total non-cancelled order count at this kitchen.", examples=[9])
+    favorite_dishes: list[FavoriteDish] = Field(..., description="Top-5 dishes by quantity ordered.")
+    order_patterns: OrderPatterns = Field(..., description="Peak hours + weekday/weekend order split.")
+    tags: list[str] = Field(..., description="Owner-assigned free-form tags (e.g. 'vip', 'spicy-lover'). Owner CRM belongs to the kitchen, never shared.")
+    last_order_at: datetime | None = Field(default=None, description="Timestamp of the customer's most recent non-cancelled order, UTC.")
 
     model_config = {"from_attributes": True}
 
 
 class KitchenCustomerListResponse(BaseModel):
-    customers: list[KitchenCustomerResponse]
-    total: int
-    synced_at: datetime | None = None
+    """CRM roster for a kitchen, ranked by total spend."""
+
+    customers: list[KitchenCustomerResponse] = Field(..., description="Customer profiles ordered by `total_spend` descending.")
+    total: int = Field(..., description="Number of customer profiles returned.")
+    synced_at: datetime | None = Field(default=None, description="Set only when `refresh=true` was requested — UTC timestamp of this re-sync from order history.")
 
 
 class KitchenCustomerTagsUpdate(BaseModel):
-    tags: list[str] = Field(default_factory=list, max_length=20)
+    """Replace an owner's free-form tags for one CRM profile."""
+
+    tags: list[str] = Field(default_factory=list, max_length=20, description="Up to 20 tags; normalized to lowercase/trimmed.", examples=[["vip", "no-onion"]])
 
     @field_validator("tags")
     @classmethod
@@ -67,13 +79,15 @@ class KitchenCustomerTagsUpdate(BaseModel):
 
 
 class CouponCreateRequest(BaseModel):
-    code: str = Field(min_length=3, max_length=32)
-    discount_type: Literal["percent", "fixed"]
-    discount_value: float = Field(gt=0)
-    min_order_amount: float | None = Field(default=None, ge=0)
-    max_uses: int | None = Field(default=None, ge=1)
-    valid_from: datetime | None = None
-    valid_until: datetime | None = None
+    """Owner request to create a discount coupon (F36) for a kitchen."""
+
+    code: str = Field(min_length=3, max_length=32, description="Coupon code, normalized to uppercase.", examples=["WELCOME10"])
+    discount_type: Literal["percent", "fixed"] = Field(..., description="'percent' — % off subtotal (capped at 100). 'fixed' — flat INR amount off, capped at subtotal.")
+    discount_value: float = Field(gt=0, description="Discount magnitude — a percent (0-100) or a flat INR amount depending on `discount_type`.", examples=[10.0])
+    min_order_amount: float | None = Field(default=None, ge=0, description="Minimum cart subtotal (INR) required to apply this coupon.", examples=[199.0])
+    max_uses: int | None = Field(default=None, ge=1, description="Maximum total redemptions across all customers; unlimited if omitted.")
+    valid_from: datetime | None = Field(default=None, description="Coupon becomes valid at this UTC timestamp; immediately valid if omitted.")
+    valid_until: datetime | None = Field(default=None, description="Coupon expires at this UTC timestamp; never expires if omitted.")
 
     @field_validator("code")
     @classmethod
@@ -89,35 +103,43 @@ class CouponCreateRequest(BaseModel):
 
 
 class CouponUpdateRequest(BaseModel):
-    is_active: bool
+    """Owner request to activate/deactivate an existing coupon."""
+
+    is_active: bool = Field(..., description="Set false to pause redemptions without deleting the coupon (preserves usage history).")
 
 
 class CouponResponse(BaseModel):
-    id: uuid.UUID
-    kitchen_id: uuid.UUID
-    code: str
-    discount_type: str
-    discount_value: float
-    min_order_amount: float | None
-    max_uses: int | None
-    used_count: int
-    valid_from: datetime | None
-    valid_until: datetime | None
-    is_active: bool
-    created_at: datetime
+    """A kitchen's discount coupon."""
+
+    id: uuid.UUID = Field(..., description="Coupon UUID.")
+    kitchen_id: uuid.UUID = Field(..., description="Owning kitchen UUID.")
+    code: str = Field(..., description="Uppercase coupon code, unique per kitchen.", examples=["WELCOME10"])
+    discount_type: str = Field(..., description="'percent' or 'fixed'.")
+    discount_value: float = Field(..., description="Discount magnitude (percent or flat INR, per `discount_type`).")
+    min_order_amount: float | None = Field(default=None, description="Minimum cart subtotal (INR) required to apply.")
+    max_uses: int | None = Field(default=None, description="Maximum total redemptions, or unlimited if null.")
+    used_count: int = Field(..., description="Redemptions consumed so far.")
+    valid_from: datetime | None = Field(default=None, description="Valid-from UTC timestamp, or null if immediately valid.")
+    valid_until: datetime | None = Field(default=None, description="Expiry UTC timestamp, or null if never expires.")
+    is_active: bool = Field(..., description="Whether the coupon currently accepts redemptions.")
+    created_at: datetime = Field(..., description="Creation timestamp, UTC.")
 
     model_config = {"from_attributes": True}
 
 
 class CouponListResponse(BaseModel):
-    coupons: list[CouponResponse]
-    total: int
+    """Full coupon roster for a kitchen (owner view)."""
+
+    coupons: list[CouponResponse] = Field(..., description="Coupons ordered by creation date, newest first.")
+    total: int = Field(..., description="Number of coupons returned.")
 
 
 class CouponValidateRequest(BaseModel):
-    kitchen_id: uuid.UUID
-    code: str
-    subtotal: float = Field(ge=0)
+    """Customer-side request to validate + price a coupon during checkout."""
+
+    kitchen_id: uuid.UUID = Field(..., description="Kitchen the coupon belongs to.")
+    code: str = Field(..., description="Coupon code as entered by the customer (case-insensitive).", examples=["WELCOME10"])
+    subtotal: float = Field(ge=0, description="Cart subtotal (INR) to evaluate `min_order_amount` and compute the discount amount.", examples=[450.0])
 
     @field_validator("code")
     @classmethod
@@ -126,22 +148,33 @@ class CouponValidateRequest(BaseModel):
 
 
 class CouponValidateResponse(BaseModel):
-    valid: bool
-    coupon_id: uuid.UUID | None = None
-    code: str | None = None
-    discount_type: str | None = None
-    discount_amount: float = 0
-    message: str
+    """Result of validating a coupon against a cart — checkout uses this to price the order."""
+
+    valid: bool = Field(..., description="Whether the coupon can be applied to this cart right now.")
+    coupon_id: uuid.UUID | None = Field(default=None, description="Coupon UUID, when valid.")
+    code: str | None = Field(default=None, description="Normalized coupon code, when valid.")
+    discount_type: str | None = Field(default=None, description="'percent' or 'fixed', when valid.")
+    discount_amount: float = Field(default=0, description="Computed discount in INR to subtract from the order total. `0` when invalid.", examples=[45.0])
+    message: str = Field(..., description="Human-readable status, e.g. 'Coupon applied', 'Coupon expired', 'Minimum order ₹199 required'.")
 
 
 class PromotionCreateRequest(BaseModel):
-    name: str = Field(min_length=2, max_length=120)
-    dish_id: uuid.UUID
-    special_price: float = Field(gt=0)
-    segment: Literal["all", "top_spenders", "repeat", "vip", "churn_risk"] = "all"
-    segment_limit: int | None = Field(default=None, ge=1, le=500)
-    starts_at: datetime
-    ends_at: datetime
+    """Owner request to create a targeted, time-boxed dish promotion (F38)."""
+
+    name: str = Field(min_length=2, max_length=120, description="Internal promotion name shown to the owner.", examples=["Weekend VIP Special"])
+    dish_id: uuid.UUID = Field(..., description="Dish this promotion discounts; must belong to the same kitchen.")
+    special_price: float = Field(gt=0, description="Promotional price (INR) for the dish while the promotion is active.", examples=[99.0])
+    segment: Literal["all", "top_spenders", "repeat", "vip", "churn_risk"] = Field(
+        default="all",
+        description=(
+            "Customer segment eligible for the promo: 'all' — every customer; 'repeat' — 2+ orders; "
+            "'vip' — 5+ orders; 'churn_risk' — 2+ orders but inactive 21+ days; "
+            "'top_spenders' — top-N by total spend (see `segment_limit`)."
+        ),
+    )
+    segment_limit: int | None = Field(default=None, ge=1, le=500, description="Required when `segment='top_spenders'` — the N in top-N by spend.")
+    starts_at: datetime = Field(..., description="Promotion start, UTC.")
+    ends_at: datetime = Field(..., description="Promotion end, UTC. Must be after `starts_at`.")
 
     @field_validator("ends_at")
     @classmethod
@@ -153,38 +186,48 @@ class PromotionCreateRequest(BaseModel):
 
 
 class PromotionResponse(BaseModel):
-    id: uuid.UUID
-    kitchen_id: uuid.UUID
-    name: str
-    dish_id: uuid.UUID
-    dish_name: str
-    special_price: float
-    segment: str
-    segment_limit: int | None
-    starts_at: datetime
-    ends_at: datetime
-    is_active: bool
-    created_at: datetime
+    """A kitchen's targeted promotion (owner view — full detail)."""
+
+    id: uuid.UUID = Field(..., description="Promotion UUID.")
+    kitchen_id: uuid.UUID = Field(..., description="Owning kitchen UUID.")
+    name: str = Field(..., description="Internal promotion name.")
+    dish_id: uuid.UUID = Field(..., description="Discounted dish UUID.")
+    dish_name: str = Field(..., description="Dish name at creation time.")
+    special_price: float = Field(..., description="Promotional price in INR.")
+    segment: str = Field(..., description="Eligible customer segment.")
+    segment_limit: int | None = Field(default=None, description="Top-N cutoff when `segment='top_spenders'`.")
+    starts_at: datetime = Field(..., description="Promotion start, UTC.")
+    ends_at: datetime = Field(..., description="Promotion end, UTC.")
+    is_active: bool = Field(..., description="Owner-controlled active flag (independent of the start/end window).")
+    created_at: datetime = Field(..., description="Creation timestamp, UTC.")
 
     model_config = {"from_attributes": True}
 
 
 class PromotionListResponse(BaseModel):
-    promotions: list[PromotionResponse]
-    total: int
+    """Full promotion roster for a kitchen (owner view)."""
+
+    promotions: list[PromotionResponse] = Field(..., description="Promotions ordered by creation date, newest first.")
+    total: int = Field(..., description="Number of promotions returned.")
 
 
 class ActivePromotionResponse(BaseModel):
-    promotion_id: uuid.UUID
-    name: str
-    dish_id: uuid.UUID
-    dish_name: str
-    special_price: float
-    segment: str
+    """Minimal, customer-facing view of a currently-live promotion the caller is eligible for."""
+
+    promotion_id: uuid.UUID = Field(..., description="Promotion UUID.")
+    name: str = Field(..., description="Promotion name shown to the customer.")
+    dish_id: uuid.UUID = Field(..., description="Discounted dish UUID.")
+    dish_name: str = Field(..., description="Dish name.")
+    special_price: float = Field(..., description="Promotional price in INR.")
+    segment: str = Field(..., description="Segment this promotion targets (informational).")
 
 
 class ActivePromotionListResponse(BaseModel):
-    promotions: list[ActivePromotionResponse]
+    """Currently-live promotions visible to the caller, filtered by segment eligibility."""
+
+    promotions: list[ActivePromotionResponse] = Field(
+        ..., description="Live promotions the caller (or anonymous public caller) is eligible for right now."
+    )
 
 
 def customer_to_response(row: KitchenCustomer) -> KitchenCustomerResponse:

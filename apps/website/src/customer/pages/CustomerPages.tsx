@@ -2,8 +2,10 @@ import { FormEvent, useState } from "react";
 import type { CSSProperties, RefObject } from "react";
 import { Link, Navigate, useNavigate, useSearchParams } from "react-router-dom";
 import { images, sampleDishImages } from "../../data/content";
-import { DEMO } from "../../shared/demo";
-import { fetchKitchenByCode } from "../../shared/api";
+import { BrandAuthArt, BrandLogo } from "../../components/BrandLogo";
+import { DEMO, DEMO_CUSTOMERS, DEMO_OWNERS, type DemoCustomerAccount } from "../../shared/demo";
+import { normalizePhone } from "../../shared/api";
+import { fetchKitchenByCode } from "../../shared/publicApi";
 import { CUSTOMER_HOST, KITCHEN_HOST } from "../../shared/brand";
 import { CustomerSocialLogin } from "../../components/CustomerSocialLogin";
 import { isCustomerSignedIn, useCustomerAuth } from "../../shared/customerAuth";
@@ -11,20 +13,28 @@ import { saveKitchenToSession } from "../../shared/customerSession";
 import { kitchenUrl } from "../../shared/urls";
 import { useInView } from "../../hooks/useParallax";
 import { AnimatedMesh } from "../../components/AnimatedMesh";
+import {
+  getCustomerToken,
+  requestCustomerWhatsAppOtp,
+  verifyCustomerWhatsAppOtp,
+} from "../../shared/customerApi";
 
 export function CustomerLoginPage() {
-  const { session, login, applyAuthResult } = useCustomerAuth();
+  const { session, applyAuthResult } = useCustomerAuth();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const nextPath = searchParams.get("next") || "/";
   const [name, setName] = useState(session?.name ?? "");
   const [phone, setPhone] = useState(session?.phone ?? "");
+  const [otp, setOtp] = useState("");
+  const [otpSent, setOtpSent] = useState(false);
   const [code, setCode] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [busyPhone, setBusyPhone] = useState<string | null>(null);
 
-  if (isCustomerSignedIn(session)) {
-    return <Navigate to="/" replace />;
+  if (isCustomerSignedIn(session) && getCustomerToken()) {
+    return <Navigate to={nextPath.startsWith("/") ? nextPath : "/"} replace />;
   }
 
   const afterAuth = async (kitchenCode: string) => {
@@ -34,43 +44,83 @@ export function CustomerLoginPage() {
       navigate(`/kitchen/${kitchen.id}/menu`);
       return;
     }
-    navigate(nextPath);
+    navigate(nextPath.startsWith("/") ? nextPath : "/");
   };
 
-  const handleSubmit = async (e: FormEvent) => {
+  const handleRequestOtp = async (e: FormEvent) => {
     e.preventDefault();
     setError("");
     setBusy(true);
     try {
-      login(name, phone);
-      if (code.trim()) {
-        const kitchen = await fetchKitchenByCode(code);
-        saveKitchenToSession(kitchen);
-        navigate(`/kitchen/${kitchen.id}/menu`);
-        return;
-      }
-      navigate(nextPath);
+      await requestCustomerWhatsAppOtp(normalizePhone(phone));
+      setOtpSent(true);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not sign in");
+      setError(err instanceof Error ? err.message : "Could not send OTP");
     } finally {
       setBusy(false);
     }
   };
 
-  const fillDemo = () => {
-    setName(DEMO.customerName);
-    setPhone(DEMO.customerPhone);
+  const handleVerify = async (e: FormEvent) => {
+    e.preventDefault();
+    setError("");
+    setBusy(true);
+    try {
+      const result = await verifyCustomerWhatsAppOtp(normalizePhone(phone), otp.trim());
+      applyAuthResult({
+        ...result,
+        customer: {
+          ...result.customer,
+          name: name.trim() || result.customer.name,
+        },
+      });
+      await afterAuth(code);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not verify OTP");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const fillDemo = (account: DemoCustomerAccount) => {
+    setName(account.name);
+    setPhone(account.phone);
     setCode(DEMO.kitchenCode);
+    setOtp(DEMO.otp);
+    setOtpSent(true);
+  };
+
+  const handleDemoWhatsApp = async (account: DemoCustomerAccount) => {
+    setError("");
+    setBusy(true);
+    setBusyPhone(account.phone);
+    fillDemo(account);
+    try {
+      const e164 = normalizePhone(account.phone);
+      await requestCustomerWhatsAppOtp(e164);
+      const result = await verifyCustomerWhatsAppOtp(e164, DEMO.otp);
+      applyAuthResult(result);
+      await afterAuth(DEMO.kitchenCode);
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? `${err.message} — ensure gateway is up`
+          : "Demo customer login failed",
+      );
+    } finally {
+      setBusy(false);
+      setBusyPhone(null);
+    }
   };
 
   return (
     <div className="auth-page auth-page--customer">
       <AnimatedMesh variant="customer" />
       <div className="auth-page__visual">
-        <img src={images.customers.src} alt="" className="auth-page__img" />
         <div className="auth-page__overlay" />
-        <div className="auth-page__visual-text">
-          <Link to="/" className="nav__logo">kitchCU</Link>
+        <div className="auth-page__brand-stack">
+          <BrandLogo variant="wordmark" className="brand-logo--lg" />
+          <BrandAuthArt surface="customer" />
           <h1>Customer sign in</h1>
           <p>Save your profile and favourite kitchens on {CUSTOMER_HOST}</p>
         </div>
@@ -78,6 +128,33 @@ export function CustomerLoginPage() {
 
       <div className="auth-page__form-wrap">
         <div className="auth-card glass">
+          <div className="auth-card__demo">
+            <strong>Demo customer accounts</strong>
+            <p className="auth-card__demo-otp">WhatsApp OTP (dev): <code>{DEMO.otp}</code></p>
+            <ul className="auth-card__demo-list">
+              {DEMO_CUSTOMERS.map((account) => (
+                <li key={account.phone}>
+                  <div className="auth-card__demo-meta">
+                    <span className="auth-card__demo-name">{account.name}</span>
+                    <span>{account.phone} · {account.note}</span>
+                  </div>
+                  <button
+                    type="button"
+                    className="btn btn--primary btn--sm"
+                    disabled={busy}
+                    onClick={() => handleDemoWhatsApp(account)}
+                  >
+                    {busyPhone === account.phone ? "Signing in…" : "WhatsApp login"}
+                  </button>
+                </li>
+              ))}
+            </ul>
+            <p className="auth-card__demo-note">
+              Opens demo kitchen <code>{DEMO.kitchenCode}</code>. Owners:{" "}
+              {DEMO_OWNERS.map((o) => o.phone).join(", ")}
+            </p>
+          </div>
+
           <form onSubmit={handleSubmit}>
             <h2>Welcome back</h2>
             <p className="auth-card__hint">
@@ -103,8 +180,12 @@ export function CustomerLoginPage() {
             <button type="submit" className="btn btn--primary btn--lg" disabled={busy}>
               {busy ? "Signing in..." : "Continue"}
             </button>
-            <button type="button" className="btn btn--ghost auth-card__resend" onClick={fillDemo}>
-              Fill demo customer
+            <button
+              type="button"
+              className="btn btn--ghost auth-card__resend"
+              onClick={() => fillDemo(DEMO_CUSTOMERS[0])}
+            >
+              Fill demo profile
             </button>
           </form>
 
@@ -137,12 +218,12 @@ export function CustomerHomePage() {
     setError("");
     setBusy(true);
     try {
-      const kitchen = await fetchKitchenByCode(kitchenCode);
+      const kitchen = await fetchKitchenByCode(kitchenCode.trim().toUpperCase());
       const next = saveKitchenToSession(kitchen);
       updateSession(next);
       navigate(`/kitchen/${kitchen.id}/menu`);
-    } catch {
-      setError("Kitchen not found. Check the code or run seed script.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Kitchen not found. Check the code or run seed script.");
     } finally {
       setBusy(false);
     }
@@ -158,7 +239,7 @@ export function CustomerHomePage() {
       <form className={`glass customer-search reveal ${visible ? "reveal--visible" : ""}`} onSubmit={handleSubmit}>
         <h2>Find a kitchen</h2>
         <p>
-          {session
+          {session?.name?.trim()
             ? `Welcome back, ${session.name}. Enter a kitchen code or pick a saved kitchen below.`
             : "Enter the kitchen code shared by your cloud kitchen owner."}
         </p>
@@ -220,7 +301,7 @@ export function CustomerHomePage() {
         <article className="glass customer-benefit-card" style={{ "--i": 2 } as CSSProperties}>
           <img src={sampleDishImages.thali} alt="" loading="lazy" />
           <h3>Order tracking</h3>
-          <p>Follow your order from kitchen to delivery (coming to customer app).</p>
+          <p>Follow your order from kitchen to door with live tracking links.</p>
         </article>
       </div>
     </div>

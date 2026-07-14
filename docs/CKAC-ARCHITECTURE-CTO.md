@@ -4,9 +4,10 @@
 
 | Field | Value |
 |-------|-------|
-| Version | 1.0 |
+| Version | **1.1** |
 | Audience | CTO, Engineering Managers, Tech Leads, CPO (product ↔ code traceability) |
-| Companion | [Implementation Guide](./CKAC-IMPLEMENTATION-GUIDE.md) · [System Benchmark](./CKAC-SYSTEM-BENCHMARK.md) · [CPO Blueprint](./CKAC-CPO-PRODUCT-BLUEPRINT.md) · [AGENTS.md](../AGENTS.md) |
+| Status | S1–S18 shipped; deep how/why + ER + flows in Complete Guide v3.1 |
+| Companion | [Complete Guide v3.1](./CKAC-COMPLETE-GUIDE.md) · [Implementation Guide](./CKAC-IMPLEMENTATION-GUIDE.md) · [System Benchmark](./CKAC-SYSTEM-BENCHMARK.md) · [CPO Blueprint v4.2](./CKAC-CPO-PRODUCT-BLUEPRINT.md) · [User Flows](./CKAC-USERFLOWS.md) · [API.md](./API.md) · [AGENTS.md](../AGENTS.md) · [UI Catalog](./assets/ui/) |
 
 ---
 
@@ -14,18 +15,19 @@
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────┐
-│  EXPERIENCE LAYER (Phase 1 partial — S5 next)                           │
-│  Owner PWA · Customer PWA · WhatsApp (Meta webhook)                     │
+│  EXPERIENCE LAYER (S5–S18)                                              │
+│  Portal · Owner PWA · Customer PWA · Admin PWA · WhatsApp webhook       │
 └───────────────────────────────────┬─────────────────────────────────────┘
                                     │ HTTPS / JWT
 ┌───────────────────────────────────▼─────────────────────────────────────┐
 │  EDGE LAYER — API Gateway (services/gateway)                            │
-│  Path routing · CORS · future rate limits                               │
+│  Path routing · CORS · correlation ID · future rate limits              │
 └───────────────────────────────────┬─────────────────────────────────────┘
                                     │
 ┌───────────────────────────────────▼─────────────────────────────────────┐
-│  APPLICATION LAYER — Bounded-context microservices                      │
-│  identity · catalog · order · notification (+ billing, analytics later) │
+│  APPLICATION LAYER — Bounded-context microservices (13 domains)         │
+│  identity · catalog · order · billing · marketing · ratings · growth    │
+│  delivery · learning · community · streaming · notification             │
 │  Pattern: routes (thin) → schemas (domain) → models (persistence)       │
 └───────────────┬─────────────────────────────┬───────────────────────────┘
                 │                             │
@@ -34,7 +36,7 @@
 │  PostgreSQL 16 + PostGIS     │   │  Redis Streams (events)             │
 │  Schema-per-service          │   │  Redis cache (menu TTL 300s)        │
 │  ckac_identity, catalog,     │   │  Internal HTTP (X-Internal-Key)     │
-│  orders, events, …           │   │  Outbox (ckac_events.outbox)        │
+│  orders, billing, …events    │   │  Outbox (ckac_events.outbox)        │
 └──────────────────────────────┘   └─────────────────────────────────────┘
                 │
 ┌───────────────▼──────────────┐
@@ -42,6 +44,8 @@
 │  Live-capture dish URLs      │
 └──────────────────────────────┘
 ```
+
+> For the full "why microservices / gateway / outbox / tenant scoping / 100k sessions" narrative, see Complete Guide **§9–§11**.
 
 ### 1.1 Engineering standards (enforced in code)
 

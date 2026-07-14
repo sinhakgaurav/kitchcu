@@ -32,7 +32,13 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="kitchCU Catalog Service",
     version="0.1.0",
-    description="Dishes, categories, menu, ingredient balance mapper — Sprint 15",
+    description=(
+        "Owns a kitchen's menu: cuisines, diet categories, dishes, and photo media. Enforces "
+        "**truth in media** — active dish hero images must be live-captured, never stock photos. "
+        "Also owns the ingredient balance mapper (F19): raw ingredient stock, dish recipes, "
+        "low-stock warnings, and automatic stock deduction on order acceptance (via internal "
+        "service-to-service routes called by the order service)."
+    ),
     lifespan=lifespan,
 )
 

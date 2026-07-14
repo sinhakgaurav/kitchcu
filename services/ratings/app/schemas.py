@@ -19,12 +19,14 @@ QUALITY_WEIGHT = 0.4
 
 
 class RatingItemInput(BaseModel):
-    dish_id: uuid.UUID
-    home_taste_score: int = Field(ge=1, le=5)
-    quality_score: int = Field(ge=1, le=5)
-    media_url: str | None = Field(default=None, max_length=2048)
-    media_type: Literal["video", "audio"] | None = None
-    is_anonymous: bool = True
+    """One dish's rating within an order-level rating submission (F16)."""
+
+    dish_id: uuid.UUID = Field(..., description="Dish being rated; must have been part of the order.")
+    home_taste_score: int = Field(ge=1, le=5, description="1-5 — how close the dish tasted to authentic home cooking.", examples=[5])
+    quality_score: int = Field(ge=1, le=5, description="1-5 — overall food quality/execution.", examples=[4])
+    media_url: str | None = Field(default=None, max_length=2048, description="Optional uploaded audio/video review URL. Must be paired with `media_type`.")
+    media_type: Literal["video", "audio"] | None = Field(default=None, description="Media kind for `media_url`. Required if `media_url` is set, omitted otherwise.")
+    is_anonymous: bool = Field(default=True, description="Whether the A/V review (if any) is shown to other customers without attribution.")
 
     @model_validator(mode="after")
     def media_pair(self) -> RatingItemInput:
@@ -34,81 +36,103 @@ class RatingItemInput(BaseModel):
 
 
 class OrderRatingsCreateRequest(BaseModel):
-    ratings: list[RatingItemInput] = Field(min_length=1, max_length=20)
+    """Customer request to rate 1-20 dishes from a single delivered order."""
+
+    ratings: list[RatingItemInput] = Field(min_length=1, max_length=20, description="One entry per dish being rated, up to 20.")
 
 
 class DishRatingResponse(BaseModel):
-    id: uuid.UUID
-    dish_id: uuid.UUID
-    order_id: uuid.UUID
-    home_taste_score: int
-    quality_score: int
-    media_url: str | None
-    media_type: str | None
-    is_anonymous: bool
-    created_at: datetime
+    """A single submitted dish rating."""
+
+    id: uuid.UUID = Field(..., description="Rating row UUID.")
+    dish_id: uuid.UUID = Field(..., description="Rated dish UUID.")
+    order_id: uuid.UUID = Field(..., description="Order this rating is tied to — always a delivered order.")
+    home_taste_score: int = Field(..., description="1-5 home-taste score.")
+    quality_score: int = Field(..., description="1-5 quality score.")
+    media_url: str | None = Field(default=None, description="Attached A/V review URL, if any.")
+    media_type: str | None = Field(default=None, description="'video' or 'audio', if media attached.")
+    is_anonymous: bool = Field(..., description="Whether the review is shown anonymously.")
+    created_at: datetime = Field(..., description="Submission timestamp, UTC.")
 
     model_config = {"from_attributes": True}
 
 
 class OrderRatingsCreateResponse(BaseModel):
-    ratings: list[DishRatingResponse]
+    """Result of submitting ratings for an order."""
+
+    ratings: list[DishRatingResponse] = Field(..., description="The created rating rows, one per dish rated.")
 
 
 class DishRatingSummaryResponse(BaseModel):
-    dish_id: uuid.UUID
-    rating_count: int
-    avg_home_taste: float
-    avg_quality: float
-    overall_rating: float
+    """Live-aggregated rating summary for one dish."""
+
+    dish_id: uuid.UUID = Field(..., description="Dish UUID.")
+    rating_count: int = Field(..., description="Total verified ratings received. `0` if unrated.")
+    avg_home_taste: float = Field(..., description="Average home-taste score across all ratings.", examples=[4.6])
+    avg_quality: float = Field(..., description="Average quality score across all ratings.", examples=[4.3])
+    overall_rating: float = Field(..., description="Weighted overall score: 60% home-taste + 40% quality.", examples=[4.48])
 
 
 class KitchenRatingSummariesResponse(BaseModel):
-    summaries: list[DishRatingSummaryResponse]
+    """Rating summaries for every rated dish in a kitchen."""
+
+    summaries: list[DishRatingSummaryResponse] = Field(..., description="One summary per dish that has at least one rating.")
 
 
 class AnonymousReviewResponse(BaseModel):
-    id: uuid.UUID
-    home_taste_score: int
-    quality_score: int
-    media_url: str | None
-    media_type: str | None
-    created_at: datetime
+    """Public, customer-facing review card shown on a dish's page."""
+
+    id: uuid.UUID = Field(..., description="Rating row UUID.")
+    home_taste_score: int = Field(..., description="1-5 home-taste score.")
+    quality_score: int = Field(..., description="1-5 quality score.")
+    media_url: str | None = Field(default=None, description="Attached A/V review URL, if any.")
+    media_type: str | None = Field(default=None, description="'video' or 'audio', if media attached.")
+    created_at: datetime = Field(..., description="Submission timestamp, UTC.")
 
 
 class AnonymousReviewsListResponse(BaseModel):
-    reviews: list[AnonymousReviewResponse]
-    total: int
+    """Page of public reviews for a dish, newest first."""
+
+    reviews: list[AnonymousReviewResponse] = Field(..., description="Approved reviews, most recent first.")
+    total: int = Field(..., description="Number of reviews returned in this page.")
 
 
 class DishSuggestionCreateRequest(BaseModel):
-    suggestion_text: str = Field(min_length=5, max_length=1000)
-    order_id: uuid.UUID | None = None
+    """Customer feedback/suggestion tied to a dish (e.g. requesting a tweak or a new variant)."""
+
+    suggestion_text: str = Field(min_length=5, max_length=1000, description="Freeform suggestion text.", examples=["Could you make a less spicy version of this?"])
+    order_id: uuid.UUID | None = Field(default=None, description="Order this suggestion relates to, if any (not required to be delivered).")
 
 
 class DishSuggestionUpdateRequest(BaseModel):
-    status: Literal["accepted", "rejected"]
-    owner_response: str | None = Field(default=None, max_length=2000)
+    """Owner decision on a customer's dish suggestion."""
+
+    status: Literal["accepted", "rejected"] = Field(..., description="Owner's decision on the suggestion.")
+    owner_response: str | None = Field(default=None, max_length=2000, description="Optional owner reply shown back to the customer.")
 
 
 class DishSuggestionResponse(BaseModel):
-    id: uuid.UUID
-    kitchen_id: uuid.UUID
-    dish_id: uuid.UUID
-    dish_name: str | None = None
-    customer_id: uuid.UUID
-    order_id: uuid.UUID | None
-    suggestion_text: str
-    status: str
-    owner_response: str | None
-    created_at: datetime
+    """A customer's dish suggestion and its current owner-review status."""
+
+    id: uuid.UUID = Field(..., description="Suggestion UUID.")
+    kitchen_id: uuid.UUID = Field(..., description="Kitchen the dish belongs to.")
+    dish_id: uuid.UUID = Field(..., description="Dish the suggestion is about.")
+    dish_name: str | None = Field(default=None, description="Dish name, resolved for display.")
+    customer_id: uuid.UUID = Field(..., description="Customer who submitted the suggestion.")
+    order_id: uuid.UUID | None = Field(default=None, description="Related order, if provided at submission.")
+    suggestion_text: str = Field(..., description="Suggestion text.")
+    status: str = Field(..., description="'pending', 'accepted', or 'rejected'.")
+    owner_response: str | None = Field(default=None, description="Owner's reply, if any.")
+    created_at: datetime = Field(..., description="Submission timestamp, UTC.")
 
     model_config = {"from_attributes": True}
 
 
 class DishSuggestionListResponse(BaseModel):
-    suggestions: list[DishSuggestionResponse]
-    total: int
+    """Suggestion roster for a kitchen (owner view)."""
+
+    suggestions: list[DishSuggestionResponse] = Field(..., description="Suggestions ordered newest first.")
+    total: int = Field(..., description="Number of suggestions returned.")
 
 
 def _overall_rating(avg_home: float, avg_quality: float) -> float:

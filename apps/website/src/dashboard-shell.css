@@ -324,6 +324,15 @@
   display: block;
 }
 
+.admin-shell__brand .brand-logo--wordmark {
+  display: block;
+  height: 36px;
+  width: auto;
+  max-width: 150px;
+  object-fit: contain;
+  margin-bottom: 0.35rem;
+}
+
 .admin-shell__host {
   font-size: 0.72rem;
   color: var(--orange-light);
@@ -785,6 +794,10 @@
 .owner-form.dash-card {
   max-width: 640px;
   padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.1rem;
+  box-sizing: border-box;
 }
 
 .owner-form--wide.dash-card {
@@ -794,7 +807,7 @@
 .owner-form--inline {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.65rem;
+  gap: 0.75rem;
   align-items: flex-end;
   max-width: none;
   padding: 0;
@@ -803,11 +816,23 @@
   box-shadow: none;
 }
 
+.owner-form--inline > label,
+.owner-form--inline .kc-field {
+  flex: 1;
+  min-width: 10rem;
+  margin: 0;
+}
+
 .owner-form--inline .owner-input,
 .owner-form--inline .kc-input,
 .owner-form--inline .kc-select {
   flex: 1;
   min-width: 8rem;
+}
+
+.owner-form--inline > .btn,
+.owner-form--inline .kc-actions {
+  margin-top: 0;
 }
 
 .owner-screen .owner-tabs {

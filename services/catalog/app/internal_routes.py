@@ -15,11 +15,14 @@ from app.ingredients import (
 from ckac_common.database import get_db
 from ckac_common.event_bus import EventPublisher
 from ckac_common.internal_auth import verify_internal_key
+from ckac_common.openapi import RESP_401
 
 router = APIRouter(
     prefix="/internal/kitchens/{kitchen_id}/stock",
     dependencies=[Depends(verify_internal_key)],
 )
+
+TAG_INGREDIENTS = "Ingredients"
 
 
 def get_publisher() -> EventPublisher:
@@ -28,7 +31,17 @@ def get_publisher() -> EventPublisher:
     return event_publisher
 
 
-@router.post("/low-stock-check", response_model=LowStockCheckResponse)
+@router.post(
+    "/low-stock-check",
+    response_model=LowStockCheckResponse,
+    tags=[TAG_INGREDIENTS],
+    summary="[Internal] Check ingredient availability",
+    description=(
+        "Internal service-to-service (X-Internal-Key) — called by the order service to project ingredient "
+        "shortfalls for a set of order line items, without deducting stock."
+    ),
+    responses={401: RESP_401},
+)
 async def internal_low_stock_check(
     kitchen_id: uuid.UUID,
     body: LowStockCheckRequest,
@@ -37,7 +50,18 @@ async def internal_low_stock_check(
     return await check_low_stock_for_order(session, kitchen_id, body)
 
 
-@router.post("/deduct-order", response_model=StockDeductResponse)
+@router.post(
+    "/deduct-order",
+    response_model=StockDeductResponse,
+    tags=[TAG_INGREDIENTS],
+    summary="[Internal] Deduct stock for an order",
+    description=(
+        "Internal service-to-service (X-Internal-Key) — called by the order service on order acceptance "
+        "to deduct ingredient stock per dish recipe, publishing `ingredient.stock.deducted` and "
+        "`ingredient.low_stock` events as thresholds are crossed."
+    ),
+    responses={401: RESP_401},
+)
 async def internal_deduct_order_stock(
     kitchen_id: uuid.UUID,
     body: StockDeductRequest,

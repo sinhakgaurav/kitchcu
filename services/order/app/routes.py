@@ -59,12 +59,24 @@ from ckac_common.cache import (
 )
 from ckac_common.database import get_db
 from ckac_common.event_bus import EventPublisher
+from ckac_common.openapi import (
+    RESP_400,
+    RESP_403,
+    RESP_422,
+    auth_errors,
+)
 
 from sqlalchemy import select
 
 from app.models import Order, OrderItem
 
 router = APIRouter()
+
+TAG_OWNER_ORDERS = "Owner Orders"
+TAG_CUSTOMER_CHECKOUT = "Customer Checkout"
+TAG_MASTER_ORDERS = "Master Orders"
+TAG_ANALYTICS = "Analytics"
+TAG_BILLS = "Bills"
 
 
 def get_publisher() -> EventPublisher:
@@ -83,6 +95,20 @@ def get_redis():
     "/kitchens/{kitchen_id}/orders/manual",
     response_model=OrderResponse,
     status_code=status.HTTP_201_CREATED,
+    tags=[TAG_OWNER_ORDERS],
+    summary="Create a manual order (owner-entered walk-in/phone order)",
+    description=(
+        "**Auth:** Owner JWT (Bearer) — caller must own `kitchen_id`.\n\n"
+        "**Body:** `ManualOrderCreateRequest` — dish line items, delivery type, payment method, "
+        "and optional customer contact/location.\n\n"
+        "**Behavior:** Resolves each dish against the live catalog (rejecting inactive/unknown "
+        "dishes), computes `subtotal` from current prices, and — for delivery orders with "
+        "customer coordinates — recomputes and validates the delivery fee against the kitchen's "
+        "radius rules. Creates the order in `received` status, emits `order.placed`, and (for "
+        "delivery orders) issues a public tracking token via `delivery.tracking_created`.\n\n"
+        "**Response:** `201` with the created `OrderResponse` (`total = subtotal + delivery_fee`)."
+    ),
+    responses={**auth_errors(include_403=True), 400: RESP_400},
 )
 async def manual_order_create(
     kitchen_id: uuid.UUID,
@@ -107,6 +133,18 @@ async def manual_order_create(
     "/kitchens/{kitchen_id}/orders/customer",
     response_model=OrderResponse,
     status_code=status.HTTP_201_CREATED,
+    tags=[TAG_CUSTOMER_CHECKOUT],
+    summary="Place a single-kitchen checkout order",
+    description=(
+        "**Auth:** Customer JWT (Bearer, `type: customer`).\n\n"
+        "**Body:** `CustomerOrderCreateRequest` — cart line items, delivery type, payment "
+        "method, and optional delivery location/fee acknowledgement.\n\n"
+        "**Behavior:** Verifies the kitchen is active, resolves the customer's phone from their "
+        "profile (or the request), then creates the order exactly like a manual order but tagged "
+        "`source=\"customer_pwa\"`. Emits `order.placed` and, for delivery, `delivery.tracking_created`.\n\n"
+        "**Response:** `201` with the created `OrderResponse`."
+    ),
+    responses={**auth_errors(include_404=True), 400: RESP_400},
 )
 async def customer_order_create(
     kitchen_id: uuid.UUID,
@@ -146,6 +184,22 @@ async def customer_order_create(
     "/customers/me/master-orders",
     response_model=MasterOrderResponse,
     status_code=status.HTTP_201_CREATED,
+    tags=[TAG_MASTER_ORDERS],
+    summary="Place a multi-kitchen checkout (grouped sub-orders, single payment)",
+    description=(
+        "**Auth:** Customer JWT (Bearer).\n\n"
+        "**Headers:** `Idempotency-Key` (required, 8-128 chars) — replaying the same key for "
+        "the same customer returns the previously created master order with `200 OK` instead of "
+        "creating a duplicate; a new key creates a fresh master order with `201 Created`.\n\n"
+        "**Body:** `MasterOrderCreateRequest` — 2-10 distinct-kitchen groups, one payment method "
+        "for the whole checkout.\n\n"
+        "**Behavior:** Validates every kitchen is active, creates one sub-`Order` per group "
+        "(each independently trackable through the order status machine), links them via "
+        "`master_order_id`, and sums subtotal/delivery_fee/total across all sub-orders. Emits "
+        "`master_order.created` plus `order.placed` per sub-order.\n\n"
+        "**Response:** `MasterOrderResponse` with all sub-orders nested under `orders`."
+    ),
+    responses={**auth_errors(), 400: RESP_400},
 )
 async def customer_master_order_create(
     body: MasterOrderCreateRequest,
@@ -194,6 +248,15 @@ async def customer_master_order_create(
 @router.get(
     "/customers/me/master-orders/{master_order_id}",
     response_model=MasterOrderResponse,
+    tags=[TAG_MASTER_ORDERS],
+    summary="Get a multi-kitchen master order (with all sub-orders)",
+    description=(
+        "**Auth:** Customer JWT (Bearer) — only the customer who placed the master order can "
+        "read it.\n\n"
+        "**Response:** `MasterOrderResponse` with each sub-order's live status, items, and "
+        "status history nested under `orders`."
+    ),
+    responses={**auth_errors(include_404=True)},
 )
 async def customer_master_order_get(
     master_order_id: uuid.UUID,
@@ -209,7 +272,17 @@ async def customer_master_order_get(
     return await master_order_to_response(session, master)
 
 
-@router.get("/customers/me/master-orders/{master_order_id}/bill.pdf")
+@router.get(
+    "/customers/me/master-orders/{master_order_id}/bill.pdf",
+    tags=[TAG_BILLS],
+    summary="Download the consolidated PDF receipt for a master order",
+    description=(
+        "**Auth:** Customer JWT (Bearer) — only the owning customer can download the receipt.\n\n"
+        "**Response:** `200` with `application/pdf` body (`Content-Disposition: attachment`), "
+        "a single master receipt covering every kitchen's sub-order and the aggregated total."
+    ),
+    responses={**auth_errors(include_404=True)},
+)
 async def customer_master_order_bill_pdf(
     master_order_id: uuid.UUID,
     customer_id: Annotated[uuid.UUID, Depends(get_current_customer_id)],
@@ -231,7 +304,20 @@ async def customer_master_order_bill_pdf(
     )
 
 
-@router.get("/customers/me/orders", response_model=OrderListResponse)
+@router.get(
+    "/customers/me/orders",
+    response_model=OrderListResponse,
+    tags=[TAG_CUSTOMER_CHECKOUT],
+    summary="List the signed-in customer's order history",
+    description=(
+        "**Auth:** Customer JWT (Bearer).\n\n"
+        "**Behavior:** Looks up orders by the customer's registered phone number across all "
+        "kitchens (F33 order history), newest first. Returns an empty list (not an error) if the "
+        "profile has no phone on file.\n\n"
+        "**Response:** `OrderListResponse`."
+    ),
+    responses=auth_errors(),
+)
 async def customer_orders_list(
     customer_id: Annotated[uuid.UUID, Depends(get_current_customer_id)],
     session: Annotated[AsyncSession, Depends(get_db)],
@@ -246,7 +332,18 @@ async def customer_orders_list(
     return OrderListResponse(kitchen_id=kitchen_id, orders=enriched, total=len(enriched))
 
 
-@router.get("/customers/me/orders/{order_id}", response_model=OrderResponse)
+@router.get(
+    "/customers/me/orders/{order_id}",
+    response_model=OrderResponse,
+    tags=[TAG_CUSTOMER_CHECKOUT],
+    summary="Get one of the signed-in customer's own orders",
+    description=(
+        "**Auth:** Customer JWT (Bearer) — the order must belong to the same phone number as "
+        "the caller's profile, else `404` (never reveals another customer's order).\n\n"
+        "**Response:** `OrderResponse` with items and status history."
+    ),
+    responses={**auth_errors(include_404=True)},
+)
 async def customer_order_get(
     order_id: uuid.UUID,
     customer_id: Annotated[uuid.UUID, Depends(get_current_customer_id)],
@@ -260,7 +357,16 @@ async def customer_order_get(
     return await order_to_response(session, order)
 
 
-@router.get("/customers/me/orders/{order_id}/bill.pdf")
+@router.get(
+    "/customers/me/orders/{order_id}/bill.pdf",
+    tags=[TAG_BILLS],
+    summary="Download the PDF receipt for one of the customer's own orders",
+    description=(
+        "**Auth:** Customer JWT (Bearer) — order must belong to the caller's phone number.\n\n"
+        "**Response:** `200` with `application/pdf` body (`Content-Disposition: attachment`)."
+    ),
+    responses={**auth_errors(include_404=True)},
+)
 async def customer_order_bill_pdf(
     order_id: uuid.UUID,
     customer_id: Annotated[uuid.UUID, Depends(get_current_customer_id)],
@@ -285,6 +391,17 @@ async def customer_order_bill_pdf(
     "/customers/me/orders/{order_id}/repeat",
     response_model=OrderResponse,
     status_code=status.HTTP_201_CREATED,
+    tags=[TAG_CUSTOMER_CHECKOUT],
+    summary="Repeat a past order (F33) as a new checkout",
+    description=(
+        "**Auth:** Customer JWT (Bearer) — source order must belong to the caller's phone "
+        "number.\n\n"
+        "**Behavior:** Copies the source order's line items, delivery type, and payment method "
+        "into a brand-new order against the same kitchen (current prices and delivery-fee rules "
+        "apply — this is not a price-locked replay). Emits `order.placed`.\n\n"
+        "**Response:** `201` with the newly created `OrderResponse`."
+    ),
+    responses={**auth_errors(include_404=True), 400: RESP_400},
 )
 async def customer_order_repeat(
     order_id: uuid.UUID,
@@ -308,7 +425,19 @@ async def customer_order_repeat(
     return await order_to_response(session, new_order)
 
 
-@router.get("/kitchens/{kitchen_id}/orders", response_model=OrderListResponse)
+@router.get(
+    "/kitchens/{kitchen_id}/orders",
+    response_model=OrderListResponse,
+    tags=[TAG_OWNER_ORDERS],
+    summary="List a kitchen's orders (owner dashboard)",
+    description=(
+        "**Auth:** Owner JWT (Bearer) — caller must own `kitchen_id`.\n\n"
+        "**Query:** optional `status` (any status in the order lifecycle) and `source` "
+        "(`manual`, `customer_pwa`, `customer_pwa_multi`, `whatsapp`, `manual_message`) filters.\n\n"
+        "**Response:** `OrderListResponse`, newest first."
+    ),
+    responses=auth_errors(include_403=True),
+)
 async def orders_list(
     kitchen_id: uuid.UUID,
     owner_id: Annotated[uuid.UUID, Depends(get_current_owner_id)],
@@ -322,7 +451,17 @@ async def orders_list(
     return OrderListResponse(kitchen_id=kitchen_id, orders=enriched, total=len(enriched))
 
 
-@router.get("/orders/{order_id}", response_model=OrderResponse)
+@router.get(
+    "/orders/{order_id}",
+    response_model=OrderResponse,
+    tags=[TAG_OWNER_ORDERS],
+    summary="Get a single order (owner view)",
+    description=(
+        "**Auth:** Owner JWT (Bearer) — caller must own the order's kitchen.\n\n"
+        "**Response:** `OrderResponse` with items and full status-change history."
+    ),
+    responses=auth_errors(include_403=True, include_404=True),
+)
 async def order_get(
     order_id: uuid.UUID,
     owner_id: Annotated[uuid.UUID, Depends(get_current_owner_id)],
@@ -332,7 +471,16 @@ async def order_get(
     return await order_to_response(session, order)
 
 
-@router.get("/orders/{order_id}/bill.pdf")
+@router.get(
+    "/orders/{order_id}/bill.pdf",
+    tags=[TAG_BILLS],
+    summary="Download the PDF receipt for an order (owner view)",
+    description=(
+        "**Auth:** Owner JWT (Bearer) — caller must own the order's kitchen.\n\n"
+        "**Response:** `200` with `application/pdf` body (`Content-Disposition: attachment`)."
+    ),
+    responses=auth_errors(include_403=True, include_404=True),
+)
 async def order_bill_pdf(
     order_id: uuid.UUID,
     owner_id: Annotated[uuid.UUID, Depends(get_current_owner_id)],
@@ -349,7 +497,20 @@ async def order_bill_pdf(
     )
 
 
-@router.get("/orders/{order_id}/stock-warnings", response_model=OrderStockWarningsResponse)
+@router.get(
+    "/orders/{order_id}/stock-warnings",
+    response_model=OrderStockWarningsResponse,
+    tags=[TAG_OWNER_ORDERS],
+    summary="Check ingredient stock shortfall for an order (F19)",
+    description=(
+        "**Auth:** Owner JWT (Bearer) — caller must own the order's kitchen.\n\n"
+        "**Behavior:** Projects this order's dishes against the ingredient balance mapper "
+        "(catalog service). Best-effort — returns an empty, non-shortfall result rather than "
+        "erroring if the catalog service is unreachable.\n\n"
+        "**Response:** `OrderStockWarningsResponse`."
+    ),
+    responses=auth_errors(include_403=True, include_404=True),
+)
 async def order_stock_warnings(
     order_id: uuid.UUID,
     owner_id: Annotated[uuid.UUID, Depends(get_current_owner_id)],
@@ -359,7 +520,24 @@ async def order_stock_warnings(
     return await get_order_stock_warnings(session, order)
 
 
-@router.patch("/orders/{order_id}/status", response_model=OrderResponse)
+@router.patch(
+    "/orders/{order_id}/status",
+    response_model=OrderResponse,
+    tags=[TAG_OWNER_ORDERS],
+    summary="Advance or cancel an order's status",
+    description=(
+        "**Auth:** Owner JWT (Bearer) — caller must own the order's kitchen.\n\n"
+        "**Body:** `OrderStatusUpdateRequest` — target `status` (must be a valid forward "
+        "transition per the status machine, or `cancelled` from any non-terminal state) plus an "
+        "optional `note` and a `cancel_reason` required when cancelling.\n\n"
+        "**Behavior:** Rejects invalid transitions (`400`). Records the transition in the "
+        "status-event audit trail, emits `order.status.changed`, dispatches a WhatsApp "
+        "notification, and — on first transition into `accepted` — best-effort deducts recipe "
+        "ingredients from stock (never blocks the status change if that call fails).\n\n"
+        "**Response:** Updated `OrderResponse`."
+    ),
+    responses={**auth_errors(include_403=True, include_404=True), 400: RESP_400},
+)
 async def order_status_update(
     order_id: uuid.UUID,
     body: OrderStatusUpdateRequest,
@@ -392,6 +570,19 @@ async def order_status_update(
     "/kitchens/{kitchen_id}/orders/parse-message",
     response_model=OrderDraftResponse,
     status_code=status.HTTP_201_CREATED,
+    tags=[TAG_OWNER_ORDERS],
+    summary="Parse a free-text message into a draft order for owner review",
+    description=(
+        "**Auth:** Owner JWT (Bearer) — caller must own `kitchen_id`.\n\n"
+        "**Body:** `ParseMessageRequest` — raw message text (e.g. a manually pasted WhatsApp "
+        "order), `source`, and optional customer phone.\n\n"
+        "**Behavior:** Matches each line against the kitchen's active menu; unmatched lines and "
+        "free-text notes are kept separately for the owner to resolve. Creates an "
+        "`OrderDraft` (`status=\"draft\"`) and emits `order.draft.created` — no `Order` row is "
+        "created until the owner confirms via the confirm endpoint.\n\n"
+        "**Response:** `201` with the `OrderDraftResponse`."
+    ),
+    responses=auth_errors(include_403=True),
 )
 async def parse_message(
     kitchen_id: uuid.UUID,
@@ -407,7 +598,17 @@ async def parse_message(
     return _draft_to_response(draft)
 
 
-@router.get("/kitchens/{kitchen_id}/orders/drafts", response_model=OrderDraftListResponse)
+@router.get(
+    "/kitchens/{kitchen_id}/orders/drafts",
+    response_model=OrderDraftListResponse,
+    tags=[TAG_OWNER_ORDERS],
+    summary="List pending (unconfirmed) order drafts for a kitchen",
+    description=(
+        "**Auth:** Owner JWT (Bearer) — caller must own `kitchen_id`.\n\n"
+        "**Response:** `OrderDraftListResponse` — drafts with `status=\"draft\"` only, newest first."
+    ),
+    responses=auth_errors(include_403=True),
+)
 async def drafts_list(
     kitchen_id: uuid.UUID,
     owner_id: Annotated[uuid.UUID, Depends(get_current_owner_id)],
@@ -426,6 +627,17 @@ async def drafts_list(
     "/kitchens/{kitchen_id}/orders/drafts/{draft_id}/confirm",
     response_model=OrderResponse,
     status_code=status.HTTP_201_CREATED,
+    tags=[TAG_OWNER_ORDERS],
+    summary="Confirm a draft — convert matched items into a real order",
+    description=(
+        "**Auth:** Owner JWT (Bearer) — caller must own `kitchen_id`.\n\n"
+        "**Behavior:** Requires the draft to exist, belong to this kitchen, still be in "
+        "`status=\"draft\"`, and have at least one matched item (`400` otherwise). Creates a "
+        "manual order (`source` inherited from the draft) from the matched items, marks the "
+        "draft `confirmed`, and links it to the new order. Emits `order.placed`.\n\n"
+        "**Response:** `201` with the created `OrderResponse`."
+    ),
+    responses={**auth_errors(include_403=True), 400: RESP_400},
 )
 async def draft_confirm(
     kitchen_id: uuid.UUID,
@@ -449,6 +661,17 @@ async def draft_confirm(
 @router.get(
     "/kitchens/{kitchen_id}/analytics/summary",
     response_model=analytics.RevenueSummary,
+    tags=[TAG_ANALYTICS],
+    summary="Revenue and order summary (F07)",
+    description=(
+        "**Auth:** Owner JWT (Bearer) — caller must own `kitchen_id`.\n\n"
+        "**Query:** `days` — trailing window in days (1-365, default 30).\n\n"
+        "**Behavior:** Gross revenue, average order value, cancellation rate, and repeat-customer "
+        "rate over the window. Cached in Redis for 1-6h per `kitchen_id` + window (tenant-scoped "
+        "key), invalidated on order events.\n\n"
+        "**Response:** `RevenueSummary`."
+    ),
+    responses=auth_errors(include_403=True),
 )
 async def analytics_summary(
     kitchen_id: uuid.UUID,
@@ -470,6 +693,15 @@ async def analytics_summary(
 @router.get(
     "/kitchens/{kitchen_id}/analytics/revenue-timeseries",
     response_model=analytics.RevenueTimeseries,
+    tags=[TAG_ANALYTICS],
+    summary="Daily revenue timeseries (F07)",
+    description=(
+        "**Auth:** Owner JWT (Bearer) — caller must own `kitchen_id`.\n\n"
+        "**Query:** `days` — trailing window in days (1-365, default 30).\n\n"
+        "**Response:** `RevenueTimeseries` — one revenue/order-count point per day, in the "
+        "kitchen's local (Asia/Kolkata) day boundaries."
+    ),
+    responses=auth_errors(include_403=True),
 )
 async def analytics_revenue_timeseries(
     kitchen_id: uuid.UUID,
@@ -484,6 +716,14 @@ async def analytics_revenue_timeseries(
 @router.get(
     "/kitchens/{kitchen_id}/analytics/top-dishes",
     response_model=analytics.TopDishes,
+    tags=[TAG_ANALYTICS],
+    summary="Best-selling dishes by quantity/revenue (F08)",
+    description=(
+        "**Auth:** Owner JWT (Bearer) — caller must own `kitchen_id`.\n\n"
+        "**Query:** `days` (1-365, default 30), `limit` (1-50, default 10).\n\n"
+        "**Response:** `TopDishes` — dishes ranked by quantity sold within the window."
+    ),
+    responses=auth_errors(include_403=True),
 )
 async def analytics_top_dishes(
     kitchen_id: uuid.UUID,
@@ -499,6 +739,14 @@ async def analytics_top_dishes(
 @router.get(
     "/kitchens/{kitchen_id}/analytics/peak-hours",
     response_model=analytics.PeakHours,
+    tags=[TAG_ANALYTICS],
+    summary="Busiest hours of day by order volume (F08)",
+    description=(
+        "**Auth:** Owner JWT (Bearer) — caller must own `kitchen_id`.\n\n"
+        "**Query:** `days` — trailing window in days (1-365, default 30).\n\n"
+        "**Response:** `PeakHours` — order counts bucketed by local (Asia/Kolkata) hour of day."
+    ),
+    responses=auth_errors(include_403=True),
 )
 async def analytics_peak_hours(
     kitchen_id: uuid.UUID,
@@ -513,6 +761,16 @@ async def analytics_peak_hours(
 @router.get(
     "/kitchens/{kitchen_id}/analytics/customers",
     response_model=analytics.CustomerSegments,
+    tags=[TAG_ANALYTICS],
+    summary="Customer segments — repeat rate and churn risk (F07)",
+    description=(
+        "**Auth:** Owner JWT (Bearer) — caller must own `kitchen_id`.\n\n"
+        "**Query:** `days` — trailing window in days (1-365, default 90); `limit` — max "
+        "customers listed per segment (1-50, default 10).\n\n"
+        "**Response:** `CustomerSegments` — repeat customers and churn-risk customers (2+ "
+        "lifetime orders, inactive 21+ days) for owner-driven CRM outreach."
+    ),
+    responses=auth_errors(include_403=True),
 )
 async def analytics_customers(
     kitchen_id: uuid.UUID,
@@ -529,6 +787,19 @@ async def analytics_customers(
     "/internal/kitchens/{kitchen_id}/orders/from-whatsapp",
     response_model=OrderDraftResponse,
     status_code=status.HTTP_201_CREATED,
+    tags=[TAG_OWNER_ORDERS],
+    summary="[Internal] Create an order draft from an inbound WhatsApp message",
+    description=(
+        "**Auth:** `X-Internal-Key` header (service-to-service only — called by the "
+        "notification service's WhatsApp webhook handler; never exposed to public clients "
+        "through the gateway).\n\n"
+        "**Body:** `ParseMessageRequest` — `source` is forced to `\"whatsapp\"` regardless of "
+        "the request body.\n\n"
+        "**Behavior:** Same parsing/matching as the manual parse-message endpoint, producing an "
+        "`OrderDraft` for the owner to review and confirm. Emits `order.draft.created`.\n\n"
+        "**Response:** `201` with the `OrderDraftResponse`."
+    ),
+    responses={403: RESP_403, 422: RESP_422},
 )
 async def whatsapp_intake(
     kitchen_id: uuid.UUID,

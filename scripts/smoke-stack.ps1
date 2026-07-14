@@ -7,7 +7,20 @@ $gateway = if ($env:CKAC_GATEWAY_URL) { $env:CKAC_GATEWAY_URL } else { "http://l
 $customer = if ($env:CKAC_CUSTOMER_URL) { $env:CKAC_CUSTOMER_URL } else { "http://localhost:13001" }
 $kitchen = if ($env:CKAC_KITCHEN_URL) { $env:CKAC_KITCHEN_URL } else { "http://localhost:13002" }
 $admin = if ($env:CKAC_ADMIN_URL) { $env:CKAC_ADMIN_URL } else { "http://localhost:13003" }
-$demoKitchenId = if ($env:CKAC_DEMO_KITCHEN_ID) { $env:CKAC_DEMO_KITCHEN_ID } else { "b93c4c92-e1f4-4fa9-8730-5366c5a2c4f2" }
+$demoKitchenId = if ($env:CKAC_DEMO_KITCHEN_ID) { $env:CKAC_DEMO_KITCHEN_ID } else { "" }
+$demoKitchenCode = if ($env:CKAC_DEMO_KITCHEN_CODE) { $env:CKAC_DEMO_KITCHEN_CODE } else { "CKPNQ001" }
+
+function Resolve-DemoKitchenId {
+    param([string]$Gateway, [string]$Code, [string]$FallbackId)
+    if ($FallbackId) { return $FallbackId }
+    try {
+        $json = Invoke-RestMethod -Uri "$Gateway/api/v1/kitchens/public/by-code/$Code" -TimeoutSec 20
+        if ($json.id) { return [string]$json.id }
+    } catch {
+        Write-Host "WARN resolve kitchen $Code - $($_.Exception.Message)" -ForegroundColor Yellow
+    }
+    return $null
+}
 
 function Test-HttpStatus {
     param([string]$Name, [string]$Url, [int]$Expected = 200)
@@ -68,7 +81,15 @@ $ok = (Test-HttpStatus "Gateway ready" "$gateway/health/ready") -and $ok
 $ok = (Test-HttpStatus "Customer PWA" $customer) -and $ok
 $ok = (Test-HttpStatus "Kitchen PWA" $kitchen) -and $ok
 $ok = (Test-HttpStatus "Admin PWA" $admin) -and $ok
-$ok = (Test-PublicMenu "Public menu API" "$gateway/api/v1/kitchens/$demoKitchenId/menu") -and $ok
+
+$resolvedKitchenId = Resolve-DemoKitchenId -Gateway $gateway -Code $demoKitchenCode -FallbackId $demoKitchenId
+if (-not $resolvedKitchenId) {
+    Write-Host "FAIL Public menu API - could not resolve kitchen $demoKitchenCode" -ForegroundColor Red
+    $ok = $false
+} else {
+    Write-Host "Demo kitchen: $demoKitchenCode -> $resolvedKitchenId"
+    $ok = (Test-PublicMenu "Public menu API" "$gateway/api/v1/kitchens/$resolvedKitchenId/menu") -and $ok
+}
 $nearbyUrl = '{0}/api/v1/kitchens/public/nearby?latitude=18.52&longitude=73.85&limit=3' -f $gateway
 $ok = (Test-NearbyKitchens "Nearby kitchens API" $nearbyUrl) -and $ok
 

@@ -23,6 +23,12 @@ export async function fetchPublicMenu(kitchenId: string): Promise<Menu> {
   return publicFetch(`/api/v1/kitchens/${kitchenId}/menu`);
 }
 
+export async function fetchKitchenByCode(code: string): Promise<import("./api").KitchenPublic> {
+  return publicFetch(
+    `/api/v1/kitchens/public/by-code/${encodeURIComponent(code.trim().toUpperCase())}`,
+  );
+}
+
 export async function fetchPublicNearbyKitchens(params: {
   latitude: number;
   longitude: number;
