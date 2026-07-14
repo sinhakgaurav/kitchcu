@@ -68,6 +68,16 @@ async def test_get_menu_returns_active_dishes(client: AsyncClient, kitchen_ctx):
 
 
 @pytest.mark.asyncio
+async def test_get_menu_unknown_kitchen_returns_404(client: AsyncClient):
+    import uuid
+
+    missing = uuid.UUID("00000000-0000-0000-0000-000000000099")
+    response = await client.get(f"/api/v1/kitchens/{missing}/menu")
+    assert response.status_code == 404
+    assert "not found" in response.json()["detail"].lower()
+
+
+@pytest.mark.asyncio
 async def test_create_dish_forbidden_for_other_owner(client: AsyncClient, kitchen_ctx):
     import uuid
 

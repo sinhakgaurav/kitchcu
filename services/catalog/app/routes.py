@@ -126,7 +126,10 @@ async def menu_get(
     kitchen_id: uuid.UUID,
     session: Annotated[AsyncSession, Depends(get_db)],
 ) -> MenuResponse:
+    from app.deps import require_kitchen_exists
     from app.main import redis_client
+
+    await require_kitchen_exists(kitchen_id, session)
 
     cached = await get_cached_menu(redis_client, kitchen_id)
     if cached:

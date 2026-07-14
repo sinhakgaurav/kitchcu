@@ -42,6 +42,15 @@ async def test_verify_otp_invalid_code(client: AsyncClient, registered_owner: di
 
 
 @pytest.mark.asyncio
+async def test_request_otp_rejects_invalid_phone(client: AsyncClient):
+    response = await client.post(
+        "/api/v1/auth/otp/request",
+        json={"phone": "not-a-phone"},
+    )
+    assert response.status_code == 422
+
+
+@pytest.mark.asyncio
 async def test_verify_otp_unregistered_phone(client: AsyncClient):
     phone = "+919999999999"
     await client.post("/api/v1/auth/otp/request", json={"phone": phone})

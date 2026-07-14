@@ -25,6 +25,20 @@ CITY_CODES: dict[str, str] = {
 }
 
 
+def normalize_india_phone(v: str) -> str:
+    """Normalize 10-digit India mobile or E.164 into +91XXXXXXXXXX."""
+    digits = re.sub(r"\D", "", v or "")
+    if len(digits) < 10:
+        raise ValueError("Phone must have at least 10 digits")
+    if len(digits) == 10:
+        return f"+91{digits}"
+    if len(digits) == 12 and digits.startswith("91"):
+        return f"+{digits}"
+    if 10 < len(digits) <= 15:
+        return f"+{digits}"
+    raise ValueError("Invalid phone number")
+
+
 class OwnerRegisterRequest(BaseModel):
     """Body for `POST /owners/register` — creates a kitchCU owner account."""
 
@@ -54,12 +68,7 @@ class OwnerRegisterRequest(BaseModel):
     @field_validator("phone")
     @classmethod
     def normalize_phone(cls, v: str) -> str:
-        digits = re.sub(r"\D", "", v)
-        if len(digits) < 10:
-            raise ValueError("Phone must have at least 10 digits")
-        if len(digits) == 10:
-            return f"+91{digits}"
-        return f"+{digits}" if not v.startswith("+") else v
+        return normalize_india_phone(v)
 
 
 class OwnerResponse(BaseModel):
@@ -221,6 +230,11 @@ class OTPRequest(BaseModel):
         examples=["9876543210"],
     )
 
+    @field_validator("phone")
+    @classmethod
+    def normalize_phone(cls, v: str) -> str:
+        return normalize_india_phone(v)
+
 
 class OTPVerifyRequest(BaseModel):
     """Body for `POST /auth/otp/verify` — exchanges OTP for an owner JWT."""
@@ -233,6 +247,11 @@ class OTPVerifyRequest(BaseModel):
         description="One-time password. Dev/staging value is always `123456`.",
         examples=["123456"],
     )
+
+    @field_validator("phone")
+    @classmethod
+    def normalize_phone(cls, v: str) -> str:
+        return normalize_india_phone(v)
 
 
 def create_access_token(owner_id: uuid.UUID, phone: str) -> TokenResponse:

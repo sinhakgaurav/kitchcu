@@ -35,3 +35,16 @@ async def verify_kitchen_owner(
     )
     if result.scalar_one_or_none() is None:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Kitchen access denied")
+
+
+async def require_kitchen_exists(
+    kitchen_id: uuid.UUID,
+    session: AsyncSession,
+) -> None:
+    """Public-menu guard: unknown kitchen_id must not return an empty shell."""
+    result = await session.execute(
+        text("SELECT 1 FROM ckac_identity.kitchens WHERE id = :kid LIMIT 1"),
+        {"kid": kitchen_id},
+    )
+    if result.scalar_one_or_none() is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Kitchen not found")

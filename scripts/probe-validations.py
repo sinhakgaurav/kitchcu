@@ -13,6 +13,14 @@ import sys
 import urllib.error
 import urllib.request
 
+# Windows consoles (cp1252) choke on arrows/dashes in probe names.
+if hasattr(sys.stdout, "reconfigure"):
+    try:
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+        sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+    except Exception:
+        pass
+
 GATEWAY = os.environ.get("CKAC_GATEWAY_URL", "http://localhost:18000").rstrip("/")
 DEMO_PHONE = "+919876543210"
 DEMO_OTP = "123456"
@@ -23,6 +31,8 @@ failed = 0
 
 def check(name: str, ok: bool, detail: str = "") -> None:
     global passed, failed
+    name = name.replace("\u2192", "->").replace("\u2014", "-").replace("\u2013", "-")
+    detail = detail.replace("\u2192", "->").replace("\u2014", "-").replace("\u2013", "-")
     if ok:
         passed += 1
         print(f"  PASS  {name}")
@@ -176,19 +186,7 @@ def main() -> None:
     check("unknown kitchen code -> 404", status == 404)
 
     status, body = api("GET", "/api/v1/kitchens/00000000-0000-0000-0000-000000000099/menu")
-    # Known gap: missing kitchen may return empty menu 200 instead of 404
-    dishes_empty = isinstance(body, dict) and body.get("dishes") == []
-    check(
-        "unknown kitchen menu not serving real dishes",
-        status == 404 or (status == 200 and dishes_empty),
-        f"got {status}",
-    )
-    if status == 200 and dishes_empty:
-        check(
-            "unknown kitchen menu ideally 404 (gap if PASS skipped)",
-            False,
-            "returns 200 empty shell — should be 404",
-        )
+    check("unknown kitchen menu -> 404", status == 404, f"got {status}")
 
     print("\nCoupon / GST style validation (if reachable)")
     if token and kitchens:
