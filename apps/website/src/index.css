@@ -870,9 +870,9 @@ html.theme-brand-light .brand-nav-mark__sub {
 }
 
 .hero__banner-icon {
-  height: clamp(112px, 18vw, 160px);
+  height: clamp(200px, 28vw, 240px);
   width: auto;
-  max-width: min(72vw, 220px);
+  max-width: min(88vw, 280px);
   object-fit: contain;
   filter: drop-shadow(0 14px 32px rgba(11, 27, 50, 0.2));
 }
