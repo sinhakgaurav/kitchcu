@@ -796,7 +796,7 @@ html.theme-brand-light .brand-nav-mark__sub {
 
 .hero__content--centered .hero__banner-icon {
   display: block;
-  margin: 0 auto 0.85rem;
+  margin: 0 auto 1.1rem;
 }
 
 .hero__content--centered .hero__actions,
@@ -870,9 +870,11 @@ html.theme-brand-light .brand-nav-mark__sub {
 }
 
 .hero__banner-icon {
-  height: 64px;
+  height: clamp(112px, 18vw, 160px);
   width: auto;
-  filter: drop-shadow(0 10px 24px rgba(11, 27, 50, 0.18));
+  max-width: min(72vw, 220px);
+  object-fit: contain;
+  filter: drop-shadow(0 14px 32px rgba(11, 27, 50, 0.2));
 }
 
 .hero__brand-tagline {

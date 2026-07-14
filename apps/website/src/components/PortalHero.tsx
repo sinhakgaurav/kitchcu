@@ -15,7 +15,7 @@ export function PortalHero() {
 
         <div className="container hero__overlay hero__overlay--centered">
           <div className="hero__content hero__content--parallax hero__content--centered">
-            <BrandLogo variant="icon" height={64} className="hero__banner-icon" alt={APP_NAME} />
+            <BrandLogo variant="icon" className="hero__banner-icon" alt={APP_NAME} />
             <p className="hero__brand-tagline">{APP_TAGLINE}</p>
             <p className="hero__positioning">{APP_POSITIONING}</p>
 
