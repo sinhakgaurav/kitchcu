@@ -1,0 +1,23 @@
+{
+  "menu_id": "menu_ingest_flow",
+  "audience": "owner",
+  "channel": ["whatsapp", "portal"],
+  "header": "Build menu from WhatsApp",
+  "body": "How do you want to import?",
+  "options": [
+    {"id": "1", "title": "Paste full price list", "intent": "menu.ingest.catalog", "prompt": "Paste your catalog (dish — price). I'll propose dishes."},
+    {"id": "2", "title": "Today's specials only", "intent": "menu.ingest.daily_specials"},
+    {"id": "3", "title": "Services / tiffin (not dishes)", "intent": "menu.ingest.catalog"},
+    {"id": "4", "title": "Live-capture rules", "intent": "support.faq", "answer_id": "owner.menu.live_capture"},
+    {"id": "5", "title": "Manual Add dish instead", "section": "menu"},
+    {"id": "6", "title": "Back", "intent": "support.greeting"}
+  ],
+  "after_propose": {
+    "body": "Proposed dishes ready:",
+    "options": [
+      {"id": "1", "title": "Review list", "intent": "menu.publish.review"},
+      {"id": "2", "title": "Edit a dish name/price", "intent": "menu.publish.review"},
+      {"id": "3", "title": "Discard all", "intent": "support.greeting"}
+    ]
+  }
+}

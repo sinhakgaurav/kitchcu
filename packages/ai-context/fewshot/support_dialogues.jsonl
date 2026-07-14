@@ -1,0 +1,9 @@
+{"id":"sup_o_001","audience":"owner","user":"How much does it cost?","expect_answer_id":"owner.pricing.plans","expect_options":true,"must_include":["499","zero food commission"]}
+{"id":"sup_o_002","audience":"owner","user":"Is there any commission on orders?","expect_answer_id":"owner.pricing.plans","expect_options":true,"must_include":["zero food commission","499"]}
+{"id":"sup_o_003","audience":"owner","user":"Explain WhatsApp order flow","expect_answer_id":"owner.whatsapp.orders","expect_options":true,"must_include":["draft"]}
+{"id":"sup_o_004","audience":"owner","user":"Can I import my WhatsApp price list as menu?","expect_answer_id":"owner.menu.from_whatsapp","expect_options":true,"must_include":["live-capture","review"]}
+{"id":"sup_o_005","audience":"owner","user":"I want a human, billing charged twice","expect_suggest_ticket":true,"expect_category":"billing","expect_options":true}
+{"id":"sup_c_001","audience":"customer","user":"How do I find kitchens near me?","expect_answer_id":"customer.find.kitchen","expect_options":true,"must_include":["Nearby","kitchen code"]}
+{"id":"sup_c_002","audience":"customer","user":"Are the food photos stock images?","expect_answer_id":"customer.trust.live_capture","expect_options":true,"must_include":["live"]}
+{"id":"sup_c_003","audience":"customer","user":"My order is wrong and cold","expect_suggest_ticket":true,"expect_category":"quality","expect_options":true,"must_include":["kitchen"]}
+{"id":"sup_c_004","audience":"customer","user":"Can I pay with UPI online?","expect_answer_id":"customer.order.checkout","expect_options":true,"must_include":["OTP"]}

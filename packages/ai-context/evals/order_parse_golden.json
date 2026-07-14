@@ -1,0 +1,10 @@
+{
+  "version": "2026-07-15",
+  "source_fewshot": "fewshot/order_parse_examples.jsonl",
+  "rules": [
+    "Every matched item must exist on provided menu",
+    "Unmatched lines must not invent dish_id",
+    "cancel/status intents must not fabricate items",
+    "needs_owner_confirm always true for place_order"
+  ]
+}

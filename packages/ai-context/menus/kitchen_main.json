@@ -1,0 +1,15 @@
+{
+  "menu_id": "kitchen_main",
+  "audience": "owner",
+  "channel": ["portal", "whatsapp"],
+  "header": "kitchCU owner assistant",
+  "body": "Choose an option (reply with the number):",
+  "options": [
+    {"id": "1", "title": "Pricing & plans", "intent": "support.faq", "answer_id": "owner.pricing.plans"},
+    {"id": "2", "title": "WhatsApp orders", "intent": "support.faq", "answer_id": "owner.whatsapp.orders"},
+    {"id": "3", "title": "Menu / live photos", "intent": "support.faq", "answer_id": "owner.menu.live_capture"},
+    {"id": "4", "title": "Import menu from WA", "intent": "menu.ingest.catalog"},
+    {"id": "5", "title": "Dashboard sections", "intent": "support.section.assist"},
+    {"id": "6", "title": "Raise a ticket", "intent": "support.ticket.start"}
+  ]
+}

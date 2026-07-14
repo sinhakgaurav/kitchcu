@@ -13,6 +13,7 @@
 | **This file (`AGENTS.md`)** | Agent rules for every implementation |
 | **`docs/KITCHCU-ENGINEERING-STANDARDS.md`** | **Engineering constitution — DDD, EDD, quality, security, phase targets** |
 | **`docs/templates/MODULE-DESIGN-PACK.md`** | **Required pre-code design template (10-step gate)** |
+| **`packages/ai-context/`** | **WhatsApp + support AI training/context pack** (options-first, FAQ answer_ids, order/menu extract, tickets) — branch `feature/whatsapp-ai-model-training` |
 | `docs/CKAC-COMPLETE-GUIDE.md` | **Master guide v3.1** — CEO + CPO + CTO encyclopedia (definitions, how/why, flows, UI Catalog, aggregated OpenAPI reference + PDF) |
 | `docs/CKAC-USERFLOWS.md` | **Full user journey pack** — every persona, every screen, every API call, step-by-step (+ PDF) |
 | `docs/API.md` | **Public API reference** — auth, body/response examples; live aggregated OpenAPI at gateway `/openapi.json`/`/docs`/`/redoc` + portal `/openapi` |

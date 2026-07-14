@@ -1,0 +1,15 @@
+{
+  "menu_id": "customer_main",
+  "audience": "customer",
+  "channel": ["portal", "whatsapp"],
+  "header": "kitchCU customer help",
+  "body": "How can I help? Reply with a number:",
+  "options": [
+    {"id": "1", "title": "Find a kitchen", "intent": "support.faq", "answer_id": "customer.find.kitchen"},
+    {"id": "2", "title": "Order / checkout", "intent": "support.faq", "answer_id": "customer.order.checkout"},
+    {"id": "3", "title": "Live-capture photos", "intent": "support.faq", "answer_id": "customer.trust.live_capture"},
+    {"id": "4", "title": "Track my order", "intent": "order.status"},
+    {"id": "5", "title": "Delivery fees", "intent": "support.faq", "answer_id": "customer.delivery.fees"},
+    {"id": "6", "title": "Support / ticket", "intent": "support.ticket.start"}
+  ]
+}

@@ -1,0 +1,23 @@
+{
+  "menu_id": "order_flow",
+  "audience": "customer",
+  "channel": ["whatsapp"],
+  "header": "Order with this kitchen",
+  "body": "Pick a step:",
+  "options": [
+    {"id": "1", "title": "Place new order", "intent": "order.place", "prompt": "Send items like: 2 butter chicken, 1 roti. Add notes if needed."},
+    {"id": "2", "title": "Change last draft", "intent": "order.modify"},
+    {"id": "3", "title": "Order status", "intent": "order.status"},
+    {"id": "4", "title": "Cancel request", "intent": "order.cancel"},
+    {"id": "5", "title": "See menu tips", "intent": "support.faq", "answer_id": "customer.find.kitchen"},
+    {"id": "6", "title": "Talk to kitchen / ticket", "intent": "support.ticket.start"}
+  ],
+  "after_parse": {
+    "body": "Draft ready. Next:",
+    "options": [
+      {"id": "1", "title": "Send to kitchen for confirm", "intent": "order.owner.confirm_draft"},
+      {"id": "2", "title": "Edit items", "intent": "order.modify"},
+      {"id": "3", "title": "Discard", "intent": "order.cancel"}
+    ]
+  }
+}

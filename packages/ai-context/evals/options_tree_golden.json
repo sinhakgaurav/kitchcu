@@ -1,0 +1,16 @@
+{
+  "version": "2026-07-15",
+  "menus": [
+    "menus/kitchen_main.json",
+    "menus/customer_main.json",
+    "menus/order_flow.json",
+    "menus/menu_ingest_flow.json",
+    "menus/ticket_flow.json"
+  ],
+  "rules": [
+    "Each menu has 3-6 top-level options",
+    "Option ids unique within a menu",
+    "Every option has title",
+    "FAQ options reference existing answer_id when present"
+  ]
+}

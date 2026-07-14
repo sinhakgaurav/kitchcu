@@ -1,0 +1,104 @@
+# Customer FAQ — paraphrase → answer_id
+version: "2026-07-15"
+audience: customer
+entries:
+  - answer_id: customer.find.kitchen
+    option_set_id: customer.after_find
+    paraphrases:
+      - How do I find a kitchen?
+      - Nearby kitchens
+      - Kitchen code
+      - Browse menu
+    canonical_answer: |
+      On **customer.kitchcu.in**:
+      • Enter a kitchen code (e.g. CKPNQ001) from your home chef
+      • Or use **Nearby** to list cloud kitchens by distance
+
+      Menus use cuisine + veg/non-veg with live-capture photos.
+    facts_refs: [domains]
+
+  - answer_id: customer.order.checkout
+    option_set_id: customer.after_order
+    paraphrases:
+      - Can I order online?
+      - Checkout
+      - Pay with UPI
+      - COD
+      - Cart
+    canonical_answer: |
+      Yes — browse the kitchen menu, add items, and checkout on customer.kitchcu.in.
+      Sign in with **WhatsApp OTP**. Pay with COD, UPI, or online pay when offered by the kitchen.
+
+      You can also message the kitchen on WhatsApp; the owner confirms the draft.
+    facts_refs: [auth]
+
+  - answer_id: customer.trust.live_capture
+    option_set_id: customer.after_trust
+    paraphrases:
+      - Why live capture?
+      - Are photos real?
+      - Stock images?
+    canonical_answer: |
+      Every hero dish photo is **live-captured in the kitchen** — not stock.
+      You see what the home chef actually cooks. That's kitchCU's trust promise.
+    facts_refs: [menu]
+
+  - answer_id: customer.delivery.fees
+    option_set_id: customer.after_delivery
+    paraphrases:
+      - Delivery fee
+      - Delivery radius
+      - Pickup
+    canonical_answer: |
+      Delivery fees and radius are set by each kitchen — fair pricing without aggregator markups.
+      Check the kitchen menu page for prep time and delivery options.
+    facts_refs: []
+
+  - answer_id: customer.support.contact
+    option_set_id: customer.after_support
+    paraphrases:
+      - Order issue
+      - Who do I contact?
+      - Refund
+      - Help
+    canonical_answer: |
+      For order issues, contact the **kitchen directly first** — kitchCU connects you to the home chef.
+      Platform help: **hello@kitchcu.in**. I can also open a ticket if you want.
+    facts_refs: [support]
+
+  - answer_id: customer.about.platform
+    option_set_id: customer.after_about
+    paraphrases:
+      - What is kitchCU?
+      - About this app
+    canonical_answer: |
+      kitchCU helps you discover and trust **home food businesses & cloud kitchens** near you —
+      live-capture menus, kitchen codes / Nearby, and direct relationships (no aggregator games).
+    facts_refs: [product]
+
+option_sets:
+  customer.after_find:
+    - {id: "1", label: "Enter kitchen code help"}
+    - {id: "2", label: "How ordering works"}
+    - {id: "3", label: "Live-capture photos"}
+    - {id: "4", label: "Raise a ticket"}
+  customer.after_order:
+    - {id: "1", label: "Find a kitchen"}
+    - {id: "2", label: "Track my order"}
+    - {id: "3", label: "Payment options"}
+    - {id: "4", label: "Talk to support"}
+  customer.after_trust:
+    - {id: "1", label: "Find a kitchen"}
+    - {id: "2", label: "Order online"}
+    - {id: "3", label: "Back to main"}
+  customer.after_delivery:
+    - {id: "1", label: "Find a kitchen"}
+    - {id: "2", label: "Order issue ticket"}
+  customer.after_support:
+    - {id: "1", label: "Raise a ticket"}
+    - {id: "2", label: "Find kitchen contact"}
+    - {id: "3", label: "Back to main"}
+  customer.after_about:
+    - {id: "1", label: "Find a kitchen"}
+    - {id: "2", label: "Owner? Switch help"}
+    - {id: "3", label: "Pricing for kitchens"}
