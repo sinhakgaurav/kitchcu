@@ -794,9 +794,14 @@ html.theme-brand-light .brand-nav-mark__sub {
   text-align: center;
 }
 
+.hero__content--centered .brand-logo.hero__banner-icon,
 .hero__content--centered .hero__banner-icon {
   display: block;
   margin: 0 auto 1.1rem;
+  height: clamp(200px, 28vw, 240px);
+  width: auto;
+  max-width: min(88vw, 280px);
+  border-radius: 0;
 }
 
 .hero__content--centered .hero__actions,
@@ -869,10 +874,12 @@ html.theme-brand-light .brand-nav-mark__sub {
   filter: drop-shadow(0 10px 28px rgba(0, 0, 0, 0.45));
 }
 
+.brand-logo.brand-logo--icon.hero__banner-icon,
 .hero__banner-icon {
-  height: clamp(200px, 28vw, 240px);
-  width: auto;
+  height: clamp(200px, 28vw, 240px) !important;
+  width: auto !important;
   max-width: min(88vw, 280px);
+  border-radius: 0;
   object-fit: contain;
   filter: drop-shadow(0 14px 32px rgba(11, 27, 50, 0.2));
 }
