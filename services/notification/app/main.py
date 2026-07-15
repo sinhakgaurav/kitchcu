@@ -9,6 +9,7 @@ from app.internal_routes import router as internal_router
 from app.routes import router
 from app.ticket_routes import admin_router as ticket_admin_router
 from app.ticket_routes import public_router as ticket_public_router
+from app.ticket_routes import customer_router as ticket_customer_router
 from ckac_common.config import get_settings
 from ckac_common.database import check_db_connection
 from ckac_common.event_bus import EventPublisher
@@ -65,6 +66,7 @@ app.include_router(router, prefix="/api/v1")
 app.include_router(internal_router, prefix="/api/v1")
 app.include_router(ticket_public_router, prefix="/api/v1")
 app.include_router(ticket_admin_router, prefix="/api/v1")
+app.include_router(ticket_customer_router, prefix="/api/v1")
 
 
 @app.get("/health/live")

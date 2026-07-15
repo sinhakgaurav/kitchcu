@@ -11,6 +11,38 @@ from ckac_common.auth import stream_key
 from ckac_common.event_bus import EventPublisher
 
 
+def projected_ready_min(
+    prep: int,
+    delivery: int | None,
+    max_time: int | None,
+    *,
+    for_delivery: bool = True,
+) -> int:
+    """Customer-facing readiness minutes.
+
+    Prefer owner ``max_time`` (honest ceiling). Otherwise prep (+ delivery when applicable).
+    Cart / order ETA uses ``max(...)`` across dishes — quality-first parallel prep, not race sums.
+    """
+    if max_time is not None:
+        return max_time
+    delivery_part = (delivery or 0) if for_delivery else 0
+    return prep + delivery_part
+
+
+def default_max_time_min(prep: int, delivery: int | None) -> int:
+    return prep + (delivery or 0)
+
+
+def validate_timing(prep: int, delivery: int | None, max_time: int) -> None:
+    if max_time < prep:
+        raise ValueError("max_time_min must be greater than or equal to prep_time_min")
+    floor = default_max_time_min(prep, delivery)
+    if max_time < floor:
+        raise ValueError(
+            f"max_time_min must cover prep + delivery ({floor} min); got {max_time}"
+        )
+
+
 class CategoryResponse(BaseModel):
     """A diet category (e.g. veg, non-veg, vegan) — used to filter and group the menu."""
 
@@ -96,12 +128,29 @@ class DishCreateRequest(BaseModel):
     delivery_time_min: int | None = Field(
         default=None, ge=0, description="Owner-set delivery time in minutes (never a fake speed guarantee)."
     )
+    max_time_min: int | None = Field(
+        default=None,
+        gt=0,
+        description=(
+            "Owner-set max readiness minutes shown to customers. "
+            "Defaults to prep + delivery. Cart ETA uses the max across dishes."
+        ),
+    )
     ingredients_description: str | None = Field(default=None, description="Free-text ingredient list for customers.")
     quality_measures: str | None = Field(
         default=None, description="Free-text hygiene/quality notes shown to build customer trust."
     )
     is_active: bool = Field(default=True, description="Whether the dish is visible on the live menu.")
     media: DishMediaInput = Field(..., description="Hero image — see truth-in-media requirement above.")
+
+    @model_validator(mode="after")
+    def _timing(self):
+        max_time = self.max_time_min
+        if max_time is None:
+            max_time = default_max_time_min(self.prep_time_min, self.delivery_time_min)
+            object.__setattr__(self, "max_time_min", max_time)
+        validate_timing(self.prep_time_min, self.delivery_time_min, max_time)
+        return self
 
 
 class DishMediaResponse(BaseModel):
@@ -131,6 +180,11 @@ class DishResponse(BaseModel):
     price: float = Field(..., description="Price in INR.")
     prep_time_min: int = Field(..., description="Owner-set preparation time in minutes.")
     delivery_time_min: int | None = Field(default=None, description="Owner-set delivery time in minutes.")
+    max_time_min: int = Field(..., description="Owner-set max readiness minutes (customer projection).")
+    projected_ready_min: int = Field(
+        ...,
+        description="Minutes customers should expect for this dish (max_time; quality-first SLA).",
+    )
     description: str | None = Field(default=None, description="Customer-facing dish description.")
     ingredients_description: str | None = Field(default=None, description="Free-text ingredient list.")
     quality_measures: str | None = Field(default=None, description="Free-text hygiene/quality notes.")
@@ -235,6 +289,7 @@ async def create_dish(
         price=data.price,
         prep_time_min=data.prep_time_min,
         delivery_time_min=data.delivery_time_min,
+        max_time_min=data.max_time_min or default_max_time_min(data.prep_time_min, data.delivery_time_min),
         ingredients_description=data.ingredients_description,
         quality_measures=data.quality_measures,
         is_active=data.is_active,
@@ -273,7 +328,15 @@ class DishUpdateRequest(BaseModel):
     is_active: bool | None = Field(default=None, description="Toggle menu visibility.")
     prep_time_min: int | None = Field(default=None, gt=0, description="New preparation time in minutes.")
     delivery_time_min: int | None = Field(default=None, ge=0, description="New delivery time in minutes.")
+    max_time_min: int | None = Field(default=None, gt=0, description="New max readiness minutes for customers.")
     description: str | None = Field(default=None, description="New customer-facing description.")
+
+    @model_validator(mode="after")
+    def _timing_pair(self):
+        if self.prep_time_min is not None and self.max_time_min is not None:
+            if self.max_time_min < self.prep_time_min:
+                raise ValueError("max_time_min must be greater than or equal to prep_time_min")
+        return self
 
 
 async def update_dish(
@@ -296,6 +359,17 @@ async def update_dish(
 
     for field, value in updates.items():
         setattr(dish, field, value)
+
+    try:
+        validate_timing(dish.prep_time_min, dish.delivery_time_min, dish.max_time_min)
+    except ValueError:
+        # Auto-lift max when owner raises prep/delivery without updating max.
+        floor = default_max_time_min(dish.prep_time_min, dish.delivery_time_min)
+        if dish.max_time_min < floor and "max_time_min" not in updates:
+            dish.max_time_min = floor
+        else:
+            raise
+
     await session.flush()
 
     if publisher:
@@ -347,6 +421,10 @@ async def dish_with_media(session: AsyncSession, dish: Dish) -> DishResponse:
         price=float(dish.price),
         prep_time_min=dish.prep_time_min,
         delivery_time_min=dish.delivery_time_min,
+        max_time_min=dish.max_time_min,
+        projected_ready_min=projected_ready_min(
+            dish.prep_time_min, dish.delivery_time_min, dish.max_time_min, for_delivery=True
+        ),
         description=dish.description,
         ingredients_description=dish.ingredients_description,
         quality_measures=dish.quality_measures,

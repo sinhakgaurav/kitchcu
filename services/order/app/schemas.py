@@ -254,6 +254,17 @@ class OrderResponse(BaseModel):
     delivery_fee_accepted: bool | None = Field(
         default=None, description="Whether the customer acknowledged a non-zero delivery fee before checkout."
     )
+    delivery_mode: str | None = Field(
+        default=None, description="'self' or 'platform' once owner chooses fulfillment."
+    )
+    delivery_payer: str | None = Field(
+        default=None, description="'owner' (in-range) or 'customer' (out-of-range)."
+    )
+    owner_delivery_cost: float = Field(
+        default=0, description="Platform courier cost paid by kitchen when delivery_payer is owner."
+    )
+    customer_latitude: float | None = Field(default=None)
+    customer_longitude: float | None = Field(default=None)
     tracking_token: str | None = Field(
         default=None, description="Opaque public tracking token for `GET /api/v1/delivery/track/{token}` on the delivery service. Set only for delivery orders."
     )
@@ -316,6 +327,87 @@ class OrderStatusUpdateRequest(BaseModel):
         return self
 
 
+class DeliveryFulfillmentRequest(BaseModel):
+    """Owner chooses self delivery vs platform courier for a delivery order."""
+
+    mode: Literal["self", "platform"] = Field(..., description="'self' or 'platform'.")
+    customer_fee: float | None = Field(
+        default=None,
+        ge=0,
+        description="Optional override of customer delivery fee (out-of-range self only).",
+    )
+
+
+async def set_delivery_fulfillment(
+    session: AsyncSession,
+    order: Order,
+    data: DeliveryFulfillmentRequest,
+    publisher: EventPublisher | None,
+) -> Order:
+    if order.delivery_type != "delivery":
+        raise ValueError("Only delivery orders have fulfillment modes")
+    if order.status in ("delivered", "cancelled"):
+        raise ValueError("Cannot change delivery mode on a terminal order")
+
+    distance = float(order.distance_km or 0)
+    # Lazy import keeps catalog/order coupling soft; formula matches delivery service mock.
+    import math
+    import os
+
+    base = float(os.getenv("DELIVERY_PARTNER_BASE_FEE", "25"))
+    per_km = float(os.getenv("DELIVERY_PARTNER_PER_KM", "12"))
+    platform_fee = round(base + math.ceil(distance) * per_km, 2)
+
+    in_range = (order.delivery_payer or "owner") == "owner" or (
+        order.delivery_fee == 0 and distance > 0
+    )
+    # Prefer distance vs kitchen max when available
+    max_km_row = (
+        await session.execute(
+            text(
+                "SELECT max_delivery_radius_km FROM ckac_identity.kitchens WHERE id = :kid LIMIT 1"
+            ),
+            {"kid": order.kitchen_id},
+        )
+    ).scalar_one_or_none()
+    if max_km_row is not None and order.distance_km is not None:
+        in_range = float(order.distance_km) <= float(max_km_row)
+
+    order.delivery_mode = data.mode
+    if in_range:
+        order.delivery_payer = "owner"
+        order.delivery_fee = 0
+        order.owner_delivery_cost = platform_fee if data.mode == "platform" else 0
+    else:
+        order.delivery_payer = "customer"
+        order.owner_delivery_cost = 0
+        if data.mode == "platform":
+            order.delivery_fee = platform_fee
+        elif data.customer_fee is not None:
+            order.delivery_fee = float(data.customer_fee)
+        # else keep existing customer fee from checkout
+    order.total = float(order.subtotal) + float(order.delivery_fee)
+    order.updated_at = datetime.now(UTC)
+    await session.flush()
+
+    if publisher:
+        event = EventPublisher.build(
+            event_type="order.delivery_mode.set",
+            aggregate_type="order",
+            aggregate_id=str(order.id),
+            producer="order-service",
+            payload={
+                "order_id": str(order.id),
+                "mode": data.mode,
+                "payer": order.delivery_payer,
+                "customer_fee": float(order.delivery_fee),
+                "owner_cost": float(order.owner_delivery_cost or 0),
+            },
+        )
+        await publisher.publish(stream_key("orders", "order"), event, session=session)
+    return order
+
+
 async def _get_kitchen_code(session: AsyncSession, kitchen_id: uuid.UUID) -> str:
     result = await session.execute(
         text("SELECT code FROM ckac_identity.kitchens WHERE id = :kid LIMIT 1"),
@@ -365,10 +457,12 @@ async def _next_master_order_code(session: AsyncSession) -> str:
 
 async def _load_dish(
     session: AsyncSession, kitchen_id: uuid.UUID, dish_id: uuid.UUID
-) -> tuple[str, float, int, int]:
+) -> tuple[str, float, int, int, int]:
+    """Return name, price, prep_min, delivery_min, max_time_min (customer-facing ceiling)."""
     result = await session.execute(
         text(
-            "SELECT name, price, prep_time_min, COALESCE(delivery_time_min, 0) "
+            "SELECT name, price, prep_time_min, COALESCE(delivery_time_min, 0), "
+            "COALESCE(max_time_min, prep_time_min + COALESCE(delivery_time_min, 0)) "
             "FROM ckac_catalog.dishes "
             "WHERE id = :did AND kitchen_id = :kid AND is_active = true LIMIT 1"
         ),
@@ -377,7 +471,7 @@ async def _load_dish(
     row = result.one_or_none()
     if not row:
         raise ValueError(f"Dish {dish_id} not found or inactive")
-    return row[0], float(row[1]), int(row[2]), int(row[3])
+    return row[0], float(row[1]), int(row[2]), int(row[3]), int(row[4])
 
 
 async def _quote_delivery_fee(
@@ -391,14 +485,19 @@ async def _quote_delivery_fee(
     delivery_fee_accepted: bool | None,
     customer_latitude: float | None,
     customer_longitude: float | None,
-) -> tuple[float, float | None, bool | None]:
+) -> tuple[float, float | None, bool | None, str | None, bool]:
+    """Return customer_fee, distance, accepted, payer, in_range.
+
+    In range → customer fee 0 (owner pays logistics). Out of range → customer pays.
+    """
     if delivery_type != "delivery":
-        return 0.0, None, None
+        return 0.0, None, None, None, True
 
     if customer_latitude is None or customer_longitude is None:
         if delivery_fee > 0 and delivery_fee_accepted is not True:
             raise ValueError("delivery_fee_accepted must be true when location is unknown")
-        return delivery_fee, distance_km, delivery_fee_accepted
+        payer = "customer" if delivery_fee > 0 else "owner"
+        return delivery_fee, distance_km, delivery_fee_accepted, payer, True
 
     row = (
         await session.execute(
@@ -430,27 +529,28 @@ async def _quote_delivery_fee(
     dist = round(float(row["distance_km"]), 2)
     free_km = float(row["free_delivery_radius_km"])
     max_km = float(row["max_delivery_radius_km"])
-    if dist > max_km:
-        raise ValueError("Delivery address is outside kitchen service range")
+    in_range = dist <= max_km
 
-    if dist <= free_km:
+    if in_range:
         quoted = 0.0
+        payer = "owner"
     else:
-        chargeable_km = math.ceil(dist - free_km)
+        chargeable_km = max(1, math.ceil(max(0.0, dist - free_km)))
         quoted = round(
             float(row["delivery_fee_flat_beyond"])
             + chargeable_km * float(row["delivery_fee_per_km"]),
             2,
         )
-    min_free = row["min_order_for_free_delivery"]
-    if min_free is not None and subtotal >= float(min_free) and quoted > 0:
-        quoted = 0.0
+        min_free = row["min_order_for_free_delivery"]
+        if min_free is not None and subtotal >= float(min_free) and quoted > 0:
+            quoted = 0.0
+        payer = "customer"
 
     if round(delivery_fee, 2) != quoted:
         raise ValueError(f"Delivery fee mismatch: expected {quoted:.2f}")
     if quoted > 0 and delivery_fee_accepted is not True:
         raise ValueError("Customer must accept delivery fee before placing order")
-    return quoted, dist, True if quoted > 0 else delivery_fee_accepted
+    return quoted, dist, True if quoted > 0 else delivery_fee_accepted, payer, in_range
 
 
 def _new_tracking_token() -> str:
@@ -472,17 +572,23 @@ async def create_manual_order(
 
     line_items: list[tuple[str, float, int, int, OrderItemInput]] = []
     max_prep = 0
-    max_delivery = 0
+    max_projected = 0
     subtotal = 0.0
 
     for item in data.items:
-        name, price, prep_min, delivery_min = await _load_dish(session, kitchen_id, item.dish_id)
+        name, price, prep_min, delivery_min, max_time = await _load_dish(
+            session, kitchen_id, item.dish_id
+        )
         line_items.append((name, price, prep_min, delivery_min, item))
         max_prep = max(max_prep, prep_min)
-        max_delivery = max(max_delivery, delivery_min)
+        # Quality-first: project cart/order ETA from each dish's owner max_time (not sum of preps).
+        if data.delivery_type == "delivery":
+            max_projected = max(max_projected, max_time)
+        else:
+            max_projected = max(max_projected, prep_min)
         subtotal += price * item.quantity
 
-    delivery_fee, distance_km, fee_accepted = await _quote_delivery_fee(
+    delivery_fee, distance_km, fee_accepted, delivery_payer, _in_range = await _quote_delivery_fee(
         session,
         kitchen_id,
         delivery_type=data.delivery_type,
@@ -494,7 +600,7 @@ async def create_manual_order(
         customer_longitude=data.customer_longitude,
     )
     total = subtotal + delivery_fee
-    eta_minutes = max_prep + (max_delivery if data.delivery_type == "delivery" else 0)
+    eta_minutes = max_projected or max_prep
     estimated_ready_at = datetime.now(UTC) + timedelta(minutes=eta_minutes)
     tracking_token = _new_tracking_token() if data.delivery_type == "delivery" else None
 
@@ -512,6 +618,10 @@ async def create_manual_order(
         delivery_fee=delivery_fee,
         distance_km=distance_km,
         delivery_fee_accepted=fee_accepted,
+        delivery_payer=delivery_payer if data.delivery_type == "delivery" else None,
+        owner_delivery_cost=0,
+        customer_latitude=data.customer_latitude,
+        customer_longitude=data.customer_longitude,
         tracking_token=tracking_token,
         total=total,
         estimated_prep_min=max_prep,
@@ -858,6 +968,11 @@ async def order_to_response(session: AsyncSession, order: Order) -> OrderRespons
         delivery_fee=float(order.delivery_fee),
         distance_km=float(order.distance_km) if order.distance_km is not None else None,
         delivery_fee_accepted=order.delivery_fee_accepted,
+        delivery_mode=getattr(order, "delivery_mode", None),
+        delivery_payer=getattr(order, "delivery_payer", None),
+        owner_delivery_cost=float(getattr(order, "owner_delivery_cost", 0) or 0),
+        customer_latitude=getattr(order, "customer_latitude", None),
+        customer_longitude=getattr(order, "customer_longitude", None),
         tracking_token=order.tracking_token,
         total=float(order.total),
         estimated_prep_min=order.estimated_prep_min,

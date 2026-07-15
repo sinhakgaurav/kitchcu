@@ -21,7 +21,8 @@ async def test_quote_free_within_radius(client: AsyncClient, delivery_ctx):
 
 
 @pytest.mark.asyncio
-async def test_quote_per_km_beyond_free(client: AsyncClient, delivery_ctx):
+async def test_quote_in_range_customer_fee_zero(client: AsyncClient, delivery_ctx):
+    """Beyond free radius but within max → still in range: customer fee 0 (owner pays)."""
     response = await client.post(
         "/api/v1/delivery/quote",
         json={
@@ -34,11 +35,13 @@ async def test_quote_per_km_beyond_free(client: AsyncClient, delivery_ctx):
     assert response.status_code == 200
     data = response.json()
     assert data["status"] == "ok"
-    assert data["fee"] > 0
+    assert data["in_range"] is True
+    assert data["fee"] == 0.0
+    assert data["platform_fee"] > 0
 
 
 @pytest.mark.asyncio
-async def test_quote_out_of_range(client: AsyncClient, delivery_ctx):
+async def test_quote_out_of_range_extended(client: AsyncClient, delivery_ctx):
     response = await client.post(
         "/api/v1/delivery/quote",
         json={
@@ -50,8 +53,8 @@ async def test_quote_out_of_range(client: AsyncClient, delivery_ctx):
     )
     assert response.status_code == 200
     data = response.json()
-    assert data["status"] == "out_of_range"
-    assert data["fee"] == 0.0
+    assert data["status"] == "extended"
+    assert data["in_range"] is False
 
 
 @pytest.mark.asyncio

@@ -5,7 +5,12 @@ import { sampleDishImages } from "../../data/content";
 import type { CuisineMenuGroup, Dish, Menu } from "../../shared/api";
 import { fetchKitchenRatingSummaries, type DishRatingSummary } from "../../shared/customerRatingsApi";
 import { fetchPublicMenu } from "../../shared/publicApi";
-import { addToCart, cartItemCount, getCart } from "../../shared/customerCart";
+import {
+  addToCart,
+  cartItemCount,
+  getCart,
+  projectKitchenReadyMin,
+} from "../../shared/customerCart";
 import { getCustomerSession } from "../../shared/customerSession";
 
 const DIET_LABELS: Record<string, string> = {
@@ -22,6 +27,7 @@ export function KitchenMenuPage() {
   const [kitchenCode, setKitchenCode] = useState("");
   const [error, setError] = useState("");
   const [cartLines, setCartLines] = useState(0);
+  const [cartReadyMin, setCartReadyMin] = useState(0);
   const [ratingMap, setRatingMap] = useState<Record<string, DishRatingSummary>>({});
 
   useEffect(() => {
@@ -47,7 +53,9 @@ export function KitchenMenuPage() {
       .catch(() => {});
     const refreshCart = () => {
       const cart = getCart();
-      setCartLines(cartItemCount(cart));
+      setCartLines(cartItemCount(cart, kitchenId));
+      const kitchen = cart?.kitchens.find((k) => k.kitchenId === kitchenId);
+      setCartReadyMin(kitchen ? projectKitchenReadyMin(kitchen, true) : 0);
     };
     refreshCart();
     window.addEventListener("storage", refreshCart);
@@ -63,7 +71,9 @@ export function KitchenMenuPage() {
       dish,
     );
     const cart = getCart();
-    setCartLines(cartItemCount(cart));
+    setCartLines(cartItemCount(cart, kitchenId));
+    const kitchen = cart?.kitchens.find((k) => k.kitchenId === kitchenId);
+    setCartReadyMin(kitchen ? projectKitchenReadyMin(kitchen, true) : 0);
   };
 
   return (
@@ -106,7 +116,9 @@ export function KitchenMenuPage() {
 
           {cartLines > 0 && kitchenId && (
             <div className="customer-cart-bar glass">
-              <span>{cartLines} item{cartLines === 1 ? "" : "s"} in cart</span>
+              <span>
+                {cartLines} item{cartLines === 1 ? "" : "s"} · ready within ~{cartReadyMin} min
+              </span>
               <Link to="/checkout" className="btn btn--primary btn--sm">
                 Checkout
               </Link>
@@ -176,6 +188,16 @@ function DishCard({
       <div>
         <h4>{dish.name}</h4>
         <p className="customer-dish__price">₹{dish.price}</p>
+        <p className="customer-dish__eta">
+          Prep {dish.prep_time_min} min
+          {dish.delivery_time_min != null && dish.delivery_time_min > 0
+            ? ` · Delivery ${dish.delivery_time_min} min`
+            : ""}
+          {" · "}
+          <strong>
+            Ready within {dish.projected_ready_min ?? dish.max_time_min ?? dish.prep_time_min} min
+          </strong>
+        </p>
         {summary && summary.rating_count > 0 && (
           <p className="owner-muted">
             ★ {summary.overall_rating.toFixed(1)} home taste · {summary.rating_count} rating

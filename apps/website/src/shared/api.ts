@@ -114,6 +114,10 @@ export type Dish = {
   name: string;
   price: number;
   prep_time_min: number;
+  delivery_time_min?: number | null;
+  max_time_min: number;
+  /** Customer-facing ready-within minutes (owner max_time). */
+  projected_ready_min: number;
   description: string | null;
   ingredients_description: string | null;
   quality_measures: string | null;
@@ -165,6 +169,11 @@ export type Order = {
   delivery_fee: number;
   distance_km?: number | null;
   delivery_fee_accepted?: boolean | null;
+  delivery_mode?: string | null;
+  delivery_payer?: string | null;
+  owner_delivery_cost?: number;
+  customer_latitude?: number | null;
+  customer_longitude?: number | null;
   tracking_token?: string | null;
   total: number;
   estimated_prep_min: number | null;
@@ -456,6 +465,8 @@ export async function createDish(
     name: string;
     price: number;
     prep_time_min: number;
+    delivery_time_min?: number | null;
+    max_time_min?: number;
     cuisine_id: string;
     category_id: string;
     description?: string;
@@ -465,6 +476,25 @@ export async function createDish(
 ): Promise<Dish> {
   return apiFetch(`/api/v1/kitchens/${kitchenId}/dishes`, {
     method: "POST",
+    body: JSON.stringify(data),
+  });
+}
+
+export async function updateDish(
+  kitchenId: string,
+  dishId: string,
+  data: {
+    name?: string;
+    price?: number;
+    prep_time_min?: number;
+    delivery_time_min?: number | null;
+    max_time_min?: number;
+    is_active?: boolean;
+    description?: string;
+  },
+): Promise<Dish> {
+  return apiFetch(`/api/v1/kitchens/${kitchenId}/dishes/${dishId}`, {
+    method: "PATCH",
     body: JSON.stringify(data),
   });
 }
@@ -569,6 +599,41 @@ export async function activateSubscription(subscriptionId: string): Promise<Owne
   return apiFetch(`/api/v1/billing/subscriptions/${subscriptionId}/activate`, { method: "POST" });
 }
 
+export type KitchenPaymentGateway = {
+  kitchen_id: string;
+  provider: string;
+  key_id: string | null;
+  key_secret_configured: boolean;
+  key_secret_masked: string | null;
+  webhook_secret_configured: boolean;
+  webhook_secret_masked: string | null;
+  linked_account_id: string | null;
+  is_active: boolean;
+  updated_at: string | null;
+};
+
+export async function fetchKitchenPaymentGateway(kitchenId: string): Promise<KitchenPaymentGateway> {
+  return apiFetch(`/api/v1/billing/kitchens/${kitchenId}/payment-gateway`);
+}
+
+export async function upsertKitchenPaymentGateway(
+  kitchenId: string,
+  data: {
+    key_id?: string | null;
+    key_secret?: string | null;
+    webhook_secret?: string | null;
+    linked_account_id?: string | null;
+    is_active?: boolean;
+    clear_key_secret?: boolean;
+    clear_webhook_secret?: boolean;
+  },
+): Promise<KitchenPaymentGateway> {
+  return apiFetch(`/api/v1/billing/kitchens/${kitchenId}/payment-gateway`, {
+    method: "PUT",
+    body: JSON.stringify(data),
+  });
+}
+
 export async function createPayment(data: {
   order_id: string;
   method: "online" | "upi";
@@ -592,6 +657,76 @@ export async function capturePayment(paymentId: string): Promise<Payment> {
 
 export async function fetchPayment(paymentId: string): Promise<Payment> {
   return apiFetch(`/api/v1/billing/payments/${paymentId}`);
+}
+
+export type Refund = {
+  id: string;
+  payment_id: string;
+  order_id: string;
+  kitchen_id: string;
+  kind: "full" | "partial" | string;
+  channel: "gateway" | "direct_transfer" | string;
+  amount: number;
+  currency: string;
+  status: string;
+  destination_type: string;
+  destination_upi: string | null;
+  destination_bank_account_masked: string | null;
+  destination_bank_ifsc: string | null;
+  destination_account_name: string | null;
+  transfer_remark: string;
+  razorpay_refund_id: string | null;
+  evidence_url: string | null;
+  reason: string | null;
+  created_at: string;
+  completed_at: string | null;
+};
+
+export async function createRefund(data: {
+  order_id: string;
+  kind: "full" | "partial";
+  channel?: "gateway" | "direct_transfer";
+  amount?: number;
+  destination_type?: "upi" | "bank";
+  destination_upi?: string;
+  destination_bank_account?: string;
+  destination_bank_ifsc?: string;
+  destination_account_name?: string;
+  reason?: string;
+}): Promise<Refund> {
+  return apiFetch("/api/v1/billing/refunds", {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+}
+
+export async function fetchRefunds(orderId?: string): Promise<Refund[]> {
+  const qs = orderId ? `?order_id=${encodeURIComponent(orderId)}` : "";
+  return apiFetch(`/api/v1/billing/refunds${qs}`);
+}
+
+export async function processGatewayRefund(refundId: string): Promise<Refund> {
+  return apiFetch(`/api/v1/billing/refunds/${refundId}/process`, { method: "POST" });
+}
+
+export async function completeDirectRefund(refundId: string): Promise<Refund> {
+  return apiFetch(`/api/v1/billing/refunds/${refundId}/complete`, { method: "POST" });
+}
+
+export async function uploadRefundEvidence(refundId: string, file: File): Promise<Refund> {
+  const token = getToken();
+  const form = new FormData();
+  form.append("file", file);
+  const res = await fetch(`/api/v1/billing/refunds/${refundId}/evidence`, {
+    method: "POST",
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+    body: form,
+  });
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(typeof body.detail === "string" ? body.detail : "Upload failed");
+  }
+  return body as Refund;
 }
 
 export type CrmFavoriteDish = {
@@ -801,14 +936,27 @@ export async function pushDailyMenu(
   });
 }
 
+export type DeliveryModeOption = {
+  mode: string;
+  payer: string;
+  customer_fee: number;
+  owner_fee: number;
+  label: string;
+  description: string;
+};
+
 export type DeliveryQuote = {
   kitchen_id: string;
   distance_km: number;
   fee: number;
   status: string;
+  in_range?: boolean;
   within_free_radius: boolean;
   free_delivery_radius_km: number;
   max_delivery_radius_km: number;
+  modes?: DeliveryModeOption[];
+  platform_fee?: number;
+  kitchen_self_fee?: number;
   breakdown: Record<string, unknown>;
   quote_id: string | null;
 };
@@ -833,15 +981,33 @@ export type TrackingInfo = {
   kitchen_name: string | null;
   status: string;
   delivery_type: string;
+  delivery_mode?: string | null;
+  delivery_payer?: string | null;
   distance_km: number | null;
   delivery_fee: number;
+  owner_delivery_cost?: number;
   estimated_ready_at: string | null;
   tracking_notify_interval_min: number;
   updated_at: string | null;
+  kitchen_latitude?: number | null;
+  kitchen_longitude?: number | null;
+  customer_latitude?: number | null;
+  customer_longitude?: number | null;
+  map_directions_url?: string | null;
 };
 
 export async function fetchTracking(token: string): Promise<TrackingInfo> {
   return apiFetch(`/api/v1/delivery/track/${encodeURIComponent(token)}`);
+}
+
+export async function setOrderDeliveryFulfillment(
+  orderId: string,
+  data: { mode: "self" | "platform"; customer_fee?: number },
+): Promise<Order> {
+  return apiFetch(`/api/v1/orders/${orderId}/delivery-fulfillment`, {
+    method: "PATCH",
+    body: JSON.stringify(data),
+  });
 }
 
 export type Ingredient = {

@@ -1,7 +1,7 @@
 import uuid
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.deps import (
@@ -57,24 +57,95 @@ from app.gst import (
     upsert_gst_profile,
     build_balance_sheet,
 )
+from app.refunds import (
+    RefundCreateRequest,
+    RefundResponse,
+    apply_gateway_refund_webhook,
+    attach_refund_evidence,
+    complete_direct_refund,
+    create_refund,
+    get_refund_for_owner,
+    list_refunds_for_owner,
+    process_gateway_refund,
+    refund_to_response,
+)
 from ckac_common.database import get_db
 from ckac_common.event_bus import EventPublisher
 from ckac_common.openapi import RESP_400, RESP_404, auth_errors
+from ckac_common.storage import get_media_storage
 
 router = APIRouter()
+
+from app.payment_gateway import (
+    PaymentGatewayResponse,
+    PaymentGatewayUpsertRequest,
+    get_kitchen_payment_gateway,
+    upsert_kitchen_payment_gateway,
+)
 
 TAG_PAYMENTS = "Payments"
 TAG_CUSTOMER_PAYMENTS = "Customer Payments"
 TAG_SETTLEMENTS = "Settlements"
 TAG_SUBSCRIPTIONS = "Subscriptions"
+TAG_PAYMENT_GATEWAY = "Payment Gateway"
 TAG_GST = "GST"
+TAG_REFUNDS = "Refunds"
 TAG_WEBHOOKS = "Webhooks"
+
+_REFUND_IMAGE_TYPES = {
+    "image/jpeg": "jpg",
+    "image/png": "png",
+    "image/webp": "webp",
+}
 
 
 def get_publisher() -> EventPublisher:
     from app.main import event_publisher
 
     return event_publisher
+
+
+@router.get(
+    "/billing/kitchens/{kitchen_id}/payment-gateway",
+    response_model=PaymentGatewayResponse,
+    tags=[TAG_PAYMENT_GATEWAY],
+    summary="Get kitchen payment gateway config",
+    description=(
+        "Owner-only — Razorpay key id / secret / webhook / Route linked account for this kitchen. "
+        "Secrets are never returned in full (masked + configured flags only)."
+    ),
+    responses=auth_errors(),
+)
+async def payment_gateway_get(
+    kitchen_id: uuid.UUID,
+    owner_id: Annotated[uuid.UUID, Depends(get_current_owner_id)],
+    session: Annotated[AsyncSession, Depends(get_db)],
+) -> PaymentGatewayResponse:
+    await verify_kitchen_owner(kitchen_id, owner_id, session)
+    return await get_kitchen_payment_gateway(session, kitchen_id)
+
+
+@router.put(
+    "/billing/kitchens/{kitchen_id}/payment-gateway",
+    response_model=PaymentGatewayResponse,
+    tags=[TAG_PAYMENT_GATEWAY],
+    summary="Upsert kitchen payment gateway config",
+    description=(
+        "Owner-only — save Razorpay credentials for kitchen checkout / Route splits. "
+        "Omit key_secret / webhook_secret to keep existing secrets. Publishes "
+        "`kitchen_payment_gateway.updated`."
+    ),
+    responses={**auth_errors(), 400: RESP_400},
+)
+async def payment_gateway_upsert(
+    kitchen_id: uuid.UUID,
+    body: PaymentGatewayUpsertRequest,
+    owner_id: Annotated[uuid.UUID, Depends(get_current_owner_id)],
+    session: Annotated[AsyncSession, Depends(get_db)],
+    publisher: Annotated[EventPublisher, Depends(get_publisher)],
+) -> PaymentGatewayResponse:
+    await verify_kitchen_owner(kitchen_id, owner_id, session)
+    return await upsert_kitchen_payment_gateway(session, publisher, kitchen_id, body)
 
 
 @router.get(
@@ -411,16 +482,229 @@ async def customer_master_payment_capture(
     )
 
 
+@router.get(
+    "/billing/refunds/customer/me",
+    response_model=list[RefundResponse],
+    tags=[TAG_REFUNDS],
+    summary="List my refunds (customer)",
+    description="Customer-only — refunds tied to the caller's phone or customer_id.",
+    responses=auth_errors(),
+)
+async def customer_refunds_list(
+    customer_id: Annotated[uuid.UUID, Depends(get_current_customer_id)],
+    session: Annotated[AsyncSession, Depends(get_db)],
+) -> list[RefundResponse]:
+    from sqlalchemy import select, text
+
+    from app.models import Refund
+
+    try:
+        phone = await load_customer_phone(customer_id, session)
+    except HTTPException:
+        phone = None
+
+    result = await session.execute(
+        text(
+            """
+            SELECT r.id
+            FROM ckac_billing.refunds r
+            LEFT JOIN ckac_orders.orders o ON o.id = r.order_id
+            WHERE r.customer_id = :cid
+               OR (:phone IS NOT NULL AND o.customer_phone = :phone)
+            ORDER BY r.created_at DESC
+            LIMIT 100
+            """
+        ),
+        {"cid": customer_id, "phone": phone},
+    )
+    ids = [row[0] for row in result.all()]
+    if not ids:
+        return []
+    refunds = await session.execute(
+        select(Refund).where(Refund.id.in_(ids)).order_by(Refund.created_at.desc())
+    )
+    return [refund_to_response(r) for r in refunds.scalars().all()]
+
+
+@router.post(
+    "/billing/refunds",
+    response_model=RefundResponse,
+    status_code=status.HTTP_201_CREATED,
+    tags=[TAG_REFUNDS],
+    summary="Create a refund (owner)",
+    description=(
+        "Owner-only — create a per-order refund. `kind=full|partial` is the refund switch. "
+        "Full refunds may use `channel=gateway` (Razorpay reverse) or `direct_transfer` (UPI/bank). "
+        "Partial refunds always use direct transfer with `transfer_remark` = order code. "
+        "Publishes `refund.created`."
+    ),
+    responses={**auth_errors(include_404=True), 400: RESP_400},
+)
+async def refund_create(
+    body: RefundCreateRequest,
+    owner_id: Annotated[uuid.UUID, Depends(get_current_owner_id)],
+    session: Annotated[AsyncSession, Depends(get_db)],
+    publisher: Annotated[EventPublisher, Depends(get_publisher)],
+) -> RefundResponse:
+    order = await load_order_for_owner(body.order_id, owner_id, session)
+    try:
+        refund = await create_refund(
+            session, owner_id=owner_id, order=order, body=body, publisher=publisher
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    return refund_to_response(refund)
+
+
+@router.get(
+    "/billing/refunds",
+    response_model=list[RefundResponse],
+    tags=[TAG_REFUNDS],
+    summary="List refunds (owner)",
+    description="Owner-only — list refunds, optionally filtered by order_id.",
+    responses=auth_errors(),
+)
+async def refund_list(
+    owner_id: Annotated[uuid.UUID, Depends(get_current_owner_id)],
+    session: Annotated[AsyncSession, Depends(get_db)],
+    order_id: Annotated[uuid.UUID | None, Query()] = None,
+) -> list[RefundResponse]:
+    refunds = await list_refunds_for_owner(session, owner_id, order_id)
+    return [refund_to_response(r) for r in refunds]
+
+
+@router.get(
+    "/billing/refunds/{refund_id}",
+    response_model=RefundResponse,
+    tags=[TAG_REFUNDS],
+    summary="Get a refund (owner)",
+    responses={**auth_errors(), 404: RESP_404},
+)
+async def refund_get(
+    refund_id: uuid.UUID,
+    owner_id: Annotated[uuid.UUID, Depends(get_current_owner_id)],
+    session: Annotated[AsyncSession, Depends(get_db)],
+) -> RefundResponse:
+    try:
+        refund = await get_refund_for_owner(session, refund_id, owner_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    return refund_to_response(refund)
+
+
+@router.post(
+    "/billing/refunds/{refund_id}/process",
+    response_model=RefundResponse,
+    tags=[TAG_REFUNDS],
+    summary="Process gateway refund (owner)",
+    description=(
+        "Owner-only — execute a full gateway refund (dev-mocked Razorpay Refunds API). "
+        "Marks payment `refunded` and publishes `refund.completed`."
+    ),
+    responses={**auth_errors(), 400: RESP_400, 404: RESP_404},
+)
+async def refund_process_gateway(
+    refund_id: uuid.UUID,
+    owner_id: Annotated[uuid.UUID, Depends(get_current_owner_id)],
+    session: Annotated[AsyncSession, Depends(get_db)],
+    publisher: Annotated[EventPublisher, Depends(get_publisher)],
+) -> RefundResponse:
+    try:
+        refund = await get_refund_for_owner(session, refund_id, owner_id)
+        refund = await process_gateway_refund(session, refund, publisher)
+    except ValueError as exc:
+        detail = str(exc)
+        code = status.HTTP_404_NOT_FOUND if detail == "Refund not found" else status.HTTP_400_BAD_REQUEST
+        raise HTTPException(status_code=code, detail=detail) from exc
+    return refund_to_response(refund)
+
+
+@router.post(
+    "/billing/refunds/{refund_id}/evidence",
+    response_model=RefundResponse,
+    tags=[TAG_REFUNDS],
+    summary="Attach refund screenshot (owner)",
+    description="Owner-only — upload proof of a direct UPI/bank refund (required before complete).",
+    responses={**auth_errors(), 400: RESP_400, 404: RESP_404},
+)
+async def refund_attach_evidence(
+    refund_id: uuid.UUID,
+    owner_id: Annotated[uuid.UUID, Depends(get_current_owner_id)],
+    session: Annotated[AsyncSession, Depends(get_db)],
+    file: Annotated[UploadFile, File()],
+) -> RefundResponse:
+    try:
+        refund = await get_refund_for_owner(session, refund_id, owner_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+
+    data = await file.read()
+    if not data:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Empty file")
+    if len(data) > 10 * 1024 * 1024:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="File exceeds 10MB")
+
+    content_type = file.content_type or ""
+    if data.startswith(b"\xff\xd8\xff"):
+        content_type, ext = "image/jpeg", "jpg"
+    elif data.startswith(b"\x89PNG\r\n\x1a\n"):
+        content_type, ext = "image/png", "png"
+    elif len(data) >= 12 and data[:4] == b"RIFF" and data[8:12] == b"WEBP":
+        content_type, ext = "image/webp", "webp"
+    elif content_type in _REFUND_IMAGE_TYPES:
+        ext = _REFUND_IMAGE_TYPES[content_type]
+    else:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Use JPEG, PNG, or WebP")
+
+    url = get_media_storage().upload(
+        kitchen_id=str(refund.kitchen_id),
+        context="refund_evidence",
+        data=data,
+        content_type=content_type,
+        extension=ext,
+    )
+    try:
+        refund = await attach_refund_evidence(session, refund, url)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    return refund_to_response(refund)
+
+
+@router.post(
+    "/billing/refunds/{refund_id}/complete",
+    response_model=RefundResponse,
+    tags=[TAG_REFUNDS],
+    summary="Complete direct refund (owner)",
+    description=(
+        "Owner-only — mark a direct UPI/bank refund complete after transferring funds "
+        "(remark already set to order id). Requires uploaded evidence screenshot."
+    ),
+    responses={**auth_errors(), 400: RESP_400, 404: RESP_404},
+)
+async def refund_complete_direct(
+    refund_id: uuid.UUID,
+    owner_id: Annotated[uuid.UUID, Depends(get_current_owner_id)],
+    session: Annotated[AsyncSession, Depends(get_db)],
+    publisher: Annotated[EventPublisher, Depends(get_publisher)],
+) -> RefundResponse:
+    try:
+        refund = await get_refund_for_owner(session, refund_id, owner_id)
+        refund = await complete_direct_refund(session, refund, publisher)
+    except ValueError as exc:
+        detail = str(exc)
+        code = status.HTTP_404_NOT_FOUND if detail == "Refund not found" else status.HTTP_400_BAD_REQUEST
+        raise HTTPException(status_code=code, detail=detail) from exc
+    return refund_to_response(refund)
+
+
 @router.post(
     "/webhooks/razorpay",
     tags=[TAG_WEBHOOKS],
     summary="Razorpay payment webhook",
     description=(
-        "Unauthenticated Razorpay callback endpoint. Only `payment.captured` is processed — other "
-        "event types are acknowledged with `{\"status\": \"ignored\"}` and no side effects. Matches "
-        "the inbound payment to a `Payment` row by `razorpay_order_id` and marks it captured, "
-        "publishing `payment.captured`. **Do not rely on this in place of gateway-level webhook "
-        "signature verification in production.**"
+        "Unauthenticated Razorpay callback. Handles `payment.captured`, `refund.processed`, and "
+        "`payment.refunded`. Gateway refunds complete matching `Refund` rows and publish "
+        "`refund.completed`. **Add signature verification in production.**"
     ),
     responses={400: RESP_400, 404: RESP_404},
 )
@@ -429,6 +713,27 @@ async def razorpay_webhook(
     session: Annotated[AsyncSession, Depends(get_db)],
     publisher: Annotated[EventPublisher, Depends(get_publisher)],
 ) -> dict[str, str]:
+    if body.event in ("refund.processed", "payment.refunded"):
+        entity = body.payload.get("refund", {}).get("entity") or body.payload.get("payment", {}).get(
+            "entity", {}
+        )
+        refund_id = entity.get("id") if body.event == "refund.processed" else entity.get("refund_id")
+        payment_id = entity.get("payment_id")
+        if body.event == "payment.refunded":
+            payment_id = entity.get("id")
+            refund_id = entity.get("refund_id") or refund_id
+        if not payment_id:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Missing payment_id")
+        refund = await apply_gateway_refund_webhook(
+            session,
+            razorpay_refund_id=refund_id or f"rfnd_wh_{payment_id[-16:]}",
+            razorpay_payment_id=payment_id,
+            publisher=publisher,
+        )
+        if not refund:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Refund not found")
+        return {"status": "ok"}
+
     if body.event != "payment.captured":
         return {"status": "ignored"}
 

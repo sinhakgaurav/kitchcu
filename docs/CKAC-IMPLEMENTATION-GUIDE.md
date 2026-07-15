@@ -7,7 +7,7 @@
 | Version | **2.0** |
 | Status | **S1–S18 shipped** (13 domain services + gateway + 4 PWAs + GST); E1/E2 quality loop = design pack only |
 | Last updated | July 2026 |
-| Encyclopedia | **[CKAC-COMPLETE-GUIDE.md](./CKAC-COMPLETE-GUIDE.md) v3.1** — definitions, how/why, flows, ER, **UI Catalog**, aggregated OpenAPI reference |
+| Encyclopedia | **[CKAC-COMPLETE-GUIDE.md](./CKAC-COMPLETE-GUIDE.md) v3.2** — definitions, how/why, flows (§17.9–17.10), ER, **UI Catalog (8 surfaces)**, super-admin Control, delivery payer, dish timing, aggregated OpenAPI |
 | Companion docs | [Planning Benchmark](./CKAC-COMPLETE-PLANNING-BENCHMARK.md) · [System Benchmark](./CKAC-SYSTEM-BENCHMARK.md) · [CPO Blueprint v4.2](./CKAC-CPO-PRODUCT-BLUEPRINT.md) · [CTO Architecture](./CKAC-ARCHITECTURE-CTO.md) · [Development Phases](./DEVELOPMENT-PHASES.md) · [User Flows](./CKAC-USERFLOWS.md) · [API.md](./API.md) · [AGENTS.md](../AGENTS.md) · [UI shots](./assets/ui/) |
 
 > For deep definitions, module logic, Mermaid flows, and annotated screenshots, prefer the Complete Guide. This file remains the **code ↔ feature map** (what's wired where).
@@ -18,7 +18,7 @@
 
 | If you need… | Read section |
 |--------------|--------------|
-| Full definitions / how & why / UI screens | [Complete Guide v3.1](./CKAC-COMPLETE-GUIDE.md) |
+| Full definitions / how & why / UI screens | [Complete Guide v3.2](./CKAC-COMPLETE-GUIDE.md) |
 | Full step-by-step user journeys (every persona, every screen, every API call) | [CKAC-USERFLOWS.md](./CKAC-USERFLOWS.md) / [.pdf](./CKAC-USERFLOWS.pdf) |
 | What Kitchcu is and who it serves | [§1 Product Overview](#1-product-overview) |
 | What's built vs planned (48 features) | [§2 Feature Implementation Matrix](#2-feature-implementation-matrix) |
@@ -78,7 +78,7 @@
 |---------|------|---------------|-----------------|
 | **Raj (Owner)** | Run kitchen, see orders | **kitchen.kitchcu.in** PWA (orders, menu, reports) | Full offline PWA (S5+) |
 | **Priya (Customer)** | Order trusted food | **customer.kitchcu.in** PWA (browse, nearby) | Checkout + accounts (Phase 2) |
-| **Platform admin** | Moderate, support tickets | **admin.kitchcu.in** (stats, kitchens, orders, tickets) | Billing console (S6) |
+| **Platform admin** | Moderate, support tickets, refunds, flags | **admin.kitchcu.in** (Overview, Customers, Refunds, Control, tickets) | Super-admin Control plane ✅ |
 
 **Maps to:** Planning Benchmark [§2.2 Personas](./CKAC-COMPLETE-PLANNING-BENCHMARK.md#22-personas-detailed) · System Benchmark [§2.2 Personas](./CKAC-SYSTEM-BENCHMARK.md#22-personas)
 

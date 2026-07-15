@@ -6,8 +6,8 @@
 |-------|-------|
 | Version | **1.1** |
 | Audience | CTO, Engineering Managers, Tech Leads, CPO (product ↔ code traceability) |
-| Status | S1–S18 shipped; deep how/why + ER + flows in Complete Guide v3.1 |
-| Companion | [Complete Guide v3.1](./CKAC-COMPLETE-GUIDE.md) · [Implementation Guide](./CKAC-IMPLEMENTATION-GUIDE.md) · [System Benchmark](./CKAC-SYSTEM-BENCHMARK.md) · [CPO Blueprint v4.2](./CKAC-CPO-PRODUCT-BLUEPRINT.md) · [User Flows](./CKAC-USERFLOWS.md) · [API.md](./API.md) · [AGENTS.md](../AGENTS.md) · [UI Catalog](./assets/ui/) |
+| Status | S1–S18 shipped; deep how/why + ER + flows in Complete Guide v3.2 |
+| Companion | [Complete Guide v3.2](./CKAC-COMPLETE-GUIDE.md) · [Implementation Guide](./CKAC-IMPLEMENTATION-GUIDE.md) · [System Benchmark](./CKAC-SYSTEM-BENCHMARK.md) · [CPO Blueprint v4.2](./CKAC-CPO-PRODUCT-BLUEPRINT.md) · [User Flows](./CKAC-USERFLOWS.md) · [API.md](./API.md) · [AGENTS.md](../AGENTS.md) · [UI Catalog](./assets/ui/) |
 
 ---
 

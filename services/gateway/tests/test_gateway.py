@@ -88,10 +88,14 @@ def test_resolve_service_url_order():
     )
 
 
-def test_resolve_service_url_customer_orders():
+def test_resolve_service_url_customer_dashboard_and_tickets():
+    from app.main import resolve_service_url
     from ckac_common.config import get_settings
 
     settings = get_settings()
+    assert resolve_service_url("/api/v1/customers/me/dashboard") == settings.order_service_url
+    assert resolve_service_url("/api/v1/customers/me/tickets") == settings.notification_service_url
+    assert resolve_service_url("/api/v1/customers/me/addresses") == settings.identity_service_url
     assert resolve_service_url("/api/v1/customers/me/orders") == settings.order_service_url
     assert (
         resolve_service_url("/api/v1/customers/me/master-orders")
@@ -106,6 +110,13 @@ def test_resolve_service_url_billing():
     assert resolve_service_url("/api/v1/billing/payments") == settings.billing_service_url
     assert resolve_service_url("/api/v1/billing/subscriptions/plans") == settings.billing_service_url
     assert resolve_service_url("/api/v1/webhooks/razorpay") == settings.billing_service_url
+    assert resolve_service_url("/api/v1/admin/refunds") == settings.billing_service_url
+    assert resolve_service_url("/api/v1/admin/payments") == settings.billing_service_url
+    assert resolve_service_url("/api/v1/admin/settlements") == settings.billing_service_url
+    assert resolve_service_url("/api/v1/admin/money-stats") == settings.billing_service_url
+    assert resolve_service_url("/api/v1/admin/customers") == settings.identity_service_url
+    assert resolve_service_url("/api/v1/admin/feature-flags") == settings.identity_service_url
+    assert resolve_service_url("/api/v1/admin/journeys") == settings.identity_service_url
 
 
 def test_resolve_service_url_marketing():

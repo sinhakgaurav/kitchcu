@@ -86,7 +86,7 @@ async def load_order_for_owner(
     result = await session.execute(
         text(
             """
-            SELECT o.id, o.kitchen_id, o.order_code, o.total, o.payment_method
+            SELECT o.id, o.kitchen_id, o.order_code, o.total, o.payment_method, o.customer_phone
             FROM ckac_orders.orders o
             JOIN ckac_identity.kitchens k ON k.id = o.kitchen_id
             WHERE o.id = :oid AND k.owner_id = :owner_id

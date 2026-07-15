@@ -10,6 +10,12 @@ export type CustomerProfile = {
   email: string | null;
   phone: string | null;
   avatar_url: string | null;
+  upi_vpa: string | null;
+  upi_qr_url: string | null;
+  bank_account_number_masked: string | null;
+  bank_ifsc: string | null;
+  bank_account_name: string | null;
+  has_password?: boolean;
   status: string;
 };
 
@@ -106,6 +112,34 @@ export async function verifyCustomerWhatsAppOtp(
 
 export async function fetchCustomerProfile(): Promise<CustomerProfile> {
   return customerFetch("/api/v1/customers/me");
+}
+
+export async function updateCustomerPayout(data: {
+  upi_vpa?: string | null;
+  bank_account_number?: string | null;
+  bank_ifsc?: string | null;
+  bank_account_name?: string | null;
+}): Promise<CustomerProfile> {
+  return customerFetch("/api/v1/customers/me/payout", {
+    method: "PATCH",
+    body: JSON.stringify(data),
+  });
+}
+
+export async function uploadCustomerPayoutQr(file: File): Promise<CustomerProfile> {
+  const token = getCustomerToken();
+  const form = new FormData();
+  form.append("file", file);
+  const res = await fetch("/api/v1/customers/me/payout/qr", {
+    method: "POST",
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+    body: form,
+  });
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(typeof body.detail === "string" ? body.detail : "Upload failed");
+  }
+  return body as CustomerProfile;
 }
 
 export async function loginWithCustomerOAuthProvider(provider: string): Promise<CustomerAuthResult> {

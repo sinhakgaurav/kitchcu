@@ -16,6 +16,8 @@ import { OrdersPage } from "../pages/customer/OrdersPage";
 import { MasterOrderConfirmPage } from "../pages/customer/MasterOrderConfirmPage";
 import { RateOrderPage } from "../pages/customer/RateOrderPage";
 import { TrackOrderPage } from "../pages/customer/TrackOrderPage";
+import { CustomerAccountPage } from "../pages/customer/CustomerAccountPage";
+import { CustomerDashboardPage } from "../pages/customer/CustomerDashboardPage";
 function CustomerShell({ children }: { children: React.ReactNode }) {
   return (
     <div className="customer-app">
@@ -75,6 +77,22 @@ export default function CustomerApp() {
             element={
               <CustomerShell>
                 <OrdersPage />
+              </CustomerShell>
+            }
+          />
+          <Route
+            path="/dashboard"
+            element={
+              <CustomerShell>
+                <CustomerDashboardPage />
+              </CustomerShell>
+            }
+          />
+          <Route
+            path="/account"
+            element={
+              <CustomerShell>
+                <CustomerAccountPage />
               </CustomerShell>
             }
           />

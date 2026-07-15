@@ -2,6 +2,7 @@ import { FormEvent, useState } from "react";
 import type { CSSProperties, RefObject } from "react";
 import { Link, Navigate, useNavigate, useSearchParams } from "react-router-dom";
 import { images, sampleDishImages } from "../../data/content";
+import { AuthLoginHighlights } from "../../components/AuthLoginHighlights";
 import { BrandAuthArt, BrandLogo } from "../../components/BrandLogo";
 import { DEMO, DEMO_CUSTOMERS, DEMO_OWNERS, type DemoCustomerAccount } from "../../shared/demo";
 import { normalizePhone } from "../../shared/api";
@@ -120,9 +121,10 @@ export function CustomerLoginPage() {
         <div className="auth-page__overlay" />
         <div className="auth-page__brand-stack">
           <BrandLogo variant="wordmark" className="brand-logo--lg" />
-          <BrandAuthArt surface="customer" />
           <h1>Customer sign in</h1>
           <p>Save your profile and favourite kitchens on {CUSTOMER_HOST}</p>
+          <AuthLoginHighlights surface="customer" />
+          <BrandAuthArt surface="customer" />
         </div>
       </div>
 
@@ -155,10 +157,11 @@ export function CustomerLoginPage() {
             </p>
           </div>
 
-          <form onSubmit={handleSubmit}>
+          <form onSubmit={otpSent ? handleVerify : handleRequestOtp}>
             <h2>Welcome back</h2>
             <p className="auth-card__hint">
-              Your session stays on <strong>{CUSTOMER_HOST}</strong> — separate from kitchen owners.
+              WhatsApp OTP on <strong>{CUSTOMER_HOST}</strong> — separate from kitchen owners.
+              Dev OTP: <strong>{DEMO.otp}</strong>.
             </p>
             {error && <div className="auth-card__error">{error}</div>}
             <label>
@@ -167,7 +170,13 @@ export function CustomerLoginPage() {
             </label>
             <label>
               Phone
-              <input value={phone} onChange={(e) => setPhone(e.target.value)} required placeholder="9123456789" />
+              <input
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                required
+                placeholder="9123456789"
+                disabled={otpSent}
+              />
             </label>
             <label>
               Kitchen code (optional)
@@ -177,16 +186,34 @@ export function CustomerLoginPage() {
                 placeholder={DEMO.kitchenCode}
               />
             </label>
+            {otpSent && (
+              <label>
+                OTP code
+                <input
+                  value={otp}
+                  onChange={(e) => setOtp(e.target.value)}
+                  required
+                  placeholder={DEMO.otp}
+                  maxLength={6}
+                />
+              </label>
+            )}
             <button type="submit" className="btn btn--primary btn--lg" disabled={busy}>
-              {busy ? "Signing in..." : "Continue"}
+              {busy ? "Please wait…" : otpSent ? "Verify & sign in" : "Send WhatsApp OTP"}
             </button>
-            <button
-              type="button"
-              className="btn btn--ghost auth-card__resend"
-              onClick={() => fillDemo(DEMO_CUSTOMERS[0])}
-            >
-              Fill demo profile
-            </button>
+            {otpSent ? (
+              <button type="button" className="btn btn--ghost auth-card__resend" onClick={() => setOtpSent(false)}>
+                Change phone number
+              </button>
+            ) : (
+              <button
+                type="button"
+                className="btn btn--ghost auth-card__resend"
+                onClick={() => fillDemo(DEMO_CUSTOMERS[0])}
+              >
+                Fill demo profile
+              </button>
+            )}
           </form>
 
           <CustomerSocialLogin

@@ -38,10 +38,23 @@ export function AddDishPage() {
     setError("");
     setBusy(true);
     try {
+      const prep = Number(fd.get("prep_time_min") || 30);
+      const deliveryRaw = fd.get("delivery_time_min");
+      const delivery =
+        deliveryRaw === null || String(deliveryRaw).trim() === ""
+          ? undefined
+          : Number(deliveryRaw);
+      const maxRaw = fd.get("max_time_min");
+      const maxTime =
+        maxRaw === null || String(maxRaw).trim() === ""
+          ? prep + (delivery || 0)
+          : Number(maxRaw);
       await createDish(kitchen.id, {
         name: String(fd.get("name")),
         price: Number(fd.get("price")),
-        prep_time_min: Number(fd.get("prep_time_min") || 30),
+        prep_time_min: prep,
+        delivery_time_min: delivery,
+        max_time_min: maxTime,
         cuisine_id: String(fd.get("cuisine_id")),
         category_id: String(fd.get("category_id")),
         description: descriptionHtml.trim() || undefined,
@@ -76,8 +89,38 @@ export function AddDishPage() {
         <label>Dish name<input name="name" required placeholder="Butter Chicken" /></label>
         <div className="form-row">
           <label>Price (₹)<input name="price" type="number" min="1" step="1" required /></label>
-          <label>Prep time (min)<input name="prep_time_min" type="number" min="5" defaultValue="30" /></label>
+          <label>
+            Prep time (min)
+            <input name="prep_time_min" type="number" min="5" defaultValue="30" required />
+          </label>
         </div>
+        <div className="form-row">
+          <label>
+            Delivery time (min)
+            <input
+              name="delivery_time_min"
+              type="number"
+              min="0"
+              defaultValue="20"
+              placeholder="e.g. 20"
+            />
+          </label>
+          <label>
+            Max time customers see (min)
+            <input
+              name="max_time_min"
+              type="number"
+              min="5"
+              defaultValue="50"
+              title="Projected ready-within time. Defaults to prep + delivery. Cart uses the max across dishes."
+              required
+            />
+          </label>
+        </div>
+        <p className="auth-card__hint">
+          Prep is kitchen work. Delivery is the travel window. Max time is what customers see as
+          “ready within” — multi-dish carts use the longest max (quality-first, not a race).
+        </p>
         <label>
           Cuisine
           <select name="cuisine_id" required defaultValue={cuisines[0]?.id}>

@@ -14,6 +14,7 @@ os.environ.setdefault("REDIS_URL", "redis://localhost:16379/0")
 os.environ.setdefault("JWT_SECRET", "test-secret-key-for-pytest")
 os.environ.setdefault("INTERNAL_API_KEY", "test-internal-key-for-pytest")
 os.environ.setdefault("APP_ENV", "test")
+os.environ.setdefault("MEDIA_STORAGE_BACKEND", "local")
 
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.pool import NullPool
@@ -53,6 +54,8 @@ def _truncate_all() -> None:
         cur.execute("TRUNCATE TABLE ckac_billing.gst_monthly_audits CASCADE")
         cur.execute("TRUNCATE TABLE ckac_billing.gst_tax_invoices CASCADE")
         cur.execute("TRUNCATE TABLE ckac_billing.kitchen_gst_profiles CASCADE")
+        cur.execute("TRUNCATE TABLE ckac_billing.kitchen_payment_gateways CASCADE")
+        cur.execute("TRUNCATE TABLE ckac_billing.refunds CASCADE")
         cur.execute("TRUNCATE TABLE ckac_billing.settlements CASCADE")
         cur.execute("TRUNCATE TABLE ckac_billing.payments CASCADE")
         cur.execute("TRUNCATE TABLE ckac_billing.owner_subscriptions CASCADE")
@@ -77,6 +80,7 @@ async def _flush_billing_streams() -> None:
             "ckac:billing:subscription",
             "ckac:billing:settlement",
             "ckac:billing:gst",
+            "ckac:billing:refund",
         )
     finally:
         await client.aclose()

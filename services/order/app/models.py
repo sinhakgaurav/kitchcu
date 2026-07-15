@@ -1,7 +1,7 @@
 import uuid
 from datetime import UTC, datetime
 
-from sqlalchemy import DateTime, ForeignKey, Integer, Numeric, String, Text, Boolean
+from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Integer, Numeric, String, Text
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -58,6 +58,11 @@ class Order(Base):
     delivery_fee: Mapped[float] = mapped_column(Numeric(10, 2), default=0)
     distance_km: Mapped[float | None] = mapped_column(Numeric(6, 2), nullable=True)
     delivery_fee_accepted: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    delivery_mode: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    delivery_payer: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    owner_delivery_cost: Mapped[float] = mapped_column(Numeric(10, 2), default=0)
+    customer_latitude: Mapped[float | None] = mapped_column(Float, nullable=True)
+    customer_longitude: Mapped[float | None] = mapped_column(Float, nullable=True)
     tracking_token: Mapped[str | None] = mapped_column(String(64), unique=True, nullable=True)
     total: Mapped[float] = mapped_column(Numeric(10, 2), nullable=False)
     estimated_prep_min: Mapped[int | None] = mapped_column(Integer)

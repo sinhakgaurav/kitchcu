@@ -21,6 +21,7 @@ import { TrialDetailPage } from "../pages/owner/TrialDetailPage";
 import { CrmPage } from "../pages/owner/CrmPage";
 import { CouponsPage } from "../pages/owner/CouponsPage";
 import { SubscriptionPage } from "../pages/owner/SubscriptionPage";
+import { PaymentGatewayPage } from "../pages/owner/PaymentGatewayPage";
 import { GstFinancePage } from "../pages/owner/GstFinancePage";
 
 export default function KitchenApp() {
@@ -58,6 +59,7 @@ export default function KitchenApp() {
             <Route path="crm" element={<CrmPage />} />
             <Route path="coupons" element={<CouponsPage />} />
             <Route path="subscription" element={<SubscriptionPage />} />
+            <Route path="payment-gateway" element={<PaymentGatewayPage />} />
             <Route path="gst" element={<GstFinancePage />} />
           </Route>
 

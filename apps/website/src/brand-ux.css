@@ -501,12 +501,78 @@ html.theme-brand-light .hero__scroll-hint {
   color: var(--brand-ink-soft);
 }
 
+.auth-login-highlights {
+  list-style: none;
+  margin: 0.35rem 0 0.5rem;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  max-width: 22rem;
+  text-align: left;
+  width: 100%;
+  flex-shrink: 0;
+}
+
+.auth-login-highlights li {
+  position: relative;
+  padding-left: 1.05rem;
+  font-size: 0.78rem;
+  line-height: 1.35;
+  color: var(--brand-ink-soft);
+}
+
+.auth-login-highlights li::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0.45em;
+  width: 0.45rem;
+  height: 0.45rem;
+  border-radius: 50%;
+  background: var(--brand-orange, #e65100);
+}
+
+.auth-page--kitchen .auth-login-highlights li::before {
+  background: var(--brand-teal, #00897b);
+}
+
+.auth-page--customer .auth-login-highlights li::before {
+  background: var(--brand-orange, #e65100);
+}
+
+.admin-login .auth-login-highlights li::before {
+  background: var(--brand-ink, #0b1b32);
+}
+
+@media (max-width: 900px) {
+  .auth-login-highlights {
+    max-width: 100%;
+    margin-inline: auto;
+  }
+}
+
 .auth-page.auth-page--brand .auth-page__brand-stack .brand-auth-art,
 .auth-page.auth-page--kitchen .auth-page__brand-stack .brand-auth-art,
 .auth-page.auth-page--customer .auth-page__brand-stack .brand-auth-art,
 .admin-login .auth-page__brand-stack .brand-auth-art {
-  width: min(88%, 420px);
-  filter: drop-shadow(0 18px 36px rgba(11, 27, 50, 0.16));
+  width: min(72%, 280px);
+  margin-top: auto;
+  flex-shrink: 1;
+  filter: drop-shadow(0 12px 24px rgba(11, 27, 50, 0.12));
+}
+
+.auth-page__brand-stack h1 {
+  max-width: 18ch;
+}
+
+@media (max-height: 720px) {
+  .auth-page.auth-page--brand .auth-page__brand-stack .brand-auth-art,
+  .auth-page.auth-page--kitchen .auth-page__brand-stack .brand-auth-art,
+  .auth-page.auth-page--customer .auth-page__brand-stack .brand-auth-art,
+  .admin-login .auth-page__brand-stack .brand-auth-art {
+    width: min(55%, 200px);
+  }
 }
 
 .auth-page.auth-page--brand .auth-page__form-wrap,

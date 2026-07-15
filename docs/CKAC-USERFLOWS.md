@@ -4,7 +4,7 @@
 
 | Field | Value |
 |-------|-------|
-| Version | **1.0** |
+| Version | **1.1** |
 | Date | July 2026 |
 | Audience | CPO, Product, Engineering, QA, Investors |
 | Status | Traces to code shipped through **S1–S18** (13 domain services + gateway + 4 PWAs) |
@@ -19,7 +19,7 @@ This document is the **single source of truth for "how does a user actually get 
 | Question | Answered by |
 |----------|-------------|
 | *What is KitchCu and why does it exist?* | [`docs/CKAC-COMPLETE-GUIDE.md`](./CKAC-COMPLETE-GUIDE.md) Parts 0–III (CEO/CPO/CTO lenses) |
-| *What are the step-by-step flows, at encyclopedia depth?* | **This document** — expands Complete Guide **Part IV (§17.1–17.8)** into full UI-step + API + event + diagram detail, plus 3 flows the Guide only summarizes (multi-kitchen split, coupons/CRM, live streaming) |
+| *What are the step-by-step flows, at encyclopedia depth?* | **This document** — expands Complete Guide **Part IV (§17.1–17.10)** into full UI-step + API + event + diagram detail, plus flows the Guide only summarizes (multi-kitchen split, coupons/CRM, live streaming, delivery payer) |
 | *What is the exact request/response shape for an endpoint?* | [`docs/API.md`](./API.md) (human index) → live OpenAPI: Gateway `/docs` / `/redoc` / `/openapi.json`, or Portal explorer at **`/openapi`** (`apps/website/src/portal/OpenApiPage.tsx`, aggregated by `services/gateway/app/openapi_aggregate.py`) |
 | *What does the actual screen look like?* | [`docs/assets/ui/`](./assets/ui/) reference screenshots (linked per flow below) |
 | *What's built vs. designed?* | [`docs/CKAC-IMPLEMENTATION-GUIDE.md`](./CKAC-IMPLEMENTATION-GUIDE.md) |
@@ -474,23 +474,25 @@ flowchart LR
 
 ---
 
-## 9. Flow 6 — Admin Login -> Overview -> Tickets
+## 9. Flow 6 — Admin Login -> Overview -> Customers / Refunds / Control / Tickets
 
-**Goal:** Platform-scope oversight — is the platform healthy, who is stuck — never owner-scope menu/order mutation.
+**Goal:** Full super-admin control plane — platform health, customer/refund oversight, feature flags & journeys — never owner-scope menu/order mutation.
 **Persona:** Platform admin
 **Entry URL:** `admin.kitchcu.in` (13003)
-**Screenshot:** [`docs/assets/ui/05-admin-overview.png`](./assets/ui/05-admin-overview.png)
+**Screenshots:** [`07-admin-login.png`](./assets/ui/07-admin-login.png) · [`05-admin-overview.png`](./assets/ui/05-admin-overview.png) · [`08-admin-control.png`](./assets/ui/08-admin-control.png)
 
 ### Preconditions
 - Admin account seeded: `admin@kitchcu.dev` / `admin123456`.
 
 ### Step-by-step UI actions
 
-1. Admin logs in with email + password.
-2. Lands on the Overview screen — platform stat tiles (owners, kitchens, orders) and a recent-activity table.
-3. Drills into Kitchens or Owners lists for detail; can moderate a kitchen's status (e.g. suspend) if needed.
-4. Opens Tickets — sees the support queue, including AI-chat-escalated tickets flagged distinctly.
-5. Opens a ticket, reads the timeline, replies; can mark it resolved.
+1. Admin opens login — left panel **AuthLoginHighlights** lists customers/refunds, flags & journeys, suspend, tickets/money, zero-commission oversight; signs in with email + password.
+2. Lands on **Overview** — attention tiles (open tickets/refunds, suspended kitchens, trial owners), platform health, charts, Quick actions into Control / Customers / Refunds.
+3. **Customers** — suspend accounts, reset passwords, view payout details (identity admin APIs).
+4. **Refunds** — escalate gateway vs direct refunds with evidence; money-stats from billing admin routes.
+5. **Control** — application data journeys grid; toggle feature flags (`refunds_gateway`, `refunds_direct`, journey keys); owner subscription overrides; recent payments.
+6. **Tickets** — support queue including AI-chat escalations; reply and resolve.
+7. **Kitchens / Owners** — activate/suspend kitchens; override SaaS tier when needed.
 
 ### API calls
 
@@ -498,13 +500,16 @@ flowchart LR
 |------|----------------|------|-------|
 | 1 | `POST /api/v1/admin/auth/login` | none | `AdminLoginRequest{email, password}` -> `AdminTokenResponse` (JWT `type:"admin"`) |
 | 2 | `GET /api/v1/admin/me` | admin | Profile |
-| 2 | `GET /api/v1/admin/stats` | admin | `PlatformStats` |
+| 2 | `GET /api/v1/admin/stats` | admin | `PlatformStats` (incl. customers, refunds_open, payments_captured) |
+| 3 | `GET /api/v1/admin/customers` (+ suspend/reset) | admin | Identity customer control |
 | 3 | `GET /api/v1/admin/owners` / `GET /api/v1/admin/kitchens` / `GET /api/v1/admin/orders` | admin | Platform-wide lists |
 | 3 | `PATCH /api/v1/admin/kitchens/{kitchen_id}/status` | admin | `KitchenStatusUpdate{status}` -> `AdminKitchenRow` |
-| 4 | `GET /api/v1/admin/tickets` | admin | `TicketListResponse` |
-| 5 | `GET /api/v1/admin/tickets/{ticket_id}` | admin | Detail + timeline |
-| 5 | `PATCH /api/v1/admin/tickets/{ticket_id}` | admin | `TicketUpdateRequest{status, priority, ...}` |
-| 5 | `POST /api/v1/admin/tickets/{ticket_id}/reply` | admin | `TicketReplyRequest{message}` -> `TicketResponse` |
+| 4 | `GET /api/v1/admin/refunds` / `payments` / `settlements` / `money-stats` | admin | Billing admin (gateway routes billing before identity catch-all) |
+| 5 | `GET/PATCH /api/v1/admin/feature-flags` · journeys | admin | Kill-switches + journey stats |
+| 6 | `GET /api/v1/admin/tickets` | admin | `TicketListResponse` |
+| 6 | `GET /api/v1/admin/tickets/{ticket_id}` | admin | Detail + timeline |
+| 6 | `PATCH /api/v1/admin/tickets/{ticket_id}` | admin | `TicketUpdateRequest{status, priority, ...}` |
+| 6 | `POST /api/v1/admin/tickets/{ticket_id}/reply` | admin | `TicketReplyRequest{message}` -> `TicketResponse` |
 
 ### Domain events published
 
@@ -783,8 +788,8 @@ Gateway-owned (not forwarded): `GET /`, `GET /health/live`, `GET /health/ready`,
 | Need | Go to |
 |------|-------|
 | Exact request/response JSON per endpoint | [`docs/API.md`](./API.md); live schema at gateway `/docs`, `/redoc`, `/openapi.json`, or Portal `/openapi` |
-| CEO/CPO/CTO narrative for these same flows | [`docs/CKAC-COMPLETE-GUIDE.md`](./CKAC-COMPLETE-GUIDE.md) §17.1–17.8 (this doc supersedes those sections in depth; the Guide keeps the condensed executive version) |
-| UI reference screenshots per surface | [`docs/assets/ui/`](./assets/ui/) — `01-portal-home`, `02-customer-home`, `03-kitchen-login`, `04-owner-dashboard`, `05-admin-overview` |
+| CEO/CPO/CTO narrative for these same flows | [`docs/CKAC-COMPLETE-GUIDE.md`](./CKAC-COMPLETE-GUIDE.md) §17.1–17.10 (this doc supersedes those sections in depth; the Guide keeps the condensed executive version) |
+| UI reference screenshots per surface | [`docs/assets/ui/`](./assets/ui/) — portal, customer home/login, kitchen login, owner dashboard, admin login/overview/Control (8 surfaces) |
 | Feature acceptance criteria (F01–F48) | `docs/CKAC-COMPLETE-PLANNING-BENCHMARK.md` |
 | Architecture / scale / TDD+EDD rationale | `docs/CKAC-ARCHITECTURE-CTO.md`, `docs/KITCHCU-ENGINEERING-STANDARDS.md` |
 | Build status per module | `docs/CKAC-IMPLEMENTATION-GUIDE.md` |
@@ -796,10 +801,10 @@ Gateway-owned (not forwarded): `GET /`, `GET /health/live`, `GET /health/ready`,
 | Field | Value |
 |-------|-------|
 | Document | `CKAC-USERFLOWS.md` |
-| Version | 1.0 |
+| Version | 1.1 |
 | Date | July 2026 |
 | Author | KitchCu engineering (AI-assisted, human-reviewed) |
 | Traceability | Every route/event cited here was read directly from `services/*/app/routes.py`, `schemas.py`, and `main.py` in this repository as of July 2026 — not inferred from memory |
 | Companion | `docs/CKAC-USERFLOWS.pdf` — generate/refresh via `python scripts/generate_userflows_pdf.py` |
 | Change policy | Update this file whenever a route, event name, or status transition changes; regenerate the PDF in the same change |
-| Supersedes | Nothing (net-new pack); condenses into Complete Guide §17 on next Guide revision |
+| Supersedes | v1.0; aligned with Complete Guide v3.2 (super-admin Control, login highlights, delivery payer) |

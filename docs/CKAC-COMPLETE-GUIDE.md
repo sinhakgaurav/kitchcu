@@ -4,11 +4,11 @@
 
 | Field | Value |
 |-------|-------|
-| Version | **3.1** |
-| Status | Phase 1 complete through **S18** (13 domain services + gateway + 4 PWAs); GST live; **E1/E2 Kitchen Quality Loop** design pack ready, not built |
+| Version | **3.2** |
+| Status | Phase 1 complete through **S18** (13 domain services + gateway + 4 PWAs); GST live; **super-admin control plane**, dish timing / ready-within, delivery payer modes, Maps tracking, login feature highlights shipped; **E1/E2 Kitchen Quality Loop** design pack ready, not built |
 | Audience | CEO, CPO, CTO, Product, Engineering, DBA, QA, Investors, AI coding agents |
 | Last updated | July 2026 |
-| Supersedes | `CKAC-COMPLETE-GUIDE.md` v3.0 (July 2026) |
+| Supersedes | `CKAC-COMPLETE-GUIDE.md` v3.1 (July 2026) |
 | Operating charter | [`.cursor/rules/kitchcu-executive-operating-charter.mdc`](../.cursor/rules/kitchcu-executive-operating-charter.mdc) — always-on, non-negotiable |
 | Engineering constitution | [`KITCHCU-ENGINEERING-STANDARDS.md`](./KITCHCU-ENGINEERING-STANDARDS.md) |
 | Agent quick spec | [`AGENTS.md`](../AGENTS.md) |
@@ -62,9 +62,11 @@
 17.6 [Payment & Split Settlement](#176-payment--split-settlement)
 17.7 [GST Monthly Close](#177-gst-monthly-close)
 17.8 [Ratings After Delivery](#178-ratings-after-delivery)
+17.9 [Delivery Payer Modes & Maps Tracking](#179-delivery-payer-modes--maps-tracking)
+17.10 [Super Admin Control Plane](#1710-super-admin-control-plane)
 
 **Part V — UI Catalog**
-18. [UI Catalog — Five Reference Surfaces](#18-ui-catalog--five-reference-surfaces)
+18. [UI Catalog — Reference Surfaces (Login, Ops, Control)](#18-ui-catalog--reference-surfaces-login-ops-control)
 
 **Part VI — Brand & UX System**
 19. [Brand / UX System](#19-brand--ux-system)
@@ -111,7 +113,10 @@ KitchCu (repo/schema identifiers use the legacy short name **`ckac`** — CloudK
 | **Kitchen** | A tenant — one cloud kitchen or home food business, owned by exactly one `Owner` row (today), identified by a human-readable code (`CKPNQ001`) and a PostGIS point for delivery-radius math. All business data is scoped to a `kitchen_id`. |
 | **Owner** | The person who runs a kitchen. Authenticates via phone OTP → JWT. Can own more than one kitchen. |
 | **Customer** | A diner. Authenticates via WhatsApp OTP or social OAuth (Google/Facebook/Instagram/X) → JWT of `type: customer`, distinct token namespace from owner JWTs. |
-| **Dish** | A menu item owned by a kitchen; belongs to a `Category` and a `Cuisine`; carries price, diet flags, prep/delivery time, and one or more `DishMedia` rows. |
+| **Dish** | A menu item owned by a kitchen; belongs to a `Category` and a `Cuisine`; carries price, diet flags, prep/delivery/`max_time_min`, and one or more `DishMedia` rows. |
+| **Ready-within / `max_time_min`** | Customer-facing honest readiness window derived from dish timing (cart uses the max across items). Never a fake aggregator-style “10 min” race timer. |
+| **Delivery payer mode** | Who pays logistics: **owner** when the customer is in-range (`fee=0`); **customer** when extended beyond max radius. Modes: `self` or `platform` courier. |
+| **Feature flag** | Platform kill-switch row (`ckac_identity.feature_flags`) toggling journeys or money paths (e.g. `refunds_gateway`, `refunds_direct`) from Admin Control. |
 | **Live-capture** | A server-enforced trust rule: a dish's hero image must be flagged `is_live_capture: true`, meaning it was captured through the owner's camera at the time of upload (via `getUserMedia`), never selected from a gallery or stock library. This is KitchCu's core anti-deception mechanism (`C1` / `P4` in the challenge tables below). |
 | **Order** | A single-kitchen purchase: `order_items` + a status machine (`received → accepted → preparing → ready → out_for_delivery → delivered`, with `cancelled` as a terminal branch) + `order_status_events` audit trail. |
 | **Master order** | A customer-facing wrapper (code `MORD-YYYYMMDD-XXXX`) around 2+ per-kitchen sub-`orders` created from one multi-kitchen cart, paid with **one** customer payment, and settled to each kitchen independently. Exists to give customers an Amazon-cart-style experience without KitchCu ever taking a commission cut. |
@@ -156,7 +161,9 @@ KitchCu (repo/schema identifiers use the legacy short name **`ckac`** — CloudK
 | Sprints shipped | **S1 – S18** (identity through live streaming) |
 | Microservices | Gateway + **13** domain services |
 | Public web surfaces | Portal · `customer.kitchcu.in` · `kitchen.kitchcu.in` · `admin.kitchcu.in` |
-| Billing / GST | Payments, UPI intents, subscriptions, split settlements, **GST profiles + tax invoices + monthly audit + balance sheet** |
+| Billing / GST | Payments, UPI intents, subscriptions, split settlements, **refunds (gateway/direct)**, **GST profiles + tax invoices + monthly audit + balance sheet** |
+| Delivery / timing | Dish **ready-within** (`max_time_min`); **delivery payer** (owner in-range / customer extended) + platform courier + Google Maps track |
+| Super admin | Customers, Refunds, **Control** (feature flags + application data journeys), kitchen suspend, subscription overrides |
 | Design-only (next) | **E1 + E2 Kitchen Quality Loop** — purchase ledger + chef standard lock — design pack approved for review, **no production code yet** |
 | Engineering method | TDD (RED→GREEN→REFACTOR) + EDD (event + outbox on every write), enforced by the [operating charter](../.cursor/rules/kitchcu-executive-operating-charter.mdc) on every change |
 
@@ -168,7 +175,7 @@ Aggregators (marketplace)          KitchCu (operating system)
 Per-order commission 18–30%        Flat monthly subscription
 Platform owns the customer         Owner owns CRM + customer data
 Stock / studio dish photos         Live-capture dish media, enforced server-side
-Speed-race delivery timers         Owner-set prep/delivery SLA, no fake ETAs
+Speed-race delivery timers         Owner-set prep/delivery/`max_time` — honest ready-within
 Single-kitchen cart only           Multi-kitchen master checkout, one payment
 No GST / quality OS for the owner  GST invoicing, ingredient ledger, recipe standards
 ```
@@ -292,10 +299,10 @@ Each module is a **bounded product + engineering context**: one row per module w
 |--|--|
 | **Definition** | The menu of truth — cuisines, categories, dishes, prices, and live-capture hero media. |
 | **Problem solved** | P4 / C1 photo deception; keeping the menu identical and fast across four independent PWAs. |
-| **Logic / how it works** | `DishMediaInput` Pydantic validator rejects any hero image lacking `is_live_capture: true` at the API boundary — the rule cannot be bypassed by a client. Public menu reads go through a **read-through Redis cache** keyed `menu:{kitchen_id}` (TTL 5 min); any `dish.created` / `dish.updated` write invalidates that key immediately so the cache never serves stale menus after an edit. Cuisine → veg/non-veg/vegan → dish is a first-class hierarchy for the customer discovery grid. |
-| **Data / events** | Schema `ckac_catalog`: `cuisines`, `categories`, `dishes`, `dish_media`. Events on `ckac:catalog:dish`: `dish.created`, `dish.updated`. |
-| **Surfaces** | Kitchen PWA (Add Dish, Menu page) · Customer PWA (browse, kitchen menu page). |
-| **Status** | ✅ S2 · cuisine hierarchy + grouped menu API ✅. |
+| **Logic / how it works** | `DishMediaInput` Pydantic validator rejects any hero image lacking `is_live_capture: true` at the API boundary — the rule cannot be bypassed by a client. Public menu reads go through a **read-through Redis cache** keyed `menu:{kitchen_id}` (TTL 5 min); any `dish.created` / `dish.updated` write invalidates that key immediately so the cache never serves stale menus after an edit. Cuisine → veg/non-veg/vegan → dish is a first-class hierarchy for the customer discovery grid. Each dish carries **prep_time_min**, **delivery_time_min**, and **max_time_min**; the API exposes `projected_ready_min` so customers see an honest **ready-within** window (never a fake “10 min delivery” race). Cart/checkout takes the **max** across line items; order ETA for delivery uses that max. |
+| **Data / events** | Schema `ckac_catalog`: `cuisines`, `categories`, `dishes` (incl. `max_time_min`), `dish_media`. Events on `ckac:catalog:dish`: `dish.created`, `dish.updated`. Migration `007_dish_max_time`. |
+| **Surfaces** | Kitchen PWA (Add Dish, Menu “Edit timing”) · Customer PWA (menu cards + checkout ready-within). |
+| **Status** | ✅ S2 · cuisine hierarchy + grouped menu API · **dish timing / ready-within** ✅. |
 
 ---
 
@@ -318,10 +325,10 @@ Each module is a **bounded product + engineering context**: one row per module w
 |--|--|
 | **Definition** | Order intake (any channel), lifecycle state machine, PDF bills, and owner analytics. |
 | **Problem solved** | P1, P3, P8, C3 — the single operational source of truth for "what did we sell, to whom, and where is it right now." |
-| **Logic / how it works** | Orders can originate from manual entry, WhatsApp draft confirmation, or customer PWA checkout — all converge on one `orders` table and one status machine: `received → accepted → preparing → ready → out_for_delivery → delivered`, with `cancelled` reachable from any pre-delivered state. Every transition appends an immutable `order_status_events` row (audit trail) and publishes `order.status.changed`. A PDF bill is generated per order/master order. `services/order/app/analytics.py` computes revenue summaries, 30-day trend, top dishes, IST-bucketed peak hours, and repeat/VIP/churn customer segments, Redis-cached (120s TTL) per kitchen. |
-| **Data / events** | Schema `ckac_orders`: `orders`, `order_items`, `order_status_events`, `order_drafts`, `master_orders`. Events on `ckac:orders:order` / `ckac:orders:draft` / `ckac:orders:master_order`: `order.placed`, `order.status.changed`, `order.draft.created`. |
-| **Surfaces** | Kitchen PWA (Orders, New Order, Order Detail, Reports) · Customer PWA (checkout, order tracking, order history). |
-| **Status** | ✅ S3 + analytics + PDF bills + master orders (S8). |
+| **Logic / how it works** | Orders can originate from manual entry, WhatsApp draft confirmation, or customer PWA checkout — all converge on one `orders` table and one status machine: `received → accepted → preparing → ready → out_for_delivery → delivered`, with `cancelled` reachable from any pre-delivered state. Every transition appends an immutable `order_status_events` row (audit trail) and publishes `order.status.changed`. A PDF bill is generated per order/master order. Delivery fulfillment stores `delivery_mode` (`self` \| `platform`), `delivery_payer` (`owner` \| `customer`), `owner_delivery_cost`, and customer lat/lng for Maps tracking; owners set fulfillment via `PATCH /orders/{id}/delivery-fulfillment`. `services/order/app/analytics.py` computes revenue summaries, 30-day trend, top dishes, IST-bucketed peak hours, and repeat/VIP/churn customer segments, Redis-cached (120s TTL) per kitchen. |
+| **Data / events** | Schema `ckac_orders`: `orders` (incl. delivery payer fields), `order_items`, `order_status_events`, `order_drafts`, `master_orders`. Events on `ckac:orders:order` / `ckac:orders:draft` / `ckac:orders:master_order`: `order.placed`, `order.status.changed`, `order.draft.created`. Migration `005_delivery_payer_mode`. |
+| **Surfaces** | Kitchen PWA (Orders, New Order, Order Detail + Maps, Reports, **CommissionAdvantagePanel** on Home) · Customer PWA (checkout, Track page with Google Maps, order history, customer dashboard). |
+| **Status** | ✅ S3 + analytics + PDF bills + master orders (S8) · **delivery payer + Maps tracking** ✅. |
 
 ---
 
@@ -344,10 +351,10 @@ Each module is a **bounded product + engineering context**: one row per module w
 |--|--|
 | **Definition** | Money movement: order payments, UPI intents, owner subscriptions, and multi-kitchen split settlements. |
 | **Problem solved** | P2 (subscription revenue model) and fair, independent payout per kitchen inside a multi-kitchen master order. |
-| **Logic / how it works** | Online/UPI capture goes through `payments`; Cash-on-Delivery orders are explicitly excluded from online capture bookkeeping. For a master order (F44), one aggregated `payment` is captured, then split into one `settlements` row per kitchen (`net_to_owner`) — modeled after Razorpay Route in dev-simulation mode today, swappable for the live Route API in production without a schema change. Payments and settlements are **never cached** (per the caching rules in §10) because staleness there is a financial-integrity bug, not a performance nicety. |
-| **Data / events** | Schema `ckac_billing`: `payments`, `settlements`, `owner_subscriptions`. Events on `ckac:billing:payment` / `ckac:billing:settlement`: `payment.captured`, `settlement.created`. |
-| **Surfaces** | Customer PWA (checkout payment step) · Kitchen PWA (Subscription page, settlement visibility). |
-| **Status** | ✅ S6 (payments/subscriptions) · S9 (split settlement). |
+| **Logic / how it works** | Online/UPI capture goes through `payments`; Cash-on-Delivery orders are explicitly excluded from online capture bookkeeping. For a master order (F44), one aggregated `payment` is captured, then split into one `settlements` row per kitchen (`net_to_owner`) — modeled after Razorpay Route in dev-simulation mode today, swappable for the live Route API in production without a schema change. Payments and settlements are **never cached** (per the caching rules in §10) because staleness there is a financial-integrity bug, not a performance nicety. **Refunds** support full/partial amounts via gateway (Razorpay-style) or **direct** UPI/bank transfer with evidence upload; feature flags `refunds_gateway` / `refunds_direct` kill-switch each path. Admin money APIs expose refunds, payments, settlements, and money-stats under `/api/v1/admin/*` (gateway routes billing admin **before** identity catch-all). |
+| **Data / events** | Schema `ckac_billing`: `payments`, `settlements`, `owner_subscriptions`, refund artifacts + evidence. Events on `ckac:billing:payment` / `ckac:billing:settlement` (+ refund lifecycle events). |
+| **Surfaces** | Customer PWA (checkout payment, refund status on dashboard) · Kitchen PWA (Subscription, settlements) · **Admin PWA — Refunds tab**. |
+| **Status** | ✅ S6 (payments/subscriptions) · S9 (split settlement) · **refunds + admin money oversight** ✅. |
 
 ---
 
@@ -420,12 +427,12 @@ Each module is a **bounded product + engineering context**: one row per module w
 
 | | |
 |--|--|
-| **Definition** | Distance-aware delivery fee quotes and shareable customer tracking links. |
-| **Problem solved** | C2 (opaque delivery fees), C3 (weak journey visibility). |
-| **Logic / how it works** | Each kitchen configures a free-delivery radius and a max-service radius (identity `delivery_fee_rules`); a fee quote computes PostGIS geodesic distance between kitchen and customer address, applies a fee curve, and returns an accept/deny decision **before** checkout so the customer never discovers the fee at the last step (F27/F28/F31). Tracking issues a signed, time-bounded token/link the customer can share without logging in. |
-| **Data / events** | Schema `ckac_delivery`: `delivery_quotes`. Events on `ckac:delivery:quote` / `tracking`. |
-| **Surfaces** | Customer PWA (checkout fee quote, `TrackOrderPage.tsx`). |
-| **Status** | ✅ S13. |
+| **Definition** | Distance-aware delivery fee quotes, **who pays logistics**, platform-courier quotes, and shareable Maps tracking. |
+| **Problem solved** | C2 (opaque delivery fees), C3 (weak journey visibility); owner control of in-range vs extended delivery economics. |
+| **Logic / how it works** | Each kitchen configures free-delivery and max-service radii (identity `delivery_fee_rules`). A fee quote computes PostGIS geodesic distance kitchen→customer and returns accept decision **before** checkout (F27/F28/F31). **Payer rules:** when `distance ≤ max_delivery_radius_km` (in-range), modes are `self` or `platform` and the **owner** covers logistics (customer fee `0`); when distance is beyond max (`extended`), the **customer** pays (self fee or platform partner quote). Platform courier adapter: `services/delivery/app/platform_courier.py` (`DELIVERY_PARTNER=mock\|http`). Tracking issues a signed, time-bounded link; public Track + owner Order Detail embed **Google Maps directions** (kitchen→customer) without requiring partner GPS for v1. Design pack: [`DELIVERY-PAYER-MODE-DESIGN.md`](./DELIVERY-PAYER-MODE-DESIGN.md). |
+| **Data / events** | Schema `ckac_delivery`: `delivery_quotes` (incl. payer/mode). Events on `ckac:delivery:quote` / `tracking`. Order fields owned by `ckac_orders` (see M05). |
+| **Surfaces** | Customer PWA (checkout fee quote + Maps track) · Kitchen PWA (fulfillment controls on Order Detail). |
+| **Status** | ✅ S13 · **delivery payer modes + platform courier + Maps** ✅. |
 
 ---
 
@@ -472,12 +479,12 @@ Each module is a **bounded product + engineering context**: one row per module w
 
 | | |
 |--|--|
-| **Definition** | Installable React surfaces for every persona. |
-| **Problem solved** | Distribution without app-store gatekeeping or review delays; deep-linkable from WhatsApp. |
-| **Logic / how it works** | One Vite monorepo (`apps/website/`) builds four independent bundles (`portal`, `customer`, `kitchen`, `admin`) sharing components, brand tokens (`shared/brand.ts`), and API helpers, but each with its own `main.tsx` entry, manifest, and service worker where offline matters (customer, kitchen). The **`OwnerPageShell`** component gives the kitchen dashboard a consistent command-center layout across every owner page. |
-| **Data / events** | No schema — pure client. |
+| **Definition** | Installable React surfaces for every persona — including super-admin control. |
+| **Problem solved** | Distribution without app-store gatekeeping or review delays; deep-linkable from WhatsApp; platform ops in one Admin shell. |
+| **Logic / how it works** | One Vite monorepo (`apps/website/`) builds four independent bundles (`portal`, `customer`, `kitchen`, `admin`) sharing components, brand tokens (`shared/brand.ts`), and API helpers, but each with its own `main.tsx` entry, manifest, and service worker where offline matters (customer, kitchen). **`OwnerPageShell`** unifies the kitchen dashboard. **`AuthLoginHighlights`** (left panel on Kitchen / Customer / Admin login) lists subdomain-specific value props (zero commission, ready-within, Maps, refunds, feature flags). Owner Home includes **`CommissionAdvantagePanel`** (0% food take vs typical 25–30% aggregator comparison). Customer **Dashboard** covers savings, health tips, refunds, and addresses. Admin tabs: Overview · Kitchens · Owners · Customers · Orders · Refunds · Tickets · **Control** (feature flags, application data journeys, subscription overrides, money snapshot). |
+| **Data / events** | Client-only; identity feature flags / journey stats + billing admin APIs power Admin Control. |
 | **Surfaces** | All four apps — see §18/§21. |
-| **Status** | ✅ Continuous polish; installable + offline-capable on customer and kitchen. |
+| **Status** | ✅ Continuous polish; login highlights · customer dashboard · super-admin Control plane ✅. |
 
 ---
 
@@ -817,6 +824,7 @@ platform_admins (standalone — platform scope only, no owner JWT)
 | `customers` | Diner identity (WhatsApp OTP primary) |
 | `customer_oauth_identities` | Linked Google/Facebook/Instagram/X identities per customer |
 | `platform_admins` | Admin login, platform-scope only |
+| `feature_flags` | Platform kill-switches (key, scope, enabled, description) — migration `008_feature_flags` |
 
 ### `ckac_catalog` — menu of truth + pantry
 
@@ -830,7 +838,7 @@ dishes 1──* dish_prep_steps
 | Table | Purpose |
 |-------|---------|
 | `cuisines` / `categories` | Menu hierarchy (cuisine → veg/non-veg/vegan → dish) |
-| `dishes` | Menu item: price, diet flags, prep/delivery time |
+| `dishes` | Menu item: price, diet flags, prep/delivery/`max_time_min` (ready-within) |
 | `dish_media` | Hero + gallery images; `is_live_capture` enforced |
 | `ingredients` | Pantry item with low-stock threshold |
 | `dish_ingredients` | Recipe line (many-to-many, ingredient × qty × unit) |
@@ -848,7 +856,7 @@ order_drafts (pre-confirmation, from WhatsApp parser)
 
 | Table | Purpose |
 |-------|---------|
-| `orders` | One kitchen's order: status machine, totals, source channel |
+| `orders` | One kitchen's order: status machine, totals, source channel, `delivery_mode` / `delivery_payer` / Maps lat-lng |
 | `master_orders` | Multi-kitchen wrapper around 2+ `orders` |
 | `order_items` | Line items (dish × qty × price at time of order) |
 | `order_status_events` | Immutable audit trail of every status transition |
@@ -1038,6 +1046,10 @@ curl "http://localhost:18000/openapi.json?refresh=true"   # force refresh after 
 | Home-taste ratings + aggregates + A/V | S11 | ✅ |
 | Combos / patterns / suggestions / daily menu push | S12 | ✅ |
 | Delivery radius / fees / distance / tracking | S13 | ✅ |
+| Delivery payer modes + platform courier + Maps track | (delivery/order extension) | ✅ |
+| Dish prep/delivery/max_time + customer ready-within | (catalog extension) | ✅ |
+| Super admin: customers, refunds, flags, journeys, Control | (identity + billing + admin PWA) | ✅ |
+| Login feature highlights + owner commission panel + customer dashboard | (website PWAs) | ✅ |
 | Tracking-interval reminders + WhatsApp order updates | S14 | ✅ |
 | Ingredient balance mapper (F19) | S15 | ✅ |
 | Learning portal + dish trials | S16 | ✅ |
@@ -1198,13 +1210,54 @@ sequenceDiagram
 
 Ratings are only accepted against an order the requesting customer actually placed **and** that has reached `delivered` — a rating submitted against a `received` or `cancelled` order is rejected outright, which is what makes the aggregate a genuine trust signal rather than an easily-gamed counter.
 
+## 17.9 Delivery Payer Modes & Maps Tracking
+
+**Context.** Aggregators often hide who pays for last-mile logistics until checkout. KitchCu makes the rule explicit: **inside the kitchen’s max radius the owner covers logistics** (customer fee ₹0); **beyond range the customer pays** for self or platform courier — so kitchens can still fulfill without silently eating unbounded distance costs.
+
+```mermaid
+flowchart TD
+  Q[POST delivery quote lat/lng] --> D{distance vs max_radius}
+  D -->|in range| O[payer=owner fee=0]
+  D -->|extended| C[payer=customer]
+  O --> M{mode self or platform}
+  C --> M
+  M -->|platform| P[platform_courier quote]
+  M -->|self| S[owner sets or self fee]
+  P --> CHK[Checkout + order fields]
+  S --> CHK
+  CHK --> T[Track: Google Maps kitchen to customer]
+```
+
+| Step | Actor | Surface / API | What changes |
+|------|-------|---------------|--------------|
+| 1 | Customer | Checkout requests quote with address lat/lng | Delivery service returns distance, fee, `payer`, available modes |
+| 2 | Customer / Owner | Fulfillment choice | `orders.delivery_mode`, `delivery_payer`, `owner_delivery_cost`, customer lat/lng persisted |
+| 3 | Owner | `PATCH .../orders/{id}/delivery-fulfillment` | Sets self vs platform when operating the kitchen |
+| 4 | Customer / Owner | Track page / Order Detail | Google Maps directions embed + open-in-Maps; no partner GPS required for v1 |
+
+See [`DELIVERY-PAYER-MODE-DESIGN.md`](./DELIVERY-PAYER-MODE-DESIGN.md) for the contract table.
+
+## 17.10 Super Admin Control Plane
+
+**Context.** Platform ops need one place to see **customers, refunds, money, kill-switches, and journey health** without impersonating an owner JWT (admin tokens never call owner-mutation routes).
+
+| Area | Admin tab / API | Job |
+|------|-----------------|-----|
+| Health | Overview | Stat tiles, charts, quick actions (tickets, refunds, suspended kitchens, trials) |
+| People | Customers, Owners, Kitchens | Suspend, activate, subscription overrides |
+| Money | Refunds + billing admin | Gateway vs direct refunds, payments, settlements, money-stats |
+| Governance | **Control** | Feature flags (`refunds_*`, journey flags), application data journeys grid, recent payments |
+| Support | Tickets | Escalated AI-chat queues |
+
+Gateway note: admin **billing** paths are registered **before** the identity admin catch-all so refunds/payments proxy correctly.
+
 ---
 
 # Part V — UI Catalog
 
-## 18. UI Catalog — Five Reference Surfaces
+## 18. UI Catalog — Reference Surfaces (Login, Ops, Control)
 
-The screenshots referenced below live at `docs/assets/ui/`. Each is a reference capture of a live surface, used here to document **anatomy** (what's on screen and why), **UX intent** (what job that screen does), **brand cues** (which half of the brand system — light marketing cream/teal/orange, or dark ops — it belongs to), and the **demo data** it renders against.
+Screenshots live at [`docs/assets/ui/`](./assets/ui/) (PNG for markdown; `*-pdf.jpg` for PDF size). Each capture documents **anatomy**, **UX intent**, **brand theme**, and **product context** for the July 2026 addons (login highlights, super-admin Control, ready-within / Maps / zero-commission messaging).
 
 ### 18.1 Portal Home
 
@@ -1213,10 +1266,10 @@ The screenshots referenced below live at `docs/assets/ui/`. Each is a reference 
 | | |
 |--|--|
 | **Surface** | Portal, `kitchcu.in` :13000 |
-| **Anatomy** | `PortalNavbar` (wordmark left, nav links + CTA right) → `Hero` / `HeroCopyParallax` (headline + positioning claim + primary "Get started" CTA) → `AudienceSections` (owner vs customer value split) → `Features` → `Pricing` (Starter/Growth/Pro tiers) → `CustomerShowcase` / `FloatingGallery` (live-capture dish imagery) → `SupportSection` (AI chat entry) → `PortalFooter`. |
-| **UX intent** | This is the **only** surface whose job is persuasion, not operation — a prospective owner or investor should understand the positioning claim ("India's first — and the world's third — platform with this feature stack") within one scroll, and reach pricing within two. |
-| **Brand cues** | Full **light marketing theme**: cream (`#FFF8EE`) background, teal/orange wordmark, parallax hero art, mascot and creative-hero illustrations from `logos/` used generously — this is the one surface where brand personality is allowed to be loud. |
-| **Demo** | Static marketing content; the pricing tiers shown match §2's Starter ₹499 / Growth ₹999 / Pro ₹1,999 dev defaults. |
+| **Anatomy** | `PortalNavbar` → `Hero` / `HeroCopyParallax` → `AudienceSections` → `Features` → `Pricing` → live-capture showcase → Support → Footer. |
+| **UX intent** | Persuasion only — positioning claim + path to pricing in two scrolls. |
+| **Brand cues** | Light marketing: cream `#FFF8EE`, teal/orange wordmark, parallax hero. |
+| **Demo** | Static; Starter ₹499 / Growth ₹999 / Pro ₹1,999. |
 
 ### 18.2 Customer Home
 
@@ -1224,49 +1277,86 @@ The screenshots referenced below live at `docs/assets/ui/`. Each is a reference 
 
 | | |
 |--|--|
-| **Surface** | Customer PWA, `customer.kitchcu.in` :13001 |
-| **Anatomy** | `CustomerNavbar` (location chip + cart icon + login) → `NearbyKitchensList` (PostGIS-sorted kitchen cards with live-capture hero thumbnail, distance, rating chip) → diet/cuisine filter row → `CustomerFooter`. |
-| **UX intent** | **Discovery-first.** The very first thing a customer sees is proof of nearby, real kitchens with real photos — the screen's entire job is to answer "is there a trustworthy kitchen near me right now," closing C1 and C6 in the same view. |
-| **Brand cues** | **Light marketing-adjacent theme** — cream background, teal accents on filter chips, orange primary CTA ("Order now") — customer-facing surfaces stay in the light, warm palette because trust and appetite appeal benefit from warmth, unlike ops screens. |
-| **Demo** | Renders against seeded kitchens including `CKPNQ001` (Sharma Home Kitchen, Pune) at the default demo location (Koregaon Park, 18.5362° N, 73.8958° E). |
+| **Surface** | Customer PWA :13001 |
+| **Anatomy** | Navbar (Nearby, My orders, Dashboard, Payout, Find by code) → kitchen code entry → filters (radius, diet, live-capture, live stream) → `NearbyKitchensList`. |
+| **UX intent** | Discovery-first trust (C1/C6). |
+| **Brand cues** | Light cream/teal; orange CTAs. |
+| **Demo** | Demo location Pune / `CKPNQ001` after seed. |
 
-### 18.3 Kitchen Login
+### 18.3 Customer Login (highlights)
 
-![Kitchen login — owner OTP entry](./assets/ui/03-kitchen-login.png)
+![Customer login — AuthLoginHighlights](./assets/ui/06-customer-login.png)
 
 | | |
 |--|--|
-| **Surface** | Kitchen PWA, `kitchen.kitchcu.in` :13002 — `LoginPage.tsx` |
-| **Anatomy** | Centered auth card: wordmark + `creative-chef.png` hero illustration → phone number field → "Send OTP" → OTP field (auto-advances to kitchen selection/creation on success). |
-| **UX intent** | The **fastest possible path** from "I found this app" to "I'm looking at my orders" — deliberately minimal, no marketing copy, no distraction; this screen's only job is authentication in under two steps. |
-| **Brand cues** | Transitional screen — light cream background with the `creative-chef` illustration (warm, personal), but already hinting at the dark ops theme via the card's deep-navy accents, since the next screen after login is the dark dashboard. |
-| **Demo** | Phone `9876543210` (Raj Sharma), OTP `123456` — see §20 for the full demo owner roster. |
+| **Surface** | `customer.kitchcu.in/login` |
+| **Anatomy** | **Left:** wordmark + bullet highlights (ready-within, Maps track, full dashboard, in-range no markup, live-capture) + chef mascot. **Right:** demo WhatsApp login cards + OTP form + social OAuth buttons. |
+| **UX intent** | Authenticate **and** teach the customer value prop before the first order — highlights are not decoration; they encode honest timing, Maps, and delivery payer economics. |
+| **Brand cues** | Light auth split panel; teal primary OTP CTA. |
+| **Demo** | WhatsApp OTP `123456`; demo diners (Priya / Rahul / Ananya). |
 
-### 18.4 Owner Dashboard
+### 18.4 Kitchen Login (highlights)
+
+![Kitchen login — owner OTP + highlights](./assets/ui/03-kitchen-login.png)
+
+| | |
+|--|--|
+| **Surface** | `kitchen.kitchcu.in/login` |
+| **Anatomy** | **Left:** wordmark + owner highlights (zero commission vs 25–30%, per-dish timing, in-range owner-pays logistics, extended customer-pays, Maps tracking). **Right:** demo owner Sign-in cards + phone/OTP. |
+| **UX intent** | Fast OTP path **plus** SaaS positioning — owners see why they are not on an aggregator take-rate before they enter the dark ops shell. |
+| **Brand cues** | Light transitional → next screen is dark ops. |
+| **Demo** | `9876543210` / OTP `123456` (after `seed-dev-data.py`). |
+
+### 18.5 Owner Dashboard
 
 ![Owner dashboard — kitchen command center](./assets/ui/04-owner-dashboard.png)
 
 | | |
 |--|--|
-| **Surface** | Kitchen PWA, `kitchen.kitchcu.in` :13002 — `OwnerHomePage.tsx` inside `OwnerLayout` / `OwnerPageShell` |
-| **Anatomy** | Persistent left/side nav (Home, Orders, Menu, Ingredients, Reports, CRM, Coupons, Growth, GST & Finance, Learning, Community, Stream, Subscription) → top status strip (today's revenue, order count, pending-accept count) → primary action card ("New Order") → recent-orders feed → low-stock ingredient alert (if any). |
-| **UX intent** | **Inbox-first, one primary action per screen** (the frontend rule from §15/AGENTS.md §7). An owner mid-service should be able to see "what needs my attention right now" without hunting through menus — the entire nav is the capability ladder from §7 made literal, with rungs 3–5 items (Ingredients, Growth, GST) only meaningfully populated once the kitchen has traction. |
-| **Brand cues** | Full **dark ops theme** — deep navy (`#0B1B32`) surfaces, teal/orange used sparingly as status and CTA accents, not as decoration. Ops dashboards are dark by design: an owner using this screen for hours during service should not be fighting a bright-white UI, and the dark theme visually separates "I am running my business" from "I am reading marketing" (Portal/Customer). |
-| **Demo** | Renders Raj Sharma's `CKPNQ001` kitchen with seeded orders from `scripts/seed-dev-data.py` / `scripts/bulk_demo_data.py`. |
+| **Surface** | Kitchen PWA — `OwnerHomePage` / `OwnerPageShell` |
+| **Anatomy** | Side nav (capability ladder) → status strip → **New Order** → recent orders → **`CommissionAdvantagePanel`** (0% food commission vs aggregator comparison chart) → low-stock alerts. |
+| **UX intent** | Inbox-first ops; commission panel reinforces the business model every session. |
+| **Brand cues** | Dark navy ops `#0B1B32`. |
+| **Demo** | Seeded `CKPNQ001` kitchen. |
 
-### 18.5 Admin Overview
+### 18.6 Admin Login (highlights)
 
-![Admin overview — platform operations](./assets/ui/05-admin-overview.png)
+![Admin login — platform control highlights](./assets/ui/07-admin-login.png)
 
 | | |
 |--|--|
-| **Surface** | Admin PWA, `admin.kitchcu.in` :13003 |
-| **Anatomy** | Admin nav (Overview, Kitchens, Owners, Orders, Tickets) → platform-wide stat tiles (total kitchens, total orders, open tickets) → recent-activity table → support ticket queue with AI-chat-escalation badges. |
-| **UX intent** | **Platform-scope oversight, never owner-scope operation.** This surface exists to answer "is the platform healthy and are any kitchens/customers stuck," not to let an admin edit a kitchen's menu or orders on its behalf — admin JWTs are deliberately scoped away from owner-mutation routes (see §15 security posture). |
-| **Brand cues** | **Dark ops theme**, matching the Kitchen dashboard's visual language — admin and owner are both "operate the platform" contexts, so they share the dark palette, distinct from the light marketing/customer contexts. |
-| **Demo** | Login `admin@kitchcu.dev` / `admin123456`; overview tiles reflect whatever demo/seed data is currently loaded. |
+| **Surface** | `admin.kitchcu.in` unauthenticated |
+| **Anatomy** | Left: platform-control highlights (customers/refunds/payments, feature flags & journeys, kitchen suspend, tickets/money, zero-commission oversight). Right: email/password Sign in. |
+| **UX intent** | Make the **super-admin job** readable before credentials — this is not a kitchen login. |
+| **Brand cues** | Dark-leaning auth; admin continuity with ops theme. |
+| **Demo** | `admin@kitchcu.dev` / `admin123456`. |
+
+### 18.7 Admin Overview
+
+![Admin overview — platform health](./assets/ui/05-admin-overview.png)
+
+| | |
+|--|--|
+| **Surface** | Admin PWA Overview |
+| **Anatomy** | Nav: Overview, Kitchens, Owners, **Customers**, Orders, **Refunds**, Tickets, **Control** → attention tiles (open tickets/refunds, suspended kitchens, trial owners) → platform health → charts (orders 14d, status mix, top kitchens, subscription tiers) → Quick actions. |
+| **UX intent** | Platform health at a glance; deep work lives in Customers / Refunds / Control. |
+| **Brand cues** | Dark ops (matches Kitchen). |
+| **Demo** | Stats reflect current seed/DB state. |
+
+### 18.8 Admin Control Plane
+
+![Admin Control — flags and journeys](./assets/ui/08-admin-control.png)
+
+| | |
+|--|--|
+| **Surface** | Admin PWA → **Control** |
+| **Anatomy** | Application data journeys grid (owner onboard, customer discover→cart, checkout→settlement, dispute→refund, complaint→ticket, kill-switches) → Feature flags table (key/scope/description/toggle) → Owner subscription control → Recent payments. |
+| **UX intent** | Governance: pause refund paths, understand journey volume, override SaaS tiers — without touching tenant menus. |
+| **Brand cues** | Dark ops; orange selection on Control. |
+| **Demo** | Flags such as `refunds_gateway`, `refunds_direct`, journey-scoped keys. |
 
 ---
+
 
 # Part VI — Brand & UX System
 
@@ -1462,7 +1552,7 @@ Full acceptance criteria for every feature: [`CKAC-COMPLETE-PLANNING-BENCHMARK.m
 
 | Doc | Role |
 |-----|------|
-| **This guide (v3.1)** | CEO/CPO/CTO master encyclopedia |
+| **This guide (v3.2)** | CEO/CPO/CTO master encyclopedia |
 | [`CKAC-USERFLOWS.md`](./CKAC-USERFLOWS.md) / [`.pdf`](./CKAC-USERFLOWS.pdf) | Full user journey pack — every persona, every screen, every API call |
 | [`API.md`](./API.md) | Public API reference — auth cheat-sheet, quick-start examples, error catalog |
 | Gateway `/openapi.json`, `/docs`, `/redoc` · Portal `/openapi` (`/api-docs`) | Live, always-current aggregated OpenAPI contract (see §15.5) |
@@ -1478,17 +1568,19 @@ Full acceptance criteria for every feature: [`CKAC-COMPLETE-PLANNING-BENCHMARK.m
 | [`CKAC-GAPS.md`](./CKAC-GAPS.md) | Historical gap tracker (superseded in most areas by AGENTS.md's current build baseline) |
 | [`AGENTS.md`](../AGENTS.md) | Agent / engineer quick spec — read before every code change |
 | [`.cursor/rules/`](../.cursor/rules/) | Auto-applied Cursor rules (operating charter, TDD/EDD, backend, frontend, security) |
-| [`docs/assets/ui/`](./assets/ui/) | Reference UI screenshots (see §18) |
+| [`docs/assets/ui/`](./assets/ui/) | Reference UI screenshots (see §18 — 8 surfaces) |
+| [`DELIVERY-PAYER-MODE-DESIGN.md`](./DELIVERY-PAYER-MODE-DESIGN.md) | Delivery payer + platform courier rules |
 
 # Appendix C — Document Control
 
 | Version | Date | Changes |
 |---------|------|---------|
-| **3.1** | July 2026 | Documents the aggregated gateway OpenAPI contract (§15.5: `/openapi.json`, `/docs`, `/redoc`, portal `/openapi`/`/api-docs`, `docs/API.md`, `?refresh=true`, mandatory `summary`/`description`/`Field`/`responses` on every route via `ckac_common.openapi`); adds the unified form spacing system (§19.5: `owner-forms.css` field-stack tokens spanning auth + dashboards); links the new step-by-step [`CKAC-USERFLOWS.md`](./CKAC-USERFLOWS.md) pack from the TOC and Part IV; updates Appendix B/document index and changelog. |
+| **3.2** | July 2026 | Super-admin Control plane (Customers/Refunds/Control, feature flags, journeys); dish prep/delivery/`max_time` + customer ready-within; delivery payer modes (owner in-range / customer extended) + platform courier + Google Maps tracking; login `AuthLoginHighlights` + owner `CommissionAdvantagePanel` + customer dashboard; expanded UI Catalog (§18.1–18.8) with new screenshots; flows §17.9–17.10; PDF layout v3.2 (header clearance, caption-above-figure, no overlap). |
+| 3.1 | July 2026 | Documents the aggregated gateway OpenAPI contract (§15.5: `/openapi.json`, `/docs`, `/redoc`, portal `/openapi`/`/api-docs`, `docs/API.md`, `?refresh=true`, mandatory `summary`/`description`/`Field`/`responses` on every route via `ckac_common.openapi`); adds the unified form spacing system (§19.5: `owner-forms.css` field-stack tokens spanning auth + dashboards); links the new step-by-step [`CKAC-USERFLOWS.md`](./CKAC-USERFLOWS.md) pack from the TOC and Part IV; updates Appendix B/document index and changelog. |
 | 3.0 | July 2026 | Full rewrite as a definitions-first encyclopedia: glossary; architecture "why" for microservices/gateway/schemas/streams/outbox/tenant scoping; 100k-session scale lens; TDD+EDD rationale (not just rules); step-by-step product flows with Mermaid sequence/flow diagrams for owner onboarding, OTP login, WhatsApp/manual order intake, single + multi-kitchen checkout, split settlement, GST close, post-delivery ratings; per-schema logical ER using real table names from the codebase; UI Catalog section (5 reference screenshots with anatomy/UX/brand notes); brand/UX system with light-vs-dark theme rationale; demo credentials and ports tables; operating charter reference; E1/E2 quality-loop summary; F01–F48 status appendix. |
 | 2.0 | July 2026 | CEO/CPO/CTO module catalog + build status through S18; GST live; E1/E2 design pack referenced |
 | 1.0 | (superseded) | Initial Phase 1 baseline (S1–S4) |
 
 ---
 
-*KitchCu Complete Executive & Engineering Guide v3.1 — Confidential — July 2026*
+*KitchCu Complete Executive & Engineering Guide v3.2 — Confidential — July 2026*

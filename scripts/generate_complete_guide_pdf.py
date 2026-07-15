@@ -1,15 +1,15 @@
 #!/usr/bin/env python3
-"""Generate Kitchcu Complete Executive Guide PDF v3.1 — deep encyclopedia (CEO + CPO + CTO).
+"""Generate Kitchcu Complete Executive Guide PDF v3.2 — deep encyclopedia (CEO + CPO + CTO).
 
-Source of truth: docs/CKAC-COMPLETE-GUIDE.md v3.1 (July 2026).
-Shared layout: scripts/pdf_guide.py (GuidePDF).
+Source of truth: docs/CKAC-COMPLETE-GUIDE.md v3.2 (July 2026).
+Shared layout: scripts/pdf_guide.py (GuidePDF) — header clearance, caption-above figures.
 """
 
 from pathlib import Path
 
 from pdf_guide import GuidePDF
 
-GUIDE_VERSION = "3.1"
+GUIDE_VERSION = "3.2"
 GUIDE_DATE = "July 2026"
 OUTPUT = Path(__file__).resolve().parent.parent / "docs" / "CKAC-COMPLETE-GUIDE.pdf"
 UI = Path(__file__).resolve().parent.parent / "docs" / "assets" / "ui"
@@ -35,11 +35,13 @@ def build() -> GuidePDF:
             "Part 0 definitions + glossary (tenant, outbox, EventEnvelope, live-capture, master order)",
             "Parts I-III: CEO / CPO / CTO lenses through S18 + GST; E1/E2 design-ready",
             "Aggregated OpenAPI portal (/openapi.json, /docs, /redoc, portal /openapi) + docs/API.md",
-            "Parts IV-V: step-by-step product flows + UI Catalog (5 reference JPEGs)",
-            "Full step-by-step userflows pack: docs/CKAC-USERFLOWS.md / .pdf (companion document)",
-            "Parts VI-VIII: brand/UX (incl. unified form spacing), demo credentials, ports, operating charter, E1/E2 summary",
+            "Parts IV-V: product flows (+ delivery payer, super-admin) + UI Catalog (8 JPEGs)",
+            "Addons: dish ready-within, Maps tracking, login highlights, Control plane, refunds",
+            "Full userflows pack: docs/CKAC-USERFLOWS.md / .pdf",
+            "Parts VI-VIII: brand/UX, demo credentials, ports, charter, E1/E2 summary",
             "Zero per-order food commission; owner-owned CRM; live-capture truth",
             "India's first — and the world's third — platform with this feature stack",
+            "PDF layout v3.2: running header clearance; no caption/title overlap",
         ],
     )
 
@@ -74,10 +76,13 @@ def build() -> GuidePDF:
         ]),
         ("PART IV — Product Flows", [
             "17.1-17.8 Owner onboard, OTP, intake, checkout, settlement, GST, ratings",
+            "17.9 Delivery payer modes + Maps tracking",
+            "17.10 Super admin Control plane",
             "Full journey pack: docs/CKAC-USERFLOWS.md / .pdf",
         ]),
         ("PART V — UI Catalog", [
-            "18. Five reference surfaces (Portal, Customer, Kitchen login, Owner, Admin)",
+            "18. Eight surfaces: portal, customer home/login, kitchen login,",
+            "owner dashboard, admin login/overview/Control",
         ]),
         ("PART VI — Brand & UX", [
             "19. Palette tokens, two themes, asset map, unified form spacing system",
@@ -151,6 +156,9 @@ def build() -> GuidePDF:
             ["Idempotency-Key", "Client header on money POSTs; prevents double-charge"],
             ["Correlation ID", "X-Correlation-ID from gateway across all services"],
             ["Home-taste rating", "0.6*taste + 0.4*quality; verified delivered only"],
+            ["Ready-within / max_time", "Honest readiness from dish timing; cart uses max"],
+            ["Delivery payer", "Owner pays in-range; customer pays extended"],
+            ["Feature flag", "Admin Control kill-switch (e.g. refunds_gateway)"],
             ["Purchase / lock", "E1/E2 design: bill-backed stock + recipe standard lock"],
         ],
         [42, 128],
@@ -901,74 +909,105 @@ def build() -> GuidePDF:
         "Tips -> dish_suggestions pending; accepted tips feed E2 (design)"
     )
 
+    pdf.chapter("Delivery Payer Modes & Maps Tracking")
+    pdf.body(
+        "In-range (distance <= max radius): mode self|platform, payer=owner, "
+        "customer fee 0. Extended: payer=customer (self fee or platform courier quote). "
+        "Adapter: delivery/app/platform_courier.py. Order stores delivery_mode, "
+        "delivery_payer, owner_delivery_cost, customer lat/lng. Track + Order Detail: "
+        "Google Maps directions kitchen->customer. Design: DELIVERY-PAYER-MODE-DESIGN.md."
+    )
+    pdf.bullets([
+        "Dish timing: prep_time_min + delivery_time_min + max_time_min -> ready-within",
+        "Cart/checkout uses max projected_ready_min across line items",
+        "Owner PATCH /orders/{id}/delivery-fulfillment for self vs platform",
+        "CommissionAdvantagePanel on owner home: 0% food take vs typical aggregators",
+    ])
+
+    pdf.chapter("Super Admin Control Plane")
+    pdf.bullets([
+        "Login highlights: customers/refunds, flags & journeys, suspend, money, SaaS oversight",
+        "Nav: Overview, Kitchens, Owners, Customers, Orders, Refunds, Tickets, Control",
+        "Control: application data journeys + feature_flags kill-switches + subscription overrides",
+        "Billing admin (refunds/payments/settlements/money-stats) proxied before identity catch-all",
+        "Admin JWT never mutates owner menu/order routes",
+    ])
+
     # ═════════════════════════════════════════════════════════════════════
     # PART V — UI Catalog
     # ═════════════════════════════════════════════════════════════════════
-    pdf.lens_part("UI", 5, "UI Catalog — Five Reference Surfaces")
+    pdf.lens_part("UI", 5, "UI Catalog — Eight Reference Surfaces")
     pdf.body(
-        "Screenshots from docs/assets/ui/ (JPEG for PDF size). Each documents "
-        "surface, anatomy, UX intent, and brand theme (light marketing vs dark ops)."
+        "Screenshots from docs/assets/ui/ (*-pdf.jpg). Anatomy, UX intent, brand theme, "
+        "and addon context (login highlights, Control plane, Maps/timing messaging). "
+        "Layout: caption above image; content starts below running header (no overlap)."
     )
 
     pdf.chapter("Portal Home")
     pdf.figure(
         UI / "01-portal-home-pdf.jpg",
-        "Portal home (kitchcu.in :13000) — Light marketing theme. Anatomy: PortalNavbar "
-        "wordmark + CTA; Hero/HeroCopyParallax with positioning claim (India's first / "
-        "world's third feature stack) + Get started; AudienceSections; Features; Pricing "
-        "(Starter/Growth/Pro); live-capture showcase; Support AI chat; PortalFooter. "
-        "UX intent: persuasion only — understand claim in one scroll, reach pricing in two. "
-        "Brand: cream #FFF8EE, teal/orange wordmark, parallax hero art, mascot/creative art.",
-        max_h=88,
+        "Portal (kitchcu.in :13000) — Light marketing. Hero + pricing + live-capture "
+        "showcase. Persuasion only; reach pricing in two scrolls. Cream #FFF8EE.",
+        max_h=78,
     )
 
     pdf.chapter("Customer Home")
     pdf.figure(
         UI / "02-customer-home-pdf.jpg",
-        "Customer home (customer.kitchcu.in :13001) — Light marketing-adjacent theme. "
-        "Anatomy: CustomerNavbar (location chip, cart, login); NearbyKitchensList "
-        "(PostGIS-sorted cards with live-capture thumbnail, distance, rating); "
-        "diet/cuisine filters; CustomerFooter. UX intent: discovery-first — answer "
-        "'is there a trustworthy kitchen near me' (closes C1 + C6). Brand: cream + teal "
-        "filter accents + orange Order CTA. Demo: CKPNQ001 near Koregaon Park.",
-        max_h=88,
+        "Customer home (:13001) — Discovery: NearbyKitchensList, diet/live-capture "
+        "filters, Dashboard nav. Closes trust + near-me (C1/C6). Demo: CKPNQ001 Pune.",
+        max_h=78,
+    )
+
+    pdf.chapter("Customer Login")
+    pdf.figure(
+        UI / "06-customer-login-pdf.jpg",
+        "Customer login — Left AuthLoginHighlights: ready-within, Maps track, full "
+        "dashboard, in-range no markup, live-capture. Right: demo WhatsApp OTP + OAuth. "
+        "Dev OTP 123456.",
+        max_h=78,
     )
 
     pdf.chapter("Kitchen Login")
     pdf.figure(
         UI / "03-kitchen-login-pdf.jpg",
-        "Kitchen login (kitchen.kitchcu.in :13002) — Transitional screen. Anatomy: "
-        "centered auth card with wordmark + creative-chef illustration; phone field; "
-        "Send OTP; OTP field auto-advances to kitchen select/create. UX intent: fastest "
-        "path from install to Orders — auth only, no marketing copy. Brand: cream + "
-        "creative-chef warmth, deep-navy card accents hinting at dark ops dashboard next. "
-        "Demo: 9876543210 / OTP 123456 (Raj Sharma).",
-        max_h=88,
+        "Kitchen login — Left highlights: zero commission vs 25-30%, dish timing, "
+        "in-range owner pays / extended customer pays, Maps. Right: demo owner OTP. "
+        "9876543210 / 123456 after seed.",
+        max_h=78,
     )
 
     pdf.chapter("Owner Dashboard")
     pdf.figure(
         UI / "04-owner-dashboard-pdf.jpg",
-        "Owner dashboard (kitchen.kitchcu.in — OwnerHomePage / OwnerPageShell) — Dark ops "
-        "theme. Anatomy: side nav (Home, Orders, Menu, Ingredients, Reports, CRM, Coupons, "
-        "Growth, GST, Learning, Community, Stream, Subscription); status strip (revenue, "
-        "orders, pending); New Order primary action; recent-orders feed; low-stock alerts. "
-        "UX intent: inbox-first, one primary action — capability ladder made literal. "
-        "Brand: navy #0B1B32 surfaces; teal/orange as status/CTA only. Dark by design for "
-        "long mid-service sessions; separates ops from marketing (Portal/Customer).",
-        max_h=88,
+        "Owner dashboard — Dark ops. Side nav capability ladder; New Order; recent "
+        "orders; CommissionAdvantagePanel (0% food commission). Navy #0B1B32.",
+        max_h=78,
+    )
+
+    pdf.chapter("Admin Login")
+    pdf.figure(
+        UI / "07-admin-login-pdf.jpg",
+        "Admin login — Platform-control highlights (customers/refunds, flags & journeys, "
+        "suspend, money, zero-commission oversight). Demo: admin@kitchcu.dev / admin123456.",
+        max_h=78,
     )
 
     pdf.chapter("Admin Overview")
     pdf.figure(
         UI / "05-admin-overview-pdf.jpg",
-        "Admin overview (admin.kitchcu.in :13003) — Dark ops theme (matches Kitchen). "
-        "Anatomy: Admin nav (Overview, Kitchens, Owners, Orders, Tickets); platform stat "
-        "tiles; recent-activity table; support ticket queue with AI-escalation badges. "
-        "UX intent: platform-scope oversight — is the platform healthy / who is stuck — "
-        "never owner-scope menu/order mutation. Admin JWTs scoped away from owner-mutation "
-        "routes. Demo: admin@kitchcu.dev / admin123456.",
-        max_h=88,
+        "Admin overview — Nav includes Customers, Refunds, Control. Attention tiles, "
+        "platform health, charts, Quick actions. Platform-scope only; dark ops theme.",
+        max_h=78,
+    )
+
+    pdf.chapter("Admin Control Plane")
+    pdf.figure(
+        UI / "08-admin-control-pdf.jpg",
+        "Admin Control — Application data journeys grid; feature flags table "
+        "(refunds_gateway/direct, journey keys); subscription overrides; recent payments. "
+        "Governance without tenant menu mutation.",
+        max_h=78,
     )
 
     # ═════════════════════════════════════════════════════════════════════
@@ -1169,7 +1208,7 @@ def build() -> GuidePDF:
     pdf.table(
         ["Document", "Role"],
         [
-            ["CKAC-COMPLETE-GUIDE.md/.pdf v3.1", "This CEO/CPO/CTO encyclopedia"],
+            ["CKAC-COMPLETE-GUIDE.md/.pdf v3.2", "This CEO/CPO/CTO encyclopedia"],
             ["CKAC-USERFLOWS.md/.pdf", "Full step-by-step user journey pack"],
             ["API.md", "Public API reference + OpenAPI URLs"],
             ["E1-E2-*-DESIGN.md", "S19 quality-loop design pack"],
@@ -1180,7 +1219,8 @@ def build() -> GuidePDF:
             ["CKAC-COMPLETE-PLANNING-BENCHMARK.md", "F01-F48 acceptance criteria"],
             ["CKAC-SYSTEM-BENCHMARK.md", "Architecture, DB, cache, SLOs"],
             ["AGENTS.md", "Agent/engineer quick spec"],
-            ["docs/assets/ui/", "UI reference screenshots"],
+            ["docs/assets/ui/", "UI reference screenshots (8 surfaces)"],
+            ["DELIVERY-PAYER-MODE-DESIGN.md", "Delivery payer + courier rules"],
         ],
         [75, 95],
         size=6,
@@ -1188,14 +1228,13 @@ def build() -> GuidePDF:
 
     pdf.chapter("Document control")
     pdf.body(
-        "v3.1 July 2026 — Documents the aggregated gateway OpenAPI contract (/openapi.json, "
-        "/docs, /redoc, portal /openapi + docs/API.md, mandatory summary/description/Field/"
-        "responses on every route); adds the unified form spacing system (owner-forms.css "
-        "tokens spanning auth + dashboards); links the new CKAC-USERFLOWS.md step-by-step "
-        "journey pack. Supersedes v3.0."
+        "v3.2 July 2026 — Super-admin Control plane; dish ready-within / max_time; delivery "
+        "payer modes + Maps tracking; login AuthLoginHighlights; expanded UI Catalog "
+        "(8 surfaces); flows 17.9-17.10; PDF layout fix (header clearance, caption above "
+        "figures). Supersedes v3.1 (OpenAPI aggregation + form spacing + USERFLOWS pack)."
     )
     pdf.quote(
-        "KitchCu Complete Executive & Engineering Guide v3.1 — Confidential — July 2026. "
+        "KitchCu Complete Executive & Engineering Guide v3.2 — Confidential — July 2026. "
         "India's first — and the world's third — platform with this feature stack."
     )
 

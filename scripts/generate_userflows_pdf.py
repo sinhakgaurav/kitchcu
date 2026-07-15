@@ -9,7 +9,7 @@ from pathlib import Path
 
 from pdf_guide import GuidePDF
 
-GUIDE_VERSION = "1.0"
+GUIDE_VERSION = "1.1"
 GUIDE_DATE = "July 2026"
 OUTPUT = Path(__file__).resolve().parent.parent / "docs" / "CKAC-USERFLOWS.pdf"
 UI = Path(__file__).resolve().parent.parent / "docs" / "assets" / "ui"
@@ -59,14 +59,14 @@ def build() -> GuidePDF:
             "7. Customer WhatsApp OTP / OAuth login",
         ]),
         ("PART III — Platform & Growth Flows", [
-            "6. Admin: login -> overview -> tickets",
+            "6. Admin: login -> overview -> Customers/Refunds/Control/Tickets",
             "8. Coupon apply / CRM promotion path",
             "9. Live stream opt-in (owner go-live, customer live filter)",
         ]),
         ("PART IV — Operating Reference", [
             "13. Gateway proxy map",
             "14. Cross-references",
-            "Appendix: UI reference figures",
+            "Appendix: UI reference figures (8 surfaces)",
             "Document control",
         ]),
     ])
@@ -411,8 +411,8 @@ def build() -> GuidePDF:
         ["Need", "Go to"],
         [
             ["Exact request/response JSON", "docs/API.md; gateway /docs /redoc /openapi.json; Portal /openapi"],
-            ["CEO/CPO/CTO narrative", "CKAC-COMPLETE-GUIDE.md 17.1-17.8 (condensed version)"],
-            ["UI reference screenshots", "docs/assets/ui/ (5 surfaces)"],
+            ["CEO/CPO/CTO narrative", "CKAC-COMPLETE-GUIDE.md 17.1-17.10 (condensed version)"],
+            ["UI reference screenshots", "docs/assets/ui/ (8 surfaces)"],
             ["Feature acceptance criteria F01-F48", "CKAC-COMPLETE-PLANNING-BENCHMARK.md"],
             ["Architecture / scale / TDD+EDD", "CKAC-ARCHITECTURE-CTO.md, KITCHCU-ENGINEERING-STANDARDS.md"],
             ["Build status per module", "CKAC-IMPLEMENTATION-GUIDE.md"],
@@ -424,28 +424,39 @@ def build() -> GuidePDF:
     pdf.chapter("UI Reference — Flows in Context")
     pdf.figure(
         UI / "03-kitchen-login-pdf.jpg",
-        "Kitchen login (kitchen.kitchcu.in :13002) -- entry point for Flow 1 (owner "
-        "onboarding) and Flow 2 (daily login). Demo: 9876543210 / OTP 123456.",
-        max_h=78,
+        "Kitchen login — Flow 1/2 entry + AuthLoginHighlights (zero commission, timing, "
+        "delivery payer, Maps). Demo: 9876543210 / OTP 123456.",
+        max_h=70,
     )
     pdf.figure(
         UI / "04-owner-dashboard-pdf.jpg",
-        "Owner dashboard -- lands here after Flow 1 step 3 and is the home base for "
-        "Flow 2 (order intake/lifecycle) and Flow 5 (GST) side-nav entries.",
-        max_h=78,
+        "Owner dashboard — Flow 2/5 home; CommissionAdvantagePanel reinforces SaaS model.",
+        max_h=70,
+    )
+    pdf.figure(
+        UI / "06-customer-login-pdf.jpg",
+        "Customer login — Flow 7 entry; highlights ready-within, Maps, dashboard, in-range fee.",
+        max_h=70,
     )
     pdf.figure(
         UI / "02-customer-home-pdf.jpg",
-        "Customer home (customer.kitchcu.in :13001) -- entry point for Flow 3 (single-"
-        "kitchen checkout) and Flow 4 (multi-kitchen cart). Demo: CKPNQ001 near "
-        "Koregaon Park.",
-        max_h=78,
+        "Customer home — Flow 3/4 discovery entry. Demo: CKPNQ001 near Koregaon Park.",
+        max_h=70,
+    )
+    pdf.figure(
+        UI / "07-admin-login-pdf.jpg",
+        "Admin login — Flow 6: platform-control highlights before credentials.",
+        max_h=70,
     )
     pdf.figure(
         UI / "05-admin-overview-pdf.jpg",
-        "Admin overview (admin.kitchcu.in :13003) -- entry point for Flow 6. "
-        "Demo: admin@kitchcu.dev / admin123456.",
-        max_h=78,
+        "Admin overview — Flow 6: Customers/Refunds/Control nav + health tiles.",
+        max_h=70,
+    )
+    pdf.figure(
+        UI / "08-admin-control-pdf.jpg",
+        "Admin Control — Flow 6 governance: journeys, feature flags, subscription overrides.",
+        max_h=70,
     )
 
     pdf.chapter("Document Control")
@@ -453,17 +464,17 @@ def build() -> GuidePDF:
         ["Field", "Value"],
         [
             ["Document", "CKAC-USERFLOWS.md / .pdf"],
-            ["Version", "1.0"],
+            ["Version", "1.1"],
             ["Date", "July 2026"],
             ["Traceability", "Every route/event read directly from services/*/app source"],
             ["Change policy", "Update .md whenever a route/event/status changes; regenerate PDF same change"],
-            ["Supersedes", "Nothing (net-new pack); condenses into Complete Guide 17 on next revision"],
+            ["Supersedes", "v1.0; aligned with Complete Guide v3.2 addons"],
         ],
         [40, 130],
         size=7,
     )
     pdf.quote(
-        "KitchCu User Flow Documentation Pack v1.0 - Confidential - July 2026."
+        "KitchCu User Flow Documentation Pack v1.1 - Confidential - July 2026."
     )
 
     return pdf

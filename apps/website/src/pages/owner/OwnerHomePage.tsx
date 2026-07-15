@@ -16,6 +16,7 @@ import {
   type RevenueTimeseries,
   type StreamSettings,
 } from "../../lib/api";
+import { CommissionAdvantagePanel } from "../../components/owner/CommissionAdvantagePanel";
 import { CUSTOMER_HOST } from "../../shared/brand";
 import { customerUrl } from "../../shared/urls";
 
@@ -206,6 +207,12 @@ export function OwnerHomePage() {
               </div>
             </Link>
           </div>
+
+          <CommissionAdvantagePanel
+            grossRevenue={summary?.gross_revenue ?? 0}
+            avgOrderValue={summary?.avg_order_value ?? 0}
+            completedOrders={summary?.completed_orders ?? 0}
+          />
 
           <div className="od-board__grid">
             <section className="dash-card od-panel">

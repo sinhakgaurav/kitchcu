@@ -37,6 +37,7 @@ const NAV_SECTIONS = [
     label: "Account",
     items: [
       { to: "/dashboard/subscription", label: "Subscription" },
+      { to: "/dashboard/payment-gateway", label: "Payment gateway" },
       { to: "/dashboard/gst", label: "GST & finance" },
       { to: "/dashboard/setup", label: "Kitchen setup" },
     ],

@@ -1,19 +1,26 @@
+import { FormEvent, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { useEffect, useState } from "react";
 import { OwnerEmpty, OwnerPageShell } from "../../components/owner/OwnerPageShell";
-import { fetchMenu, type Dish } from "../../lib/api";
+import { fetchMenu, updateDish, type Dish } from "../../lib/api";
 import { useKitchen } from "../../lib/kitchen";
 
 export function MenuPage() {
   const { kitchen } = useKitchen();
   const [dishes, setDishes] = useState<Dish[]>([]);
   const [loading, setLoading] = useState(true);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [error, setError] = useState("");
+
+  const reload = async () => {
+    if (!kitchen) return;
+    const m = await fetchMenu(kitchen.id);
+    setDishes(m.dishes);
+  };
 
   useEffect(() => {
     if (!kitchen) return;
     setLoading(true);
-    fetchMenu(kitchen.id)
-      .then((m) => setDishes(m.dishes))
+    reload()
       .catch(() => setDishes([]))
       .finally(() => setLoading(false));
   }, [kitchen]);
@@ -24,9 +31,10 @@ export function MenuPage() {
     <OwnerPageShell
       eyebrow="Operations"
       title="Menu"
-      description={`${dishes.length} live-capture dish${dishes.length !== 1 ? "es" : ""} · customers browse on your menu link`}
+      description={`${dishes.length} live-capture dish${dishes.length !== 1 ? "es" : ""} · set prep, delivery & max time per dish`}
       actions={<Link to="/dashboard/menu/new" className="btn btn--primary">Add dish</Link>}
     >
+      {error && <p className="auth-card__error">{error}</p>}
       {loading ? (
         <p className="app-loading">Loading menu…</p>
       ) : dishes.length === 0 ? (
@@ -43,12 +51,42 @@ export function MenuPage() {
                 {hero && <img src={hero.url} alt={d.name} loading="lazy" />}
                 <div>
                   <h3>{d.name}</h3>
-                  <p>₹{d.price} · {d.prep_time_min} min prep</p>
+                  <p>
+                    ₹{d.price} · prep {d.prep_time_min}m
+                    {d.delivery_time_min != null ? ` · delivery ${d.delivery_time_min}m` : ""}
+                    {" · "}
+                    <strong>ready within {d.max_time_min ?? d.projected_ready_min}m</strong>
+                  </p>
                   {d.description && <p className="owner-dish-card__desc">{d.description}</p>}
                   {hero?.is_live_capture && <span className="live-badge">Live capture</span>}
-                  <Link to={`/dashboard/ingredients?dish=${d.id}`} className="btn btn--ghost btn--sm">
-                    Recipe & prep
-                  </Link>
+                  <div className="owner-dish-card__actions">
+                    <button
+                      type="button"
+                      className="btn btn--ghost btn--sm"
+                      onClick={() => setEditingId(editingId === d.id ? null : d.id)}
+                    >
+                      {editingId === d.id ? "Close timing" : "Edit timing"}
+                    </button>
+                    <Link to={`/dashboard/ingredients?dish=${d.id}`} className="btn btn--ghost btn--sm">
+                      Recipe & prep
+                    </Link>
+                  </div>
+                  {editingId === d.id && (
+                    <TimingForm
+                      dish={d}
+                      onSaved={async () => {
+                        setError("");
+                        try {
+                          await reload();
+                          setEditingId(null);
+                        } catch (e) {
+                          setError(e instanceof Error ? e.message : "Reload failed");
+                        }
+                      }}
+                      onError={setError}
+                      kitchenId={kitchen.id}
+                    />
+                  )}
                 </div>
               </article>
             );
@@ -56,5 +94,73 @@ export function MenuPage() {
         </div>
       )}
     </OwnerPageShell>
+  );
+}
+
+function TimingForm({
+  kitchenId,
+  dish,
+  onSaved,
+  onError,
+}: {
+  kitchenId: string;
+  dish: Dish;
+  onSaved: () => void | Promise<void>;
+  onError: (msg: string) => void;
+}) {
+  const [busy, setBusy] = useState(false);
+
+  const submit = async (e: FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const fd = new FormData(e.currentTarget);
+    setBusy(true);
+    onError("");
+    try {
+      const prep = Number(fd.get("prep_time_min"));
+      const delivery = Number(fd.get("delivery_time_min"));
+      const maxTime = Number(fd.get("max_time_min"));
+      await updateDish(kitchenId, dish.id, {
+        prep_time_min: prep,
+        delivery_time_min: delivery,
+        max_time_min: maxTime,
+      });
+      await onSaved();
+    } catch (err) {
+      onError(err instanceof Error ? err.message : "Could not update timing");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <form className="owner-timing-form" onSubmit={submit}>
+      <label>
+        Prep
+        <input name="prep_time_min" type="number" min={5} defaultValue={dish.prep_time_min} required />
+      </label>
+      <label>
+        Delivery
+        <input
+          name="delivery_time_min"
+          type="number"
+          min={0}
+          defaultValue={dish.delivery_time_min ?? 0}
+          required
+        />
+      </label>
+      <label>
+        Max (customer)
+        <input
+          name="max_time_min"
+          type="number"
+          min={5}
+          defaultValue={dish.max_time_min ?? dish.projected_ready_min}
+          required
+        />
+      </label>
+      <button type="submit" className="btn btn--primary btn--sm" disabled={busy}>
+        {busy ? "Saving…" : "Save times"}
+      </button>
+    </form>
   );
 }

@@ -175,12 +175,12 @@ def _seed_catalog_for_kitchen(
         )
         cur.execute(
             """
-            INSERT INTO ckac_catalog.dishes
-            (id, kitchen_id, category_id, name, price, prep_time_min, is_active)
-            VALUES (%s::uuid, %s::uuid, %s::uuid, 'Test Dish', 149.00, 20, true)
-            """,
-            (str(dish_id), str(kitchen_id), str(category_id)),
-        )
+                INSERT INTO ckac_catalog.dishes
+                (id, kitchen_id, category_id, name, price, prep_time_min, delivery_time_min, max_time_min, is_active)
+                VALUES (%s::uuid, %s::uuid, %s::uuid, 'Test Dish', 149.00, 20, 15, 35, true)
+                """,
+                (str(dish_id), str(kitchen_id), str(category_id)),
+            )
         if live_capture:
             cur.execute(
                 """

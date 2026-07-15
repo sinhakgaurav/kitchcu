@@ -39,6 +39,7 @@ class SupportTicket(Base):
     customer_name: Mapped[str | None] = mapped_column(String(255))
     customer_phone: Mapped[str | None] = mapped_column(String(20))
     customer_email: Mapped[str | None] = mapped_column(String(255))
+    customer_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True, index=True)
     order_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), index=True)
     order_code: Mapped[str | None] = mapped_column(String(64))
     kitchen_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), index=True)

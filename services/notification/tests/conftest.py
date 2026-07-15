@@ -150,8 +150,8 @@ def _seed_kitchen(whatsapp_phone_id: str = "PHONE123") -> uuid.UUID:
             (str(category_id), str(kitchen_id)),
         )
         cur.execute(
-            "INSERT INTO ckac_catalog.dishes (id, kitchen_id, category_id, name, price, prep_time_min, is_active) "
-            "VALUES (%s::uuid, %s::uuid, %s::uuid, 'Paneer Tikka', 199, 25, true)",
+            "INSERT INTO ckac_catalog.dishes (id, kitchen_id, category_id, name, price, prep_time_min, delivery_time_min, max_time_min, is_active) "
+            "VALUES (%s::uuid, %s::uuid, %s::uuid, 'Paneer Tikka', 199, 25, 20, 45, true)",
             (str(dish_id), str(kitchen_id), str(category_id)),
         )
     conn.close()

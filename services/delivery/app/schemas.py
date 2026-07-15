@@ -1,17 +1,13 @@
-"""Delivery domain — fee quotes, tracking (F27-F31, F29).
+"""Delivery domain — fee quotes, payer modes, tracking (F27-F31 + owner/platform courier).
 
-Fee rule (evaluated per kitchen, in order):
-1. `distance_km > max_delivery_radius_km` -> `status="out_of_range"`, fee `0` — kitchen
-   does not deliver this far; the customer must choose pickup or another kitchen.
-2. `distance_km <= free_delivery_radius_km` -> within free radius, fee `0`.
-3. Otherwise -> chargeable distance is `ceil(distance_km - free_delivery_radius_km)` whole
-   km, fee = `delivery_fee_flat_beyond + chargeable_km * delivery_fee_per_km`.
-4. If the kitchen has `min_order_for_free_delivery` set and `subtotal` meets/exceeds it,
-   any non-zero fee computed above is waived back to `0`.
+Distance rules:
+- **In range** (`distance ≤ max_delivery_radius_km`): owner may `self` deliver or book
+  `platform` courier. Logistics charged to **owner** — customer delivery fee is `0`.
+- **Out of range**: delivery still allowed. Owner may `self` (can charge customer) or
+  book `platform` — logistics charged to **customer**.
 
-Every quote is persisted (`ckac_delivery.delivery_quotes`) and an audit `breakdown` of
-which rule applied is returned alongside the fee, so owners/customers can see exactly why
-a fee was (or wasn't) charged.
+Legacy kitchen per-km rules still compute a kitchen_self_fee for out-of-range self
+delivery (owner-settable amount suggested at quote time).
 """
 
 from __future__ import annotations
@@ -25,6 +21,7 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import DeliveryQuote
+from app.platform_courier import quote_platform_delivery_fee
 from ckac_common.auth import stream_key
 from ckac_common.event_bus import EventPublisher
 
@@ -33,94 +30,92 @@ class DeliveryQuoteRequest(BaseModel):
     """Request a delivery fee quote for a kitchen + customer location before checkout."""
 
     kitchen_id: uuid.UUID = Field(
-        ..., description="UUID of the active kitchen to quote delivery for.", examples=["8f14e45f-ceea-467e-9f1c-1234567890ab"]
+        ..., description="UUID of the active kitchen to quote delivery for."
     )
-    latitude: float = Field(..., ge=-90, le=90, description="Customer's delivery destination latitude.")
-    longitude: float = Field(..., ge=-180, le=180, description="Customer's delivery destination longitude.")
+    latitude: float = Field(..., ge=-90, le=90, description="Customer destination latitude.")
+    longitude: float = Field(..., ge=-180, le=180, description="Customer destination longitude.")
     subtotal: float = Field(
-        default=0, ge=0, description="Cart subtotal in INR — used to evaluate the kitchen's minimum-order-for-free-delivery rule.", examples=[350.0]
+        default=0, ge=0, description="Cart subtotal in INR.", examples=[350.0]
     )
+
+
+class DeliveryModeOption(BaseModel):
+    mode: str = Field(..., description="'self' or 'platform'.")
+    payer: str = Field(..., description="'owner' or 'customer' — who pays logistics.")
+    customer_fee: float = Field(..., description="INR charged to the customer at checkout.")
+    owner_fee: float = Field(..., description="INR kitchen pays for platform logistics (0 for self).")
+    label: str
+    description: str
 
 
 class DeliveryQuoteResponse(BaseModel):
-    """Computed delivery fee + full rule breakdown for a kitchen/location/subtotal combination."""
-
-    kitchen_id: uuid.UUID = Field(..., description="Kitchen this quote was computed for.")
-    distance_km: float = Field(..., description="Straight-line distance from kitchen to customer, in km (PostGIS geography distance).", examples=[3.4])
-    fee: float = Field(..., description="Quoted delivery fee in INR. `0` when within the free radius, out of range, or waived by a minimum-order rule.", examples=[20.0])
+    kitchen_id: uuid.UUID
+    distance_km: float
+    in_range: bool = Field(..., description="True when distance ≤ kitchen max radius.")
     status: str = Field(
-        ..., description="'ok' — deliverable, fee as quoted. 'out_of_range' — beyond the kitchen's max delivery radius; fee is always `0` and delivery is not offered.", examples=["ok", "out_of_range"]
-    )
-    within_free_radius: bool = Field(..., description="Whether `distance_km` is within the kitchen's free-delivery radius.")
-    free_delivery_radius_km: float = Field(..., description="Kitchen's configured free-delivery radius, in km.")
-    max_delivery_radius_km: float = Field(..., description="Kitchen's configured maximum delivery radius, in km. Beyond this, `status` is `out_of_range`.")
-    breakdown: dict = Field(
         ...,
-        description="Audit of which fee rule applied, e.g. `{'rule': 'within_free_radius'}`, "
-        "`{'rule': 'per_km_beyond_free', 'chargeable_km': ..., 'fee_per_km': ..., 'flat_beyond': ...}`, "
-        "`{'rule': 'min_order_free_delivery', ...}`, or `{'reason': 'beyond_max_radius', ...}`.",
+        description="'ok' in-range (customer fee 0). 'extended' out-of-range but still deliverable.",
     )
-    quote_id: uuid.UUID | None = Field(default=None, description="Persisted quote UUID (`ckac_delivery.delivery_quotes`), for audit/analytics.")
+    # Convenience: customer-facing fee for the default mode at checkout (in-range → 0).
+    fee: float = Field(..., description="Default customer fee for checkout.")
+    within_free_radius: bool
+    free_delivery_radius_km: float
+    max_delivery_radius_km: float
+    modes: list[DeliveryModeOption]
+    platform_fee: float = Field(..., description="Quoted platform courier fee.")
+    kitchen_self_fee: float = Field(
+        ..., description="Suggested fee if owner self-delivers (0 in-range; per-km out-of-range)."
+    )
+    breakdown: dict
+    quote_id: uuid.UUID | None = None
 
 
 class TrackingResponse(BaseModel):
-    """Public, token-authenticated order tracking view — no login required.
-
-    Deliberately minimal: exposes only what a customer following a shared tracking
-    link needs (status, ETA, distance), never customer PII belonging to *other*
-    orders and never kitchen-internal data.
-    """
-
-    tracking_token: str = Field(..., description="The opaque tracking token used to fetch this view.")
-    order_id: uuid.UUID = Field(..., description="Tracked order's UUID.")
-    order_code: str = Field(..., description="Human-facing order code.", examples=["CKPNQ001-BILL-20260712-0042"])
-    kitchen_id: uuid.UUID = Field(..., description="Kitchen UUID fulfilling the order.")
-    kitchen_name: str | None = Field(default=None, description="Kitchen display name, if available.")
-    status: str = Field(
-        ..., description="Current order status.", examples=["received", "accepted", "preparing", "ready", "out_for_delivery", "delivered", "cancelled"]
-    )
-    delivery_type: str = Field(..., description="'pickup' or 'delivery'.")
-    distance_km: float | None = Field(default=None, description="Distance from kitchen to customer, in km, when `delivery_type` is 'delivery'.")
-    delivery_fee: float = Field(..., description="Delivery fee charged on this order, in INR.")
-    estimated_ready_at: datetime | None = Field(default=None, description="Predicted ready time, UTC.")
-    tracking_notify_interval_min: int = Field(
-        ..., description="Kitchen-configured interval (minutes) at which the notification service sends WhatsApp tracking updates for this order."
-    )
-    updated_at: datetime | None = Field(default=None, description="Timestamp of the order's last status update, UTC.")
+    tracking_token: str
+    order_id: uuid.UUID
+    order_code: str
+    kitchen_id: uuid.UUID
+    kitchen_name: str | None = None
+    status: str
+    delivery_type: str
+    delivery_mode: str | None = None
+    delivery_payer: str | None = None
+    distance_km: float | None = None
+    delivery_fee: float
+    owner_delivery_cost: float = 0
+    estimated_ready_at: datetime | None = None
+    tracking_notify_interval_min: int
+    updated_at: datetime | None = None
+    kitchen_latitude: float | None = None
+    kitchen_longitude: float | None = None
+    customer_latitude: float | None = None
+    customer_longitude: float | None = None
+    map_directions_url: str | None = None
 
 
-def _compute_fee(
+def _kitchen_self_fee(
     *,
     distance_km: float,
     free_km: float,
-    max_km: float,
     fee_per_km: float,
     flat_beyond: float,
     subtotal: float,
     min_order_free: float | None,
-) -> tuple[str, float, bool, dict]:
-    if distance_km > max_km:
-        return (
-            "out_of_range",
-            0.0,
-            False,
-            {"reason": "beyond_max_radius", "max_delivery_radius_km": max_km},
-        )
+    in_range: bool,
+) -> tuple[float, dict]:
+    """Self-delivery fee suggestion — 0 when in range (owner absorbs); else per-km for customer."""
+    if in_range:
+        return 0.0, {"rule": "in_range_owner_pays", "customer_fee": 0}
 
-    within_free = distance_km <= free_km
-    if within_free:
-        fee = 0.0
-        breakdown = {"rule": "within_free_radius"}
-    else:
-        chargeable_km = math.ceil(distance_km - free_km)
-        fee = round(flat_beyond + chargeable_km * fee_per_km, 2)
-        breakdown = {
-            "rule": "per_km_beyond_free",
-            "chargeable_km": chargeable_km,
-            "fee_per_km": fee_per_km,
-            "flat_beyond": flat_beyond,
-        }
-
+    # Out of range: chargeable from free radius through full distance (or full distance if no free).
+    chargeable_km = max(1, math.ceil(max(0.0, distance_km - free_km)))
+    fee = round(flat_beyond + chargeable_km * fee_per_km, 2)
+    breakdown: dict = {
+        "rule": "out_of_range_self_customer_pays",
+        "chargeable_km": chargeable_km,
+        "fee_per_km": fee_per_km,
+        "flat_beyond": flat_beyond,
+    }
     if min_order_free is not None and subtotal >= float(min_order_free) and fee > 0:
         fee = 0.0
         breakdown = {
@@ -128,8 +123,52 @@ def _compute_fee(
             "min_order_for_free_delivery": float(min_order_free),
             "subtotal": subtotal,
         }
+    return fee, breakdown
 
-    return "ok", fee, within_free, breakdown
+
+def build_mode_options(
+    *,
+    in_range: bool,
+    platform_fee: float,
+    kitchen_self_fee: float,
+) -> list[DeliveryModeOption]:
+    if in_range:
+        return [
+            DeliveryModeOption(
+                mode="self",
+                payer="owner",
+                customer_fee=0.0,
+                owner_fee=0.0,
+                label="Self delivery",
+                description="Kitchen delivers. In range — no delivery charge to customer.",
+            ),
+            DeliveryModeOption(
+                mode="platform",
+                payer="owner",
+                customer_fee=0.0,
+                owner_fee=platform_fee,
+                label="Platform courier",
+                description=f"Local partner (~₹{platform_fee:.0f}). Paid by kitchen, not customer.",
+            ),
+        ]
+    return [
+        DeliveryModeOption(
+            mode="self",
+            payer="customer",
+            customer_fee=kitchen_self_fee,
+            owner_fee=0.0,
+            label="Self delivery (extended)",
+            description="Beyond kitchen radius. Customer pays your delivery fee (editable).",
+        ),
+        DeliveryModeOption(
+            mode="platform",
+            payer="customer",
+            customer_fee=platform_fee,
+            owner_fee=0.0,
+            label="Platform courier (extended)",
+            description=f"Local partner (~₹{platform_fee:.0f}). Charged to customer.",
+        ),
+    ]
 
 
 async def quote_delivery(
@@ -166,10 +205,14 @@ async def quote_delivery(
     distance_km = round(float(row["distance_km"]), 2)
     free_km = float(row["free_delivery_radius_km"])
     max_km = float(row["max_delivery_radius_km"])
-    status, fee, within_free, breakdown = _compute_fee(
+    in_range = distance_km <= max_km
+    within_free = distance_km <= free_km
+
+    platform = quote_platform_delivery_fee(distance_km)
+    platform_fee = float(platform["fee"])
+    kitchen_self_fee, self_breakdown = _kitchen_self_fee(
         distance_km=distance_km,
         free_km=free_km,
-        max_km=max_km,
         fee_per_km=float(row["delivery_fee_per_km"]),
         flat_beyond=float(row["delivery_fee_flat_beyond"]),
         subtotal=body.subtotal,
@@ -178,14 +221,29 @@ async def quote_delivery(
             if row["min_order_for_free_delivery"] is not None
             else None
         ),
+        in_range=in_range,
     )
+
+    modes = build_mode_options(
+        in_range=in_range, platform_fee=platform_fee, kitchen_self_fee=kitchen_self_fee
+    )
+    # Default checkout fee = customer fee for self mode (0 in-range; kitchen fee extended).
+    default_customer_fee = modes[0].customer_fee
+    status = "ok" if in_range else "extended"
+    breakdown = {
+        "in_range": in_range,
+        "within_free_radius": within_free,
+        "self": self_breakdown,
+        "platform": platform,
+        "payer_rule": "owner" if in_range else "customer",
+    }
 
     quote = DeliveryQuote(
         kitchen_id=body.kitchen_id,
         customer_lat=body.latitude,
         customer_lng=body.longitude,
         distance_km=distance_km,
-        fee=fee,
+        fee=default_customer_fee,
         status=status,
         breakdown=breakdown,
     )
@@ -201,8 +259,9 @@ async def quote_delivery(
             payload={
                 "kitchen_id": str(body.kitchen_id),
                 "distance_km": distance_km,
-                "fee": fee,
+                "fee": default_customer_fee,
                 "status": status,
+                "in_range": in_range,
             },
         )
         await publisher.publish(stream_key("delivery", "quote"), event, session=session)
@@ -210,11 +269,15 @@ async def quote_delivery(
     return DeliveryQuoteResponse(
         kitchen_id=body.kitchen_id,
         distance_km=distance_km,
-        fee=fee,
+        in_range=in_range,
         status=status,
+        fee=default_customer_fee,
         within_free_radius=within_free,
         free_delivery_radius_km=free_km,
         max_delivery_radius_km=max_km,
+        modes=modes,
+        platform_fee=platform_fee,
+        kitchen_self_fee=kitchen_self_fee,
         breakdown=breakdown,
         quote_id=quote.id,
     )
@@ -236,7 +299,14 @@ async def track_by_token(session: AsyncSession, token: str) -> TrackingResponse:
                     o.estimated_ready_at,
                     o.updated_at,
                     o.tracking_token,
+                    o.customer_latitude,
+                    o.customer_longitude,
+                    COALESCE(o.delivery_mode, NULL) AS delivery_mode,
+                    COALESCE(o.delivery_payer, NULL) AS delivery_payer,
+                    COALESCE(o.owner_delivery_cost, 0) AS owner_delivery_cost,
                     k.name AS kitchen_name,
+                    ST_Y(k.location::geometry) AS kitchen_latitude,
+                    ST_X(k.location::geometry) AS kitchen_longitude,
                     COALESCE(k.tracking_notify_interval_min, 5) AS tracking_notify_interval_min
                 FROM ckac_orders.orders o
                 LEFT JOIN ckac_identity.kitchens k ON k.id = o.kitchen_id
@@ -250,6 +320,17 @@ async def track_by_token(session: AsyncSession, token: str) -> TrackingResponse:
     if row is None:
         raise ValueError("Tracking link not found")
 
+    k_lat = float(row["kitchen_latitude"]) if row["kitchen_latitude"] is not None else None
+    k_lng = float(row["kitchen_longitude"]) if row["kitchen_longitude"] is not None else None
+    c_lat = float(row["customer_latitude"]) if row["customer_latitude"] is not None else None
+    c_lng = float(row["customer_longitude"]) if row["customer_longitude"] is not None else None
+    map_url = None
+    if k_lat is not None and k_lng is not None and c_lat is not None and c_lng is not None:
+        map_url = (
+            f"https://www.google.com/maps/dir/?api=1"
+            f"&origin={k_lat},{k_lng}&destination={c_lat},{c_lng}&travelmode=driving"
+        )
+
     return TrackingResponse(
         tracking_token=row["tracking_token"],
         order_id=row["order_id"],
@@ -258,9 +339,17 @@ async def track_by_token(session: AsyncSession, token: str) -> TrackingResponse:
         kitchen_name=row["kitchen_name"],
         status=row["status"],
         delivery_type=row["delivery_type"],
+        delivery_mode=row["delivery_mode"],
+        delivery_payer=row["delivery_payer"],
         distance_km=float(row["distance_km"]) if row["distance_km"] is not None else None,
         delivery_fee=float(row["delivery_fee"]),
+        owner_delivery_cost=float(row["owner_delivery_cost"] or 0),
         estimated_ready_at=row["estimated_ready_at"],
         tracking_notify_interval_min=int(row["tracking_notify_interval_min"]),
         updated_at=row["updated_at"],
+        kitchen_latitude=k_lat,
+        kitchen_longitude=k_lng,
+        customer_latitude=c_lat,
+        customer_longitude=c_lng,
+        map_directions_url=map_url,
     )

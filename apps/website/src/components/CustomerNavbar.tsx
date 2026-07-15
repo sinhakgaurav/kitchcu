@@ -28,6 +28,8 @@ export function CustomerNavbar() {
         <nav className={`nav__links ${open ? "nav__links--open" : ""}`}>
           <a href={hashLink("/#nearby")} onClick={() => setOpen(false)}>Nearby</a>
           <Link to="/orders" onClick={() => setOpen(false)}>My orders</Link>
+          <Link to="/dashboard" onClick={() => setOpen(false)}>Dashboard</Link>
+          <Link to="/account" onClick={() => setOpen(false)}>Payout details</Link>
           <a href={hashLink("/#discover")} onClick={() => setOpen(false)}>Find by code</a>
           <a href={hashLink("/#how")} onClick={() => setOpen(false)}>How it works</a>
           <Link to="/login" className="btn btn--ghost btn--sm" onClick={() => setOpen(false)}>

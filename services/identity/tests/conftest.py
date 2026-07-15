@@ -13,6 +13,7 @@ os.environ.setdefault(
 os.environ.setdefault("REDIS_URL", "redis://localhost:16379/0")
 os.environ.setdefault("JWT_SECRET", "test-secret-key-for-pytest")
 os.environ.setdefault("APP_ENV", "test")
+os.environ.setdefault("MEDIA_STORAGE_BACKEND", "local")
 
 # NullPool avoids asyncpg connections being reused across pytest event loops (Windows).
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine

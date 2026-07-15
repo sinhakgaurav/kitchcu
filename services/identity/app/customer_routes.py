@@ -5,17 +5,22 @@ from __future__ import annotations
 import uuid
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jose import JWTError, jwt
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from ckac_common.storage import get_media_storage
+
 from app.customer_schemas import (
     CustomerAuthResponse,
+    CustomerPayoutUpdateRequest,
     CustomerPhoneRequest,
     CustomerPhoneVerifyRequest,
     CustomerResponse,
+    customer_to_response,
+    update_customer_payout,
     OAuthCompleteRequest,
     OAuthStartResponse,
     clear_customer_otp_store,
@@ -28,13 +33,26 @@ from app.customer_schemas import (
     validate_oauth_provider,
     verify_customer_otp,
 )
+from app.customer_dashboard import (
+    CustomerAddressCreateRequest,
+    CustomerAddressResponse,
+    CustomerPasswordChangeRequest,
+    CustomerProfileUpdateRequest,
+    address_to_response,
+    change_customer_password,
+    create_address,
+    delete_address,
+    list_addresses,
+    update_address,
+    update_customer_profile,
+)
 from app.models import Customer
 from app.oauth import exchange_oauth_code, start_oauth
 from ckac_common.auth import stream_key
 from ckac_common.config import get_settings
 from ckac_common.database import get_db
 from ckac_common.event_bus import EventPublisher
-from ckac_common.openapi import RESP_400, RESP_401, RESP_422
+from ckac_common.openapi import RESP_400, RESP_401, RESP_404, RESP_422
 
 router = APIRouter()
 security = HTTPBearer(auto_error=False)
@@ -275,5 +293,182 @@ async def customer_whatsapp_verify(
     responses={401: RESP_401, 422: RESP_422},
     tags=["Customer Auth"],
 )
-async def customer_me(customer: Annotated[Customer, Depends(get_current_customer)]) -> Customer:
-    return customer
+async def customer_me(
+    customer: Annotated[Customer, Depends(get_current_customer)],
+) -> CustomerResponse:
+    return customer_to_response(customer)
+
+
+@router.patch(
+    "/customers/me",
+    response_model=CustomerResponse,
+    summary="Update profile details",
+    description="Customer-only — update display name, email, or avatar URL.",
+    responses={401: RESP_401, 400: RESP_400, 422: RESP_422},
+    tags=["Customer Dashboard"],
+)
+async def customer_profile_update(
+    body: CustomerProfileUpdateRequest,
+    customer: Annotated[Customer, Depends(get_current_customer)],
+    session: Annotated[AsyncSession, Depends(get_db)],
+) -> CustomerResponse:
+    await update_customer_profile(customer, body)
+    await session.flush()
+    return customer_to_response(customer)
+
+
+@router.post(
+    "/customers/me/password",
+    response_model=CustomerResponse,
+    summary="Set or change account password",
+    description=(
+        "Customer-only — optional password (OTP remains primary). "
+        "First set requires WhatsApp OTP; later changes need current password or OTP."
+    ),
+    responses={401: RESP_401, 400: RESP_400},
+    tags=["Customer Dashboard"],
+)
+async def customer_password_change(
+    body: CustomerPasswordChangeRequest,
+    customer: Annotated[Customer, Depends(get_current_customer)],
+    session: Annotated[AsyncSession, Depends(get_db)],
+) -> CustomerResponse:
+    try:
+        await change_customer_password(customer, body)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    await session.flush()
+    return customer_to_response(customer)
+
+
+@router.get(
+    "/customers/me/addresses",
+    response_model=list[CustomerAddressResponse],
+    summary="List saved addresses",
+    tags=["Customer Dashboard"],
+    responses={401: RESP_401},
+)
+async def customer_addresses_list(
+    customer: Annotated[Customer, Depends(get_current_customer)],
+    session: Annotated[AsyncSession, Depends(get_db)],
+) -> list[CustomerAddressResponse]:
+    rows = await list_addresses(session, customer.id)
+    return [address_to_response(a) for a in rows]
+
+
+@router.post(
+    "/customers/me/addresses",
+    response_model=CustomerAddressResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Add a saved address with optional map pin",
+    tags=["Customer Dashboard"],
+    responses={401: RESP_401, 400: RESP_400},
+)
+async def customer_addresses_create(
+    body: CustomerAddressCreateRequest,
+    customer: Annotated[Customer, Depends(get_current_customer)],
+    session: Annotated[AsyncSession, Depends(get_db)],
+) -> CustomerAddressResponse:
+    addr = await create_address(session, customer.id, body)
+    return address_to_response(addr)
+
+
+@router.put(
+    "/customers/me/addresses/{address_id}",
+    response_model=CustomerAddressResponse,
+    summary="Update a saved address",
+    tags=["Customer Dashboard"],
+    responses={401: RESP_401, 404: RESP_404},
+)
+async def customer_addresses_update(
+    address_id: uuid.UUID,
+    body: CustomerAddressCreateRequest,
+    customer: Annotated[Customer, Depends(get_current_customer)],
+    session: Annotated[AsyncSession, Depends(get_db)],
+) -> CustomerAddressResponse:
+    try:
+        addr = await update_address(session, customer.id, address_id, body)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    return address_to_response(addr)
+
+
+@router.delete(
+    "/customers/me/addresses/{address_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Delete a saved address",
+    tags=["Customer Dashboard"],
+    responses={401: RESP_401, 404: RESP_404},
+)
+async def customer_addresses_delete(
+    address_id: uuid.UUID,
+    customer: Annotated[Customer, Depends(get_current_customer)],
+    session: Annotated[AsyncSession, Depends(get_db)],
+) -> None:
+    try:
+        await delete_address(session, customer.id, address_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+
+
+@router.patch(
+    "/customers/me/payout",
+    response_model=CustomerResponse,
+    summary="Update refund payout details",
+    description=(
+        "Customer-only — save UPI VPA and/or bank account used when kitchen owners issue "
+        "direct refunds. Bank account numbers are masked on read."
+    ),
+    responses={401: RESP_401, 400: RESP_400, 422: RESP_422},
+    tags=["Customer Auth"],
+)
+async def customer_payout_update(
+    body: CustomerPayoutUpdateRequest,
+    customer: Annotated[Customer, Depends(get_current_customer)],
+    session: Annotated[AsyncSession, Depends(get_db)],
+) -> CustomerResponse:
+    try:
+        update_customer_payout(customer, body)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    await session.flush()
+    return customer_to_response(customer)
+
+
+@router.post(
+    "/customers/me/payout/qr",
+    response_model=CustomerResponse,
+    summary="Upload UPI QR / scanner image",
+    description="Customer-only — upload a UPI QR code image shown to owners for direct refunds.",
+    responses={401: RESP_401, 400: RESP_400},
+    tags=["Customer Auth"],
+)
+async def customer_payout_qr_upload(
+    customer: Annotated[Customer, Depends(get_current_customer)],
+    session: Annotated[AsyncSession, Depends(get_db)],
+    file: Annotated[UploadFile, File()],
+) -> CustomerResponse:
+    data = await file.read()
+    if not data:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Empty file")
+    if len(data) > 10 * 1024 * 1024:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="File exceeds 10MB")
+
+    if data.startswith(b"\xff\xd8\xff"):
+        content_type, ext = "image/jpeg", "jpg"
+    elif data.startswith(b"\x89PNG\r\n\x1a\n"):
+        content_type, ext = "image/png", "png"
+    elif len(data) >= 12 and data[:4] == b"RIFF" and data[8:12] == b"WEBP":
+        content_type, ext = "image/webp", "webp"
+    else:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Use JPEG, PNG, or WebP")
+
+    customer.upi_qr_url = get_media_storage().upload(
+        kitchen_id=f"customer-{customer.id}",
+        context="payout_qr",
+        data=data,
+        content_type=content_type,
+        extension=ext,
+    )
+    await session.flush()
+    return customer_to_response(customer)

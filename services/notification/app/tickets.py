@@ -138,6 +138,7 @@ class TicketResponse(BaseModel):
     customer_name: str | None = Field(default=None, description="Reporter's name, if provided.")
     customer_phone: str | None = Field(default=None, description="Reporter's phone, if provided.")
     customer_email: str | None = Field(default=None, description="Reporter's email, if provided.")
+    customer_id: uuid.UUID | None = Field(default=None, description="Linked customer account, if signed in.")
     order_id: uuid.UUID | None = Field(default=None, description="Resolved order UUID, if `order_code` matched an order.")
     order_code: str | None = Field(default=None, description="Order code as provided/resolved.")
     kitchen_id: uuid.UUID | None = Field(default=None, description="Related kitchen UUID, if known.")
@@ -193,6 +194,7 @@ def _ticket_response(ticket: SupportTicket, messages: list[SupportTicketMessage]
         customer_name=ticket.customer_name,
         customer_phone=ticket.customer_phone,
         customer_email=ticket.customer_email,
+        customer_id=ticket.customer_id,
         order_id=ticket.order_id,
         order_code=ticket.order_code,
         kitchen_id=ticket.kitchen_id,
@@ -214,6 +216,8 @@ async def create_ticket(
     session: AsyncSession,
     body: TicketCreateRequest,
     publisher: EventPublisher,
+    *,
+    customer_id: uuid.UUID | None = None,
 ) -> TicketResponse:
     order_id, order_code, order_kitchen_id = await _resolve_order(session, body.order_code)
     kitchen_id = body.kitchen_id or order_kitchen_id
@@ -230,6 +234,7 @@ async def create_ticket(
         customer_name=body.customer_name,
         customer_phone=body.customer_phone,
         customer_email=str(body.customer_email) if body.customer_email else None,
+        customer_id=customer_id,
         order_id=order_id,
         order_code=order_code,
         kitchen_id=kitchen_id,
@@ -284,6 +289,42 @@ async def create_ticket(
     await publisher.publish(stream_key("notify", "support"), event, session=session)
     await session.flush()
     return _ticket_response(ticket, messages)
+
+
+async def list_tickets_for_customer(
+    session: AsyncSession,
+    customer_id: uuid.UUID,
+    *,
+    phone: str | None = None,
+    limit: int = 100,
+) -> TicketListResponse:
+    from sqlalchemy import or_
+
+    if phone:
+        query = (
+            select(SupportTicket)
+            .where(
+                or_(
+                    SupportTicket.customer_id == customer_id,
+                    SupportTicket.customer_phone == phone,
+                )
+            )
+            .order_by(SupportTicket.created_at.desc())
+            .limit(limit)
+        )
+    else:
+        query = (
+            select(SupportTicket)
+            .where(SupportTicket.customer_id == customer_id)
+            .order_by(SupportTicket.created_at.desc())
+            .limit(limit)
+        )
+    result = await session.execute(query)
+    tickets = list(result.scalars().all())
+    return TicketListResponse(
+        tickets=[_ticket_response(t) for t in tickets],
+        total=len(tickets),
+    )
 
 
 async def list_tickets(

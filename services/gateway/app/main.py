@@ -40,11 +40,22 @@ GATEWAY_OWNED_PATHS = {
 def resolve_service_url(path: str) -> str | None:
     if path.startswith("/api/v1/customers/me/orders") and "/ratings" in path:
         return settings.ratings_service_url
+    if path.startswith("/api/v1/customers/me/dashboard"):
+        return settings.order_service_url
+    if path.startswith("/api/v1/customers/me/tickets"):
+        return settings.notification_service_url
     if path.startswith((
         "/api/v1/customers/me/orders",
         "/api/v1/customers/me/master-orders",
     )):
         return settings.order_service_url
+    if path.startswith((
+        "/api/v1/admin/refunds",
+        "/api/v1/admin/payments",
+        "/api/v1/admin/settlements",
+        "/api/v1/admin/money-stats",
+    )):
+        return settings.billing_service_url
     if any(path.startswith(p) for p in IDENTITY_PREFIXES):
         if path.startswith("/api/v1/admin/tickets"):
             return settings.notification_service_url

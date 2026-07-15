@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.admin_auth import AdminContext, get_current_admin
+from app.customer_deps import get_current_customer_id, load_customer_contact
 from app.tickets import (
     TicketCreateRequest,
     TicketListResponse,
@@ -14,6 +15,7 @@ from app.tickets import (
     create_ticket,
     get_ticket,
     list_tickets,
+    list_tickets_for_customer,
     reply_to_ticket,
     update_ticket,
 )
@@ -23,14 +25,86 @@ from ckac_common.openapi import RESP_400, RESP_404, auth_errors
 
 public_router = APIRouter()
 admin_router = APIRouter(prefix="/admin")
+customer_router = APIRouter()
 
 TAG_TICKETS = "Support Tickets"
+TAG_CUSTOMER = "Customer Support"
 
 
 def get_publisher() -> EventPublisher:
     from app.main import event_publisher
 
     return event_publisher
+
+
+@customer_router.get(
+    "/customers/me/tickets",
+    response_model=TicketListResponse,
+    tags=[TAG_CUSTOMER],
+    summary="List my complaints / tickets",
+    responses=auth_errors(),
+)
+async def customer_tickets_list(
+    customer_id: Annotated[uuid.UUID, Depends(get_current_customer_id)],
+    session: Annotated[AsyncSession, Depends(get_db)],
+) -> TicketListResponse:
+    contact = await load_customer_contact(customer_id, session)
+    return await list_tickets_for_customer(
+        session, customer_id, phone=contact.get("phone")
+    )
+
+
+@customer_router.post(
+    "/customers/me/tickets",
+    response_model=TicketResponse,
+    status_code=status.HTTP_201_CREATED,
+    tags=[TAG_CUSTOMER],
+    summary="Raise a complaint / support ticket",
+    responses={**auth_errors(), 400: RESP_400},
+)
+async def customer_tickets_create(
+    body: TicketCreateRequest,
+    customer_id: Annotated[uuid.UUID, Depends(get_current_customer_id)],
+    session: Annotated[AsyncSession, Depends(get_db)],
+    publisher: Annotated[EventPublisher, Depends(get_publisher)],
+) -> TicketResponse:
+    contact = await load_customer_contact(customer_id, session)
+    # Force customer audience + known contact
+    payload = body.model_copy(
+        update={
+            "audience": "customer",
+            "customer_name": body.customer_name or contact.get("name"),
+            "customer_phone": body.customer_phone or contact.get("phone"),
+            "customer_email": body.customer_email or contact.get("email"),
+            "source": "web_form",
+        }
+    )
+    return await create_ticket(session, payload, publisher, customer_id=customer_id)
+
+
+@customer_router.get(
+    "/customers/me/tickets/{ticket_id}",
+    response_model=TicketResponse,
+    tags=[TAG_CUSTOMER],
+    summary="Get one of my tickets",
+    responses={**auth_errors(), 404: RESP_404},
+)
+async def customer_tickets_get(
+    ticket_id: uuid.UUID,
+    customer_id: Annotated[uuid.UUID, Depends(get_current_customer_id)],
+    session: Annotated[AsyncSession, Depends(get_db)],
+) -> TicketResponse:
+    contact = await load_customer_contact(customer_id, session)
+    try:
+        ticket = await get_ticket(session, ticket_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    owns = ticket.customer_id == customer_id or (
+        bool(contact.get("phone")) and ticket.customer_phone == contact.get("phone")
+    )
+    if not owns:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Ticket not found")
+    return ticket
 
 
 @public_router.post(

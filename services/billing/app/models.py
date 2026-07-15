@@ -7,9 +7,21 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 from ckac_common.database import Base
 
-PAYMENT_STATUSES = ("created", "pending", "authorized", "captured", "failed", "refunded")
+PAYMENT_STATUSES = (
+    "created",
+    "pending",
+    "authorized",
+    "captured",
+    "partially_refunded",
+    "failed",
+    "refunded",
+)
 PAYMENT_METHODS = ("online", "upi", "cod")
 SUBSCRIPTION_STATUSES = ("trial", "active", "past_due", "cancelled")
+REFUND_KINDS = ("full", "partial")
+REFUND_CHANNELS = ("gateway", "direct_transfer")
+REFUND_STATUSES = ("requested", "processing", "completed", "failed")
+REFUND_DESTINATION_TYPES = ("upi", "bank", "gateway_original")
 
 
 class Payment(Base):
@@ -32,6 +44,35 @@ class Payment(Base):
     status: Mapped[str] = mapped_column(String(20), default="created")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default="now()")
     updated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class Refund(Base):
+    __tablename__ = "refunds"
+    __table_args__ = {"schema": "ckac_billing"}
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    payment_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False, index=True)
+    order_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False, index=True)
+    kitchen_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False, index=True)
+    owner_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
+    customer_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
+    kind: Mapped[str] = mapped_column(String(16), nullable=False)
+    channel: Mapped[str] = mapped_column(String(32), nullable=False)
+    amount: Mapped[float] = mapped_column(Numeric(12, 2), nullable=False)
+    currency: Mapped[str] = mapped_column(String(3), default="INR")
+    status: Mapped[str] = mapped_column(String(20), default="requested")
+    destination_type: Mapped[str] = mapped_column(String(32), nullable=False)
+    destination_upi: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    destination_bank_account: Mapped[str | None] = mapped_column(String(34), nullable=True)
+    destination_bank_ifsc: Mapped[str | None] = mapped_column(String(11), nullable=True)
+    destination_account_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    transfer_remark: Mapped[str] = mapped_column(String(128), nullable=False)
+    razorpay_refund_id: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    evidence_url: Mapped[str | None] = mapped_column(Text, nullable=True)
+    reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default="now()")
+    updated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
 class Settlement(Base):
@@ -57,6 +98,25 @@ class Settlement(Base):
     settlement_status: Mapped[str] = mapped_column(String(20), default="pending")
     settled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default="now()")
+
+
+class KitchenPaymentGateway(Base):
+    __tablename__ = "kitchen_payment_gateways"
+    __table_args__ = (
+        UniqueConstraint("kitchen_id", "provider", name="uq_kitchen_payment_gateway_provider"),
+        {"schema": "ckac_billing"},
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    kitchen_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False, index=True)
+    provider: Mapped[str] = mapped_column(String(32), default="razorpay")
+    key_id: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    key_secret_enc: Mapped[str | None] = mapped_column(Text, nullable=True)
+    webhook_secret_enc: Mapped[str | None] = mapped_column(Text, nullable=True)
+    linked_account_id: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default="now()")
+    updated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
 class OwnerSubscription(Base):

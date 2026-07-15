@@ -65,6 +65,7 @@ class Dish(Base):
     price: Mapped[float] = mapped_column(Numeric(10, 2), nullable=False)
     prep_time_min: Mapped[int] = mapped_column(Integer, default=30)
     delivery_time_min: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    max_time_min: Mapped[int] = mapped_column(Integer, default=30)
     ingredients_description: Mapped[str | None] = mapped_column(Text)
     quality_measures: Mapped[str | None] = mapped_column(Text)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)

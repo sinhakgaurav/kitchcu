@@ -29,9 +29,43 @@ class CustomerResponse(BaseModel):
     email: str | None = Field(default=None, description="Customer email (set via OAuth or optionally later).")
     phone: str | None = Field(default=None, description="Customer phone in E.164, if logged in via WhatsApp OTP.", examples=["+919123456789"])
     avatar_url: str | None = Field(default=None, description="Profile picture URL from the OAuth provider, if any.")
+    upi_vpa: str | None = Field(default=None, description="Customer UPI VPA for refunds.", examples=["priya@okaxis"])
+    upi_qr_url: str | None = Field(default=None, description="Uploaded UPI QR / scanner image URL.")
+    bank_account_number_masked: str | None = Field(
+        default=None, description="Masked bank account (last 4 digits only)."
+    )
+    bank_ifsc: str | None = Field(default=None, description="Bank IFSC for refunds.")
+    bank_account_name: str | None = Field(default=None, description="Account holder name.")
+    has_password: bool = Field(default=False, description="True when an optional account password is set.")
     status: str = Field(..., description="Customer account status.", examples=["active"])
 
     model_config = {"from_attributes": True}
+
+
+class CustomerPayoutUpdateRequest(BaseModel):
+    """Body for `PATCH /customers/me/payout` — UPI / bank instruments used for owner refunds."""
+
+    upi_vpa: str | None = Field(default=None, max_length=100, description="UPI VPA, e.g. name@upi")
+    bank_account_number: str | None = Field(default=None, max_length=34)
+    bank_ifsc: str | None = Field(default=None, max_length=11)
+    bank_account_name: str | None = Field(default=None, max_length=255)
+
+    @field_validator("upi_vpa")
+    @classmethod
+    def validate_upi(cls, v: str | None) -> str | None:
+        if v is None or not v.strip():
+            return None
+        v = v.strip()
+        if "@" not in v:
+            raise ValueError("UPI VPA must include @")
+        return v
+
+    @field_validator("bank_ifsc")
+    @classmethod
+    def normalize_ifsc(cls, v: str | None) -> str | None:
+        if v is None or not v.strip():
+            return None
+        return v.strip().upper()
 
 
 class CustomerAuthResponse(BaseModel):
@@ -116,13 +150,51 @@ def create_customer_access_token(customer_id: uuid.UUID) -> tuple[str, int]:
     return token, settings.jwt_access_expire_minutes * 60
 
 
+def _mask_account(account: str | None) -> str | None:
+    if not account:
+        return None
+    digits = re.sub(r"\s+", "", account)
+    if len(digits) <= 4:
+        return "****"
+    return f"{'*' * (len(digits) - 4)}{digits[-4:]}"
+
+
+def customer_to_response(customer: Customer) -> CustomerResponse:
+    return CustomerResponse(
+        id=customer.id,
+        name=customer.name,
+        email=customer.email,
+        phone=customer.phone,
+        avatar_url=customer.avatar_url,
+        upi_vpa=customer.upi_vpa,
+        upi_qr_url=customer.upi_qr_url,
+        bank_account_number_masked=_mask_account(customer.bank_account_number),
+        bank_ifsc=customer.bank_ifsc,
+        bank_account_name=customer.bank_account_name,
+        has_password=bool(customer.password_hash),
+        status=customer.status,
+    )
+
+
 def customer_auth_response(customer: Customer) -> CustomerAuthResponse:
     token, expires_in = create_customer_access_token(customer.id)
     return CustomerAuthResponse(
         access_token=token,
         expires_in=expires_in,
-        customer=CustomerResponse.model_validate(customer),
+        customer=customer_to_response(customer),
     )
+
+
+def update_customer_payout(customer: Customer, body: CustomerPayoutUpdateRequest) -> Customer:
+    if body.upi_vpa is not None:
+        customer.upi_vpa = body.upi_vpa
+    if body.bank_account_number is not None:
+        customer.bank_account_number = body.bank_account_number.strip() or None
+    if body.bank_ifsc is not None:
+        customer.bank_ifsc = body.bank_ifsc
+    if body.bank_account_name is not None:
+        customer.bank_account_name = body.bank_account_name.strip() or None
+    return customer
 
 
 def store_customer_otp(phone: str) -> None:

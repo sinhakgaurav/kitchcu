@@ -144,8 +144,8 @@ def _seed_ratings_ctx(*, order_status: str = "delivered") -> dict:
         cur.execute(
             """
             INSERT INTO ckac_catalog.dishes
-            (id, kitchen_id, category_id, name, price, prep_time_min, is_active)
-            VALUES (%s::uuid, %s::uuid, %s::uuid, 'Dal Tadka', 149.00, 25, true)
+            (id, kitchen_id, category_id, name, price, prep_time_min, delivery_time_min, max_time_min, is_active)
+            VALUES (%s::uuid, %s::uuid, %s::uuid, 'Dal Tadka', 149.00, 25, 20, 45, true)
             """,
             (str(dish_id), str(kitchen_id), str(category_id)),
         )

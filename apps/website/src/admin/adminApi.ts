@@ -33,6 +33,11 @@ export type PlatformStats = {
   active_kitchens: number;
   orders: number;
   dishes: number;
+  customers?: number;
+  refunds_open?: number;
+  refunds_completed?: number;
+  tickets_open?: number;
+  payments_captured?: number;
 };
 
 export async function adminLogin(email: string, password: string) {
@@ -44,6 +49,191 @@ export async function adminLogin(email: string, password: string) {
 
 export async function fetchAdminStats(): Promise<PlatformStats> {
   return adminFetch("/api/v1/admin/stats");
+}
+
+export type AdminCustomer = {
+  id: string;
+  name: string;
+  phone: string | null;
+  email: string | null;
+  status: string;
+  has_password: boolean;
+  has_payout: boolean;
+  address_count: number;
+  created_at: string;
+};
+
+export type AdminCustomerDetail = AdminCustomer & {
+  upi_vpa: string | null;
+  upi_qr_url: string | null;
+  bank_account_number_masked: string | null;
+  bank_ifsc: string | null;
+  bank_account_name: string | null;
+  addresses: Array<{
+    id: string;
+    label: string;
+    address_line: string;
+    city: string;
+    state: string | null;
+    pincode: string | null;
+    latitude: number | null;
+    longitude: number | null;
+    is_default: boolean;
+  }>;
+};
+
+export async function fetchAdminCustomers(q?: string) {
+  const qs = q ? `?q=${encodeURIComponent(q)}` : "";
+  return adminFetch<AdminCustomer[]>(`/api/v1/admin/customers${qs}`);
+}
+
+export async function fetchAdminCustomer(id: string) {
+  return adminFetch<AdminCustomerDetail>(`/api/v1/admin/customers/${id}`);
+}
+
+export async function updateAdminCustomerStatus(id: string, status: string) {
+  return adminFetch<AdminCustomer>(`/api/v1/admin/customers/${id}/status`, {
+    method: "PATCH",
+    body: JSON.stringify({ status }),
+  });
+}
+
+export async function clearAdminCustomerPassword(id: string) {
+  return adminFetch<AdminCustomerDetail>(`/api/v1/admin/customers/${id}/clear-password`, {
+    method: "POST",
+  });
+}
+
+export async function updateAdminOwnerSubscription(
+  id: string,
+  data: { subscription_tier?: string; subscription_status?: string },
+) {
+  return adminFetch(`/api/v1/admin/owners/${id}/subscription`, {
+    method: "PATCH",
+    body: JSON.stringify(data),
+  });
+}
+
+export type AdminRefund = {
+  id: string;
+  payment_id: string;
+  order_id: string;
+  kitchen_id: string;
+  kind: string;
+  channel: string;
+  amount: number;
+  status: string;
+  destination_type: string;
+  destination_upi: string | null;
+  transfer_remark: string;
+  evidence_url: string | null;
+  reason: string | null;
+  created_at: string;
+  completed_at: string | null;
+};
+
+export async function fetchAdminRefunds(params?: { status?: string; kind?: string }) {
+  const qs = new URLSearchParams();
+  if (params?.status) qs.set("status", params.status);
+  if (params?.kind) qs.set("kind", params.kind);
+  const q = qs.toString();
+  return adminFetch<AdminRefund[]>(`/api/v1/admin/refunds${q ? `?${q}` : ""}`);
+}
+
+export async function patchAdminRefund(
+  id: string,
+  data: { status?: string; admin_note?: string },
+) {
+  return adminFetch<AdminRefund>(`/api/v1/admin/refunds/${id}`, {
+    method: "PATCH",
+    body: JSON.stringify(data),
+  });
+}
+
+export async function fetchAdminPayments(status?: string) {
+  const qs = status ? `?status=${encodeURIComponent(status)}` : "";
+  return adminFetch<
+    {
+      id: string;
+      order_id: string | null;
+      amount: number;
+      method: string;
+      status: string;
+      created_at: string;
+    }[]
+  >(`/api/v1/admin/payments${qs}`);
+}
+
+export async function fetchAdminMoneyStats() {
+  return adminFetch<{
+    payments_captured: number;
+    payments_pending: number;
+    refunds_requested: number;
+    refunds_completed: number;
+    refunds_failed: number;
+    refunds_amount_completed: number;
+    settlements_transferred: number;
+  }>("/api/v1/admin/money-stats");
+}
+
+export type FeatureFlag = {
+  key: string;
+  enabled: boolean;
+  scope: string;
+  description: string | null;
+  updated_at: string;
+};
+
+export async function fetchAdminFeatureFlags() {
+  return adminFetch<FeatureFlag[]>("/api/v1/admin/feature-flags");
+}
+
+export async function updateAdminFeatureFlag(key: string, enabled: boolean) {
+  return adminFetch<FeatureFlag>(`/api/v1/admin/feature-flags/${key}`, {
+    method: "PATCH",
+    body: JSON.stringify({ enabled }),
+  });
+}
+
+export type PlatformApiKey = {
+  key: string;
+  category: string;
+  description: string | null;
+  is_secret: boolean;
+  configured: boolean;
+  value_masked: string | null;
+  updated_at: string;
+  updated_by: string | null;
+};
+
+export async function fetchAdminApiKeys() {
+  return adminFetch<PlatformApiKey[]>("/api/v1/admin/api-keys");
+}
+
+export async function updateAdminApiKey(key: string, value: string) {
+  return adminFetch<PlatformApiKey>(`/api/v1/admin/api-keys/${key}`, {
+    method: "PUT",
+    body: JSON.stringify({ value }),
+  });
+}
+
+export async function clearAdminApiKey(key: string) {
+  return adminFetch<PlatformApiKey>(`/api/v1/admin/api-keys/${key}`, {
+    method: "DELETE",
+  });
+}
+
+export async function fetchAdminJourneys() {
+  return adminFetch<{
+    stages: Array<{
+      id: string;
+      label: string;
+      control: string;
+      count: number;
+      meta?: string;
+      health: string;
+    }>;
+  }>("/api/v1/admin/journeys");
 }
 
 export async function fetchAdminKitchens() {

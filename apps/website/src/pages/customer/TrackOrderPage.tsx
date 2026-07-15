@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { fetchTracking, type TrackingInfo } from "../../shared/api";
 import { STATUS_LABELS } from "../../lib/api";
+import { googleMapsDirectionsEmbedUrl, googleMapsRouteUrl } from "../../lib/locationMaps";
 
 export function TrackOrderPage() {
   const { token } = useParams<{ token: string }>();
@@ -30,13 +31,19 @@ export function TrackOrderPage() {
     );
   }
 
+  const hasRoute =
+    info?.kitchen_latitude != null &&
+    info.kitchen_longitude != null &&
+    info.customer_latitude != null &&
+    info.customer_longitude != null;
+
   return (
     <div className="container customer-checkout">
       <Link to="/" className="owner-back">← Back to kitchCU</Link>
       <header className="owner-page__head">
         <div>
           <h1>Order tracking</h1>
-          <p>Live status from your kitchen — quality-first ETA, not a speed race.</p>
+          <p>Live status + Google Maps route from kitchen to you.</p>
         </div>
       </header>
 
@@ -63,6 +70,40 @@ export function TrackOrderPage() {
               <span>Delivery fee</span>
             </div>
           </div>
+
+          {hasRoute && (
+            <div className="track-map">
+              <iframe
+                title="Delivery route on Google Maps"
+                className="track-map__frame"
+                loading="lazy"
+                referrerPolicy="no-referrer-when-downgrade"
+                src={googleMapsDirectionsEmbedUrl(
+                  info.kitchen_latitude!,
+                  info.kitchen_longitude!,
+                  info.customer_latitude!,
+                  info.customer_longitude!,
+                )}
+              />
+              <a
+                className="btn btn--ghost btn--sm"
+                href={
+                  info.map_directions_url ||
+                  googleMapsRouteUrl(
+                    info.kitchen_latitude!,
+                    info.kitchen_longitude!,
+                    info.customer_latitude!,
+                    info.customer_longitude!,
+                  )
+                }
+                target="_blank"
+                rel="noreferrer"
+              >
+                Open in Google Maps
+              </a>
+            </div>
+          )}
+
           {info.estimated_ready_at && (
             <p className="report-hint">
               Estimated ready around{" "}

@@ -53,7 +53,7 @@
 | Identity service | `services/identity/` | Owners, kitchens, OTP, JWT |
 | **Catalog service** | `services/catalog/` | **Sprint 2** — categories, dishes, menu, EDD |
 | **Order service** | `services/order/` | **Sprint 3** — manual orders, lifecycle, history |
-| **Billing service** | `services/billing/` | **Sprint 6** — payments, UPI intents, owner subscriptions; **GST** — profiles, tax invoices, monthly audit, balance sheet |
+| **Billing service** | `services/billing/` | **Sprint 6** — payments, UPI intents, owner subscriptions; **GST**; **refunds** — full (gateway or direct) / partial (direct UPI/bank + evidence) |
 | **Marketing service** | `services/marketing/` | **Sprint 10** — CRM (F37), coupons (F36), promotions (F38) |
 | **Ratings service** | `services/ratings/` | **Sprint 11** — home taste ratings (F16–F18) |
 | **Growth service** | `services/growth/` | **Sprint 12** — combos (F09), patterns (F10), suggestions (F11), daily menu push (F39) |
@@ -76,7 +76,7 @@
 | **Streaming service** | `services/streaming/`, `apps/website/` | **S18** — F46 LiveKit sessions, F47 owner opt-in go-live, F48 customer live filter |
 | **Owner analytics** | `services/order/app/analytics.py` | F07–F08 revenue, top dishes, peak hours, customer segments |
 | Shared lib | `packages/ckac-common/` | Config, DB, auth, `EventPublisher`, cache, health, internal auth |
-| Event bus | Redis Streams | `ckac:catalog:dish`, `ckac:catalog:ingredient`, `ckac:orders:order`, `ckac:orders:draft`, `ckac:orders:master_order`, `ckac:billing:payment`, `ckac:billing:settlement`, `ckac:billing:subscription`, `ckac:billing:gst`, `ckac:marketing:coupon`, `ckac:marketing:promotion`, `ckac:marketing:crm`, `ckac:ratings:rating`, `ckac:ratings:dish`, `ckac:growth:suggestion`, `ckac:growth:daily_menu`, `ckac:delivery:quote`, `ckac:delivery:tracking`, `ckac:learning:trial`, `ckac:community:recipe`, `ckac:community:reward`, `ckac:community:ranking`, `ckac:streaming:session`, `ckac:notify:whatsapp`, `ckac:notify:dispatch`, `ckac:notify:tracking` |
+| Event bus | Redis Streams | `ckac:catalog:dish`, `ckac:catalog:ingredient`, `ckac:orders:order`, `ckac:orders:draft`, `ckac:orders:master_order`, `ckac:billing:payment`, `ckac:billing:settlement`, `ckac:billing:subscription`, `ckac:billing:gst`, `ckac:billing:refund`, `ckac:marketing:coupon`, `ckac:marketing:promotion`, `ckac:marketing:crm`, `ckac:ratings:rating`, `ckac:ratings:dish`, `ckac:growth:suggestion`, `ckac:growth:daily_menu`, `ckac:delivery:quote`, `ckac:delivery:tracking`, `ckac:learning:trial`, `ckac:community:recipe`, `ckac:community:reward`, `ckac:community:ranking`, `ckac:streaming:session`, `ckac:notify:whatsapp`, `ckac:notify:dispatch`, `ckac:notify:tracking` |
 | PostgreSQL + PostGIS | `infra/postgres/init/` | Schema-per-domain |
 | Docker stack | `docker-compose.yml` | postgres, redis, minio, gateway, identity, catalog, order, billing, marketing, ratings, growth, delivery, learning, community, streaming, notification |
 | Tests | `services/*/tests/` | TDD — run `scripts/run-tests.ps1` |

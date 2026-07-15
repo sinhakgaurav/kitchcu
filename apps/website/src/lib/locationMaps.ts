@@ -26,6 +26,38 @@ export function googleMapsDirectionsUrl(latitude: number, longitude: number): st
   return `https://www.google.com/maps/dir/?api=1&destination=${latitude},${longitude}`;
 }
 
+/** Google Maps driving directions between two pins (opens Maps app / web). */
+export function googleMapsRouteUrl(
+  originLat: number,
+  originLng: number,
+  destLat: number,
+  destLng: number,
+): string {
+  return (
+    `https://www.google.com/maps/dir/?api=1` +
+    `&origin=${originLat},${originLng}` +
+    `&destination=${destLat},${destLng}` +
+    `&travelmode=driving`
+  );
+}
+
+/**
+ * Embeddable Google Maps directions (no API key required).
+ * Uses the classic maps embed endpoint with saddr/daddr.
+ */
+export function googleMapsDirectionsEmbedUrl(
+  originLat: number,
+  originLng: number,
+  destLat: number,
+  destLng: number,
+): string {
+  return (
+    `https://maps.google.com/maps?` +
+    `saddr=${originLat},${originLng}&daddr=${destLat},${destLng}` +
+    `&hl=en&output=embed`
+  );
+}
+
 /** Embedded OpenStreetMap preview (no API key). */
 export function openStreetMapEmbedUrl(latitude: number, longitude: number, pad = 0.012): string {
   const bbox = [longitude - pad, latitude - pad, longitude + pad, latitude + pad].join("%2C");

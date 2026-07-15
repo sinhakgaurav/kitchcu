@@ -6,6 +6,8 @@ export type CartLine = {
   unitPrice: number;
   quantity: number;
   prepTimeMin: number;
+  deliveryTimeMin: number;
+  maxTimeMin: number;
 };
 
 export type KitchenCart = {
@@ -76,9 +78,35 @@ export function cartItemCount(cart: CustomerCart | null, kitchenId?: string): nu
     );
 }
 
+/** Quality-first ETA: max dish ceiling across the kitchen cart (not sum of prep times). */
+export function projectKitchenReadyMin(kitchen: KitchenCart, forDelivery = true): number {
+  if (!kitchen.lines.length) return 0;
+  return Math.max(
+    ...kitchen.lines.map((line) => {
+      const prep = line.prepTimeMin || 0;
+      const delivery = line.deliveryTimeMin || 0;
+      const maxTime = line.maxTimeMin || prep + delivery;
+      return forDelivery ? maxTime : prep;
+    }),
+  );
+}
+
+export function projectCartReadyMin(cart: CustomerCart | null, forDelivery = true): number {
+  if (!cart?.kitchens.length) return 0;
+  return Math.max(...cart.kitchens.map((k) => projectKitchenReadyMin(k, forDelivery)));
+}
+
 export function addToCart(
   kitchen: { id: string; name: string; code: string },
-  dish: { id: string; name: string; price: number; prep_time_min: number },
+  dish: {
+    id: string;
+    name: string;
+    price: number;
+    prep_time_min: number;
+    delivery_time_min?: number | null;
+    max_time_min?: number;
+    projected_ready_min?: number;
+  },
   quantity = 1,
 ): CustomerCart {
   const existing = getCart();
@@ -106,12 +134,19 @@ export function addToCart(
   if (line) {
     line.quantity += quantity;
   } else {
+    const delivery = dish.delivery_time_min ?? 0;
+    const maxTime =
+      dish.max_time_min ??
+      dish.projected_ready_min ??
+      dish.prep_time_min + delivery;
     kitchenCart.lines.push({
       dishId: dish.id,
       dishName: dish.name,
       unitPrice: dish.price,
       quantity,
       prepTimeMin: dish.prep_time_min,
+      deliveryTimeMin: delivery,
+      maxTimeMin: maxTime,
     });
   }
   saveCart(cart);

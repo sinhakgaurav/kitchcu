@@ -12,10 +12,12 @@ import {
   replyAdminTicket,
   setAdminToken,
   updateAdminTicket,
+  updateAdminOwnerSubscription,
   updateKitchenStatus,
   type AdminTicket,
   type PlatformStats,
 } from "./adminApi";
+import { AdminControlPlane, AdminCustomers, AdminRefunds } from "./AdminPanels";
 import {
   buildOrderTimeline,
   buildStatusBreakdown,
@@ -24,19 +26,31 @@ import {
 } from "./adminCharts";
 import { ADMIN_DEV_EMAIL, ADMIN_HOST, CUSTOMER_HOST, KITCHEN_HOST } from "../shared/brand";
 import { DEMO_ADMIN, DEMO_OWNERS } from "../shared/demo";
+import { AuthLoginHighlights } from "../components/AuthLoginHighlights";
 import { BrandAuthArt, BrandLogo } from "../components/BrandLogo";
 import { BrandNavMark } from "../components/BrandNavMark";
 import { customerUrl, kitchenUrl } from "../shared/urls";
 import "../owner-app.css";
 
-type Tab = "overview" | "kitchens" | "owners" | "orders" | "tickets";
+type Tab =
+  | "overview"
+  | "kitchens"
+  | "owners"
+  | "customers"
+  | "orders"
+  | "refunds"
+  | "tickets"
+  | "control";
 
 const TABS: { id: Tab; label: string }[] = [
   { id: "overview", label: "Overview" },
   { id: "kitchens", label: "Kitchens" },
   { id: "owners", label: "Owners" },
+  { id: "customers", label: "Customers" },
   { id: "orders", label: "Orders" },
+  { id: "refunds", label: "Refunds" },
   { id: "tickets", label: "Tickets" },
+  { id: "control", label: "Control" },
 ];
 
 function chartDayLabel(isoDate: string): string {
@@ -46,11 +60,26 @@ function chartDayLabel(isoDate: string): string {
 }
 
 const TAB_META: Record<Tab, { title: string; desc: string }> = {
-  overview: { title: "Platform overview", desc: "Health snapshot across all kitchens and owners" },
+  overview: {
+    title: "Platform overview",
+    desc: "Health snapshot across kitchens, customers, money, and support",
+  },
   kitchens: { title: "Kitchens", desc: "Activate, suspend, and monitor cloud kitchens" },
-  owners: { title: "Owners", desc: "Subscription tiers and kitchen counts" },
+  owners: { title: "Owners", desc: "Subscription tiers and kitchen counts — force plan changes" },
+  customers: {
+    title: "Customers",
+    desc: "Full customer control — status, payout profile, addresses, password reset",
+  },
   orders: { title: "Orders", desc: "Cross-kitchen order feed" },
+  refunds: {
+    title: "Refunds & money",
+    desc: "Gateway and direct-transfer refunds — escalate, complete, or fail",
+  },
   tickets: { title: "Support tickets", desc: "Customer and owner escalations from AI chat" },
+  control: {
+    title: "Control plane",
+    desc: "Feature flags, data journeys, payments, and SaaS subscription overrides",
+  },
 };
 
 const STAT_CARDS: {
@@ -62,8 +91,11 @@ const STAT_CARDS: {
   { key: "owners", label: "Registered owners", desc: "Kitchen operators on the platform", accent: "teal" },
   { key: "kitchens", label: "Total kitchens", desc: "All kitchen profiles created", accent: "orange" },
   { key: "active_kitchens", label: "Active kitchens", desc: "Currently accepting orders", accent: "green" },
+  { key: "customers", label: "Customers", desc: "Registered diner accounts", accent: "blue" },
   { key: "orders", label: "Platform orders", desc: "Lifetime order count", accent: "blue" },
   { key: "dishes", label: "Menu dishes", desc: "Live-capture items across kitchens", accent: "purple" },
+  { key: "refunds_open", label: "Open refunds", desc: "Needs owner or admin action", accent: "orange" },
+  { key: "payments_captured", label: "Captured payments", desc: "Successful customer payments", accent: "green" },
 ];
 
 export default function AdminApp() {
@@ -172,8 +204,11 @@ export default function AdminApp() {
 
           {tab === "kitchens" && <AdminKitchens />}
           {tab === "owners" && <AdminOwners />}
+          {tab === "customers" && <AdminCustomers />}
           {tab === "orders" && <AdminOrders />}
+          {tab === "refunds" && <AdminRefunds />}
           {tab === "tickets" && <AdminTickets />}
+          {tab === "control" && <AdminControlPlane />}
         </div>
       </div>
     </div>
@@ -238,6 +273,7 @@ function AdminOverview({
   const suspendedKitchens = kitchens.filter((k) => k.status === "suspended").length;
   const trialOwners = owners.filter((o) => o.subscription_tier === "trial").length;
   const inactiveOwners = owners.filter((o) => o.subscription_status !== "active").length;
+  const openRefunds = stats.refunds_open ?? 0;
   const attentionItems = [
     {
       key: "tickets",
@@ -246,6 +282,14 @@ function AdminOverview({
       hint: openTickets > 0 ? "Support queue needs replies" : "Queue clear",
       tab: "tickets" as Tab,
       tone: openTickets > 0 ? "alert" : "ok",
+    },
+    {
+      key: "refunds",
+      count: openRefunds,
+      label: "Open refunds",
+      hint: openRefunds > 0 ? "Escalate or complete refunds" : "No pending refunds",
+      tab: "refunds" as Tab,
+      tone: openRefunds > 0 ? "alert" : "ok",
     },
     {
       key: "suspended",
@@ -300,7 +344,10 @@ function AdminOverview({
           </p>
         </div>
         <div className="admin-hero__actions">
-          <button type="button" className="btn btn--primary btn--sm" onClick={() => onNavigate("kitchens")}>
+          <button type="button" className="btn btn--primary btn--sm" onClick={() => onNavigate("control")}>
+            Open control plane
+          </button>
+          <button type="button" className="btn btn--ghost btn--sm" onClick={() => onNavigate("kitchens")}>
             Manage kitchens
           </button>
           {openTickets > 0 && (
@@ -312,13 +359,16 @@ function AdminOverview({
       </section>
 
       <div className="admin-stats admin-stats--rich">
-        {STAT_CARDS.map((card) => (
-          <div key={card.key} className={`dash-card admin-stat-card admin-stat-card--${card.accent}`}>
-            <strong>{stats[card.key].toLocaleString("en-IN")}</strong>
-            <span>{card.label}</span>
-            <em>{card.desc}</em>
-          </div>
-        ))}
+        {STAT_CARDS.map((card) => {
+          const value = stats[card.key] ?? 0;
+          return (
+            <div key={card.key} className={`dash-card admin-stat-card admin-stat-card--${card.accent}`}>
+              <strong>{Number(value).toLocaleString("en-IN")}</strong>
+              <span>{card.label}</span>
+              <em>{card.desc}</em>
+            </div>
+          );
+        })}
       </div>
 
       <div className="admin-charts">
@@ -471,13 +521,17 @@ function AdminOverview({
             <h3>Quick actions</h3>
           </header>
           <div className="admin-quick">
-            <button type="button" className="admin-quick__item" onClick={() => onNavigate("kitchens")}>
-              <strong>Kitchen moderation</strong>
-              <span>Activate or suspend kitchens</span>
+            <button type="button" className="admin-quick__item" onClick={() => onNavigate("customers")}>
+              <strong>Customer control</strong>
+              <span>Suspend accounts, reset passwords, view payouts</span>
             </button>
-            <button type="button" className="admin-quick__item" onClick={() => onNavigate("owners")}>
-              <strong>Owner accounts</strong>
-              <span>Review tiers and kitchen counts</span>
+            <button type="button" className="admin-quick__item" onClick={() => onNavigate("refunds")}>
+              <strong>Refund oversight</strong>
+              <span>Escalate gateway and direct transfers</span>
+            </button>
+            <button type="button" className="admin-quick__item" onClick={() => onNavigate("control")}>
+              <strong>Feature flags & journeys</strong>
+              <span>Kill-switches across app data journeys</span>
             </button>
             <button type="button" className="admin-quick__item" onClick={() => onNavigate("tickets")}>
               <strong>Support queue</strong>
@@ -520,12 +574,14 @@ function AdminLogin({ onSuccess }: { onSuccess: (token: string) => void }) {
       <div className="auth-page__visual admin-login__visual">
         <div className="auth-page__overlay" />
         <div className="auth-page__brand-stack">
-          <BrandLogo variant="badge" height={88} />
-          <BrandAuthArt surface="admin" />
+          <BrandLogo variant="badge" height={72} />
           <h1>Platform control</h1>
           <p>Full visibility over kitchens, owners, orders, and support.</p>
+          <AuthLoginHighlights surface="admin" />
+          <BrandAuthArt surface="admin" />
         </div>
       </div>
+      <div className="auth-page__form-wrap">
       <form className="auth-card admin-login__card" onSubmit={submit}>
         <p className="admin-login__eyebrow">Super admin</p>
         <BrandLogo variant="wordmark" className="brand-logo--lg" />
@@ -551,6 +607,7 @@ function AdminLogin({ onSuccess }: { onSuccess: (token: string) => void }) {
           <a href={kitchenUrl("/login")}>Owner app</a>
         </p>
       </form>
+      </div>
     </div>
   );
 }
@@ -633,10 +690,16 @@ function AdminKitchens() {
 function AdminOwners() {
   const [rows, setRows] = useState<Awaited<ReturnType<typeof fetchAdminOwners>>>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [busyId, setBusyId] = useState<string | null>(null);
+
+  const load = async () => {
+    setRows(await fetchAdminOwners());
+  };
+
   useEffect(() => {
-    fetchAdminOwners()
-      .then(setRows)
-      .catch(() => {})
+    load()
+      .catch((e) => setError(e instanceof Error ? e.message : "Failed to load owners"))
       .finally(() => setLoading(false));
   }, []);
 
@@ -648,6 +711,7 @@ function AdminOwners() {
 
   return (
     <>
+      {error && <p className="auth-card__error">{error}</p>}
       <div className="admin-tab-kpis">
         <div className="dash-card admin-stat-card admin-stat-card--teal">
           <strong>{rows.length}</strong>
@@ -672,6 +736,7 @@ function AdminOwners() {
             <th>Tier</th>
             <th>Status</th>
             <th>Kitchens</th>
+            <th>Control</th>
           </tr>
         </thead>
         <tbody>
@@ -682,6 +747,30 @@ function AdminOwners() {
               <td><span className="od-pill od-pill--sub">{o.subscription_tier}</span></td>
               <td>{o.subscription_status}</td>
               <td>{o.kitchen_count}</td>
+              <td>
+                <button
+                  type="button"
+                  className="btn btn--ghost btn--sm"
+                  disabled={busyId === o.id}
+                  onClick={async () => {
+                    setBusyId(o.id);
+                    setError("");
+                    try {
+                      await updateAdminOwnerSubscription(o.id, {
+                        subscription_tier: "growth",
+                        subscription_status: "active",
+                      });
+                      await load();
+                    } catch (e) {
+                      setError(e instanceof Error ? e.message : "Update failed");
+                    } finally {
+                      setBusyId(null);
+                    }
+                  }}
+                >
+                  Force growth/active
+                </button>
+              </td>
             </tr>
           ))}
         </tbody>

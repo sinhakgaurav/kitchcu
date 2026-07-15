@@ -4,11 +4,11 @@
 |----------|---------|----------|
 | **[KITCHCU-ENGINEERING-STANDARDS.md](./KITCHCU-ENGINEERING-STANDARDS.md)** | **Engineering constitution — DDD, EDD, TDD, security, observability** | Engineering, AI agents |
 | **[templates/MODULE-DESIGN-PACK.md](./templates/MODULE-DESIGN-PACK.md)** | Pre-code design template (mandatory for new modules) | Engineering |
-| **[CKAC-COMPLETE-GUIDE.md](./CKAC-COMPLETE-GUIDE.md)** | **Master guide v3.1 — definitions/glossary, architecture why+how, 100k-session scale lens, TDD+EDD rationale, module catalog, step-by-step product flows, per-schema ER, UI Catalog, brand/UX system, aggregated OpenAPI reference** | CEO, CPO, CTO, DBA, QA, Investors, AI agents |
-| **[CKAC-COMPLETE-GUIDE.pdf](./CKAC-COMPLETE-GUIDE.pdf)** | Complete Executive Guide PDF v3.1 (portrait; includes UI Catalog figures) | CEO, CPO, CTO, Investors |
+| **[CKAC-COMPLETE-GUIDE.md](./CKAC-COMPLETE-GUIDE.md)** | **Master guide v3.2 — definitions/glossary, architecture why+how, 100k-session scale lens, TDD+EDD, modules (+ delivery payer, dish timing, super-admin Control), flows §17.9–17.10, UI Catalog (8 surfaces), brand/UX, OpenAPI** | CEO, CPO, CTO, DBA, QA, Investors, AI agents |
+| **[CKAC-COMPLETE-GUIDE.pdf](./CKAC-COMPLETE-GUIDE.pdf)** | Complete Executive Guide PDF v3.2 (portrait; UI Catalog figures; fixed header/caption layout) | CEO, CPO, CTO, Investors |
 | **[CKAC-USERFLOWS.md](./CKAC-USERFLOWS.md)** | **Full user journey pack** — every persona, every screen, every API call, step-by-step | Product, Design, Engineering, QA |
 | **[CKAC-USERFLOWS.pdf](./CKAC-USERFLOWS.pdf)** | User journey pack PDF | Product, Design, Investors |
-| **[assets/ui/](./assets/ui/)** | **Reference UI screenshots** (portal, customer, kitchen login, owner dashboard, admin) cited by Complete Guide §18 | Product, Design, Engineering |
+| **[assets/ui/](./assets/ui/)** | **Reference UI screenshots** (8 surfaces: portal, customer home/login, kitchen login, owner dashboard, admin login/overview/Control) — Complete Guide §18 | Product, Design, Engineering |
 | **[API.md](./API.md)** | **Public API reference** — auth, body/response examples, error codes; live aggregated spec via gateway `/openapi.json`/`/docs`/`/redoc` and portal `/openapi` | Engineering, Partners |
 | **[CKAC-IMPLEMENTATION-GUIDE.md](./CKAC-IMPLEMENTATION-GUIDE.md)** | **What's built** — architecture, DB, flows, APIs, feature matrix mapped to benchmarks | Product, Engineering, CPO |
 | **[AGENTS.md](../AGENTS.md)** | **Agent implementation spec — read before every code change** | AI agents, developers |
@@ -44,7 +44,7 @@ python scripts/generate_pitch_pdf.py
 
 ## Quick Stats
 
-- **S1–S18 shipped** (gateway + 13 domain services + PWAs + GST) — see [Complete Guide v3.1](./CKAC-COMPLETE-GUIDE.md)
+- **S1–S18 shipped** (gateway + 13 domain services + PWAs + GST + super-admin Control / delivery payer / dish timing) — see [Complete Guide v3.2](./CKAC-COMPLETE-GUIDE.md)
 - **Apps:** Portal :13000 · customer.kitchcu.in :13001 · kitchen.kitchcu.in :13002 · admin.kitchcu.in :13003
 - **Stack:** React PWAs + Python FastAPI + PostgreSQL/PostGIS + Redis + Docker
 - **Model:** Subscription SaaS, zero food commission
@@ -52,5 +52,6 @@ python scripts/generate_pitch_pdf.py
 - **Brand:** **Kitchcu** (internal repo/schemas retain `ckac_*` identifiers)
 - **API:** Aggregated OpenAPI at gateway `/openapi.json` / `/docs` / `/redoc`, portal `/openapi` (`/api-docs`) — see [`API.md`](./API.md)
 - **Next design:** [E1–E2 Kitchen Quality Loop](./E1-E2-KITCHEN-QUALITY-LOOP-DESIGN.md)
-- **UI screenshots:** [`docs/assets/ui/`](./assets/ui/) — Complete Guide §18 + Pitch PDF UI slides
+- **UI screenshots:** [`docs/assets/ui/`](./assets/ui/) — Complete Guide §18 (8 surfaces) + Pitch / Userflows PDF figures
+- **PDF layout (v3.2):** `scripts/pdf_guide.py` — top margin clears running header; captions above figures; part-band body starts at y=46 (no header overlap)
 - **User journeys:** [`CKAC-USERFLOWS.md`](./CKAC-USERFLOWS.md) — full step-by-step pack for every persona

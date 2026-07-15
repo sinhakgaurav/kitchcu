@@ -378,6 +378,52 @@ form.auth-card > .btn {
   font-size: 0.875rem;
 }
 
+/* Compact owner settings forms (payment gateway, etc.) */
+.owner-forms {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kc-field-stack-gap);
+  max-width: 36rem;
+}
+
+.owner-forms label {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kc-label-control-gap);
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.owner-forms input:not([type="checkbox"]) {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  min-height: var(--kc-field-h);
+  padding: var(--kc-control-pad-y) var(--kc-control-pad-x);
+  border-radius: var(--kc-field-radius);
+  border: 1px solid var(--kc-field-border);
+  background: var(--kc-field-bg);
+  color: inherit;
+}
+
+.owner-forms__check {
+  flex-direction: row !important;
+  align-items: center;
+  gap: 0.65rem !important;
+  font-weight: 500;
+}
+
+.owner-forms__hint,
+.owner-forms__success {
+  margin: 0.75rem 0 0;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+.owner-forms__success {
+  color: var(--teal-light, #2ec4b6);
+}
+
 /* Soften generic button hover so forms don't jump wildly */
 .auth-card .btn--primary:hover,
 .owner-form .btn--primary:hover,

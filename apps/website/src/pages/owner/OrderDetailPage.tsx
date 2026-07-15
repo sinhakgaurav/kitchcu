@@ -3,19 +3,27 @@ import { useEffect, useState } from "react";
 import { DishRecipeGuide } from "../../components/DishRecipeGuide";
 import {
   capturePayment,
+  completeDirectRefund,
   createPayment,
+  createRefund,
   createUpiIntent,
   downloadOwnerOrderBillPdf,
   fetchOrder,
   fetchOrderStockWarnings,
+  fetchRefunds,
   ORDER_NEXT,
+  processGatewayRefund,
+  setOrderDeliveryFulfillment,
   STATUS_LABELS,
   updateOrderStatus,
+  uploadRefundEvidence,
   type Order,
   type OrderStockWarnings,
   type Payment,
+  type Refund,
   type UpiIntent,
 } from "../../lib/api";
+import { googleMapsDirectionsEmbedUrl, googleMapsRouteUrl } from "../../lib/locationMaps";
 import { useKitchen } from "../../lib/kitchen";
 
 const inr = (n: number) => `₹${Math.round(n).toLocaleString("en-IN")}`;
@@ -45,6 +53,15 @@ export function OrderDetailPage() {
   const [payError, setPayError] = useState("");
   const [payBusy, setPayBusy] = useState(false);
   const [stockWarnings, setStockWarnings] = useState<OrderStockWarnings | null>(null);
+  const [refunds, setRefunds] = useState<Refund[]>([]);
+  const [refundKind, setRefundKind] = useState<"full" | "partial">("full");
+  const [refundChannel, setRefundChannel] = useState<"gateway" | "direct_transfer">("gateway");
+  const [refundAmount, setRefundAmount] = useState("");
+  const [refundReason, setRefundReason] = useState("");
+  const [refundError, setRefundError] = useState("");
+  const [refundBusy, setRefundBusy] = useState(false);
+  const [fulfillBusy, setFulfillBusy] = useState(false);
+  const [fulfillError, setFulfillError] = useState("");
 
   useEffect(() => {
     if (!orderId) return;
@@ -53,6 +70,13 @@ export function OrderDetailPage() {
       .then(setOrder)
       .catch(() => setError("Order not found"))
       .finally(() => setLoading(false));
+  }, [orderId]);
+
+  useEffect(() => {
+    if (!orderId) return;
+    fetchRefunds(orderId)
+      .then(setRefunds)
+      .catch(() => setRefunds([]));
   }, [orderId]);
 
   useEffect(() => {
@@ -127,6 +151,63 @@ export function OrderDetailPage() {
     }
   };
 
+  const refreshRefunds = async () => {
+    if (!orderId) return;
+    setRefunds(await fetchRefunds(orderId));
+  };
+
+  const submitRefund = async () => {
+    if (!order) return;
+    setRefundError("");
+    setRefundBusy(true);
+    try {
+      const created = await createRefund({
+        order_id: order.id,
+        kind: refundKind,
+        channel: refundKind === "full" ? refundChannel : "direct_transfer",
+        amount: refundKind === "partial" ? Number(refundAmount) : undefined,
+        reason: refundReason || undefined,
+      });
+      if (created.channel === "gateway") {
+        await processGatewayRefund(created.id);
+      }
+      await refreshRefunds();
+      setRefundAmount("");
+      setRefundReason("");
+    } catch (err) {
+      setRefundError(err instanceof Error ? err.message : "Refund failed");
+    } finally {
+      setRefundBusy(false);
+    }
+  };
+
+  const onRefundEvidence = async (refundId: string, file: File | null) => {
+    if (!file) return;
+    setRefundError("");
+    setRefundBusy(true);
+    try {
+      await uploadRefundEvidence(refundId, file);
+      await refreshRefunds();
+    } catch (err) {
+      setRefundError(err instanceof Error ? err.message : "Evidence upload failed");
+    } finally {
+      setRefundBusy(false);
+    }
+  };
+
+  const markDirectRefundDone = async (refundId: string) => {
+    setRefundError("");
+    setRefundBusy(true);
+    try {
+      await completeDirectRefund(refundId);
+      await refreshRefunds();
+    } catch (err) {
+      setRefundError(err instanceof Error ? err.message : "Could not complete refund");
+    } finally {
+      setRefundBusy(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="owner-screen od-board od-order-detail">
@@ -147,7 +228,12 @@ export function OrderDetailPage() {
 
   const next = ORDER_NEXT[order.status] ?? [];
   const needsPayment = ["online", "upi"].includes(order.payment_method);
-  const paymentCaptured = payment?.status === "captured";
+  const paymentCaptured =
+    payment?.status === "captured" ||
+    payment?.status === "partially_refunded" ||
+    payment?.status === "refunded" ||
+    refunds.some((r) => r.status === "completed" || r.status === "requested" || r.status === "processing");
+  const canRefund = needsPayment && order.status !== "cancelled";
 
   return (
     <div className="owner-screen od-board od-order-detail">
@@ -187,6 +273,101 @@ export function OrderDetailPage() {
           </button>
         </div>
       </section>
+
+      {order.delivery_type === "delivery" && (
+        <section className="dash-card od-panel">
+          <header className="od-panel__head">
+            <div>
+              <h2>Delivery fulfillment</h2>
+              <p>
+                {order.distance_km != null ? `${order.distance_km.toFixed(1)} km · ` : ""}
+                {order.delivery_payer === "customer"
+                  ? "Out of kitchen range — logistics paid by customer"
+                  : "In range — logistics paid by kitchen (customer fee ₹0)"}
+              </p>
+            </div>
+          </header>
+          {fulfillError && <p className="auth-card__error">{fulfillError}</p>}
+          <p className="report-hint">
+            Mode: <strong>{order.delivery_mode ?? "not chosen"}</strong>
+            {order.owner_delivery_cost
+              ? ` · kitchen courier cost ${inr(order.owner_delivery_cost)}`
+              : ""}
+            {order.delivery_fee > 0 ? ` · customer fee ${inr(order.delivery_fee)}` : ""}
+          </p>
+          {order.status !== "delivered" && order.status !== "cancelled" && (
+            <div className="od-board__hero-actions" style={{ flexDirection: "row", flexWrap: "wrap" }}>
+              <button
+                type="button"
+                className="btn btn--primary btn--sm"
+                disabled={fulfillBusy}
+                onClick={async () => {
+                  setFulfillBusy(true);
+                  setFulfillError("");
+                  try {
+                    setOrder(await setOrderDeliveryFulfillment(order.id, { mode: "self" }));
+                  } catch (e) {
+                    setFulfillError(e instanceof Error ? e.message : "Failed");
+                  } finally {
+                    setFulfillBusy(false);
+                  }
+                }}
+              >
+                Self delivery
+              </button>
+              <button
+                type="button"
+                className="btn btn--ghost btn--sm"
+                disabled={fulfillBusy}
+                onClick={async () => {
+                  setFulfillBusy(true);
+                  setFulfillError("");
+                  try {
+                    setOrder(await setOrderDeliveryFulfillment(order.id, { mode: "platform" }));
+                  } catch (e) {
+                    setFulfillError(e instanceof Error ? e.message : "Failed");
+                  } finally {
+                    setFulfillBusy(false);
+                  }
+                }}
+              >
+                Book platform courier
+              </button>
+            </div>
+          )}
+          {order.customer_latitude != null &&
+            order.customer_longitude != null &&
+            kitchen?.latitude != null &&
+            kitchen?.longitude != null && (
+              <div className="track-map" style={{ marginTop: "1rem" }}>
+                <iframe
+                  title="Delivery map"
+                  className="track-map__frame"
+                  loading="lazy"
+                  src={googleMapsDirectionsEmbedUrl(
+                    kitchen.latitude,
+                    kitchen.longitude,
+                    order.customer_latitude,
+                    order.customer_longitude,
+                  )}
+                />
+                <a
+                  className="btn btn--ghost btn--sm"
+                  href={googleMapsRouteUrl(
+                    kitchen.latitude,
+                    kitchen.longitude,
+                    order.customer_latitude,
+                    order.customer_longitude,
+                  )}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  Open in Google Maps
+                </a>
+              </div>
+            )}
+        </section>
+      )}
 
       <div className="od-order-detail__grid">
         <section className="dash-card od-panel">
@@ -272,6 +453,134 @@ export function OrderDetailPage() {
                     Collect {inr(order.total)}
                   </button>
                 </>
+              )}
+            </section>
+          )}
+
+          {canRefund && (
+            <section className="dash-card od-panel owner-pay-panel">
+              <header className="od-panel__head">
+                <div>
+                  <h2>Refund</h2>
+                  <p>Full via gateway or direct UPI/bank · partial is always direct</p>
+                </div>
+              </header>
+              {refundError && <div className="auth-card__error">{refundError}</div>}
+
+              <label className="kc-field">
+                <span className="kc-field__label">Type</span>
+                <select
+                  className="kc-input"
+                  value={refundKind}
+                  onChange={(e) => setRefundKind(e.target.value as "full" | "partial")}
+                >
+                  <option value="full">Full refund</option>
+                  <option value="partial">Partial refund</option>
+                </select>
+              </label>
+
+              {refundKind === "full" && (
+                <label className="kc-field">
+                  <span className="kc-field__label">Channel</span>
+                  <select
+                    className="kc-input"
+                    value={refundChannel}
+                    onChange={(e) => setRefundChannel(e.target.value as "gateway" | "direct_transfer")}
+                  >
+                    <option value="gateway">Payment gateway (Razorpay reverse)</option>
+                    <option value="direct_transfer">Direct UPI / bank transfer</option>
+                  </select>
+                </label>
+              )}
+
+              {refundKind === "partial" && (
+                <label className="kc-field">
+                  <span className="kc-field__label">Amount (₹)</span>
+                  <input
+                    className="kc-input"
+                    type="number"
+                    min="1"
+                    step="0.01"
+                    value={refundAmount}
+                    onChange={(e) => setRefundAmount(e.target.value)}
+                    placeholder="e.g. 100"
+                  />
+                </label>
+              )}
+
+              <label className="kc-field">
+                <span className="kc-field__label">Reason (optional)</span>
+                <input
+                  className="kc-input"
+                  value={refundReason}
+                  onChange={(e) => setRefundReason(e.target.value)}
+                  placeholder="Missing item, quality issue…"
+                />
+              </label>
+
+              <button type="button" className="btn btn--primary" disabled={refundBusy} onClick={submitRefund}>
+                {refundBusy
+                  ? "Working…"
+                  : refundKind === "full" && refundChannel === "gateway"
+                    ? "Refund via gateway"
+                    : "Create direct refund"}
+              </button>
+
+              {refunds.length > 0 && (
+                <ul className="owner-detail-items" style={{ marginTop: "1rem" }}>
+                  {refunds.map((r) => (
+                    <li key={r.id} style={{ flexDirection: "column", alignItems: "stretch", gap: "0.5rem" }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", gap: "0.5rem" }}>
+                        <span>
+                          {r.kind} · {r.channel} · {inr(r.amount)} · {r.status}
+                          <br />
+                          <small>Remark: {r.transfer_remark}</small>
+                          {r.destination_upi && (
+                            <>
+                              <br />
+                              <small>UPI: {r.destination_upi}</small>
+                            </>
+                          )}
+                          {r.destination_bank_account_masked && (
+                            <>
+                              <br />
+                              <small>
+                                Bank: {r.destination_bank_account_masked} · {r.destination_bank_ifsc}
+                              </small>
+                            </>
+                          )}
+                        </span>
+                        <span className="status-badge">{r.status}</span>
+                      </div>
+                      {r.channel === "direct_transfer" && r.status !== "completed" && (
+                        <>
+                          <label className="kc-field">
+                            <span className="kc-field__label">Attach refund screenshot</span>
+                            <input
+                              type="file"
+                              accept="image/jpeg,image/png,image/webp"
+                              disabled={refundBusy}
+                              onChange={(e) => onRefundEvidence(r.id, e.target.files?.[0] ?? null)}
+                            />
+                          </label>
+                          {r.evidence_url && (
+                            <a href={r.evidence_url} target="_blank" rel="noreferrer">
+                              View evidence
+                            </a>
+                          )}
+                          <button
+                            type="button"
+                            className="btn btn--ghost btn--sm"
+                            disabled={refundBusy || !r.evidence_url}
+                            onClick={() => markDirectRefundDone(r.id)}
+                          >
+                            Mark transfer complete
+                          </button>
+                        </>
+                      )}
+                    </li>
+                  ))}
+                </ul>
               )}
             </section>
           )}

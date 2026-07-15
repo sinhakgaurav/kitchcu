@@ -6,7 +6,7 @@
 |-------|-------|
 | Version | **4.2** — Module encyclopedia + UI surfaces + positioning + OpenAPI/userflows links |
 | Audience | CPO, CEO, Product, Engineering, Investors |
-| Master guide | [`CKAC-COMPLETE-GUIDE.md`](./CKAC-COMPLETE-GUIDE.md) **v3.1** · [`CKAC-COMPLETE-GUIDE.pdf`](./CKAC-COMPLETE-GUIDE.pdf) |
+| Master guide | [`CKAC-COMPLETE-GUIDE.md`](./CKAC-COMPLETE-GUIDE.md) **v3.2** · [`CKAC-COMPLETE-GUIDE.pdf`](./CKAC-COMPLETE-GUIDE.pdf) |
 | Pitch PDF | [`CKAC-PITCH-DECK.pdf`](./CKAC-PITCH-DECK.pdf) (v4.2 landscape slides) |
 | Full user journeys | [`CKAC-USERFLOWS.md`](./CKAC-USERFLOWS.md) · [`CKAC-USERFLOWS.pdf`](./CKAC-USERFLOWS.pdf) |
 | Public API reference | [`API.md`](./API.md) · aggregated spec at gateway `/openapi.json` / `/docs` / `/redoc` · portal `/openapi` |
@@ -14,7 +14,7 @@
 | Quality loop design | [`E1-E2-KITCHEN-QUALITY-LOOP-DESIGN.md`](./E1-E2-KITCHEN-QUALITY-LOOP-DESIGN.md) |
 | Last updated | July 2026 |
 
-> This blueprint is the **CPO lens extract**. Full CEO/CTO depth — definitions, architecture *why*, 100k-session scale lens, TDD+EDD rationale, Mermaid flows, per-schema ER, and UI anatomy — lives in the **Complete Executive Guide v3.1**. For the exhaustive step-by-step journey pack (every persona, every screen, every API call), see [`CKAC-USERFLOWS.md`](./CKAC-USERFLOWS.md).
+> This blueprint is the **CPO lens extract**. Full CEO/CTO depth — definitions, architecture *why*, 100k-session scale lens, TDD+EDD rationale, Mermaid flows, per-schema ER, and UI anatomy (incl. login highlights, super-admin Control, delivery payer) — lives in the **Complete Executive Guide v3.2**. For the exhaustive step-by-step journey pack (every persona, every screen, every API call), see [`CKAC-USERFLOWS.md`](./CKAC-USERFLOWS.md).
 
 **Positioning claim (product copy):** *India's first — and the world's third — platform with this feature stack* (`APP_POSITIONING` in `apps/website/src/shared/brand.ts`).
 
@@ -166,11 +166,11 @@ Full write-up: Complete Guide **§18**. Why two themes: **§19**.
 
 For architecture, event flows, and ER diagrams see:
 
-- Complete Guide **Part III** (markdown + PDF v3.1)
+- Complete Guide **Part III** (markdown + PDF v3.2)
 - `CKAC-ARCHITECTURE-CTO.md`
 - `CKAC-SYSTEM-BENCHMARK.md`
 - Live API contract: gateway `/docs` (aggregated) · [`API.md`](./API.md)
 
 ---
 
-*CPO Product Blueprint v4.2 — aligned with Complete Guide v3.1 — July 2026*
+*CPO Product Blueprint v4.2 — aligned with Complete Guide v3.2 — July 2026*

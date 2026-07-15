@@ -17,6 +17,7 @@ import {
   clearCart,
   getCart,
   kitchenCartSubtotal,
+  projectKitchenReadyMin,
   updateLineQuantity,
   type CustomerCart,
   type KitchenCartGroup,
@@ -97,6 +98,7 @@ export function CheckoutPage() {
           if (quote.status === "out_of_range") {
             throw new Error(`${kitchen.kitchenName} does not deliver to your location`);
           }
+          // status "ok" (in range) or "extended" (beyond max — customer pays) are allowed
           next[kitchen.kitchenId] = quote;
         }
         if (!cancelled) setQuotes(next);
@@ -248,6 +250,10 @@ export function CheckoutPage() {
         return (
           <section key={kitchen.kitchenId} className="glass customer-checkout__cart">
             <h2>{kitchen.kitchenName} · {kitchen.kitchenCode}</h2>
+            <p className="customer-checkout__eta">
+              Projected ready within ~{projectKitchenReadyMin(kitchen, dtype === "delivery")} min
+              {" "}(longest dish max time — quality-first, not a speed race)
+            </p>
             <ul className="owner-detail-items">
               {kitchen.lines.map((line) => (
                 <li key={line.dishId}>
@@ -264,6 +270,9 @@ export function CheckoutPage() {
                       }}
                     />
                     {" "}× {line.dishName}
+                    <em className="customer-line-eta">
+                      {" "}· ready ≤{line.maxTimeMin || line.prepTimeMin}m
+                    </em>
                   </span>
                   <span>₹{(line.unitPrice * line.quantity).toFixed(0)}</span>
                 </li>
@@ -294,9 +303,19 @@ export function CheckoutPage() {
                 {quote && (
                   <>
                     <span>
-                      {quote.distance_km.toFixed(1)} km away · delivery fee ₹{Math.round(quote.fee)}
-                      {quote.within_free_radius ? " (within free radius)" : ""}
+                      {quote.distance_km.toFixed(1)} km ·{" "}
+                      {quote.in_range !== false && quote.status !== "extended"
+                        ? "in kitchen range — delivery fee ₹0 (kitchen covers logistics)"
+                        : `beyond kitchen range — customer delivery fee ₹${Math.round(quote.fee)}`}
                     </span>
+                    {quote.platform_fee != null && (
+                      <p style={{ marginTop: "0.35rem" }}>
+                        Kitchen can self-deliver or book platform courier
+                        {quote.in_range === false || quote.status === "extended"
+                          ? ` (~₹${Math.round(quote.platform_fee)} billed to you if they use partner).`
+                          : ` (~₹${Math.round(quote.platform_fee)} paid by kitchen if they use partner).`}
+                      </p>
+                    )}
                     {quote.fee > 0 && (
                       <label style={{ display: "block", marginTop: "0.5rem" }}>
                         <input

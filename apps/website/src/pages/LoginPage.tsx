@@ -1,6 +1,7 @@
 import { FormEvent, useState } from "react";
 import { Link, Navigate, useNavigate, useSearchParams } from "react-router-dom";
 import { AnimatedMesh } from "../components/AnimatedMesh";
+import { AuthLoginHighlights } from "../components/AuthLoginHighlights";
 import { BrandAuthArt, BrandLogo } from "../components/BrandLogo";
 import { DEMO, DEMO_OWNERS, type DemoOwnerAccount } from "../shared/demo";
 import { registerOwner, requestOtp, verifyOtp } from "../shared/api";
@@ -106,9 +107,10 @@ export function LoginPage() {
         <div className="auth-page__overlay" />
         <div className="auth-page__brand-stack">
           <BrandLogo variant="wordmark" className="brand-logo--lg" />
-          <BrandAuthArt surface="kitchen" />
           <h1>Kitchen owner portal</h1>
           <p>Sign in on {KITCHEN_HOST} to manage orders, menu, and customer links.</p>
+          <AuthLoginHighlights surface="kitchen" />
+          <BrandAuthArt surface="kitchen" />
         </div>
       </div>
 

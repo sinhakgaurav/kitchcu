@@ -26,6 +26,7 @@ from app.receipts import (
 )
 from app.schemas import (
     CustomerOrderCreateRequest,
+    DeliveryFulfillmentRequest,
     ManualOrderCreateRequest,
     MasterOrderCreateRequest,
     MasterOrderResponse,
@@ -44,14 +45,16 @@ from app.schemas import (
     create_master_order,
     get_master_order_for_customer,
     get_order_stock_warnings,
-    list_customer_orders,
     list_kitchen_drafts,
     list_kitchen_orders,
+    list_customer_orders,
     master_order_to_response,
     order_to_response,
     repeat_customer_order,
+    set_delivery_fulfillment,
     update_order_status,
 )
+from app.customer_dashboard import CustomerDashboardResponse, build_customer_dashboard
 from ckac_common.cache import (
     analytics_cache_key,
     get_cached_json,
@@ -301,6 +304,37 @@ async def customer_master_order_bill_pdf(
         content=pdf_bytes,
         media_type="application/pdf",
         headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+@router.get(
+    "/customers/me/dashboard",
+    response_model=CustomerDashboardResponse,
+    tags=[TAG_CUSTOMER_CHECKOUT],
+    summary="Customer dashboard aggregate",
+    description=(
+        "Orders enriched with cuisine/diet/live media, savings vs restaurant benchmarks, "
+        "health comparison scores, and wellness tips. Supports filters: diet, cuisine, live_media_only."
+    ),
+    responses=auth_errors(),
+)
+async def customer_dashboard(
+    customer_id: Annotated[uuid.UUID, Depends(get_current_customer_id)],
+    session: Annotated[AsyncSession, Depends(get_db)],
+    diet: Annotated[str | None, Query()] = None,
+    cuisine: Annotated[str | None, Query()] = None,
+    live_media_only: Annotated[bool, Query()] = False,
+) -> CustomerDashboardResponse:
+    profile = await load_customer_profile(customer_id, session)
+    phone = profile.get("phone")
+    if not phone:
+        return await build_customer_dashboard(session, "")
+    return await build_customer_dashboard(
+        session,
+        phone,
+        diet=diet,
+        cuisine=cuisine,
+        live_media_only=live_media_only,
     )
 
 
@@ -563,6 +597,35 @@ async def order_status_update(
                 await deduct_order_stock(order.kitchen_id, order.id, items)
             except Exception:
                 pass
+    return await order_to_response(session, order)
+
+
+@router.patch(
+    "/orders/{order_id}/delivery-fulfillment",
+    response_model=OrderResponse,
+    tags=[TAG_OWNER_ORDERS],
+    summary="Choose self delivery or platform courier",
+    description=(
+        "In range: owner pays platform logistics (customer fee 0). "
+        "Out of range: customer pays (self fee or platform quote)."
+    ),
+    responses={**auth_errors(include_403=True, include_404=True), 400: RESP_400},
+)
+async def order_delivery_fulfillment(
+    order_id: uuid.UUID,
+    body: DeliveryFulfillmentRequest,
+    owner_id: Annotated[uuid.UUID, Depends(get_current_owner_id)],
+    session: Annotated[AsyncSession, Depends(get_db)],
+    publisher: Annotated[EventPublisher, Depends(get_publisher)],
+) -> OrderResponse:
+    order = await get_order_for_owner(order_id, owner_id, session)
+    try:
+        order = await set_delivery_fulfillment(session, order, body, publisher)
+        await session.commit()
+        await session.refresh(order)
+    except ValueError as exc:
+        await session.rollback()
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
     return await order_to_response(session, order)
 
 

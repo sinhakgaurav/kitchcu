@@ -908,7 +908,7 @@ Customer cart:
         size=8,
     )
 
-    # UI Catalog — five reference surfaces (from docs/assets/ui/)
+    # UI Catalog — reference surfaces (from docs/assets/ui/)
     ui = Path(__file__).resolve().parent.parent / "docs" / "assets" / "ui"
 
     pdf.new_slide("UI")
@@ -932,30 +932,58 @@ Customer cart:
     )
 
     pdf.new_slide("UI")
-    pdf.section_title("UI Catalog — Kitchen Login & Owner Ops (Dark Theme)")
+    pdf.section_title("UI Catalog — Login Highlights (Value Before Auth)")
+    pdf.body(
+        "Each subdomain login teaches the product model: ready-within timing, Maps tracking, "
+        "delivery payer economics, zero commission — then authenticates.",
+        size=10,
+    )
     pdf.figure(
-        ui / "03-kitchen-login-pdf.jpg",
-        "Kitchen login — OTP phone auth; light cream sheet into dark ops after login",
-        max_h=65,
+        ui / "06-customer-login-pdf.jpg",
+        "Customer login — ready-within, Maps, dashboard, in-range fee highlights + WhatsApp OTP",
+        max_h=62,
         max_w=150,
     )
     pdf.figure(
-        ui / "04-owner-dashboard-pdf.jpg",
-        "Owner dashboard — dark ops command center; inbox-first, today's revenue + orders",
-        max_h=65,
+        ui / "03-kitchen-login-pdf.jpg",
+        "Kitchen login — zero commission, dish timing, owner-pays in-range, Maps + OTP",
+        max_h=62,
         max_w=150,
     )
 
     pdf.new_slide("UI")
-    pdf.section_title("UI Catalog — Admin Overview")
+    pdf.section_title("UI Catalog — Owner Ops (Dark Theme)")
+    pdf.figure(
+        ui / "04-owner-dashboard-pdf.jpg",
+        "Owner dashboard — dark ops; CommissionAdvantagePanel (0% food take vs aggregators)",
+        max_h=85,
+        max_w=180,
+    )
+
+    pdf.new_slide("UI")
+    pdf.section_title("UI Catalog — Super Admin Control Plane")
     pdf.body(
-        "Admin is platform-scope only (never owner-scope mutations). Shares dark ops visual language "
-        "with the kitchen PWA.",
+        "Platform-scope only: Customers, Refunds, Control (flags + journeys). Never owner menu mutation.",
         size=10,
     )
     pdf.figure(
+        ui / "07-admin-login-pdf.jpg",
+        "Admin login — platform-control highlights",
+        max_h=55,
+        max_w=140,
+    )
+    pdf.figure(
         ui / "05-admin-overview-pdf.jpg",
-        "Admin overview (admin.kitchcu.in) — kitchens, orders, tickets at platform scope",
+        "Admin overview — health tiles, Customers/Refunds/Control nav",
+        max_h=55,
+        max_w=140,
+    )
+
+    pdf.new_slide("UI")
+    pdf.section_title("UI Catalog — Admin Control (Flags & Journeys)")
+    pdf.figure(
+        ui / "08-admin-control-pdf.jpg",
+        "Control plane — application data journeys, feature flags, subscription overrides",
         max_h=95,
         max_w=200,
     )
@@ -968,7 +996,7 @@ Customer cart:
         "Data: PostgreSQL schema-per-domain + PostGIS; Redis Streams + transactional outbox",
         "Writes never cross schemas; Growth/Ratings read orders cross-schema for evidence only",
         "PWAs: portal, customer.kitchcu.in, kitchen.kitchcu.in, admin.kitchcu.in",
-        "Full diagrams (architecture, flows, ER, UI anatomy): CKAC-COMPLETE-GUIDE.pdf v3.1",
+        "Full diagrams (architecture, flows, ER, UI anatomy): CKAC-COMPLETE-GUIDE.pdf v3.2",
     ], size=10)
     pdf.mono(
         "PWAs -> Gateway -> Identity|Catalog|Order|Billing|Marketing|Ratings|\n"
@@ -1032,7 +1060,7 @@ Customer cart:
     pdf.set_text_color(*GRAY)
     pdf.multi_cell(
         257, 6,
-        "Full guide: CKAC-COMPLETE-GUIDE.md / .pdf (v3.1) | CPO blueprint v4.2 | "
+        "Full guide: CKAC-COMPLETE-GUIDE.md / .pdf (v3.2) | CPO blueprint v4.2 | "
         "User journeys: CKAC-USERFLOWS.md / .pdf | API: docs/API.md + gateway /docs "
         "(aggregated OpenAPI) | UI shots: docs/assets/ui/ | E1-E2 quality-loop design pack",
     )

@@ -63,7 +63,7 @@ class PaymentResponse(BaseModel):
     status: str = Field(
         ...,
         description="Lifecycle status.",
-        examples=["created", "pending", "authorized", "captured", "failed", "refunded"],
+        examples=["created", "pending", "authorized", "captured", "partially_refunded", "failed", "refunded"],
     )
     razorpay_order_id: str | None = Field(default=None, description="Razorpay order reference (dev-mocked).")
     razorpay_payment_id: str | None = Field(

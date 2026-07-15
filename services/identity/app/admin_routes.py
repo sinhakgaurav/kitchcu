@@ -12,14 +12,34 @@ from pydantic import BaseModel, EmailStr, Field
 from sqlalchemy import func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models import Kitchen, Owner, PlatformAdmin
+from app.models import (
+    Customer,
+    CustomerAddress,
+    FeatureFlag,
+    Kitchen,
+    Owner,
+    PlatformAdmin,
+    PlatformApiKey,
+)
+from app.routes import get_publisher
+from ckac_common.secret_box import decrypt_secret, encrypt_secret, mask_secret
 from ckac_common.config import get_settings
 from ckac_common.database import get_db
-from ckac_common.openapi import RESP_401, RESP_422, auth_errors
+from ckac_common.event_bus import EventPublisher
+from ckac_common.openapi import RESP_400, RESP_401, RESP_422, auth_errors
 
 router = APIRouter(prefix="/admin", tags=["Admin"])
 security = HTTPBearer(auto_error=False)
 settings = get_settings()
+
+
+def _mask_account(account: str | None) -> str | None:
+    if not account:
+        return None
+    digits = "".join(c for c in account if c.isdigit())
+    if len(digits) <= 4:
+        return "****"
+    return f"{'*' * (len(digits) - 4)}{digits[-4:]}"
 
 
 def hash_password(password: str) -> str:
@@ -74,6 +94,107 @@ class PlatformStats(BaseModel):
     active_kitchens: int = Field(..., description="Kitchens with status=active.", examples=[49])
     orders: int = Field(..., description="Total orders placed platform-wide.", examples=[1830])
     dishes: int = Field(..., description="Total active dishes across all catalogs.", examples=[612])
+    customers: int = Field(default=0, description="Registered customers.")
+    refunds_open: int = Field(default=0, description="Refunds in requested/processing.")
+    refunds_completed: int = Field(default=0, description="Completed refunds.")
+    tickets_open: int = Field(default=0, description="Open support tickets.")
+    payments_captured: int = Field(default=0, description="Captured payments.")
+
+
+class AdminCustomerRow(BaseModel):
+    id: uuid.UUID
+    name: str
+    phone: str | None
+    email: str | None
+    status: str
+    has_password: bool
+    has_payout: bool
+    address_count: int
+    created_at: datetime
+
+
+class AdminCustomerDetail(BaseModel):
+    id: uuid.UUID
+    name: str
+    phone: str | None
+    email: str | None
+    status: str
+    has_password: bool
+    upi_vpa: str | None
+    upi_qr_url: str | None
+    bank_account_number_masked: str | None
+    bank_ifsc: str | None
+    bank_account_name: str | None
+    addresses: list[dict]
+    created_at: datetime
+
+
+class CustomerStatusUpdate(BaseModel):
+    status: str = Field(..., pattern="^(active|suspended)$")
+
+
+class OwnerSubscriptionUpdate(BaseModel):
+    subscription_tier: str | None = Field(default=None, pattern="^(starter|growth|pro|trial)$")
+    subscription_status: str | None = Field(
+        default=None, pattern="^(trial|active|past_due|cancelled)$"
+    )
+
+
+class FeatureFlagRow(BaseModel):
+    key: str
+    enabled: bool
+    scope: str
+    description: str | None
+    updated_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class FeatureFlagUpdate(BaseModel):
+    enabled: bool
+
+
+class PlatformApiKeyRow(BaseModel):
+    key: str
+    category: str
+    description: str | None
+    is_secret: bool
+    configured: bool
+    value_masked: str | None
+    updated_at: datetime
+    updated_by: str | None
+
+
+class PlatformApiKeyUpdate(BaseModel):
+    value: str = Field(..., min_length=1, max_length=4000)
+
+
+class JourneyMap(BaseModel):
+    """Application data-journey control map for super admin."""
+
+    stages: list[dict]
+
+
+def _api_key_row(row: PlatformApiKey) -> PlatformApiKeyRow:
+    plain = decrypt_secret(row.value_enc)
+    configured = bool(plain)
+    if not configured:
+        masked = None
+    elif row.is_secret:
+        masked = mask_secret(plain)
+    else:
+        # Non-secret public-ish keys (Maps, OAuth client id) still masked lightly
+        masked = plain if len(plain) <= 48 else mask_secret(plain, keep=8)
+    return PlatformApiKeyRow(
+        key=row.key,
+        category=row.category,
+        description=row.description,
+        is_secret=row.is_secret,
+        configured=configured,
+        value_masked=masked,
+        updated_at=row.updated_at,
+        updated_by=row.updated_by,
+    )
 
 
 class AdminOwnerRow(BaseModel):
@@ -248,12 +369,31 @@ async def admin_stats(
     dishes = (
         await session.execute(text("SELECT COUNT(*) FROM ckac_catalog.dishes WHERE is_active = true"))
     ).scalar_one()
+    customers = (await session.execute(select(func.count()).select_from(Customer))).scalar_one()
+    extra = (
+        await session.execute(
+            text(
+                """
+                SELECT
+                  (SELECT COUNT(*) FROM ckac_billing.refunds WHERE status IN ('requested','processing')) AS refunds_open,
+                  (SELECT COUNT(*) FROM ckac_billing.refunds WHERE status = 'completed') AS refunds_completed,
+                  (SELECT COUNT(*) FROM ckac_support.support_tickets WHERE status IN ('open','in_progress','waiting_customer')) AS tickets_open,
+                  (SELECT COUNT(*) FROM ckac_billing.payments WHERE status = 'captured') AS payments_captured
+                """
+            )
+        )
+    ).mappings().one()
     return PlatformStats(
         owners=owners,
         kitchens=kitchens,
         active_kitchens=active,
         orders=orders,
         dishes=dishes,
+        customers=customers,
+        refunds_open=int(extra["refunds_open"] or 0),
+        refunds_completed=int(extra["refunds_completed"] or 0),
+        tickets_open=int(extra["tickets_open"] or 0),
+        payments_captured=int(extra["payments_captured"] or 0),
     )
 
 
@@ -419,3 +559,361 @@ async def admin_orders(
         )
         for r in result.mappings().all()
     ]
+
+
+@router.get("/customers", response_model=list[AdminCustomerRow], responses=auth_errors())
+async def admin_customers(
+    admin: Annotated[PlatformAdmin, Depends(get_current_admin)],
+    session: Annotated[AsyncSession, Depends(get_db)],
+    q: str | None = None,
+    limit: int = 200,
+) -> list[AdminCustomerRow]:
+    _ = admin
+    stmt = select(Customer).order_by(Customer.created_at.desc()).limit(min(limit, 500))
+    if q and q.strip():
+        like = f"%{q.strip()}%"
+        stmt = (
+            select(Customer)
+            .where(
+                (Customer.name.ilike(like))
+                | (Customer.phone.ilike(like))
+                | (Customer.email.ilike(like))
+            )
+            .order_by(Customer.created_at.desc())
+            .limit(min(limit, 500))
+        )
+    customers = list((await session.execute(stmt)).scalars().all())
+    rows: list[AdminCustomerRow] = []
+    for c in customers:
+        addr_count = (
+            await session.execute(
+                select(func.count()).select_from(CustomerAddress).where(CustomerAddress.customer_id == c.id)
+            )
+        ).scalar_one()
+        rows.append(
+            AdminCustomerRow(
+                id=c.id,
+                name=c.name,
+                phone=c.phone,
+                email=c.email,
+                status=c.status,
+                has_password=bool(c.password_hash),
+                has_payout=bool(c.upi_vpa or c.bank_account_number),
+                address_count=addr_count,
+                created_at=c.created_at,
+            )
+        )
+    return rows
+
+
+@router.get("/customers/{customer_id}", response_model=AdminCustomerDetail, responses=auth_errors(include_404=True))
+async def admin_customer_detail(
+    customer_id: uuid.UUID,
+    admin: Annotated[PlatformAdmin, Depends(get_current_admin)],
+    session: Annotated[AsyncSession, Depends(get_db)],
+) -> AdminCustomerDetail:
+    _ = admin
+    customer = await session.get(Customer, customer_id)
+    if not customer:
+        raise HTTPException(status_code=404, detail="Customer not found")
+    addresses = list(
+        (
+            await session.execute(
+                select(CustomerAddress).where(CustomerAddress.customer_id == customer_id)
+            )
+        ).scalars().all()
+    )
+    return AdminCustomerDetail(
+        id=customer.id,
+        name=customer.name,
+        phone=customer.phone,
+        email=customer.email,
+        status=customer.status,
+        has_password=bool(customer.password_hash),
+        upi_vpa=customer.upi_vpa,
+        upi_qr_url=customer.upi_qr_url,
+        bank_account_number_masked=_mask_account(customer.bank_account_number),
+        bank_ifsc=customer.bank_ifsc,
+        bank_account_name=customer.bank_account_name,
+        addresses=[
+            {
+                "id": str(a.id),
+                "label": a.label,
+                "address_line": a.address_line,
+                "city": a.city,
+                "state": a.state,
+                "pincode": a.pincode,
+                "latitude": float(a.latitude) if a.latitude is not None else None,
+                "longitude": float(a.longitude) if a.longitude is not None else None,
+                "is_default": a.is_default,
+            }
+            for a in addresses
+        ],
+        created_at=customer.created_at,
+    )
+
+
+@router.patch(
+    "/customers/{customer_id}/status",
+    response_model=AdminCustomerRow,
+    responses=auth_errors(include_404=True),
+)
+async def admin_customer_status(
+    customer_id: uuid.UUID,
+    body: CustomerStatusUpdate,
+    admin: Annotated[PlatformAdmin, Depends(get_current_admin)],
+    session: Annotated[AsyncSession, Depends(get_db)],
+) -> AdminCustomerRow:
+    _ = admin
+    customer = await session.get(Customer, customer_id)
+    if not customer:
+        raise HTTPException(status_code=404, detail="Customer not found")
+    customer.status = body.status
+    await session.flush()
+    addr_count = (
+        await session.execute(
+            select(func.count()).select_from(CustomerAddress).where(CustomerAddress.customer_id == customer.id)
+        )
+    ).scalar_one()
+    return AdminCustomerRow(
+        id=customer.id,
+        name=customer.name,
+        phone=customer.phone,
+        email=customer.email,
+        status=customer.status,
+        has_password=bool(customer.password_hash),
+        has_payout=bool(customer.upi_vpa or customer.bank_account_number),
+        address_count=addr_count,
+        created_at=customer.created_at,
+    )
+
+
+@router.post(
+    "/customers/{customer_id}/clear-password",
+    response_model=AdminCustomerDetail,
+    responses=auth_errors(include_404=True),
+)
+async def admin_customer_clear_password(
+    customer_id: uuid.UUID,
+    admin: Annotated[PlatformAdmin, Depends(get_current_admin)],
+    session: Annotated[AsyncSession, Depends(get_db)],
+) -> AdminCustomerDetail:
+    _ = admin
+    customer = await session.get(Customer, customer_id)
+    if not customer:
+        raise HTTPException(status_code=404, detail="Customer not found")
+    customer.password_hash = None
+    await session.flush()
+    return await admin_customer_detail(customer_id, admin, session)
+
+
+@router.patch(
+    "/owners/{owner_id}/subscription",
+    response_model=AdminOwnerRow,
+    responses={**auth_errors(include_404=True), 400: RESP_400},
+)
+async def admin_owner_subscription(
+    owner_id: uuid.UUID,
+    body: OwnerSubscriptionUpdate,
+    admin: Annotated[PlatformAdmin, Depends(get_current_admin)],
+    session: Annotated[AsyncSession, Depends(get_db)],
+) -> AdminOwnerRow:
+    _ = admin
+    owner = await session.get(Owner, owner_id)
+    if not owner:
+        raise HTTPException(status_code=404, detail="Owner not found")
+    if body.subscription_tier is None and body.subscription_status is None:
+        raise HTTPException(status_code=400, detail="Provide subscription_tier and/or subscription_status")
+    if body.subscription_tier is not None:
+        owner.subscription_tier = body.subscription_tier
+    if body.subscription_status is not None:
+        owner.subscription_status = body.subscription_status
+    await session.flush()
+    kc = (
+        await session.execute(select(func.count()).select_from(Kitchen).where(Kitchen.owner_id == owner.id))
+    ).scalar_one()
+    return AdminOwnerRow(
+        id=owner.id,
+        name=owner.name,
+        phone=owner.phone,
+        email=owner.email,
+        subscription_tier=owner.subscription_tier,
+        subscription_status=owner.subscription_status,
+        kitchen_count=kc,
+    )
+
+
+@router.get("/feature-flags", response_model=list[FeatureFlagRow], responses=auth_errors())
+async def admin_feature_flags_list(
+    admin: Annotated[PlatformAdmin, Depends(get_current_admin)],
+    session: Annotated[AsyncSession, Depends(get_db)],
+) -> list[FeatureFlagRow]:
+    _ = admin
+    rows = list((await session.execute(select(FeatureFlag).order_by(FeatureFlag.scope, FeatureFlag.key))).scalars().all())
+    return [FeatureFlagRow.model_validate(r) for r in rows]
+
+
+@router.patch("/feature-flags/{key}", response_model=FeatureFlagRow, responses=auth_errors(include_404=True))
+async def admin_feature_flag_update(
+    key: str,
+    body: FeatureFlagUpdate,
+    admin: Annotated[PlatformAdmin, Depends(get_current_admin)],
+    session: Annotated[AsyncSession, Depends(get_db)],
+) -> FeatureFlagRow:
+    _ = admin
+    flag = await session.get(FeatureFlag, key)
+    if not flag:
+        raise HTTPException(status_code=404, detail="Feature flag not found")
+    flag.enabled = body.enabled
+    flag.updated_at = datetime.now(UTC)
+    await session.flush()
+    return FeatureFlagRow.model_validate(flag)
+
+
+@router.get("/api-keys", response_model=list[PlatformApiKeyRow], responses=auth_errors())
+async def admin_api_keys_list(
+    admin: Annotated[PlatformAdmin, Depends(get_current_admin)],
+    session: Annotated[AsyncSession, Depends(get_db)],
+) -> list[PlatformApiKeyRow]:
+    _ = admin
+    rows = list(
+        (
+            await session.execute(
+                select(PlatformApiKey).order_by(PlatformApiKey.category, PlatformApiKey.key)
+            )
+        )
+        .scalars()
+        .all()
+    )
+    return [_api_key_row(r) for r in rows]
+
+
+@router.put("/api-keys/{key}", response_model=PlatformApiKeyRow, responses=auth_errors(include_404=True))
+async def admin_api_key_upsert(
+    key: str,
+    body: PlatformApiKeyUpdate,
+    admin: Annotated[PlatformAdmin, Depends(get_current_admin)],
+    session: Annotated[AsyncSession, Depends(get_db)],
+    publisher: Annotated[EventPublisher, Depends(get_publisher)],
+) -> PlatformApiKeyRow:
+    row = await session.get(PlatformApiKey, key)
+    if not row:
+        raise HTTPException(status_code=404, detail="API key slot not found")
+    row.value_enc = encrypt_secret(body.value.strip())
+    row.updated_at = datetime.now(UTC)
+    row.updated_by = admin.email
+    await session.flush()
+    event = EventPublisher.build(
+        event_type="platform_api_key.updated",
+        aggregate_type="platform_api_key",
+        aggregate_id=key,
+        producer="identity-service",
+        payload={"key": key, "category": row.category, "configured": True},
+    )
+    await publisher.publish("ckac:identity:platform", event, session=session)
+    return _api_key_row(row)
+
+
+@router.delete("/api-keys/{key}", response_model=PlatformApiKeyRow, responses=auth_errors(include_404=True))
+async def admin_api_key_clear(
+    key: str,
+    admin: Annotated[PlatformAdmin, Depends(get_current_admin)],
+    session: Annotated[AsyncSession, Depends(get_db)],
+    publisher: Annotated[EventPublisher, Depends(get_publisher)],
+) -> PlatformApiKeyRow:
+    row = await session.get(PlatformApiKey, key)
+    if not row:
+        raise HTTPException(status_code=404, detail="API key slot not found")
+    row.value_enc = None
+    row.updated_at = datetime.now(UTC)
+    row.updated_by = admin.email
+    await session.flush()
+    event = EventPublisher.build(
+        event_type="platform_api_key.cleared",
+        aggregate_type="platform_api_key",
+        aggregate_id=key,
+        producer="identity-service",
+        payload={"key": key, "category": row.category, "configured": False},
+    )
+    await publisher.publish("ckac:identity:platform", event, session=session)
+    return _api_key_row(row)
+
+
+@router.get("/journeys", response_model=JourneyMap, responses=auth_errors())
+async def admin_journeys(
+    admin: Annotated[PlatformAdmin, Depends(get_current_admin)],
+    session: Annotated[AsyncSession, Depends(get_db)],
+) -> JourneyMap:
+    """Map of core application data journeys with live counters for super-admin control."""
+    _ = admin
+    counts = (
+        await session.execute(
+            text(
+                """
+                SELECT
+                  (SELECT COUNT(*) FROM ckac_identity.owners) AS owners,
+                  (SELECT COUNT(*) FROM ckac_identity.kitchens WHERE status = 'active') AS kitchens_active,
+                  (SELECT COUNT(*) FROM ckac_identity.customers WHERE status = 'active') AS customers_active,
+                  (SELECT COUNT(*) FROM ckac_orders.orders) AS orders,
+                  (SELECT COUNT(*) FROM ckac_billing.payments WHERE status = 'captured') AS payments_captured,
+                  (SELECT COUNT(*) FROM ckac_billing.refunds) AS refunds,
+                  (SELECT COUNT(*) FROM ckac_support.support_tickets) AS tickets,
+                  (SELECT COUNT(*) FROM ckac_identity.feature_flags WHERE enabled = true) AS flags_on,
+                  (SELECT COUNT(*) FROM ckac_identity.feature_flags) AS flags_total
+                """
+            )
+        )
+    ).mappings().one()
+    stages = [
+        {
+            "id": "owner_onboarding",
+            "label": "Owner onboard → kitchen → menu",
+            "control": "Kitchens · Owners · owner_registrations flag",
+            "count": int(counts["owners"] or 0),
+            "health": "ok",
+        },
+        {
+            "id": "customer_discovery",
+            "label": "Customer discover → menu → cart",
+            "control": "Customers · customer_dashboard / multi_kitchen flags",
+            "count": int(counts["customers_active"] or 0),
+            "health": "ok",
+        },
+        {
+            "id": "checkout_payment",
+            "label": "Checkout → payment → settlement",
+            "control": "Orders · Payments · Settlements",
+            "count": int(counts["payments_captured"] or 0),
+            "health": "ok",
+        },
+        {
+            "id": "fulfillment",
+            "label": "Accept → prep → delivery track",
+            "control": "Orders · Kitchens suspend",
+            "count": int(counts["orders"] or 0),
+            "health": "ok",
+        },
+        {
+            "id": "refunds",
+            "label": "Dispute → refund (gateway/direct)",
+            "control": "Refunds tab · refunds_* flags",
+            "count": int(counts["refunds"] or 0),
+            "health": "ok",
+        },
+        {
+            "id": "support",
+            "label": "Complaint → ticket → resolution",
+            "control": "Tickets · customer_complaints flag",
+            "count": int(counts["tickets"] or 0),
+            "health": "ok",
+        },
+        {
+            "id": "platform_flags",
+            "label": "Feature kill-switches",
+            "control": "Control plane flags",
+            "count": int(counts["flags_on"] or 0),
+            "meta": f"{counts['flags_on']}/{counts['flags_total']} enabled",
+            "health": "ok",
+        },
+    ]
+    return JourneyMap(stages=stages)

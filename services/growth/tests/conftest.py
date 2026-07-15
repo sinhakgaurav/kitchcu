@@ -144,8 +144,8 @@ def _seed_growth_ctx() -> dict:
             cur.execute(
                 """
                 INSERT INTO ckac_catalog.dishes
-                (id, kitchen_id, category_id, name, price, prep_time_min, is_active)
-                VALUES (%s::uuid, %s::uuid, %s::uuid, %s, %s, 20, true)
+                (id, kitchen_id, category_id, name, price, prep_time_min, delivery_time_min, max_time_min, is_active)
+                VALUES (%s::uuid, %s::uuid, %s::uuid, %s, %s, 20, 15, 35, true)
                 """,
                 (str(did), str(kitchen_id), str(category_id), name, price),
             )
