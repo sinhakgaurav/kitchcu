@@ -297,10 +297,10 @@ html.theme-brand-light .parallax-scene .pl-layer--foreground {
 }
 
 html.theme-brand-light .parallax-scene .pl-photo {
-  box-shadow: 0 18px 40px rgba(11, 27, 50, 0.16);
-  border: 2px solid rgba(255, 255, 255, 0.85);
-  opacity: 0.88;
-  max-width: 200px;
+  box-shadow: 0 22px 48px rgba(11, 27, 50, 0.18);
+  border: 2px solid rgba(255, 255, 255, 0.9);
+  opacity: 0.92;
+  max-width: none;
 }
 
 /* Full-width cursor parallax — no half-screen clip */
@@ -327,7 +327,7 @@ html.theme-brand-light .parallax-scene .pl-glow--3 {
   }
 
   html.theme-brand-light .parallax-scene .pl-photo {
-    max-width: 140px;
+    max-width: min(42vw, 220px);
   }
 }
 

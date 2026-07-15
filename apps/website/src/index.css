@@ -706,34 +706,36 @@ html.theme-brand-light .brand-nav-mark__sub {
 }
 
 .hero-copy-parallax__card--a {
-  width: 168px;
-  height: 120px;
-  top: 10%;
-  right: 6%;
+  width: min(28vw, 320px);
+  height: min(20vw, 230px);
+  top: 8%;
+  right: 3%;
+  opacity: 0.9;
 }
 
 .hero-copy-parallax__card--b {
-  width: 128px;
-  height: 128px;
-  bottom: 14%;
-  left: 4%;
+  width: min(22vw, 260px);
+  height: min(22vw, 260px);
+  bottom: 10%;
+  left: 2%;
   border-radius: 50%;
+  opacity: 0.88;
 }
 
 .hero-copy-parallax__card--c {
-  width: 150px;
-  height: 104px;
-  top: 42%;
-  right: 22%;
-  opacity: 0.65;
+  width: min(24vw, 280px);
+  height: min(17vw, 200px);
+  top: 46%;
+  right: 18%;
+  opacity: 0.78;
 }
 
 .hero-copy-parallax__card--d {
-  width: 140px;
-  height: 100px;
-  top: 18%;
-  left: 18%;
-  opacity: 0.7;
+  width: min(26vw, 300px);
+  height: min(18vw, 210px);
+  top: 14%;
+  left: 12%;
+  opacity: 0.82;
 }
 
 .hero__overlay {
@@ -853,15 +855,15 @@ html.theme-brand-light .brand-nav-mark__sub {
   }
 
   .hero-copy-parallax__card--a {
-    right: 4%;
-    width: 120px;
-    height: 88px;
+    right: 2%;
+    width: min(42vw, 180px);
+    height: min(30vw, 130px);
   }
 
   .hero-copy-parallax__card--d {
-    left: 6%;
-    width: 100px;
-    height: 72px;
+    left: 2%;
+    width: min(40vw, 170px);
+    height: min(28vw, 120px);
   }
 
   .hero__content--parallax {

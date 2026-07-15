@@ -25,7 +25,7 @@ export function ParallaxScene({ variant = "hero" }: Props) {
   const ref = useRef<HTMLDivElement>(null);
   const { scrollY } = useScrollProgress();
   const sectionOffset = useSectionParallax(ref);
-  const mouse = useMouseParallax(variant === "hero" ? 0.42 : 0.14);
+  const mouse = useMouseParallax(variant === "hero" ? 0.68 : 0.14);
 
   const baseOffset =
     variant === "hero" ? scrollY * 1.2 + sectionOffset * 0.45 : sectionOffset;
@@ -54,7 +54,7 @@ export function ParallaxScene({ variant = "hero" }: Props) {
 
       {variant === "hero" &&
         parallaxPhotos.map((photo, i) => {
-          const t = parallaxTransform(baseOffset, photo.speed * intensity, mouse, (i + 2) * 3);
+          const t = parallaxTransform(baseOffset, photo.speed * intensity, mouse, (i + 3) * 5);
           return (
             <div
               key={photo.src}

@@ -20,7 +20,7 @@ export function HeroCopyParallax({ fullBleed = false }: Props) {
   const ref = useRef<HTMLDivElement>(null);
   const { scrollY } = useScrollProgress();
   const sectionOffset = useSectionParallax(ref);
-  const mouse = useMouseParallax(0.36);
+  const mouse = useMouseParallax(0.62);
   const baseOffset = scrollY * 0.55 + sectionOffset * 0.25;
 
   const layers = [
@@ -28,32 +28,32 @@ export function HeroCopyParallax({ fullBleed = false }: Props) {
       key: "a",
       ...heroParallaxImages.front,
       className: "hero-copy-parallax__card hero-copy-parallax__card--a",
-      factor: 12,
-      tilt: 0.07,
+      factor: 18,
+      tilt: 0.09,
       speed: 0.45,
     },
     {
       key: "b",
       ...heroParallaxImages.accent,
       className: "hero-copy-parallax__card hero-copy-parallax__card--b",
-      factor: 16,
-      tilt: 0.09,
+      factor: 22,
+      tilt: 0.11,
       speed: 0.66,
     },
     {
       key: "c",
       ...heroParallaxImages.mid,
       className: "hero-copy-parallax__card hero-copy-parallax__card--c",
-      factor: 9,
-      tilt: 0.05,
+      factor: 14,
+      tilt: 0.07,
       speed: 0.38,
     },
     {
       key: "d",
       ...heroParallaxImages.back,
       className: "hero-copy-parallax__card hero-copy-parallax__card--d",
-      factor: 11,
-      tilt: 0.06,
+      factor: 16,
+      tilt: 0.08,
       speed: 0.52,
     },
   ];
