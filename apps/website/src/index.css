@@ -266,7 +266,7 @@ html.theme-brand-light .brand-nav-mark__sub {
   height: 34px;
 }
 
-.brand-logo--icon,
+.brand-logo--icon:not(.hero__banner-icon),
 .brand-logo--badge,
 .brand-logo--mark {
   height: 40px;
@@ -797,10 +797,10 @@ html.theme-brand-light .brand-nav-mark__sub {
 .hero__content--centered .brand-logo.hero__banner-icon,
 .hero__content--centered .hero__banner-icon {
   display: block;
-  margin: 0 auto 1.1rem;
-  height: clamp(200px, 28vw, 240px);
+  margin: 0 auto 1.25rem;
+  height: clamp(240px, 32vw, 320px);
   width: auto;
-  max-width: min(88vw, 280px);
+  max-width: min(92vw, 360px);
   border-radius: 0;
 }
 
@@ -876,9 +876,9 @@ html.theme-brand-light .brand-nav-mark__sub {
 
 .brand-logo.brand-logo--icon.hero__banner-icon,
 .hero__banner-icon {
-  height: clamp(200px, 28vw, 240px) !important;
+  height: clamp(240px, 32vw, 320px) !important;
   width: auto !important;
-  max-width: min(88vw, 280px);
+  max-width: min(92vw, 360px) !important;
   border-radius: 0;
   object-fit: contain;
   filter: drop-shadow(0 14px 32px rgba(11, 27, 50, 0.2));
