@@ -23,7 +23,7 @@ export function KitchenNavbar() {
   return (
     <header className={`nav nav--kitchen ${scrolled ? "nav--scrolled" : ""}`}>
       <div className="nav__inner container">
-        <BrandNavMark to="/" subtitle={KITCHEN_HOST} height={32} />
+        <BrandNavMark to="/" subtitle={KITCHEN_HOST} height={44} />
 
         <nav className={`nav__links ${open ? "nav__links--open" : ""}`}>
           <a href={hashLink("/#features")} onClick={() => setOpen(false)}>Features</a>

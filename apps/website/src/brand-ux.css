@@ -556,9 +556,9 @@ html.theme-brand-light .hero__scroll-hint {
 .auth-page.auth-page--kitchen .auth-page__brand-stack .brand-auth-art,
 .auth-page.auth-page--customer .auth-page__brand-stack .brand-auth-art,
 .admin-login .auth-page__brand-stack .brand-auth-art {
-  width: min(72%, 280px);
-  margin-top: auto;
-  flex-shrink: 1;
+  width: min(68%, 260px);
+  margin-top: 0.35rem;
+  flex-shrink: 0;
   filter: drop-shadow(0 12px 24px rgba(11, 27, 50, 0.12));
 }
 

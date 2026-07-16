@@ -293,7 +293,7 @@
 }
 
 .parallax-divider__slide:hover {
-  transform: scale(1.08) rotate(-1deg);
+  transform: scale(1.04) rotate(-0.5deg);
   box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
   z-index: 2;
 }

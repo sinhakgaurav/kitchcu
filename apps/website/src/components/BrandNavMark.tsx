@@ -23,7 +23,7 @@ export function BrandNavMark({
   to,
   href,
   subtitle,
-  height = 32,
+  height = 48,
   className = "",
   dark = false,
 }: Props) {

@@ -85,7 +85,7 @@ export function OwnerLayout() {
       <aside className="owner-app__sidebar" aria-label="Owner navigation">
         <div className="owner-app__sidebar-top">
           <div className="owner-app__brand">
-            <BrandNavMark to="/" subtitle={KITCHEN_HOST} height={28} />
+            <BrandNavMark to="/" subtitle={KITCHEN_HOST} height={40} />
           </div>
           <button
             type="button"

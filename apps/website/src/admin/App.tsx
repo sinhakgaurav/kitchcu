@@ -146,7 +146,7 @@ export default function AdminApp() {
     <div className="admin-shell">
       <aside className="admin-shell__sidebar">
         <div className="admin-shell__brand">
-          <BrandNavMark subtitle={ADMIN_HOST} height={28} />
+          <BrandNavMark subtitle={ADMIN_HOST} height={40} />
           <p className="admin-shell__tagline">Super admin · platform control center</p>
         </div>
 

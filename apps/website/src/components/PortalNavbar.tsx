@@ -26,7 +26,7 @@ export function PortalNavbar() {
   return (
     <header className={`nav ${scrolled ? "nav--scrolled" : ""}`}>
       <div className="nav__inner container">
-        <BrandNavMark href="#top" subtitle={APP_TAGLINE} height={34} />
+        <BrandNavMark href="#top" subtitle={APP_TAGLINE} height={48} />
 
         <nav className={`nav__links ${open ? "nav__links--open" : ""}`}>
           {links.map((l) => {

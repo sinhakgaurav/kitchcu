@@ -23,7 +23,7 @@ export function CustomerNavbar() {
   return (
     <header className={`nav nav--customer ${scrolled ? "nav--scrolled" : ""}`}>
       <div className="nav__inner container">
-        <BrandNavMark to="/" subtitle={CUSTOMER_HOST} height={32} />
+        <BrandNavMark to="/" subtitle={CUSTOMER_HOST} height={44} />
 
         <nav className={`nav__links ${open ? "nav__links--open" : ""}`}>
           <a href={hashLink("/#nearby")} onClick={() => setOpen(false)}>Nearby</a>
