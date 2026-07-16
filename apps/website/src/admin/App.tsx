@@ -17,7 +17,7 @@ import {
   type AdminTicket,
   type PlatformStats,
 } from "./adminApi";
-import { AdminControlPlane, AdminCustomers, AdminRefunds } from "./AdminPanels";
+import { AdminApiKeysPanel, AdminControlPlane, AdminCustomers, AdminRefunds } from "./AdminPanels";
 import {
   buildOrderTimeline,
   buildStatusBreakdown,
@@ -40,6 +40,7 @@ type Tab =
   | "orders"
   | "refunds"
   | "tickets"
+  | "api-keys"
   | "control";
 
 const TABS: { id: Tab; label: string }[] = [
@@ -50,6 +51,7 @@ const TABS: { id: Tab; label: string }[] = [
   { id: "orders", label: "Orders" },
   { id: "refunds", label: "Refunds" },
   { id: "tickets", label: "Tickets" },
+  { id: "api-keys", label: "API Keys" },
   { id: "control", label: "Control" },
 ];
 
@@ -76,6 +78,10 @@ const TAB_META: Record<Tab, { title: string; desc: string }> = {
     desc: "Gateway and direct-transfer refunds — escalate, complete, or fail",
   },
   tickets: { title: "Support tickets", desc: "Customer and owner escalations from AI chat" },
+  "api-keys": {
+    title: "Platform API keys",
+    desc: "Add, update, or clear Razorpay, LiveKit, WhatsApp, Maps, OAuth, and AI secrets",
+  },
   control: {
     title: "Control plane",
     desc: "Feature flags, data journeys, payments, and SaaS subscription overrides",
@@ -208,6 +214,7 @@ export default function AdminApp() {
           {tab === "orders" && <AdminOrders />}
           {tab === "refunds" && <AdminRefunds />}
           {tab === "tickets" && <AdminTickets />}
+          {tab === "api-keys" && <AdminApiKeysPanel />}
           {tab === "control" && <AdminControlPlane />}
         </div>
       </div>
@@ -528,6 +535,10 @@ function AdminOverview({
             <button type="button" className="admin-quick__item" onClick={() => onNavigate("refunds")}>
               <strong>Refund oversight</strong>
               <span>Escalate gateway and direct transfers</span>
+            </button>
+            <button type="button" className="admin-quick__item" onClick={() => onNavigate("api-keys")}>
+              <strong>API keys</strong>
+              <span>Add / update Razorpay, LiveKit, WhatsApp secrets</span>
             </button>
             <button type="button" className="admin-quick__item" onClick={() => onNavigate("control")}>
               <strong>Feature flags & journeys</strong>

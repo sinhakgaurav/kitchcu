@@ -25,6 +25,188 @@ import {
 
 const inr = (n: number) => `₹${Math.round(n).toLocaleString("en-IN")}`;
 
+const API_KEY_CATEGORY_LABEL: Record<string, string> = {
+  billing: "Payments (Razorpay)",
+  streaming: "Live streaming (LiveKit)",
+  notification: "WhatsApp & AI support",
+  identity: "Customer OAuth",
+  platform: "Maps & platform",
+};
+
+export function AdminApiKeysPanel() {
+  const [apiKeys, setApiKeys] = useState<PlatformApiKey[]>([]);
+  const [draftValues, setDraftValues] = useState<Record<string, string>>({});
+  const [error, setError] = useState("");
+  const [okMsg, setOkMsg] = useState("");
+  const [busyKey, setBusyKey] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  const load = async () => {
+    setLoading(true);
+    try {
+      const keys = await fetchAdminApiKeys();
+      setApiKeys(keys);
+      setError("");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to load API keys");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    load();
+  }, []);
+
+  const byCategory = apiKeys.reduce<Record<string, PlatformApiKey[]>>((acc, k) => {
+    (acc[k.category] ??= []).push(k);
+    return acc;
+  }, {});
+
+  const saveKey = async (key: string) => {
+    const value = (draftValues[key] || "").trim();
+    if (!value) return;
+    setBusyKey(key);
+    setOkMsg("");
+    try {
+      await updateAdminApiKey(key, value);
+      setDraftValues((prev) => ({ ...prev, [key]: "" }));
+      setOkMsg(`Saved ${key}`);
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "API key update failed");
+    } finally {
+      setBusyKey(null);
+    }
+  };
+
+  const clearKey = async (key: string) => {
+    setBusyKey(key);
+    setOkMsg("");
+    try {
+      await clearAdminApiKey(key);
+      setOkMsg(`Cleared ${key}`);
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Clear failed");
+    } finally {
+      setBusyKey(null);
+    }
+  };
+
+  return (
+    <div className="admin-panel">
+      {error && <p className="auth-card__error">{error}</p>}
+      {okMsg && <p className="admin-panel__note" role="status">{okMsg}</p>}
+
+      <section className="glass admin-detail">
+        <header className="admin-panel__head">
+          <div>
+            <h3>Platform API keys</h3>
+            <p style={{ margin: "0.35rem 0 0", color: "var(--text-muted)" }}>
+              Add or replace secrets for Razorpay, LiveKit, WhatsApp, Maps, OAuth, and AI support.
+              Values are encrypted at rest; only masked previews are shown after save.
+            </p>
+          </div>
+          <button type="button" className="btn btn--ghost btn--sm" onClick={() => load()} disabled={loading}>
+            Refresh
+          </button>
+        </header>
+
+        {loading && <p className="admin-panel__empty">Loading API key slots…</p>}
+        {!loading && apiKeys.length === 0 && (
+          <p className="admin-panel__empty">
+            No API key slots found. Run identity migrations (`009` / `010`) then refresh.
+          </p>
+        )}
+
+        {!loading &&
+          Object.entries(byCategory).map(([category, keys]) => (
+            <div key={category} className="admin-table-wrap" style={{ marginBottom: "1.25rem" }}>
+              <h4 style={{ margin: "0 0 0.5rem", fontSize: "0.95rem" }}>
+                {API_KEY_CATEGORY_LABEL[category] || category}
+              </h4>
+              <table className="admin-table">
+                <thead>
+                  <tr>
+                    <th>Key</th>
+                    <th>Status</th>
+                    <th>Set / update value</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {keys.map((k) => (
+                    <tr key={k.key}>
+                      <td>
+                        <code>{k.key}</code>
+                        {k.description && (
+                          <>
+                            <br />
+                            <small>{k.description}</small>
+                          </>
+                        )}
+                      </td>
+                      <td>
+                        {k.configured ? (
+                          <span>
+                            Configured
+                            {k.value_masked ? ` · ${k.value_masked}` : ""}
+                            {k.updated_by ? (
+                              <>
+                                <br />
+                                <small>by {k.updated_by}</small>
+                              </>
+                            ) : null}
+                          </span>
+                        ) : (
+                          <span>Not set</span>
+                        )}
+                      </td>
+                      <td>
+                        <input
+                          type={k.is_secret ? "password" : "text"}
+                          className="admin-inline-input"
+                          placeholder={k.configured ? "Enter new value to replace" : "Paste value to add"}
+                          value={draftValues[k.key] ?? ""}
+                          onChange={(e) =>
+                            setDraftValues((prev) => ({ ...prev, [k.key]: e.target.value }))
+                          }
+                          autoComplete="off"
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") void saveKey(k.key);
+                          }}
+                        />
+                      </td>
+                      <td>
+                        <button
+                          type="button"
+                          className="btn btn--primary btn--sm"
+                          disabled={busyKey === k.key || !(draftValues[k.key] || "").trim()}
+                          onClick={() => void saveKey(k.key)}
+                        >
+                          {k.configured ? "Update" : "Add"}
+                        </button>{" "}
+                        <button
+                          type="button"
+                          className="btn btn--ghost btn--sm"
+                          disabled={busyKey === k.key || !k.configured}
+                          onClick={() => void clearKey(k.key)}
+                        >
+                          Clear
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ))}
+      </section>
+    </div>
+  );
+}
+
 export function AdminCustomers() {
   const [rows, setRows] = useState<AdminCustomer[]>([]);
   const [q, setQ] = useState("");
@@ -328,8 +510,6 @@ export function AdminRefunds() {
 
 export function AdminControlPlane() {
   const [flags, setFlags] = useState<FeatureFlag[]>([]);
-  const [apiKeys, setApiKeys] = useState<PlatformApiKey[]>([]);
-  const [draftValues, setDraftValues] = useState<Record<string, string>>({});
   const [journeys, setJourneys] = useState<
     Awaited<ReturnType<typeof fetchAdminJourneys>>["stages"]
   >([]);
@@ -340,18 +520,17 @@ export function AdminControlPlane() {
 
   const load = async () => {
     try {
-      const [f, j, p, o, keys] = await Promise.all([
+      const [f, j, p, o] = await Promise.all([
         fetchAdminFeatureFlags(),
         fetchAdminJourneys(),
         fetchAdminPayments(),
         fetchAdminOwners(),
-        fetchAdminApiKeys(),
       ]);
       setFlags(f);
       setJourneys(j.stages);
       setPayments(p.slice(0, 40));
       setOwners(o);
-      setApiKeys(keys);
+      setError("");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to load control plane");
     }
@@ -368,99 +547,9 @@ export function AdminControlPlane() {
       <section className="glass admin-detail" style={{ marginBottom: "1rem" }}>
         <h3>Platform API keys</h3>
         <p>
-          Configure Razorpay (platform SaaS), LiveKit, WhatsApp, Maps, OAuth, and AI support keys.
-          Secrets are encrypted at rest; responses only show masked values.
+          Manage Razorpay, LiveKit, WhatsApp, Maps, OAuth, and AI keys on the dedicated{" "}
+          <strong>API Keys</strong> tab (Add / Update / Clear).
         </p>
-        <table className="admin-table">
-          <thead>
-            <tr>
-              <th>Key</th>
-              <th>Category</th>
-              <th>Status</th>
-              <th>Set / update value</th>
-              <th />
-            </tr>
-          </thead>
-          <tbody>
-            {apiKeys.map((k) => (
-              <tr key={k.key}>
-                <td>
-                  <code>{k.key}</code>
-                  {k.description && (
-                    <>
-                      <br />
-                      <small>{k.description}</small>
-                    </>
-                  )}
-                </td>
-                <td>{k.category}</td>
-                <td>
-                  {k.configured ? (
-                    <span>
-                      Configured
-                      {k.value_masked ? ` · ${k.value_masked}` : ""}
-                    </span>
-                  ) : (
-                    <span>Not set</span>
-                  )}
-                </td>
-                <td>
-                  <input
-                    type={k.is_secret ? "password" : "text"}
-                    className="admin-inline-input"
-                    placeholder={k.configured ? "Enter new value to replace" : "Enter value"}
-                    value={draftValues[k.key] ?? ""}
-                    onChange={(e) =>
-                      setDraftValues((prev) => ({ ...prev, [k.key]: e.target.value }))
-                    }
-                    autoComplete="off"
-                  />
-                </td>
-                <td>
-                  <button
-                    type="button"
-                    className="btn btn--primary btn--sm"
-                    disabled={busyKey === k.key || !(draftValues[k.key] || "").trim()}
-                    onClick={async () => {
-                      const value = (draftValues[k.key] || "").trim();
-                      if (!value) return;
-                      setBusyKey(k.key);
-                      try {
-                        await updateAdminApiKey(k.key, value);
-                        setDraftValues((prev) => ({ ...prev, [k.key]: "" }));
-                        await load();
-                      } catch (e) {
-                        setError(e instanceof Error ? e.message : "API key update failed");
-                      } finally {
-                        setBusyKey(null);
-                      }
-                    }}
-                  >
-                    Save
-                  </button>{" "}
-                  <button
-                    type="button"
-                    className="btn btn--ghost btn--sm"
-                    disabled={busyKey === k.key || !k.configured}
-                    onClick={async () => {
-                      setBusyKey(k.key);
-                      try {
-                        await clearAdminApiKey(k.key);
-                        await load();
-                      } catch (e) {
-                        setError(e instanceof Error ? e.message : "Clear failed");
-                      } finally {
-                        setBusyKey(null);
-                      }
-                    }}
-                  >
-                    Clear
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
       </section>
 
       <section className="glass admin-detail" style={{ marginBottom: "1rem" }}>
