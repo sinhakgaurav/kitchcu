@@ -3,7 +3,7 @@ export const APP_NAME = "kitchCU";
 /** localStorage / sessionStorage key prefix (camel brand, no spaces). */
 export const APP_STORAGE_PREFIX = "kitchCU";
 export const APP_NAME_LOWER = "kitchcu";
-export const APP_TAGLINE = "Growth OS for cloud kitchens";
+export const APP_TAGLINE = "A complete kitchen care unit";
 /** Category-defining claim for marketing surfaces (portal / heroes). */
 export const APP_POSITIONING =
   "India's first — and the world's third — platform with this feature stack";
