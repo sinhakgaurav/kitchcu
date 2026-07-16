@@ -355,6 +355,7 @@ def main() -> None:
         owner_token=demo_token,
         kitchen_id=primary["id"],
         dish_ids=primary_dish_ids,
+        kitchen_name=primary["name"],
     )
 
     # Additional owners — more kitchens for nearby density

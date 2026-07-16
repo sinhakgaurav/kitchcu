@@ -28,7 +28,10 @@ class LiveSession(Base):
     kitchen_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False, index=True)
     owner_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
     title: Mapped[str] = mapped_column(String(255), nullable=False)
-    room_name: Mapped[str] = mapped_column(String(100), nullable=False, unique=True)
+    # Not unique: room_name is derived deterministically from kitchen_id, so a kitchen
+    # accumulates one row per go-live/end cycle over its lifetime and legitimately reuses
+    # the same room_name across historical sessions.
+    room_name: Mapped[str] = mapped_column(String(100), nullable=False, index=True)
     status: Mapped[str] = mapped_column(String(20), default="live", index=True)
     order_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
     viewer_count: Mapped[int] = mapped_column(Integer, default=0)

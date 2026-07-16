@@ -1,0 +1,324 @@
+# kitchCU — single e2-small VM production compose.
+#
+# Differences vs the root docker-compose.yml (local dev):
+#   - No source bind-mounts (baked image code only; no --reload hot-swap surprises in prod)
+#   - No MinIO container — media goes to the GCS bucket via the S3-compatible MinIO client
+#     (MINIO_ENDPOINT=storage.googleapis.com + HMAC keys, zero app code changes)
+#   - Postgres/Redis/gateway bind to 127.0.0.1 only (debug via SSH tunnel, not internet-exposed)
+#   - Caddy terminates TLS for all 5 hostnames and reverse-proxies to the 4 website
+#     containers + gateway; websites' own nginx.*.conf already proxy /api/* to gateway:8000
+#     internally, so this is the only public-facing container besides DNS-01 challenges.
+#
+# Run from the repo root:
+#   docker compose -f infra/gcp-vm/docker-compose.prod.yml --env-file infra/gcp-vm/.env up -d --build
+
+services:
+  postgres:
+    image: postgis/postgis:16-3.4
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-ckac}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:-ckac}
+    ports:
+      - "127.0.0.1:15432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ../postgres/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-ckac} -d ${POSTGRES_DB:-ckac}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:16379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  identity:
+    build:
+      context: ../..
+      dockerfile: services/identity/Dockerfile
+    restart: unless-stopped
+    env_file: [.env]
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-ckac}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-ckac}
+      REDIS_URL: redis://redis:6379/0
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+
+  catalog:
+    build:
+      context: ../..
+      dockerfile: services/catalog/Dockerfile
+    restart: unless-stopped
+    env_file: [.env]
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-ckac}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-ckac}
+      REDIS_URL: redis://redis:6379/0
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+
+  order:
+    build:
+      context: ../..
+      dockerfile: services/order/Dockerfile
+    restart: unless-stopped
+    env_file: [.env]
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-ckac}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-ckac}
+      REDIS_URL: redis://redis:6379/0
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+
+  billing:
+    build:
+      context: ../..
+      dockerfile: services/billing/Dockerfile
+    restart: unless-stopped
+    env_file: [.env]
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-ckac}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-ckac}
+      REDIS_URL: redis://redis:6379/0
+      IDENTITY_SERVICE_URL: http://identity:8001
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+
+  notification:
+    build:
+      context: ../..
+      dockerfile: services/notification/Dockerfile
+    restart: unless-stopped
+    env_file: [.env]
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-ckac}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-ckac}
+      REDIS_URL: redis://redis:6379/0
+      ORDER_SERVICE_URL: http://order:8003
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+      order: { condition: service_started }
+
+  marketing:
+    build:
+      context: ../..
+      dockerfile: services/marketing/Dockerfile
+    restart: unless-stopped
+    env_file: [.env]
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-ckac}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-ckac}
+      REDIS_URL: redis://redis:6379/0
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+
+  ratings:
+    build:
+      context: ../..
+      dockerfile: services/ratings/Dockerfile
+    restart: unless-stopped
+    env_file: [.env]
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-ckac}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-ckac}
+      REDIS_URL: redis://redis:6379/0
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+
+  growth:
+    build:
+      context: ../..
+      dockerfile: services/growth/Dockerfile
+    restart: unless-stopped
+    env_file: [.env]
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-ckac}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-ckac}
+      REDIS_URL: redis://redis:6379/0
+      BILLING_SERVICE_URL: http://billing:8004
+      NOTIFICATION_SERVICE_URL: http://notification:8005
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+
+  delivery:
+    build:
+      context: ../..
+      dockerfile: services/delivery/Dockerfile
+    restart: unless-stopped
+    env_file: [.env]
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-ckac}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-ckac}
+      REDIS_URL: redis://redis:6379/0
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+
+  learning:
+    build:
+      context: ../..
+      dockerfile: services/learning/Dockerfile
+    restart: unless-stopped
+    env_file: [.env]
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-ckac}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-ckac}
+      REDIS_URL: redis://redis:6379/0
+      CATALOG_SERVICE_URL: http://catalog:8002
+      NOTIFICATION_SERVICE_URL: http://notification:8005
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+      catalog: { condition: service_started }
+      notification: { condition: service_started }
+
+  community:
+    build:
+      context: ../..
+      dockerfile: services/community/Dockerfile
+    restart: unless-stopped
+    env_file: [.env]
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-ckac}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-ckac}
+      REDIS_URL: redis://redis:6379/0
+      COMMUNITY_MIN_ORDERS_RANKING: "3"
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+
+  streaming:
+    build:
+      context: ../..
+      dockerfile: services/streaming/Dockerfile
+    restart: unless-stopped
+    env_file: [.env]
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-ckac}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-ckac}
+      REDIS_URL: redis://redis:6379/0
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+
+  gateway:
+    build:
+      context: ../..
+      dockerfile: services/gateway/Dockerfile
+    restart: unless-stopped
+    env_file: [.env]
+    environment:
+      IDENTITY_SERVICE_URL: http://identity:8001
+      CATALOG_SERVICE_URL: http://catalog:8002
+      ORDER_SERVICE_URL: http://order:8003
+      BILLING_SERVICE_URL: http://billing:8004
+      NOTIFICATION_SERVICE_URL: http://notification:8005
+      MARKETING_SERVICE_URL: http://marketing:8006
+      RATINGS_SERVICE_URL: http://ratings:8007
+      GROWTH_SERVICE_URL: http://growth:8008
+      DELIVERY_SERVICE_URL: http://delivery:8009
+      LEARNING_SERVICE_URL: http://learning:8010
+      COMMUNITY_SERVICE_URL: http://community:8011
+      STREAMING_SERVICE_URL: http://streaming:8012
+      REDIS_URL: redis://redis:6379/0
+    ports:
+      - "127.0.0.1:18000:8000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/live', timeout=5)"]
+      interval: 10s
+      timeout: 8s
+      retries: 12
+      start_period: 90s
+    depends_on:
+      identity: { condition: service_started }
+      catalog: { condition: service_started }
+      order: { condition: service_started }
+      billing: { condition: service_started }
+      notification: { condition: service_started }
+      marketing: { condition: service_started }
+      ratings: { condition: service_started }
+      growth: { condition: service_started }
+      delivery: { condition: service_started }
+      learning: { condition: service_started }
+      community: { condition: service_started }
+      streaming: { condition: service_started }
+      redis: { condition: service_healthy }
+
+  customer-web:
+    build:
+      context: ../../apps/website
+      dockerfile: Dockerfile
+      args:
+        APP: customer
+        VITE_CUSTOMER_APP_URL: https://customer.kitchcu.com
+        VITE_KITCHEN_APP_URL: https://kitchen.kitchcu.com
+        VITE_ADMIN_APP_URL: https://admin.kitchcu.com
+    restart: unless-stopped
+    depends_on:
+      gateway: { condition: service_healthy }
+
+  kitchen-web:
+    build:
+      context: ../../apps/website
+      dockerfile: Dockerfile
+      args:
+        APP: kitchen
+        VITE_CUSTOMER_APP_URL: https://customer.kitchcu.com
+        VITE_KITCHEN_APP_URL: https://kitchen.kitchcu.com
+        VITE_ADMIN_APP_URL: https://admin.kitchcu.com
+    restart: unless-stopped
+    depends_on:
+      gateway: { condition: service_healthy }
+
+  portal-web:
+    build:
+      context: ../../apps/website
+      dockerfile: Dockerfile
+      args:
+        APP: portal
+        VITE_CUSTOMER_APP_URL: https://customer.kitchcu.com
+        VITE_KITCHEN_APP_URL: https://kitchen.kitchcu.com
+        VITE_ADMIN_APP_URL: https://admin.kitchcu.com
+    restart: unless-stopped
+
+  admin-web:
+    build:
+      context: ../../apps/website
+      dockerfile: Dockerfile
+      args:
+        APP: admin
+        VITE_CUSTOMER_APP_URL: https://customer.kitchcu.com
+        VITE_KITCHEN_APP_URL: https://kitchen.kitchcu.com
+        VITE_ADMIN_APP_URL: https://admin.kitchcu.com
+    restart: unless-stopped
+    depends_on:
+      gateway: { condition: service_healthy }
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - portal-web
+      - customer-web
+      - kitchen-web
+      - admin-web
+      - gateway
+
+volumes:
+  pgdata:
+  caddy_data:
+  caddy_config:

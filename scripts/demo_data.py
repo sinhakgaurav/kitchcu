@@ -73,6 +73,18 @@ DEMO_CUSTOMERS = [
         "name": "Ananya Guest",
         "note": "Guest checkout",
     },
+    {
+        "phone": "9123456781",
+        "phone_e164": "+919123456781",
+        "name": "Kabir Singh",
+        "note": "Frequent orderer (CRM/learning trial pool)",
+    },
+    {
+        "phone": "9123456782",
+        "phone_e164": "+919123456782",
+        "name": "Meera Iyer",
+        "note": "Health-conscious diner (CRM/learning trial pool)",
+    },
 ]
 
 DEMO_KITCHEN = {

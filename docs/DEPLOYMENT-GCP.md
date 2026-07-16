@@ -38,7 +38,16 @@ caller service account for defense-in-depth.
    gcloud config set project YOUR_PROJECT_ID
    ```
 2. **Install locally**: `gcloud` CLI, `terraform` >= 1.7, Docker (for local image builds if you don't want to wait for CI on first deploy).
-3. **Auth**: `gcloud auth login && gcloud auth application-default login`
+
+   **Windows alternative — no local `gcloud`/`terraform` install, no Cloud Shell:** run everything through
+   Docker with `scripts/gcp-auth.ps1` (one-time login), `scripts/gcp-tf.ps1` (wraps
+   `hashicorp/terraform:1.9`), and `scripts/gcp-cli.ps1` (wraps `google/cloud-sdk:slim`
+   for one-off `gcloud` commands). Skip straight to step 3 below with `.\scripts\gcp-tf.ps1`
+   in place of every `terraform` command. One gap: `gcloud sql connect` (the manual
+   PostGIS-enable step in §3) needs a `psql` binary the `cloud-sdk` image doesn't ship —
+   use Cloud Shell for that one step, or a local `postgres:16` container through the
+   Cloud SQL Auth Proxy.
+3. **Auth**: `gcloud auth login && gcloud auth application-default login` (or `.\scripts\gcp-auth.ps1` on Windows/Docker).
 4. **Terraform state bucket** (recommended — keeps state off your laptop):
    ```bash
    gsutil mb -l asia-south1 gs://YOUR_PROJECT_ID-tfstate
@@ -200,3 +209,130 @@ Alembic migration's `downgrade()` before rolling back a release that shipped one
 
 **Estimate: ~$200-280/mo at near-zero traffic**, scaling with Cloud Run request volume
 and Cloud SQL/Redis tier upgrades as usage grows.
+
+---
+
+## 11. Alternative: single-VM deploy (Docker Compose on one e2-small)
+
+**Use this instead of §1-10 when you want to go live in minutes, not the full
+Cloud Run + Cloud SQL + LB architecture above.** Everything (all 13 domain services +
+gateway + Postgres + Redis + 4 websites + Caddy) runs as containers on **one VM** via
+`infra/gcp-vm/docker-compose.prod.yml`. Third-party services (Razorpay, Meta WhatsApp
+Cloud API, LiveKit, OAuth providers) are never self-hosted — they stay external API
+calls exactly like local dev, configured post-launch via Super Admin → Control → API Keys.
+
+**CTO risk call — read before choosing `e2-small`:** ~20 containers (13 Python
+services, Postgres, Redis, 4 nginx, Caddy) on a 2 vCPU / **2 GB RAM** burstable VM is
+genuinely tight — realistic idle footprint is ~1.8-1.9 GB, leaving almost no headroom
+for real traffic or the initial `docker compose build` (C-extension compilation for
+`asyncpg`/`psycopg2` is memory-hungry). `startup.sh` adds a 2 GB swap file as a safety
+net against OOM kills, but this tier is appropriate for **demo / smoke-test traffic
+only**, not the 100k-concurrent-session design target. Upgrading is a 2-command,
+~1-minute operation if you see OOM kills (`docker compose logs` showing containers
+restarting unexpectedly, or `dmesg | grep -i oom`):
+```bash
+gcloud compute instances stop ckac-vm --zone=asia-south1-a
+gcloud compute instances set-machine-type ckac-vm --zone=asia-south1-a --machine-type=e2-medium
+gcloud compute instances start ckac-vm --zone=asia-south1-a
+```
+
+### 11.1 One-time setup (run in Cloud Shell — has `gcloud`/`gsutil` pre-authenticated)
+
+```bash
+git clone https://github.com/sinhakgaurav/kitchcu.git && cd kitchcu
+gcloud config set project kitchcu
+gcloud services enable compute.googleapis.com storage.googleapis.com
+```
+
+### 11.2 Create the media bucket + HMAC keys (S3-compatible, zero app code changes)
+
+```bash
+gcloud iam service-accounts create ckac-media --display-name="kitchCU media storage"
+
+gsutil mb -l asia-south1 -b on gs://ckac-media-kitchcu
+gsutil iam ch allUsers:objectViewer gs://ckac-media-kitchcu
+gsutil iam ch serviceAccount:ckac-media@kitchcu.iam.gserviceaccount.com:objectAdmin gs://ckac-media-kitchcu
+
+# Prints access_id + secret — save both, you need them for the VM metadata below
+gsutil hmac create ckac-media@kitchcu.iam.gserviceaccount.com
+```
+
+### 11.3 Generate secrets
+
+```bash
+JWT_SECRET=$(openssl rand -hex 32)
+INTERNAL_API_KEY=$(openssl rand -hex 32)
+DB_PASSWORD=$(openssl rand -base64 24)
+ADMIN_PASSWORD=$(openssl rand -base64 16)
+echo "Save these — you won't see them again in this form:"
+echo "JWT_SECRET=$JWT_SECRET"
+echo "INTERNAL_API_KEY=$INTERNAL_API_KEY"
+echo "DB_PASSWORD=$DB_PASSWORD"
+echo "ADMIN_PASSWORD=$ADMIN_PASSWORD"
+```
+
+### 11.4 Firewall + reserved static IP
+
+```bash
+gcloud compute firewall-rules create ckac-allow-web \
+  --network=default --direction=INGRESS --action=ALLOW \
+  --rules=tcp:80,tcp:443 --target-tags=ckac-web --source-ranges=0.0.0.0/0
+
+gcloud compute addresses create ckac-vm-ip --region=asia-south1
+gcloud compute addresses describe ckac-vm-ip --region=asia-south1 --format='get(address)'
+```
+
+### 11.5 Create the VM
+
+Fill in the HMAC access id / secret from §11.2 and the secrets from §11.3:
+
+```bash
+gcloud compute instances create ckac-vm \
+  --zone=asia-south1-a \
+  --machine-type=e2-small \
+  --image-family=ubuntu-2204-lts --image-project=ubuntu-os-cloud \
+  --boot-disk-size=30GB --boot-disk-type=pd-balanced \
+  --tags=ckac-web \
+  --address=ckac-vm-ip \
+  --metadata-from-file=startup-script=infra/gcp-vm/startup.sh \
+  --metadata=db-password="$DB_PASSWORD",jwt-secret="$JWT_SECRET",internal-api-key="$INTERNAL_API_KEY",admin-password="$ADMIN_PASSWORD",whatsapp-verify-token="ckac-prod-verify",minio-access-key="GOOG...",minio-secret-key="...",minio-bucket="ckac-media-kitchcu"
+```
+
+First boot takes **10-20 minutes** (Docker install + building 17 images). Watch it:
+
+```bash
+gcloud compute ssh ckac-vm --zone=asia-south1-a --command="sudo tail -f /var/log/ckac-startup.log"
+```
+
+### 11.6 Point DNS at the VM
+
+A records for `kitchcu.com`, `www.kitchcu.com`, `customer.kitchcu.com`,
+`kitchen.kitchcu.com`, `admin.kitchcu.com`, `api.kitchcu.com` → the reserved IP from
+§11.4. Caddy (in `docker-compose.prod.yml`) auto-provisions Let's Encrypt certs for
+each hostname the first time it sees traffic on port 80 for it — no manual cert step,
+but DNS must resolve first.
+
+### 11.7 Verify + seed demo data
+
+```bash
+gcloud compute ssh ckac-vm --zone=asia-south1-a --command="cd /opt/ckac && sudo docker compose -f infra/gcp-vm/docker-compose.prod.yml ps"
+gcloud compute ssh ckac-vm --zone=asia-south1-a --command="curl -s http://127.0.0.1:18000/health/ready"
+
+# Optional: seed demo owner/kitchens/menu/orders (safe to skip for a real launch)
+gcloud compute ssh ckac-vm --zone=asia-south1-a --command="cd /opt/ckac && CKAC_GATEWAY_URL=http://127.0.0.1:18000 python3 scripts/seed-bulk-data.py"
+```
+
+### 11.8 Redeploy after a code change
+
+```bash
+gcloud compute ssh ckac-vm --zone=asia-south1-a --command="sudo google_metadata_script_runner startup"
+```
+
+Re-runs `startup.sh`: `git reset --hard origin/main`, rewrites `.env` from the same
+metadata (unchanged), `docker compose up -d --build` (rebuilds only what changed).
+
+### 11.9 What you still owe post-launch (same as §7 above)
+
+Real Razorpay keys, Meta WhatsApp `whatsapp_app_secret`, LiveKit creds, Google Maps
+key, OAuth client secrets — all via Super Admin → Control → API Keys (DB-backed, no
+redeploy). Change `ADMIN_PASSWORD` immediately after first login.

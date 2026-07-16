@@ -426,7 +426,7 @@ Delivered order only → home_taste (1–5) + quality (1–5) → optional anony
 | How to handle phone numbers? | Normalize to E.164 (`+91...`) via Pydantic validator |
 | Default OTP in dev? | `123456` (replace with Redis + WhatsApp in prod) |
 | Demo owner / kitchen? | Run `python scripts/seed-dev-data.py` or `.\scripts\seed-all.ps1` (bulk + all personas) → phones `9876543210`–`9876543213`, OTP `123456`, primary kitchen `CKPNQ001` |
-| Demo customers? | WhatsApp OTP `123456` — `9123456789`, `9123456780`, `9988776655` |
+| Demo customers? | WhatsApp OTP `123456` — `9123456789`, `9123456780`, `9988776655`, `9123456781`, `9123456782` (5 total — needed for CRM/learning-trial invite minimum) |
 | Platform admin? | `admin@kitchcu.dev` / `admin123456` (dev default) |
 | Primary user for Phase 1? | Owner — optimize owner flows before customer PWA |
 

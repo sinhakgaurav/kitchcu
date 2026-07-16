@@ -85,6 +85,39 @@ async def test_end_live_and_list_public(client: AsyncClient, stream_ctx):
 
 
 @pytest.mark.asyncio
+async def test_go_live_again_after_ending_previous_session(client: AsyncClient, stream_ctx):
+    """A kitchen's room_name is derived deterministically from kitchen_id, so ending one
+    session and going live again later (e.g. the next day) must not collide on room_name."""
+    kid = stream_ctx["kitchen_id"]
+    owner_headers = {"Authorization": f"Bearer {stream_ctx['owner_token']}"}
+
+    await client.patch(
+        f"/api/v1/kitchens/{kid}/stream/settings",
+        json={"live_sharing_enabled": True},
+        headers=owner_headers,
+    )
+    first = await client.post(
+        f"/api/v1/kitchens/{kid}/stream/go-live",
+        json={"title": "Breakfast prep"},
+        headers=owner_headers,
+    )
+    assert first.status_code == 200, first.text
+    ended = await client.post(f"/api/v1/kitchens/{kid}/stream/end", headers=owner_headers)
+    assert ended.status_code == 200
+
+    second = await client.post(
+        f"/api/v1/kitchens/{kid}/stream/go-live",
+        json={"title": "Dinner prep"},
+        headers=owner_headers,
+    )
+    assert second.status_code == 200, second.text
+    body = second.json()
+    assert body["status"] == "live"
+    assert body["id"] != first.json()["id"]
+    assert body["room_name"] == first.json()["room_name"]
+
+
+@pytest.mark.asyncio
 async def test_viewer_token_increments_count(client: AsyncClient, stream_ctx):
     kid = stream_ctx["kitchen_id"]
     owner_headers = {"Authorization": f"Bearer {stream_ctx['owner_token']}"}
