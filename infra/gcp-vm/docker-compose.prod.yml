@@ -1,8 +1,8 @@
-# kitchCU — single e2-small VM production compose.
+# kitchCU â€” single e2-small VM production compose.
 #
 # Differences vs the root docker-compose.yml (local dev):
 #   - No source bind-mounts (baked image code only; no --reload hot-swap surprises in prod)
-#   - No MinIO container — media goes to the GCS bucket via the S3-compatible MinIO client
+#   - No MinIO container â€” media goes to the GCS bucket via the S3-compatible MinIO client
 #     (MINIO_ENDPOINT=storage.googleapis.com + HMAC keys, zero app code changes)
 #   - Postgres/Redis/gateway bind to 127.0.0.1 only (debug via SSH tunnel, not internet-exposed)
 #   - Caddy terminates TLS for all 5 hostnames and reverse-proxies to the 4 website

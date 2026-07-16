@@ -1,5 +1,5 @@
 #!/bin/bash
-# kitchCU — GCE VM startup script (Ubuntu 22.04). Runs as root on every boot.
+# kitchCU Ã¢â‚¬â€ GCE VM startup script (Ubuntu 22.04). Runs as root on every boot.
 # Secrets are read from instance metadata (set once at `gcloud compute instances create`
 # via --metadata=...), never baked into this script or the git repo.
 set -euo pipefail
@@ -75,7 +75,7 @@ CUSTOMER_OAUTH_REDIRECT_BASE=https://customer.kitchcu.com
 EOF
 chmod 600 "$ENV_DIR/.env"
 
-# --- 5. Build + start the full stack (idempotent — safe on every reboot) -------------
+# --- 5. Build + start the full stack (idempotent Ã¢â‚¬â€ safe on every reboot) -------------
 cd "$REPO_DIR"
 docker compose -f infra/gcp-vm/docker-compose.prod.yml --env-file infra/gcp-vm/.env up -d --build
 

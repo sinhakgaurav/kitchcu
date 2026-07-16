@@ -1,0 +1,8 @@
+# Force LF for shell scripts regardless of platform autocrlf settings —
+# CRLF in a script that runs on a Linux GCE VM (infra/gcp-vm/startup.sh) breaks
+# every line (bash sees a literal \r), so this must never be CRLF-converted.
+*.sh text eol=lf
+
+# Everything under the single-VM deploy path runs on Linux — keep it LF-only
+# regardless of the Windows checkout that authored it.
+infra/gcp-vm/** text eol=lf
