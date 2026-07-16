@@ -617,8 +617,24 @@ html.theme-brand-light .hero__scroll-hint {
   .auth-page.auth-page--kitchen .auth-page__form-wrap,
   .auth-page.auth-page--customer .auth-page__form-wrap,
   .admin-login .auth-page__form-wrap {
+    flex-direction: column;
+    width: 100%;
+    max-width: 100%;
     padding: 0.75rem 1rem 1.5rem;
-    align-items: flex-start;
+    align-items: stretch;
+    justify-content: flex-start;
+  }
+
+  .auth-page__mobile-brand {
+    width: 100%;
+  }
+
+  .auth-page.auth-page--brand .auth-card,
+  .auth-page.auth-page--kitchen .auth-card,
+  .auth-page.auth-page--customer .auth-card,
+  .admin-login .auth-card {
+    width: 100%;
+    max-width: 100%;
   }
 
   .auth-login-highlights {
@@ -645,7 +661,8 @@ html.theme-brand-light .hero__scroll-hint {
 
 .auth-page.auth-page--brand .auth-page__form-wrap,
 .auth-page.auth-page--kitchen .auth-page__form-wrap,
-.auth-page.auth-page--customer .auth-page__form-wrap {
+.auth-page.auth-page--customer .auth-page__form-wrap,
+.admin-login .auth-page__form-wrap {
   background: transparent;
 }
 
