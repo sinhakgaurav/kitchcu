@@ -117,6 +117,7 @@ services:
     environment:
       DATABASE_URL: postgresql+asyncpg://ckac:ckac_dev@postgres:5432/ckac
       REDIS_URL: redis://redis:6379/0
+      IDENTITY_SERVICE_URL: http://identity:8001
       # Prefer mounted ckac-common over image site-packages (dev volume hot-reload)
       PYTHONPATH: /app/packages/ckac-common
     ports:
