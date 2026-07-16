@@ -295,7 +295,7 @@ gcloud compute instances create ckac-vm \
   --tags=ckac-web \
   --address=ckac-vm-ip \
   --metadata-from-file=startup-script=infra/gcp-vm/startup.sh \
-  --metadata=db-password="$DB_PASSWORD",jwt-secret="$JWT_SECRET",internal-api-key="$INTERNAL_API_KEY",admin-password="$ADMIN_PASSWORD",whatsapp-verify-token="ckac-prod-verify",minio-access-key="GOOG...",minio-secret-key="...",minio-bucket="ckac-media-kitchcu"
+  --metadata=media-backend=minio,run-seed=1,demo-mode=1,db-password="$DB_PASSWORD",jwt-secret="$JWT_SECRET",internal-api-key="$INTERNAL_API_KEY",admin-password="$ADMIN_PASSWORD",whatsapp-verify-token=ckac-prod-verify,minio-access-key=ckac,minio-secret-key=ckac_minio_dev,minio-bucket=ckac-media
 ```
 
 First boot takes **10-20 minutes** (Docker install + building 17 images). Watch it:
@@ -314,13 +314,20 @@ but DNS must resolve first.
 
 ### 11.7 Verify + seed demo data
 
+With `run-seed=1` in VM metadata (recommended for demo VMs), `startup.sh` waits for
+the gateway and runs `scripts/seed-bulk-data.py` **once** on first boot
+(marker: `/var/lib/ckac/.bulk-seeded`). Set `demo-mode=1` (or `run-seed=1` alone)
+to force `APP_ENV=development` so demo OTP `123456` works for owner/customer logins.
+
 ```bash
 gcloud compute ssh ckac-vm --zone=asia-south1-a --command="cd /opt/ckac && sudo docker compose -f infra/gcp-vm/docker-compose.prod.yml ps"
 gcloud compute ssh ckac-vm --zone=asia-south1-a --command="curl -s http://127.0.0.1:18000/health/ready"
 
-# Optional: seed demo owner/kitchens/menu/orders (safe to skip for a real launch)
+# Manual re-seed (only if auto-seed failed or marker removed):
 gcloud compute ssh ckac-vm --zone=asia-south1-a --command="cd /opt/ckac && CKAC_GATEWAY_URL=http://127.0.0.1:18000 python3 scripts/seed-bulk-data.py"
 ```
+
+**Demo logins after seed:** owner `9876543210` / OTP `123456`, customers `9123456789` etc. / OTP `123456`.
 
 ### 11.8 Redeploy after a code change
 

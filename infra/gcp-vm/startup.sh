@@ -67,12 +67,18 @@ else
   MINIO_BUCKET="${MINIO_BUCKET:-ckac-media}"
 fi
 
+APP_ENV="production"
+if [ "$(meta demo-mode)" = "1" ] || [ "$(meta demo-mode)" = "true" ] \
+  || [ "$(meta run-seed)" = "1" ] || [ "$(meta run-seed)" = "true" ]; then
+  APP_ENV="development"
+fi
+
 cat > "$ENV_DIR/.env" <<EOF
 POSTGRES_USER=ckac
 POSTGRES_PASSWORD=$(meta db-password)
 POSTGRES_DB=ckac
 
-APP_ENV=production
+APP_ENV=${APP_ENV}
 CORS_ORIGINS=https://kitchcu.com,https://www.kitchcu.com,https://customer.kitchcu.com,https://kitchen.kitchcu.com,https://admin.kitchcu.com,https://api.kitchcu.com
 
 JWT_SECRET=$(meta jwt-secret)
@@ -101,5 +107,32 @@ chmod 600 "$ENV_DIR/.env"
 # --- 5. Build + start the full stack (idempotent - safe on every reboot) -------------
 cd "$REPO_DIR"
 docker compose -f infra/gcp-vm/docker-compose.prod.yml --env-file infra/gcp-vm/.env up -d --build
+
+# --- 6. Optional one-time bulk seed (metadata run-seed=1) ---------------------------
+RUN_SEED="$(meta run-seed)"
+SEED_MARKER=/var/lib/ckac/.bulk-seeded
+if { [ "$RUN_SEED" = "1" ] || [ "$RUN_SEED" = "true" ]; } && [ ! -f "$SEED_MARKER" ]; then
+  echo "Waiting for gateway before bulk seed..."
+  ready=0
+  for _ in $(seq 1 60); do
+    if curl -sf http://127.0.0.1:18000/health/ready | grep -q '"status"'; then
+      ready=1
+      break
+    fi
+    sleep 10
+  done
+  if [ "$ready" -eq 1 ]; then
+    echo "Running scripts/seed-bulk-data.py (APP_ENV=${APP_ENV})..."
+    mkdir -p /var/lib/ckac
+    if CKAC_GATEWAY_URL=http://127.0.0.1:18000 python3 scripts/seed-bulk-data.py; then
+      touch "$SEED_MARKER"
+      echo "Bulk seed complete."
+    else
+      echo "Bulk seed failed â€” marker not set; will retry on next boot." >&2
+    fi
+  else
+    echo "Gateway not ready after 10 min â€” bulk seed skipped this boot." >&2
+  fi
+fi
 
 echo "=== ckac startup done: $(date -u) ==="
