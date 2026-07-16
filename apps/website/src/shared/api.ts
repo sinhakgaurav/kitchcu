@@ -1,6 +1,7 @@
 /** Kitchen owner portal — isolated localStorage keys (kitchen.kitchcu.in only) */
 
 import { APP_STORAGE_PREFIX } from "./brand";
+import { apiHeaders, correlationHeaders } from "./http";
 
 const TOKEN_KEY = `${APP_STORAGE_PREFIX}_kitchen_token`;
 const KITCHEN_KEY = `${APP_STORAGE_PREFIX}_kitchen_active_id`;
@@ -340,10 +341,9 @@ export function normalizePhone(phone: string): string {
 
 async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
   const token = getToken();
-  const headers: Record<string, string> = {
-    "Content-Type": "application/json",
+  const headers = apiHeaders({
     ...(init?.headers as Record<string, string> | undefined),
-  };
+  });
   if (token) headers.Authorization = `Bearer ${token}`;
 
   const res = await fetch(path, { ...init, headers });
@@ -401,7 +401,7 @@ export async function fetchKitchenByCode(code: string): Promise<KitchenPublic> {
   // Public lookup — never attach owner JWT or redirect to owner login
   const res = await fetch(
     `/api/v1/kitchens/public/by-code/${encodeURIComponent(code.trim().toUpperCase())}`,
-    { headers: { Accept: "application/json" } },
+    { headers: apiHeaders({ Accept: "application/json" }) },
   );
   const body = await res.json().catch(() => ({}));
   if (!res.ok) {
@@ -717,9 +717,10 @@ export async function uploadRefundEvidence(refundId: string, file: File): Promis
   const token = getToken();
   const form = new FormData();
   form.append("file", file);
+  const headers = correlationHeaders(token ? { Authorization: `Bearer ${token}` } : undefined);
   const res = await fetch(`/api/v1/billing/refunds/${refundId}/evidence`, {
     method: "POST",
-    headers: token ? { Authorization: `Bearer ${token}` } : {},
+    headers,
     body: form,
   });
   const body = await res.json().catch(() => ({}));
@@ -1089,8 +1090,7 @@ export async function uploadKitchenMedia(
   if (options.captured_at) form.append("captured_at", options.captured_at);
 
   const token = getToken();
-  const headers: Record<string, string> = {};
-  if (token) headers.Authorization = `Bearer ${token}`;
+  const headers = correlationHeaders(token ? { Authorization: `Bearer ${token}` } : undefined);
 
   const res = await fetch(`/api/v1/kitchens/${kitchenId}/media/upload`, {
     method: "POST",
@@ -1175,7 +1175,7 @@ export async function fetchOrderStockWarnings(orderId: string): Promise<OrderSto
 async function downloadPdf(path: string, filename: string): Promise<void> {
   const token = getToken();
   const res = await fetch(path, {
-    headers: token ? { Authorization: `Bearer ${token}` } : {},
+    headers: correlationHeaders(token ? { Authorization: `Bearer ${token}` } : undefined),
   });
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));

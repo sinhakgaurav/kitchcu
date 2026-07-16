@@ -605,7 +605,7 @@ html.theme-brand-light .hero__scroll-hint {
 .auth-page .auth-card label,
 .admin-login__card label {
   color: var(--brand-ink-soft);
-  gap: 0.45rem;
+  gap: var(--kc-label-control-gap);
   margin: 0;
 }
 
@@ -619,8 +619,8 @@ html.theme-brand-light .hero__scroll-hint {
   border: 1.5px solid rgba(11, 27, 50, 0.12);
   color: var(--brand-ink);
   border-radius: 14px;
-  min-height: 3rem;
-  padding: 0.75rem 1rem;
+  min-height: var(--kc-field-h);
+  padding: var(--kc-control-pad-y) var(--kc-control-pad-x);
   margin: 0;
   box-sizing: border-box;
 }
@@ -648,12 +648,12 @@ html.theme-brand-light .hero__scroll-hint {
 .admin-login__card.auth-card {
   display: flex;
   flex-direction: column;
-  gap: 1.15rem;
+  gap: var(--kc-field-stack-gap);
 }
 
 .auth-page .auth-card form .btn,
 .admin-login__card .btn--primary {
-  min-height: 2.95rem;
+  min-height: var(--kc-btn-min-h);
 }
 
 .auth-page .auth-card__tabs {

@@ -13,6 +13,7 @@ os.environ.setdefault(
 os.environ.setdefault("REDIS_URL", "redis://localhost:16379/0")
 os.environ.setdefault("JWT_SECRET", "test-secret-key-for-pytest")
 os.environ.setdefault("INTERNAL_API_KEY", "test-internal-key-for-pytest")
+os.environ.setdefault("IDENTITY_SERVICE_URL", "http://identity")
 os.environ.setdefault("APP_ENV", "test")
 os.environ.setdefault("MEDIA_STORAGE_BACKEND", "local")
 
@@ -44,6 +45,39 @@ from tests.events_bootstrap import ensure_events_schema
 
 SYNC_DB_URL = os.environ["DATABASE_SYNC_URL"]
 JWT_SECRET = os.environ["JWT_SECRET"]
+
+
+@pytest.fixture(autouse=True)
+def wire_identity_internal_client(monkeypatch):
+    """Test shim: mirror identity internal subscription sync (production uses HTTP)."""
+    from app import identity_client
+
+    async def _sync(
+        owner_id: uuid.UUID,
+        *,
+        plan_tier: str,
+        subscription_expires_at,
+    ) -> None:
+        conn = psycopg2.connect(SYNC_DB_URL)
+        conn.autocommit = True
+        try:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    UPDATE ckac_identity.owners
+                    SET subscription_tier = %s,
+                        subscription_status = 'active',
+                        subscription_expires_at = %s
+                    WHERE id = %s::uuid
+                    """,
+                    (plan_tier, subscription_expires_at, str(owner_id)),
+                )
+                if cur.rowcount == 0:
+                    raise RuntimeError("Owner not found for subscription sync")
+        finally:
+            conn.close()
+
+    monkeypatch.setattr(identity_client, "sync_owner_subscription", _sync)
 
 
 def _truncate_all() -> None:

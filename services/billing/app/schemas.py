@@ -688,21 +688,12 @@ async def activate_subscription(
     sub.updated_at = datetime.now(UTC)
     await session.flush()
 
-    await session.execute(
-        text(
-            """
-            UPDATE ckac_identity.owners
-            SET subscription_tier = :tier,
-                subscription_status = 'active',
-                subscription_expires_at = :expires
-            WHERE id = :owner_id
-            """
-        ),
-        {
-            "tier": sub.plan_tier,
-            "expires": sub.current_period_end,
-            "owner_id": sub.owner_id,
-        },
+    from app.identity_client import sync_owner_subscription
+
+    await sync_owner_subscription(
+        sub.owner_id,
+        plan_tier=sub.plan_tier,
+        subscription_expires_at=sub.current_period_end,
     )
 
     if publisher:

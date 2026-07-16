@@ -1,6 +1,7 @@
 /** Customer auth API — social OAuth + WhatsApp OTP (customer.kitchcu.in) */
 
 import { APP_STORAGE_PREFIX } from "./brand";
+import { apiHeaders } from "./http";
 
 const TOKEN_KEY = `${APP_STORAGE_PREFIX}_customer_token`;
 
@@ -50,10 +51,9 @@ export function customerOAuthRedirectUri(): string {
 
 async function customerFetch<T>(path: string, init?: RequestInit): Promise<T> {
   const token = getCustomerToken();
-  const headers: Record<string, string> = {
-    "Content-Type": "application/json",
+  const headers = apiHeaders({
     ...(init?.headers as Record<string, string> | undefined),
-  };
+  });
   if (token) headers.Authorization = `Bearer ${token}`;
 
   const res = await fetch(path, { ...init, headers });

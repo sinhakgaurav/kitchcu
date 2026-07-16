@@ -12,6 +12,7 @@ os.environ.setdefault(
 )
 os.environ.setdefault("REDIS_URL", "redis://localhost:16379/0")
 os.environ.setdefault("JWT_SECRET", "test-secret-key-for-pytest")
+os.environ.setdefault("INTERNAL_API_KEY", "test-internal-key-for-pytest")
 os.environ.setdefault("APP_ENV", "test")
 os.environ.setdefault("MEDIA_STORAGE_BACKEND", "local")
 

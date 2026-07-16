@@ -3,6 +3,7 @@ import { createRoot } from "react-dom/client";
 import PortalApp from "./App";
 import { applyAppTheme } from "../shared/theme";
 import "../index.css";
+import "../owner-forms.css";
 import "../brand-ux.css";
 import "../animations.css";
 

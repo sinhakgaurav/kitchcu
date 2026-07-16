@@ -1,4 +1,5 @@
 import { APP_STORAGE_PREFIX } from "../shared/brand";
+import { apiHeaders } from "../shared/http";
 
 const TOKEN_KEY = `${APP_STORAGE_PREFIX}_admin_token`;
 
@@ -16,10 +17,9 @@ export function clearAdminToken(): void {
 
 async function adminFetch<T>(path: string, init?: RequestInit): Promise<T> {
   const token = getAdminToken();
-  const headers: Record<string, string> = {
-    "Content-Type": "application/json",
+  const headers = apiHeaders({
     ...(init?.headers as Record<string, string> | undefined),
-  };
+  });
   if (token) headers.Authorization = `Bearer ${token}`;
   const res = await fetch(path, { ...init, headers });
   const body = await res.json().catch(() => ({}));

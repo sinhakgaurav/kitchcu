@@ -475,7 +475,7 @@
 .customer-page__body { padding: 2rem 0 4rem; }
 .customer-search { max-width: 480px; margin: 0 auto 2.5rem; padding: 2rem; box-sizing: border-box; }
 .customer-search label { display: flex; flex-direction: column; gap: 0.45rem; margin: 0; font-size: 0.85rem; color: var(--text-muted); }
-.customer-search form { display: flex; flex-direction: column; gap: 1.1rem; }
+.customer-search form { display: flex; flex-direction: column; gap: var(--kc-field-stack-gap); }
 .customer-search__actions { display: flex; flex-direction: column; gap: 0.85rem; margin-top: 0.15rem; }
 .customer-search input {
   font-family: ui-monospace, monospace;
