@@ -24,7 +24,7 @@ from ckac_common.event_bus import EventPublisher
 from ckac_common.openapi import RESP_400, RESP_404, auth_errors
 
 public_router = APIRouter()
-admin_router = APIRouter(prefix="/admin")
+admin_router = APIRouter(prefix='/admin')
 customer_router = APIRouter()
 
 TAG_TICKETS = "Support Tickets"
@@ -48,6 +48,12 @@ async def customer_tickets_list(
     customer_id: Annotated[uuid.UUID, Depends(get_current_customer_id)],
     session: Annotated[AsyncSession, Depends(get_db)],
 ) -> TicketListResponse:
+    from ckac_common.platform_config import require_feature
+
+    try:
+        await require_feature(session, "customer_complaints")
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(exc)) from exc
     contact = await load_customer_contact(customer_id, session)
     return await list_tickets_for_customer(
         session, customer_id, phone=contact.get("phone")
@@ -68,6 +74,12 @@ async def customer_tickets_create(
     session: Annotated[AsyncSession, Depends(get_db)],
     publisher: Annotated[EventPublisher, Depends(get_publisher)],
 ) -> TicketResponse:
+    from ckac_common.platform_config import require_feature
+
+    try:
+        await require_feature(session, "customer_complaints")
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(exc)) from exc
     contact = await load_customer_contact(customer_id, session)
     # Force customer audience + known contact
     payload = body.model_copy(

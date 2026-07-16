@@ -10,6 +10,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models import OwnerSubscription, Payment, Settlement
 from ckac_common.auth import stream_key
 from ckac_common.event_bus import EventPublisher
+from ckac_common.platform_config import (
+    is_dev_provider_id,
+    is_non_production,
+    require_dev_payment_mocks,
+)
 
 SUBSCRIPTION_PLANS: dict[str, dict[str, float]] = {
     "starter": {"monthly": 499.0, "yearly": 4990.0},
@@ -236,25 +241,39 @@ def settlement_to_response(settlement: Settlement) -> SettlementResponse:
 
 
 async def _get_kitchen_linked_account(session: AsyncSession, kitchen_id: uuid.UUID) -> str:
+    """Prefer kitchen_payment_gateways, then kitchens.settings; `acc_dev_*` only in non-prod."""
     result = await session.execute(
         text(
             """
             SELECT
-                COALESCE(
-                    NULLIF(settings->>'razorpay_linked_account_id', ''),
-                    'acc_dev_' || lower(code)
-                ) AS linked_account
-            FROM ckac_identity.kitchens
-            WHERE id = :kid
+                (
+                    SELECT NULLIF(g.linked_account_id, '')
+                    FROM ckac_billing.kitchen_payment_gateways g
+                    WHERE g.kitchen_id = k.id
+                      AND g.provider = 'razorpay'
+                      AND g.is_active = true
+                    LIMIT 1
+                ) AS gateway_linked,
+                NULLIF(k.settings->>'razorpay_linked_account_id', '') AS settings_linked,
+                k.code AS code
+            FROM ckac_identity.kitchens k
+            WHERE k.id = :kid
             LIMIT 1
             """
         ),
         {"kid": kitchen_id},
     )
-    linked = result.scalar_one_or_none()
-    if not linked:
+    row = result.mappings().one_or_none()
+    if not row:
         raise ValueError("Kitchen not found")
-    return linked
+    linked = row["gateway_linked"] or row["settings_linked"]
+    if linked:
+        return linked
+    if is_non_production():
+        return f"acc_dev_{str(row['code']).lower()}"
+    raise ValueError(
+        "Kitchen has no Razorpay linked account — configure Payment Gateway before split settlement"
+    )
 
 
 async def load_master_order_for_customer(
@@ -333,6 +352,7 @@ async def create_master_payment(
     )
     session.add(payment)
     await session.flush()
+    require_dev_payment_mocks("Master payment create")
     payment.razorpay_order_id = _mock_razorpay_order_id(payment.id)
     await session.flush()
 
@@ -347,6 +367,7 @@ async def create_master_payment(
                 "master_order_id": str(master_order["id"]),
                 "amount": float(payment.amount),
                 "method": method,
+                "provider_mode": "dev_mock",
             },
         )
         await publisher.publish(stream_key("billing", "payment"), event, session=session)
@@ -391,9 +412,13 @@ async def capture_master_payment(
         )
         session.add(settlement)
         await session.flush()
-        settlement.razorpay_transfer_id = f"trf_dev_{settlement.id.hex[:16]}"
-        settlement.settlement_status = "transferred"
-        settlement.settled_at = datetime.now(UTC)
+        if is_non_production():
+            settlement.razorpay_transfer_id = f"trf_dev_{settlement.id.hex[:16]}"
+            settlement.settlement_status = "transferred"
+            settlement.settled_at = datetime.now(UTC)
+        else:
+            # Live Route transfers require a provider integration — keep pending.
+            settlement.settlement_status = "pending"
         settlements.append(settlement)
         transfer_payloads.append(
             {
@@ -406,8 +431,10 @@ async def capture_master_payment(
             }
         )
 
+    if is_dev_provider_id(payment.razorpay_payment_id):
+        require_dev_payment_mocks("Master payment capture")
+        payment.razorpay_payment_id = payment.razorpay_payment_id or f"pay_dev_{payment.id.hex[:16]}"
     payment.status = "captured"
-    payment.razorpay_payment_id = payment.razorpay_payment_id or f"pay_dev_{payment.id.hex[:16]}"
     payment.updated_at = datetime.now(UTC)
     await session.flush()
 
@@ -486,6 +513,7 @@ async def create_payment(
     )
     session.add(payment)
     await session.flush()
+    require_dev_payment_mocks("Payment create")
     payment.razorpay_order_id = _mock_razorpay_order_id(payment.id)
     await session.flush()
 
@@ -501,6 +529,7 @@ async def create_payment(
                 "kitchen_id": str(order["kitchen_id"]),
                 "amount": float(payment.amount),
                 "method": method,
+                "provider_mode": "dev_mock",
             },
         )
         await publisher.publish(stream_key("billing", "payment"), event, session=session)
@@ -533,8 +562,10 @@ async def capture_payment(
     if payment.status not in ("created", "pending", "authorized"):
         raise ValueError(f"Cannot capture payment in status {payment.status}")
 
+    if is_dev_provider_id(payment.razorpay_payment_id):
+        require_dev_payment_mocks("Payment capture")
+        payment.razorpay_payment_id = payment.razorpay_payment_id or f"pay_dev_{payment.id.hex[:16]}"
     payment.status = "captured"
-    payment.razorpay_payment_id = payment.razorpay_payment_id or f"pay_dev_{payment.id.hex[:16]}"
     payment.updated_at = datetime.now(UTC)
     await session.flush()
 
@@ -608,6 +639,7 @@ async def create_owner_subscription(
     data: SubscriptionCreateRequest,
     publisher: EventPublisher | None,
 ) -> OwnerSubscription:
+    require_dev_payment_mocks("Subscription create")
     amount = SUBSCRIPTION_PLANS[data.plan_tier][data.billing_cycle]
     sub = OwnerSubscription(
         owner_id=owner_id,
@@ -646,6 +678,9 @@ async def activate_subscription(
 ) -> OwnerSubscription:
     if sub.status == "active":
         return sub
+
+    if is_dev_provider_id(sub.razorpay_subscription_id):
+        require_dev_payment_mocks("Subscription activate")
 
     days = BILLING_CYCLE_DAYS[sub.billing_cycle]
     sub.status = "active"

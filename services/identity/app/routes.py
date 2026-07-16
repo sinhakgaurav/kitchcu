@@ -31,12 +31,15 @@ from ckac_common.config import get_settings
 from ckac_common.database import get_db
 from ckac_common.event_bus import EventPublisher
 from ckac_common.openapi import RESP_400, RESP_401, RESP_404, RESP_409, RESP_422, auth_errors
+from ckac_common.platform_config import allows_fixed_dev_otp, get_demo_otp, require_feature
 
 router = APIRouter()
 security = HTTPBearer(auto_error=False)
 settings = get_settings()
 
 _DEV_OTP: dict[str, str] = {}
+_OWNER_OTP_PREFIX = "otp:owner:"
+_OWNER_OTP_TTL = 600
 
 
 def get_publisher() -> EventPublisher:
@@ -73,8 +76,9 @@ async def get_current_owner(
     description=(
         "Sends a one-time password to the owner's phone via WhatsApp/SMS to start login.\n\n"
         "**Body:** phone (10-digit India mobile or E.164).\n\n"
-        "**Response 202:** confirmation message. In dev/staging the OTP is always `123456` "
-        "(`dev_hint` in the response reflects this) — no real message is sent.\n\n"
+        "**Response 202:** confirmation message. In `development`/`test` the OTP is "
+        "`DEMO_OTP` (default `123456`) via `dev_hint`. Outside that, returns 503 until "
+        "WhatsApp outbound delivery is configured.\n\n"
         "Follow up with `POST /auth/otp/verify` to exchange the OTP for a JWT."
     ),
     responses={422: RESP_422},
@@ -82,8 +86,19 @@ async def get_current_owner(
 )
 async def request_otp(body: OTPRequest) -> dict[str, str]:
     phone = body.phone.strip()
-    _DEV_OTP[phone] = "123456"
-    return {"message": "OTP sent", "dev_hint": "Use 123456 in development"}
+    if allows_fixed_dev_otp():
+        otp = get_demo_otp()
+        _DEV_OTP[phone] = otp
+        return {"message": "OTP sent", "dev_hint": f"Use {otp} in development"}
+
+    # WhatsApp outbound is not wired — never claim "sent" without a delivery path.
+    raise HTTPException(
+        status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+        detail=(
+            "OTP delivery not configured. Use APP_ENV=development with DEMO_OTP for local demos, "
+            "or configure WhatsApp outbound before staging/production login."
+        ),
+    )
 
 
 @router.post(
@@ -92,7 +107,7 @@ async def request_otp(body: OTPRequest) -> dict[str, str]:
     summary="Verify owner OTP and issue JWT",
     description=(
         "Exchanges a one-time password for an owner Bearer JWT.\n\n"
-        "**Body:** phone + otp (dev OTP is always 123456).\n\n"
+        "**Body:** phone + otp (dev/test OTP is `DEMO_OTP` / `123456`).\n\n"
         "**Response 200:** access_token (JWT type=owner), token_type=bearer, expires_in seconds.\n\n"
         "Use `Authorization: Bearer <access_token>` on subsequent owner APIs."
     ),
@@ -103,11 +118,17 @@ async def verify_otp(
     body: OTPVerifyRequest,
     session: Annotated[AsyncSession, Depends(get_db)],
 ) -> TokenResponse:
-    expected = _DEV_OTP.get(body.phone.strip())
-    if expected != body.otp:
+    phone = body.phone.strip()
+    if allows_fixed_dev_otp():
+        expected = _DEV_OTP.get(phone)
+    else:
+        from app.main import redis_client
+
+        expected = await redis_client.get(f"{_OWNER_OTP_PREFIX}{phone}") if redis_client else None
+    if not expected or expected != body.otp:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid OTP")
 
-    result = await session.execute(select(Owner).where(Owner.phone == body.phone.strip()))
+    result = await session.execute(select(Owner).where(Owner.phone == phone))
     owner = result.scalar_one_or_none()
     if not owner:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Owner not registered")
@@ -135,9 +156,13 @@ async def owner_register(
     session: Annotated[AsyncSession, Depends(get_db)],
 ) -> Owner:
     try:
+        await require_feature(session, "owner_registrations")
         owner = await register_owner(session, body)
     except ValueError as exc:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+        detail = str(exc)
+        if detail.startswith("Feature '") and detail.endswith("' is disabled"):
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=detail) from exc
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=detail) from exc
     return owner
 
 

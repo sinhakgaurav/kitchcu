@@ -189,20 +189,15 @@ async def test_health_live(gateway_client):
 @pytest.mark.asyncio
 async def test_health_ready_all_ok(gateway_client):
     client, clients = gateway_client
-    clients["identity"].get = AsyncMock(return_value=Response(200, json={"status": "ok"}))
-    clients["catalog"].get = AsyncMock(return_value=Response(200, json={"status": "ok"}))
-    clients["order"].get = AsyncMock(return_value=Response(200, json={"status": "ok"}))
-    clients["billing"].get = AsyncMock(return_value=Response(200, json={"status": "ok"}))
-    clients["notification"].get = AsyncMock(return_value=Response(200, json={"status": "ok"}))
-    clients["marketing"].get = AsyncMock(return_value=Response(200, json={"status": "ok"}))
-    clients["ratings"].get = AsyncMock(return_value=Response(200, json={"status": "ok"}))
-    clients["growth"].get = AsyncMock(return_value=Response(200, json={"status": "ok"}))
-    clients["delivery"].get = AsyncMock(return_value=Response(200, json={"status": "ok"}))
+    for name in clients:
+        clients[name].get = AsyncMock(return_value=Response(200, json={"status": "ok"}))
     response = await client.get("/health/ready")
     assert response.status_code == 200
     data = response.json()
     assert data["status"] == "ok"
     assert data["service"] == "gateway"
+    clients["identity"].get.assert_called()
+    assert clients["identity"].get.call_args[0][0] == "/health/live"
 
 
 @pytest.mark.asyncio

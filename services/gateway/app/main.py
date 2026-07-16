@@ -1,3 +1,4 @@
+import asyncio
 from contextlib import asynccontextmanager
 
 import httpx
@@ -185,17 +186,21 @@ async def health_live() -> dict[str, str]:
 
 @app.get("/health/ready")
 async def health_ready() -> dict:
-    checks: dict[str, bool] = {}
-    for name, client in http_clients.items():
+    # Probe /health/live in parallel with a short timeout. Cascading each
+    # upstream's /health/ready (DB+Redis) sequentially can hang the gateway for minutes.
+    async def _probe(name: str, client: httpx.AsyncClient) -> tuple[str, bool]:
         try:
-            r = await client.get("/health/ready")
-            checks[name] = r.status_code == 200
+            r = await client.get("/health/live", timeout=2.0)
+            return name, r.status_code == 200
         except Exception:
-            checks[name] = False
+            return name, False
+
+    results = await asyncio.gather(*(_probe(n, c) for n, c in http_clients.items()))
+    checks = dict(results)
     redis_ok = False
     if redis_client:
         try:
-            redis_ok = await redis_client.ping()
+            redis_ok = bool(await asyncio.wait_for(redis_client.ping(), timeout=2.0))
         except Exception:
             redis_ok = False
     return await gateway_ready_response("gateway", redis=redis_ok, services=checks)

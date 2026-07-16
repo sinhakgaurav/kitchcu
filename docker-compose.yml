@@ -47,6 +47,8 @@ services:
     environment:
       DATABASE_URL: postgresql+asyncpg://ckac:ckac_dev@postgres:5432/ckac
       REDIS_URL: redis://redis:6379/0
+      # Prefer mounted ckac-common over image site-packages (dev volume hot-reload)
+      PYTHONPATH: /app/packages/ckac-common
     ports:
       - "18001:8001"
     depends_on:
@@ -67,6 +69,8 @@ services:
     environment:
       DATABASE_URL: postgresql+asyncpg://ckac:ckac_dev@postgres:5432/ckac
       REDIS_URL: redis://redis:6379/0
+      # Prefer mounted ckac-common over image site-packages (dev volume hot-reload)
+      PYTHONPATH: /app/packages/ckac-common
       MINIO_ENDPOINT: minio:9000
       MINIO_PUBLIC_URL: http://localhost:9000
     ports:
@@ -91,6 +95,8 @@ services:
     environment:
       DATABASE_URL: postgresql+asyncpg://ckac:ckac_dev@postgres:5432/ckac
       REDIS_URL: redis://redis:6379/0
+      # Prefer mounted ckac-common over image site-packages (dev volume hot-reload)
+      PYTHONPATH: /app/packages/ckac-common
     ports:
       - "18003:8003"
     depends_on:
@@ -111,6 +117,8 @@ services:
     environment:
       DATABASE_URL: postgresql+asyncpg://ckac:ckac_dev@postgres:5432/ckac
       REDIS_URL: redis://redis:6379/0
+      # Prefer mounted ckac-common over image site-packages (dev volume hot-reload)
+      PYTHONPATH: /app/packages/ckac-common
     ports:
       - "18004:8004"
     depends_on:
@@ -131,6 +139,8 @@ services:
     environment:
       DATABASE_URL: postgresql+asyncpg://ckac:ckac_dev@postgres:5432/ckac
       REDIS_URL: redis://redis:6379/0
+      # Prefer mounted ckac-common over image site-packages (dev volume hot-reload)
+      PYTHONPATH: /app/packages/ckac-common
       ORDER_SERVICE_URL: http://order:8003
     ports:
       - "18005:8005"
@@ -154,6 +164,8 @@ services:
     environment:
       DATABASE_URL: postgresql+asyncpg://ckac:ckac_dev@postgres:5432/ckac
       REDIS_URL: redis://redis:6379/0
+      # Prefer mounted ckac-common over image site-packages (dev volume hot-reload)
+      PYTHONPATH: /app/packages/ckac-common
     ports:
       - "18006:8006"
     depends_on:
@@ -174,6 +186,8 @@ services:
     environment:
       DATABASE_URL: postgresql+asyncpg://ckac:ckac_dev@postgres:5432/ckac
       REDIS_URL: redis://redis:6379/0
+      # Prefer mounted ckac-common over image site-packages (dev volume hot-reload)
+      PYTHONPATH: /app/packages/ckac-common
     ports:
       - "18007:8007"
     depends_on:
@@ -194,6 +208,8 @@ services:
     environment:
       DATABASE_URL: postgresql+asyncpg://ckac:ckac_dev@postgres:5432/ckac
       REDIS_URL: redis://redis:6379/0
+      # Prefer mounted ckac-common over image site-packages (dev volume hot-reload)
+      PYTHONPATH: /app/packages/ckac-common
     ports:
       - "18008:8008"
     depends_on:
@@ -214,6 +230,8 @@ services:
     environment:
       DATABASE_URL: postgresql+asyncpg://ckac:ckac_dev@postgres:5432/ckac
       REDIS_URL: redis://redis:6379/0
+      # Prefer mounted ckac-common over image site-packages (dev volume hot-reload)
+      PYTHONPATH: /app/packages/ckac-common
     ports:
       - "18009:8009"
     depends_on:
@@ -234,6 +252,8 @@ services:
     environment:
       DATABASE_URL: postgresql+asyncpg://ckac:ckac_dev@postgres:5432/ckac
       REDIS_URL: redis://redis:6379/0
+      # Prefer mounted ckac-common over image site-packages (dev volume hot-reload)
+      PYTHONPATH: /app/packages/ckac-common
       CATALOG_SERVICE_URL: http://catalog:8002
       NOTIFICATION_SERVICE_URL: http://notification:8005
     ports:
@@ -260,6 +280,8 @@ services:
     environment:
       DATABASE_URL: postgresql+asyncpg://ckac:ckac_dev@postgres:5432/ckac
       REDIS_URL: redis://redis:6379/0
+      # Prefer mounted ckac-common over image site-packages (dev volume hot-reload)
+      PYTHONPATH: /app/packages/ckac-common
       COMMUNITY_MIN_ORDERS_RANKING: "3"
     ports:
       - "18011:8011"
@@ -281,6 +303,8 @@ services:
     environment:
       DATABASE_URL: postgresql+asyncpg://ckac:ckac_dev@postgres:5432/ckac
       REDIS_URL: redis://redis:6379/0
+      # Prefer mounted ckac-common over image site-packages (dev volume hot-reload)
+      PYTHONPATH: /app/packages/ckac-common
     ports:
       - "18012:8012"
     depends_on:
@@ -312,6 +336,8 @@ services:
       COMMUNITY_SERVICE_URL: http://community:8011
       STREAMING_SERVICE_URL: http://streaming:8012
       REDIS_URL: redis://redis:6379/0
+      # Prefer mounted ckac-common over image site-packages (dev volume hot-reload)
+      PYTHONPATH: /app/packages/ckac-common
     ports:
       - "18000:8000"
     healthcheck:

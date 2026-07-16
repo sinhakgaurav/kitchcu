@@ -131,6 +131,7 @@ async def list_oauth_providers() -> dict:
 )
 async def oauth_start(
     provider: str,
+    session: Annotated[AsyncSession, Depends(get_db)],
     redirect_uri: str = Query(..., min_length=8, description="Where the provider should redirect after consent; must match the value sent in `/complete`.", examples=["https://customer.kitchcu.in/oauth/callback"]),
 ) -> OAuthStartResponse:
     try:
@@ -140,7 +141,7 @@ async def oauth_start(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Use /auth/customer/whatsapp/request for WhatsApp login",
             )
-        result = start_oauth(normalized, redirect_uri=redirect_uri)
+        result = await start_oauth(normalized, redirect_uri=redirect_uri, session=session)
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
 
@@ -202,6 +203,7 @@ async def oauth_complete(
             code=body.code,
             redirect_uri=body.redirect_uri,
             code_verifier=state_data.get("code_verifier"),
+            session=session,
         )
         customer, created = await upsert_customer_from_oauth(session, normalized, profile)
     except ValueError as exc:
@@ -231,16 +233,31 @@ async def oauth_complete(
     description=(
         "Sends a one-time password to the customer's WhatsApp number to start login.\n\n"
         "**Body:** phone (10-digit India mobile or E.164).\n\n"
-        "**Response 202:** confirmation message. In dev/staging the OTP is always `123456` "
-        "— no real WhatsApp message is sent.\n\n"
+        "**Response 202:** In `development`/`test` OTP is `DEMO_OTP` (default `123456`). "
+        "Outside that, returns 503 until WhatsApp outbound is configured.\n\n"
         "Follow up with `POST /auth/customer/whatsapp/verify`."
     ),
     responses={422: RESP_422},
     tags=["Customer Auth"],
 )
 async def customer_whatsapp_request(body: CustomerPhoneRequest) -> dict[str, str]:
-    store_customer_otp(body.phone)
-    return {"message": "OTP sent via WhatsApp", "dev_hint": "Use 123456 in development"}
+    from ckac_common.platform_config import allows_fixed_dev_otp
+
+    phone = body.phone.strip()
+    if allows_fixed_dev_otp():
+        code = store_customer_otp(phone)
+        return {
+            "message": "OTP sent via WhatsApp",
+            "dev_hint": f"Use {code} in development",
+        }
+
+    raise HTTPException(
+        status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+        detail=(
+            "OTP delivery not configured. Use APP_ENV=development with DEMO_OTP for local demos, "
+            "or configure WhatsApp outbound before staging/production login."
+        ),
+    )
 
 
 @router.post(
@@ -250,7 +267,7 @@ async def customer_whatsapp_request(body: CustomerPhoneRequest) -> dict[str, str
     description=(
         "Exchanges a WhatsApp OTP for a customer Bearer JWT. Creates the customer on "
         "first login (upsert-by-phone).\n\n"
-        "**Body:** phone + otp (dev OTP is always 123456).\n\n"
+        "**Body:** phone + otp (dev/test OTP is `DEMO_OTP` / `123456`).\n\n"
         "**Response 200:** access_token (JWT type=customer), token_type=bearer, expires_in, "
         "and the customer profile. Publishes `customer.created` on `ckac:identity:customer` "
         "for first-time sign-ups.\n\n"
@@ -264,7 +281,17 @@ async def customer_whatsapp_verify(
     session: Annotated[AsyncSession, Depends(get_db)],
     publisher: Annotated[EventPublisher, Depends(get_publisher)],
 ) -> CustomerAuthResponse:
-    if not verify_customer_otp(body.phone, body.otp):
+    from ckac_common.platform_config import allows_fixed_dev_otp
+
+    phone = body.phone.strip()
+    if allows_fixed_dev_otp():
+        ok = verify_customer_otp(phone, body.otp)
+    else:
+        from app.main import redis_client
+
+        expected = await redis_client.get(f"otp:customer:{phone}") if redis_client else None
+        ok = bool(expected) and expected == body.otp
+    if not ok:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid OTP")
 
     customer, created = await upsert_customer_from_phone(session, body.phone)
@@ -352,6 +379,12 @@ async def customer_addresses_list(
     customer: Annotated[Customer, Depends(get_current_customer)],
     session: Annotated[AsyncSession, Depends(get_db)],
 ) -> list[CustomerAddressResponse]:
+    from ckac_common.platform_config import require_feature
+
+    try:
+        await require_feature(session, "customer_addresses")
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(exc)) from exc
     rows = await list_addresses(session, customer.id)
     return [address_to_response(a) for a in rows]
 
@@ -369,6 +402,12 @@ async def customer_addresses_create(
     customer: Annotated[Customer, Depends(get_current_customer)],
     session: Annotated[AsyncSession, Depends(get_db)],
 ) -> CustomerAddressResponse:
+    from ckac_common.platform_config import require_feature
+
+    try:
+        await require_feature(session, "customer_addresses")
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(exc)) from exc
     addr = await create_address(session, customer.id, body)
     return address_to_response(addr)
 
@@ -386,10 +425,14 @@ async def customer_addresses_update(
     customer: Annotated[Customer, Depends(get_current_customer)],
     session: Annotated[AsyncSession, Depends(get_db)],
 ) -> CustomerAddressResponse:
+    from ckac_common.platform_config import feature_http_status, require_feature
+
     try:
+        await require_feature(session, "customer_addresses")
         addr = await update_address(session, customer.id, address_id, body)
     except ValueError as exc:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+        code = feature_http_status(exc) or status.HTTP_404_NOT_FOUND
+        raise HTTPException(status_code=code, detail=str(exc)) from exc
     return address_to_response(addr)
 
 
@@ -405,10 +448,14 @@ async def customer_addresses_delete(
     customer: Annotated[Customer, Depends(get_current_customer)],
     session: Annotated[AsyncSession, Depends(get_db)],
 ) -> None:
+    from ckac_common.platform_config import feature_http_status, require_feature
+
     try:
+        await require_feature(session, "customer_addresses")
         await delete_address(session, customer.id, address_id)
     except ValueError as exc:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+        code = feature_http_status(exc) or status.HTTP_404_NOT_FOUND
+        raise HTTPException(status_code=code, detail=str(exc)) from exc
 
 
 @router.patch(
@@ -427,10 +474,19 @@ async def customer_payout_update(
     customer: Annotated[Customer, Depends(get_current_customer)],
     session: Annotated[AsyncSession, Depends(get_db)],
 ) -> CustomerResponse:
+    from ckac_common.platform_config import require_feature
+
     try:
+        await require_feature(session, "customer_payout_profile")
         update_customer_payout(customer, body)
     except ValueError as exc:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+        detail = str(exc)
+        code = (
+            status.HTTP_403_FORBIDDEN
+            if detail.startswith("Feature '")
+            else status.HTTP_400_BAD_REQUEST
+        )
+        raise HTTPException(status_code=code, detail=detail) from exc
     await session.flush()
     return customer_to_response(customer)
 
@@ -448,6 +504,14 @@ async def customer_payout_qr_upload(
     session: Annotated[AsyncSession, Depends(get_db)],
     file: Annotated[UploadFile, File()],
 ) -> CustomerResponse:
+    from ckac_common.platform_config import feature_http_status, require_feature
+
+    try:
+        await require_feature(session, "customer_payout_profile")
+    except ValueError as exc:
+        code = feature_http_status(exc) or status.HTTP_400_BAD_REQUEST
+        raise HTTPException(status_code=code, detail=str(exc)) from exc
+
     data = await file.read()
     if not data:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Empty file")

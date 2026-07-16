@@ -215,6 +215,8 @@ async def customer_master_order_create(
         Header(alias="Idempotency-Key", min_length=8, max_length=128),
     ],
 ) -> MasterOrderResponse:
+    from ckac_common.platform_config import require_feature
+
     profile = await load_customer_profile(customer_id, session)
     phone = profile.get("phone")
     if not phone:
@@ -223,6 +225,7 @@ async def customer_master_order_create(
             detail="Phone number required — sign in with WhatsApp OTP",
         )
     try:
+        await require_feature(session, "multi_kitchen_checkout")
         master, created = await create_master_order(
             session,
             customer_id,
@@ -236,7 +239,13 @@ async def customer_master_order_create(
         await session.refresh(master)
     except ValueError as exc:
         await session.rollback()
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+        detail = str(exc)
+        code = (
+            status.HTTP_403_FORBIDDEN
+            if detail.startswith("Feature '") and detail.endswith("' is disabled")
+            else status.HTTP_400_BAD_REQUEST
+        )
+        raise HTTPException(status_code=code, detail=detail) from exc
     if not created:
         response.status_code = status.HTTP_200_OK
     else:
@@ -325,17 +334,54 @@ async def customer_dashboard(
     cuisine: Annotated[str | None, Query()] = None,
     live_media_only: Annotated[bool, Query()] = False,
 ) -> CustomerDashboardResponse:
+    from ckac_common.platform_config import (
+        feature_http_status,
+        is_feature_enabled,
+        require_feature,
+    )
+
+    try:
+        await require_feature(session, "customer_dashboard")
+    except ValueError as exc:
+        code = feature_http_status(exc) or status.HTTP_400_BAD_REQUEST
+        raise HTTPException(status_code=code, detail=str(exc)) from exc
+
+    include_savings_health = await is_feature_enabled(session, "customer_savings_health")
     profile = await load_customer_profile(customer_id, session)
     phone = profile.get("phone")
     if not phone:
-        return await build_customer_dashboard(session, "")
-    return await build_customer_dashboard(
-        session,
-        phone,
-        diet=diet,
-        cuisine=cuisine,
-        live_media_only=live_media_only,
-    )
+        dash = await build_customer_dashboard(session, "")
+    else:
+        dash = await build_customer_dashboard(
+            session,
+            phone,
+            diet=diet,
+            cuisine=cuisine,
+            live_media_only=live_media_only,
+        )
+    if not include_savings_health:
+        from app.customer_dashboard import HealthSummary, SavingsSummary
+
+        dash = dash.model_copy(
+            update={
+                "savings": SavingsSummary(
+                    total_saved=0,
+                    restaurant_equivalent_spend=0,
+                    kitchcu_spend=0,
+                    by_dish=[],
+                ),
+                "health": HealthSummary(
+                    veg_share_pct=0,
+                    non_veg_share_pct=0,
+                    vegan_share_pct=0,
+                    home_freshness_score=0,
+                    restaurant_processed_score=0,
+                    note="Savings and health insights are currently unavailable.",
+                ),
+                "tips": [],
+            }
+        )
+    return dash
 
 
 @router.get(
@@ -590,13 +636,19 @@ async def order_status_update(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
     await dispatch_order_status_changed(order, previous_status)
     if body.status == "accepted" and previous_status != "accepted":
+        import logging
+
         rows = (await session.execute(select(OrderItem).where(OrderItem.order_id == order.id))).scalars().all()
         items = [{"dish_id": str(i.dish_id), "quantity": i.quantity} for i in rows]
         if items:
             try:
                 await deduct_order_stock(order.kitchen_id, order.id, items)
             except Exception:
-                pass
+                logging.getLogger("order.stock").exception(
+                    "Stock deduct failed after accept order_id=%s kitchen_id=%s",
+                    order.id,
+                    order.kitchen_id,
+                )
     return await order_to_response(session, order)
 
 

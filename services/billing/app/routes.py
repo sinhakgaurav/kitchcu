@@ -1,7 +1,7 @@
 import uuid
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
+from fastapi import APIRouter, Depends, File, HTTPException, Query, Request, UploadFile, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.deps import (
@@ -72,9 +72,22 @@ from app.refunds import (
 from ckac_common.database import get_db
 from ckac_common.event_bus import EventPublisher
 from ckac_common.openapi import RESP_400, RESP_404, auth_errors
+from ckac_common.platform_config import (
+    get_platform_secret,
+    is_non_production,
+    require_feature,
+    verify_razorpay_webhook_signature,
+)
 from ckac_common.storage import get_media_storage
 
 router = APIRouter()
+
+
+def _http_from_domain(exc: ValueError) -> HTTPException:
+    detail = str(exc)
+    if detail.startswith("Feature '") and detail.endswith("' is disabled"):
+        return HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=detail)
+    return HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=detail)
 
 from app.payment_gateway import (
     PaymentGatewayResponse,
@@ -444,10 +457,11 @@ async def customer_master_payment_create(
 ) -> PaymentResponse:
     phone = await load_customer_phone(customer_id, session)
     try:
+        await require_feature(session, "multi_kitchen_checkout")
         master = await load_master_order_for_customer(session, body.master_order_id, phone)
         payment = await create_master_payment(session, master, body.method, publisher)
     except ValueError as exc:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+        raise _http_from_domain(exc) from exc
     return payment_to_response(payment)
 
 
@@ -552,7 +566,7 @@ async def refund_create(
             session, owner_id=owner_id, order=order, body=body, publisher=publisher
         )
     except ValueError as exc:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+        raise _http_from_domain(exc) from exc
     return refund_to_response(refund)
 
 
@@ -702,17 +716,39 @@ async def refund_complete_direct(
     tags=[TAG_WEBHOOKS],
     summary="Razorpay payment webhook",
     description=(
-        "Unauthenticated Razorpay callback. Handles `payment.captured`, `refund.processed`, and "
-        "`payment.refunded`. Gateway refunds complete matching `Refund` rows and publish "
-        "`refund.completed`. **Add signature verification in production.**"
+        "Razorpay callback. Verifies `X-Razorpay-Signature` when a webhook secret is configured "
+        "(platform Control key or `RAZORPAY_WEBHOOK_SECRET`). Handles `payment.captured` "
+        "(single + master split), `refund.processed`, and `payment.refunded`."
     ),
-    responses={400: RESP_400, 404: RESP_404},
+    responses={400: RESP_400, 401: {"description": "Invalid signature"}, 404: RESP_404},
 )
 async def razorpay_webhook(
-    body: RazorpayWebhookPayload,
+    request: Request,
     session: Annotated[AsyncSession, Depends(get_db)],
     publisher: Annotated[EventPublisher, Depends(get_publisher)],
 ) -> dict[str, str]:
+    raw = await request.body()
+    secret = await get_platform_secret(session, "razorpay_webhook_secret")
+    if secret:
+        signature = request.headers.get("X-Razorpay-Signature")
+        if not verify_razorpay_webhook_signature(raw, signature, secret):
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid Razorpay webhook signature",
+            )
+    elif not is_non_production():
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Razorpay webhook secret not configured",
+        )
+
+    try:
+        body = RazorpayWebhookPayload.model_validate_json(raw)
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid webhook payload"
+        ) from exc
+
     if body.event in ("refund.processed", "payment.refunded"):
         entity = body.payload.get("refund", {}).get("entity") or body.payload.get("payment", {}).get(
             "entity", {}
@@ -755,7 +791,10 @@ async def razorpay_webhook(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Payment not found")
 
     payment.razorpay_payment_id = razorpay_payment_id
-    await capture_payment(session, payment, publisher)
+    if payment.master_order_id:
+        await capture_master_payment(session, payment, publisher)
+    else:
+        await capture_payment(session, payment, publisher)
     return {"status": "ok"}
 
 

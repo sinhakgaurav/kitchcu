@@ -238,6 +238,8 @@ async def create_refund(
     if remaining <= 0:
         raise ValueError("Payment is already fully refunded or refunds pending cover the amount")
 
+    from ckac_common.platform_config import require_feature
+
     kind = body.kind
     if kind == "full":
         amount = remaining
@@ -249,6 +251,7 @@ async def create_refund(
         channel = "direct_transfer"
 
     if channel == "gateway":
+        await require_feature(session, "refunds_gateway")
         if kind != "full":
             raise ValueError("Gateway refunds are full refunds only")
         if payment.method not in ("online", "upi"):
@@ -278,6 +281,7 @@ async def create_refund(
         await _publish_refund(session, publisher, "refund.created", refund)
         return refund
 
+    await require_feature(session, "refunds_direct")
     payout = await _load_customer_payout_by_phone(session, order.get("customer_phone"))
     dest_type, upi, bank, ifsc, acct_name = _resolve_direct_destination(body, payout)
     refund = Refund(
@@ -325,7 +329,14 @@ async def process_gateway_refund(
     refund.updated_at = datetime.now(UTC)
     await session.flush()
 
-    # Dev-mocked Razorpay refund — production swaps for live Refunds API.
+    from ckac_common.platform_config import is_non_production
+
+    if not is_non_production():
+        # Live Refunds API not wired — wait for Razorpay `refund.processed` webhook.
+        await _publish_refund(session, publisher, "refund.processing", refund)
+        return refund
+
+    # Dev-mocked Razorpay refund for development/test only.
     refund.razorpay_refund_id = refund.razorpay_refund_id or f"rfnd_dev_{refund.id.hex[:16]}"
     refund.status = "completed"
     refund.completed_at = datetime.now(UTC)

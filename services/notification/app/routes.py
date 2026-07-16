@@ -44,15 +44,20 @@ def get_publisher() -> EventPublisher:
     responses={403: {"description": "Verification token mismatch"}, 503: {"description": "Webhook not configured"}},
 )
 async def whatsapp_verify(
+    session: Annotated[AsyncSession, Depends(get_db)],
     hub_mode: Annotated[str | None, Query(alias="hub.mode")] = None,
     hub_verify_token: Annotated[str | None, Query(alias="hub.verify_token")] = None,
     hub_challenge: Annotated[str | None, Query(alias="hub.challenge")] = None,
 ):
-    verify_token = os.environ.get("WHATSAPP_VERIFY_TOKEN") or settings.whatsapp_verify_token
-    if settings.app_env not in ("development", "test") and not os.environ.get("WHATSAPP_VERIFY_TOKEN"):
+    from ckac_common.platform_config import get_platform_secret, is_non_production
+
+    verify_token = await get_platform_secret(session, "whatsapp_verify_token")
+    if not verify_token:
+        verify_token = os.environ.get("WHATSAPP_VERIFY_TOKEN") or settings.whatsapp_verify_token
+    if not is_non_production() and not verify_token:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="WHATSAPP_VERIFY_TOKEN not configured",
+            detail="WhatsApp verify token not configured",
         )
     if hub_mode == "subscribe" and hub_verify_token == verify_token:
         return int(hub_challenge or 0)
@@ -80,9 +85,37 @@ async def whatsapp_webhook(
     session: Annotated[AsyncSession, Depends(get_db)],
     publisher: Annotated[EventPublisher, Depends(get_publisher)],
 ):
+    from ckac_common.platform_config import (
+        get_platform_secret,
+        is_non_production,
+        verify_meta_signature,
+    )
+
     if not http_client:
         raise HTTPException(status_code=503, detail="Service not ready")
-    payload = await request.json()
+
+    raw = await request.body()
+    app_secret = await get_platform_secret(session, "whatsapp_app_secret")
+    if app_secret:
+        signature = request.headers.get("X-Hub-Signature-256")
+        if not verify_meta_signature(raw, signature, app_secret):
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid WhatsApp webhook signature",
+            )
+    elif not is_non_production():
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="WhatsApp app secret not configured",
+        )
+
+    import json
+
+    try:
+        payload = json.loads(raw.decode("utf-8") or "{}")
+    except json.JSONDecodeError as exc:
+        raise HTTPException(status_code=400, detail="Invalid webhook payload") from exc
+
     messages = parse_webhook(payload)
     results = []
     for msg in messages:
@@ -108,5 +141,8 @@ async def whatsapp_webhook(
     ),
     responses={422: RESP_422},
 )
-async def support_chat(body: SupportChatRequest) -> SupportChatResponse:
-    return await generate_support_reply(body)
+async def support_chat(
+    body: SupportChatRequest,
+    session: Annotated[AsyncSession, Depends(get_db)],
+) -> SupportChatResponse:
+    return await generate_support_reply(body, session=session)

@@ -197,8 +197,15 @@ def update_customer_payout(customer: Customer, body: CustomerPayoutUpdateRequest
     return customer
 
 
-def store_customer_otp(phone: str) -> None:
-    _CUSTOMER_OTP[phone.strip()] = "123456"
+def store_customer_otp(phone: str, otp: str | None = None) -> str:
+    """Store OTP in memory. Dev/test always uses DEMO_OTP; production callers pass a random code."""
+    from ckac_common.platform_config import allows_fixed_dev_otp, get_demo_otp
+
+    code = get_demo_otp() if allows_fixed_dev_otp() else (otp or "")
+    if not code:
+        raise ValueError("OTP code required outside development/test")
+    _CUSTOMER_OTP[phone.strip()] = code
+    return code
 
 
 def verify_customer_otp(phone: str, otp: str) -> bool:

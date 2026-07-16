@@ -13,12 +13,13 @@ from app.livekit_tokens import (
     build_livekit_token,
     livekit_configured,
     publisher_identity,
+    resolve_livekit_creds,
     viewer_identity,
 )
 from app.models import KitchenStreamSettings, LiveSession
 from ckac_common.auth import stream_key
-from ckac_common.config import get_settings
 from ckac_common.event_bus import EventPublisher
+from ckac_common.platform_config import require_feature
 
 
 class StreamSettingsResponse(BaseModel):
@@ -117,8 +118,13 @@ async def _active_session(session: AsyncSession, kitchen_id: uuid.UUID) -> LiveS
     ).scalar_one_or_none()
 
 
-def _session_response(session_row: LiveSession, *, publisher_token: str | None = None) -> LiveSessionResponse:
-    settings = get_settings()
+async def _session_response(
+    session: AsyncSession,
+    session_row: LiveSession,
+    *,
+    publisher_token: str | None = None,
+) -> LiveSessionResponse:
+    url, _, _ = await resolve_livekit_creds(session)
     return LiveSessionResponse(
         id=session_row.id,
         kitchen_id=session_row.kitchen_id,
@@ -129,7 +135,7 @@ def _session_response(session_row: LiveSession, *, publisher_token: str | None =
         viewer_count=session_row.viewer_count,
         started_at=session_row.started_at,
         ended_at=session_row.ended_at,
-        livekit_url=settings.livekit_url or None,
+        livekit_url=url or None,
         publisher_token=publisher_token,
     )
 
@@ -142,7 +148,7 @@ async def get_stream_settings(session: AsyncSession, kitchen_id: uuid.UUID) -> S
         live_sharing_enabled=row.live_sharing_enabled,
         q_and_a_enabled=row.q_and_a_enabled,
         is_live=live is not None,
-        livekit_configured=livekit_configured(),
+        livekit_configured=await livekit_configured(session),
     )
 
 
@@ -180,6 +186,7 @@ async def go_live(
     data: GoLiveRequest,
     publisher: EventPublisher,
 ) -> LiveSessionResponse:
+    await require_feature(session, "live_streaming")
     settings_row = await _get_settings_row(session, kitchen_id)
     if not settings_row.live_sharing_enabled:
         raise ValueError("Enable live sharing in settings before going live")
@@ -200,10 +207,11 @@ async def go_live(
     session.add(live)
     await session.flush()
 
-    token = build_livekit_token(
+    token = await build_livekit_token(
         room_name=room_name,
         identity=publisher_identity(kitchen_id),
         can_publish=True,
+        session=session,
     )
 
     event = EventPublisher.build(
@@ -219,7 +227,7 @@ async def go_live(
         },
     )
     await publisher.publish(stream_key("streaming", "session"), event, session=session)
-    return _session_response(live, publisher_token=token)
+    return await _session_response(session, live, publisher_token=token)
 
 
 async def end_live(
@@ -243,19 +251,20 @@ async def end_live(
         payload={"kitchen_id": str(kitchen_id), "session_id": str(live.id)},
     )
     await publisher.publish(stream_key("streaming", "session"), event, session=session)
-    return _session_response(live)
+    return await _session_response(session, live)
 
 
 async def get_current_session(session: AsyncSession, kitchen_id: uuid.UUID) -> LiveSessionResponse | None:
     live = await _active_session(session, kitchen_id)
     if not live:
         return None
-    token = build_livekit_token(
+    token = await build_livekit_token(
         room_name=live.room_name,
         identity=publisher_identity(kitchen_id),
         can_publish=True,
+        session=session,
     )
-    return _session_response(live, publisher_token=token)
+    return await _session_response(session, live, publisher_token=token)
 
 
 async def issue_viewer_token(
@@ -263,6 +272,7 @@ async def issue_viewer_token(
     session_id: uuid.UUID,
     customer_id: uuid.UUID,
 ) -> ViewerTokenResponse:
+    await require_feature(session, "live_streaming")
     live = (
         await session.execute(
             select(LiveSession).where(LiveSession.id == session_id, LiveSession.status == "live")
@@ -285,16 +295,17 @@ async def issue_viewer_token(
         )
     ).scalar_one_or_none()
 
-    settings = get_settings()
-    token = build_livekit_token(
+    url, _, _ = await resolve_livekit_creds(session)
+    token = await build_livekit_token(
         room_name=live.room_name,
         identity=viewer_identity(customer_id),
         can_publish=False,
+        session=session,
     )
     return ViewerTokenResponse(
         session_id=live.id,
         room_name=live.room_name,
-        livekit_url=settings.livekit_url or None,
+        livekit_url=url or None,
         token=token,
         kitchen_name=kitchen_name,
     )

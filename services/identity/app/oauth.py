@@ -74,16 +74,32 @@ def _pkce_pair() -> tuple[str, str]:
 
 def _provider_client(provider: str) -> tuple[str | None, str | None]:
     if provider == "google":
-        return settings.oauth_google_client_id, settings.oauth_google_client_secret
+        return settings.oauth_google_client_id or None, settings.oauth_google_client_secret or None
     if provider == "facebook":
-        return settings.oauth_facebook_client_id, settings.oauth_facebook_client_secret
+        return settings.oauth_facebook_client_id or None, settings.oauth_facebook_client_secret or None
     if provider == "instagram":
         cid = settings.oauth_instagram_client_id or settings.oauth_facebook_client_id
         secret = settings.oauth_instagram_client_secret or settings.oauth_facebook_client_secret
-        return cid, secret
+        return cid or None, secret or None
     if provider == "twitter":
-        return settings.oauth_twitter_client_id, settings.oauth_twitter_client_secret
+        return settings.oauth_twitter_client_id or None, settings.oauth_twitter_client_secret or None
     return None, None
+
+
+async def resolve_provider_client(provider: str, session=None) -> tuple[str | None, str | None]:
+    """Control-stored platform keys first, then env/Settings (DB → env)."""
+    from ckac_common.platform_config import get_platform_secret
+
+    env_id, env_secret = _provider_client(provider)
+    if provider == "google":
+        db_id = await get_platform_secret(session, "oauth_google_client_id")
+        db_secret = await get_platform_secret(session, "oauth_google_client_secret")
+        return (db_id or env_id), (db_secret or env_secret)
+    if provider in ("facebook", "instagram"):
+        db_id = await get_platform_secret(session, "oauth_facebook_client_id")
+        db_secret = await get_platform_secret(session, "oauth_facebook_client_secret")
+        return (db_id or env_id), (db_secret or env_secret)
+    return env_id, env_secret
 
 
 def provider_configured(provider: str) -> bool:
@@ -155,12 +171,13 @@ def build_authorization_url(
     raise ValueError(f"Unsupported OAuth provider: {provider}")
 
 
-def start_oauth(provider: str, *, redirect_uri: str) -> OAuthStartResult:
+async def start_oauth(provider: str, *, redirect_uri: str, session=None) -> OAuthStartResult:
     if provider not in SUPPORTED_OAUTH_PROVIDERS or provider == "whatsapp":
         raise ValueError(f"Unsupported OAuth provider: {provider}")
 
     state = secrets.token_urlsafe(32)
-    configured = provider_configured(provider)
+    client_id, _ = await resolve_provider_client(provider, session=session)
+    configured = bool(client_id)
     code_verifier: str | None = None
     code_challenge: str | None = None
 
@@ -170,8 +187,10 @@ def start_oauth(provider: str, *, redirect_uri: str) -> OAuthStartResult:
     authorization_url: str | None = None
     dev_mode = not configured
     if configured:
-        authorization_url = build_authorization_url(
+        # Temporarily expose resolved client id via env-style build using a thin shim
+        authorization_url = await _build_authorization_url_resolved(
             provider,
+            client_id=client_id,
             redirect_uri=redirect_uri,
             state=state,
             code_challenge=code_challenge,
@@ -188,12 +207,66 @@ def start_oauth(provider: str, *, redirect_uri: str) -> OAuthStartResult:
     )
 
 
+async def _build_authorization_url_resolved(
+    provider: str,
+    *,
+    client_id: str,
+    redirect_uri: str,
+    state: str,
+    code_challenge: str | None = None,
+) -> str:
+    if provider == "google":
+        params = {
+            "client_id": client_id,
+            "redirect_uri": redirect_uri,
+            "response_type": "code",
+            "scope": "openid email profile",
+            "state": state,
+            "access_type": "online",
+            "prompt": "select_account",
+        }
+        return "https://accounts.google.com/o/oauth2/v2/auth?" + urllib.parse.urlencode(params)
+    if provider == "facebook":
+        params = {
+            "client_id": client_id,
+            "redirect_uri": redirect_uri,
+            "response_type": "code",
+            "scope": "email,public_profile",
+            "state": state,
+        }
+        return "https://www.facebook.com/v19.0/dialog/oauth?" + urllib.parse.urlencode(params)
+    if provider == "instagram":
+        params = {
+            "client_id": client_id,
+            "redirect_uri": redirect_uri,
+            "response_type": "code",
+            "scope": "user_profile,user_media",
+            "state": state,
+        }
+        return "https://api.instagram.com/oauth/authorize?" + urllib.parse.urlencode(params)
+    if provider == "twitter":
+        if not code_challenge:
+            raise ValueError("Twitter OAuth requires PKCE code_challenge")
+        params = {
+            "response_type": "code",
+            "client_id": client_id,
+            "redirect_uri": redirect_uri,
+            "scope": "tweet.read users.read offline.access",
+            "state": state,
+            "code_challenge": code_challenge,
+            "code_challenge_method": "S256",
+        }
+        return "https://twitter.com/i/oauth2/authorize?" + urllib.parse.urlencode(params)
+    raise ValueError(f"Unsupported OAuth provider: {provider}")
+
+
 async def exchange_oauth_code(
     provider: str,
     *,
     code: str,
     redirect_uri: str,
     code_verifier: str | None = None,
+    session=None,
 ) -> OAuthProfile:
     if code == DEV_OAUTH_CODE:
         if not dev_oauth_allowed():
@@ -209,7 +282,7 @@ async def exchange_oauth_code(
             raw={"dev": True, "provider": provider},
         )
 
-    client_id, client_secret = _provider_client(provider)
+    client_id, client_secret = await resolve_provider_client(provider, session=session)
     if not client_id or not client_secret:
         raise ValueError(f"OAuth client not configured for {provider}")
 

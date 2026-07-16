@@ -248,10 +248,16 @@ async def _ai_reply(
         return None
 
 
-async def generate_support_reply(body: SupportChatRequest) -> SupportChatResponse:
+async def generate_support_reply(
+    body: SupportChatRequest,
+    session=None,
+) -> SupportChatResponse:
     from app.tickets import infer_category, should_suggest_ticket
+    from ckac_common.platform_config import get_platform_secret
 
-    api_key = os.environ.get("SUPPORT_AI_API_KEY", "").strip()
+    api_key = (await get_platform_secret(session, "support_ai_api_key") if session is not None else None) or ""
+    if not api_key:
+        api_key = os.environ.get("SUPPORT_AI_API_KEY", "").strip()
     kb = knowledge_reply(body.audience, body.message)
     used_fallback = kb == (FALLBACK_OWNER if body.audience == "owner" else FALLBACK_CUSTOMER)
     suggest = should_suggest_ticket(body.message, used_fallback)

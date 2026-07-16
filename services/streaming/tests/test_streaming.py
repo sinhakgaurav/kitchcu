@@ -1,5 +1,8 @@
+import psycopg2
 import pytest
 from httpx import AsyncClient
+
+from tests.conftest import SYNC_DB_URL
 
 
 @pytest.mark.asyncio
@@ -110,3 +113,46 @@ async def test_viewer_token_increments_count(client: AsyncClient, stream_ctx):
 
     session = await client.get(f"/api/v1/kitchens/{kid}/stream/session", headers=owner_headers)
     assert session.json()["viewer_count"] == 1
+
+
+@pytest.mark.asyncio
+async def test_viewer_token_blocked_when_streaming_flag_disabled(client: AsyncClient, stream_ctx):
+    kid = stream_ctx["kitchen_id"]
+    owner_headers = {"Authorization": f"Bearer {stream_ctx['owner_token']}"}
+    customer_headers = {"Authorization": f"Bearer {stream_ctx['customer_token']}"}
+
+    await client.patch(
+        f"/api/v1/kitchens/{kid}/stream/settings",
+        json={"live_sharing_enabled": True},
+        headers=owner_headers,
+    )
+    live = await client.post(
+        f"/api/v1/kitchens/{kid}/stream/go-live",
+        json={"title": "Flag gate"},
+        headers=owner_headers,
+    )
+    assert live.status_code == 200, live.text
+    session_id = live.json()["id"]
+
+    conn = psycopg2.connect(SYNC_DB_URL)
+    conn.autocommit = True
+    with conn.cursor() as cur:
+        cur.execute(
+            "UPDATE ckac_identity.feature_flags SET enabled = false WHERE key = 'live_streaming'"
+        )
+    conn.close()
+    try:
+        token_resp = await client.post(
+            f"/api/v1/stream/sessions/{session_id}/viewer-token",
+            headers=customer_headers,
+        )
+        assert token_resp.status_code == 403, token_resp.text
+        assert "live_streaming" in token_resp.json()["detail"]
+    finally:
+        conn = psycopg2.connect(SYNC_DB_URL)
+        conn.autocommit = True
+        with conn.cursor() as cur:
+            cur.execute(
+                "UPDATE ckac_identity.feature_flags SET enabled = true WHERE key = 'live_streaming'"
+            )
+        conn.close()

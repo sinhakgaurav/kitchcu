@@ -130,7 +130,10 @@ async def stream_go_live(
         await session.commit()
         return result
     except ValueError as exc:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+        from ckac_common.platform_config import feature_http_status
+
+        code = feature_http_status(exc) or status.HTTP_400_BAD_REQUEST
+        raise HTTPException(status_code=code, detail=str(exc)) from exc
 
 
 @router.post(
@@ -206,4 +209,7 @@ async def stream_viewer_token(
         await session.commit()
         return result
     except ValueError as exc:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+        from ckac_common.platform_config import feature_http_status
+
+        code = feature_http_status(exc) or status.HTTP_404_NOT_FOUND
+        raise HTTPException(status_code=code, detail=str(exc)) from exc
