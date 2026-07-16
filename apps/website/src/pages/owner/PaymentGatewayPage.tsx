@@ -5,10 +5,10 @@ import {
   upsertKitchenPaymentGateway,
   type KitchenPaymentGateway,
 } from "../../lib/api";
-import { useKitchenAuth } from "../../shared/kitchenAuth";
+import { useKitchen } from "../../shared/kitchenContext";
 
 export function PaymentGatewayPage() {
-  const { kitchen } = useKitchenAuth();
+  const { kitchen } = useKitchen();
   const [cfg, setCfg] = useState<KitchenPaymentGateway | null>(null);
   const [keyId, setKeyId] = useState("");
   const [keySecret, setKeySecret] = useState("");
@@ -70,10 +70,11 @@ export function PaymentGatewayPage() {
 
   return (
     <OwnerPageShell
+      eyebrow="Integrations"
       title="Payment gateway"
-      subtitle="Razorpay keys for this kitchen — customer checkout and Route settlements. KitchCu takes no food commission."
+      description="Razorpay keys for this kitchen — customer checkout and Route settlements. KitchCu takes no food commission."
     >
-      <OwnerPanel>
+      <OwnerPanel title="Razorpay credentials">
         {error && <p className="auth-card__error">{error}</p>}
         {ok && <p className="owner-forms__success">{ok}</p>}
         <form className="owner-forms" onSubmit={onSubmit}>

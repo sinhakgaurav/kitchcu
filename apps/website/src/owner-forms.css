@@ -424,6 +424,13 @@ form.auth-card > .btn {
   color: var(--teal-light, #2ec4b6);
 }
 
+.owner-forms__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-top: 0.5rem;
+}
+
 /* Soften generic button hover so forms don't jump wildly */
 .auth-card .btn--primary:hover,
 .owner-form .btn--primary:hover,

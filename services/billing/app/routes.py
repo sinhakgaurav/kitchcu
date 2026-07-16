@@ -95,12 +95,18 @@ from app.payment_gateway import (
     get_kitchen_payment_gateway,
     upsert_kitchen_payment_gateway,
 )
+from app.messaging_wallet import (
+    MessagingWalletResponse,
+    get_messaging_wallet,
+    messaging_wallet_to_response,
+)
 
 TAG_PAYMENTS = "Payments"
 TAG_CUSTOMER_PAYMENTS = "Customer Payments"
 TAG_SETTLEMENTS = "Settlements"
 TAG_SUBSCRIPTIONS = "Subscriptions"
 TAG_PAYMENT_GATEWAY = "Payment Gateway"
+TAG_MESSAGING_WALLET = "Messaging Wallet"
 TAG_GST = "GST"
 TAG_REFUNDS = "Refunds"
 TAG_WEBHOOKS = "Webhooks"
@@ -159,6 +165,28 @@ async def payment_gateway_upsert(
 ) -> PaymentGatewayResponse:
     await verify_kitchen_owner(kitchen_id, owner_id, session)
     return await upsert_kitchen_payment_gateway(session, publisher, kitchen_id, body)
+
+
+@router.get(
+    "/billing/kitchens/{kitchen_id}/messaging-wallet",
+    response_model=MessagingWalletResponse,
+    tags=[TAG_MESSAGING_WALLET],
+    summary="Get kitchen messaging wallet balance",
+    description=(
+        "Owner-only — Enterprise plan credits ₹500/month (or ₹5,000/year) here for WhatsApp/SMS "
+        "broadcast fees. Zero balance until Enterprise is activated for this owner's primary kitchen."
+    ),
+    responses=auth_errors(),
+)
+async def messaging_wallet_get(
+    kitchen_id: uuid.UUID,
+    owner_id: Annotated[uuid.UUID, Depends(get_current_owner_id)],
+    session: Annotated[AsyncSession, Depends(get_db)],
+) -> MessagingWalletResponse:
+    await verify_kitchen_owner(kitchen_id, owner_id, session)
+    wallet = await get_messaging_wallet(session, kitchen_id)
+    await session.commit()
+    return messaging_wallet_to_response(wallet)
 
 
 @router.get(

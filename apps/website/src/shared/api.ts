@@ -634,6 +634,46 @@ export async function upsertKitchenPaymentGateway(
   });
 }
 
+export type MessagingWallet = {
+  kitchen_id: string;
+  balance_inr: number;
+  low_balance: boolean;
+  low_balance_threshold_inr: number;
+  updated_at: string | null;
+};
+
+export async function fetchMessagingWallet(kitchenId: string): Promise<MessagingWallet> {
+  return apiFetch(`/api/v1/billing/kitchens/${kitchenId}/messaging-wallet`);
+}
+
+export type KitchenWhatsAppIntegration = {
+  kitchen_id: string;
+  whatsapp_phone_id: string | null;
+  whatsapp_display_phone: string | null;
+  connected: boolean;
+  platform_secrets_note: string;
+};
+
+export async function fetchKitchenWhatsAppIntegration(
+  kitchenId: string,
+): Promise<KitchenWhatsAppIntegration> {
+  return apiFetch(`/api/v1/kitchens/${kitchenId}/whatsapp-integration`);
+}
+
+export async function upsertKitchenWhatsAppIntegration(
+  kitchenId: string,
+  data: {
+    whatsapp_phone_id?: string | null;
+    whatsapp_display_phone?: string | null;
+    clear?: boolean;
+  },
+): Promise<KitchenWhatsAppIntegration> {
+  return apiFetch(`/api/v1/kitchens/${kitchenId}/whatsapp-integration`, {
+    method: "PUT",
+    body: JSON.stringify(data),
+  });
+}
+
 export async function createPayment(data: {
   order_id: string;
   method: "online" | "upi";

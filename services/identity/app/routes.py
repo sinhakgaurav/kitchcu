@@ -14,6 +14,8 @@ from app.schemas import (
     KitchenNearbyListResponse,
     KitchenPublicResponse,
     KitchenResponse,
+    KitchenWhatsAppIntegrationResponse,
+    KitchenWhatsAppIntegrationUpdate,
     OTPRequest,
     OTPVerifyRequest,
     OwnerRegisterRequest,
@@ -21,10 +23,12 @@ from app.schemas import (
     TokenResponse,
     create_access_token,
     create_kitchen,
+    get_kitchen_whatsapp_integration,
     kitchen_to_response,
     list_kitchens_nearby,
     register_owner,
     update_kitchen_delivery_settings,
+    update_kitchen_whatsapp_integration,
 )
 from ckac_common.auth import stream_key
 from ckac_common.config import get_settings
@@ -277,6 +281,66 @@ async def kitchen_delivery_settings_update(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
     await session.commit()
     return await kitchen_to_response(session, kitchen)
+
+
+@router.get(
+    "/kitchens/{kitchen_id}/whatsapp-integration",
+    response_model=KitchenWhatsAppIntegrationResponse,
+    summary="Get kitchen WhatsApp Business linkage (F01)",
+    description=(
+        "Owner-only — Meta Cloud API phone_number_id used to route inbound WhatsApp orders. "
+        "Platform App Secret / Verify Token stay in Super Admin API Keys."
+    ),
+    responses=auth_errors(include_404=True),
+    tags=["Kitchens"],
+)
+async def kitchen_whatsapp_get(
+    kitchen_id: uuid.UUID,
+    owner: Annotated[Owner, Depends(get_current_owner)],
+    session: Annotated[AsyncSession, Depends(get_db)],
+) -> KitchenWhatsAppIntegrationResponse:
+    result = await session.execute(
+        select(Kitchen).where(Kitchen.id == kitchen_id, Kitchen.owner_id == owner.id)
+    )
+    kitchen = result.scalar_one_or_none()
+    if not kitchen:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Kitchen not found")
+    return await get_kitchen_whatsapp_integration(session, kitchen)
+
+
+@router.put(
+    "/kitchens/{kitchen_id}/whatsapp-integration",
+    response_model=KitchenWhatsAppIntegrationResponse,
+    summary="Connect or disconnect WhatsApp Business for a kitchen",
+    description=(
+        "Owner-only — set Meta phone_number_id (unique per kitchen) and optional display E.164. "
+        "Publishes `kitchen.whatsapp.updated`. Respects per-kitchen `whatsapp` module kill-switch."
+    ),
+    responses={**auth_errors(include_404=True), 400: RESP_400},
+    tags=["Kitchens"],
+)
+async def kitchen_whatsapp_put(
+    kitchen_id: uuid.UUID,
+    body: KitchenWhatsAppIntegrationUpdate,
+    owner: Annotated[Owner, Depends(get_current_owner)],
+    session: Annotated[AsyncSession, Depends(get_db)],
+    publisher: Annotated[EventPublisher, Depends(get_publisher)],
+) -> KitchenWhatsAppIntegrationResponse:
+    result = await session.execute(
+        select(Kitchen).where(Kitchen.id == kitchen_id, Kitchen.owner_id == owner.id)
+    )
+    kitchen = result.scalar_one_or_none()
+    if not kitchen:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Kitchen not found")
+    try:
+        from ckac_common.platform_config import feature_http_status
+
+        out = await update_kitchen_whatsapp_integration(session, kitchen, body, publisher)
+    except ValueError as exc:
+        code = feature_http_status(exc) or status.HTTP_400_BAD_REQUEST
+        raise HTTPException(status_code=code, detail=str(exc)) from exc
+    await session.commit()
+    return out
 
 
 @router.get(

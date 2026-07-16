@@ -5,6 +5,7 @@ from __future__ import annotations
 import uuid
 from datetime import UTC, datetime
 
+from pydantic import BaseModel, Field
 from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -19,6 +20,16 @@ ENTERPRISE_WALLET_MONTHLY_INR = 500.0
 ENTERPRISE_PLATFORM_YEARLY_INR = 12990.0
 ENTERPRISE_WALLET_YEARLY_INR = 5000.0
 MESSAGING_WALLET_LOW_BALANCE_INR = 50.0
+
+
+class MessagingWalletResponse(BaseModel):
+    """Owner-facing messaging wallet balance (Enterprise ₹500 monthly credit)."""
+
+    kitchen_id: uuid.UUID
+    balance_inr: float = Field(..., description="Current wallet balance in INR.")
+    low_balance: bool = Field(..., description="True when balance is below the alert threshold.")
+    low_balance_threshold_inr: float = Field(..., description="Alert threshold in INR.")
+    updated_at: datetime | None = None
 
 
 def enterprise_split(amount: float, billing_cycle: str) -> tuple[float, float]:
@@ -107,6 +118,36 @@ async def apply_enterprise_subscription_bifurcation(
         await publisher.publish(stream_key("billing", "wallet"), event, session=session)
 
     return ledger
+
+
+async def get_messaging_wallet(
+    session: AsyncSession,
+    kitchen_id: uuid.UUID,
+) -> KitchenMessagingWallet:
+    """Return kitchen messaging wallet, creating a zero-balance row if missing."""
+    result = await session.execute(
+        select(KitchenMessagingWallet).where(KitchenMessagingWallet.kitchen_id == kitchen_id)
+    )
+    wallet = result.scalar_one_or_none()
+    if wallet is None:
+        wallet = KitchenMessagingWallet(kitchen_id=kitchen_id, balance_inr=0)
+        session.add(wallet)
+        await session.flush()
+    return wallet
+
+
+def messaging_wallet_to_response(wallet: KitchenMessagingWallet) -> MessagingWalletResponse:
+    from ckac_common.risk_config import messaging_wallet_low_balance_inr
+
+    balance = float(wallet.balance_inr)
+    threshold = messaging_wallet_low_balance_inr()
+    return MessagingWalletResponse(
+        kitchen_id=wallet.kitchen_id,
+        balance_inr=balance,
+        low_balance=balance < threshold,
+        low_balance_threshold_inr=threshold,
+        updated_at=wallet.updated_at,
+    )
 
 
 async def deduct_messaging_wallet(

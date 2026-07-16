@@ -146,6 +146,69 @@ class KitchenDeliverySettingsUpdate(BaseModel):
     )
 
 
+class KitchenWhatsAppIntegrationResponse(BaseModel):
+    """Owner view of Meta WhatsApp Business Cloud API linkage for inbound F01 orders."""
+
+    kitchen_id: uuid.UUID
+    whatsapp_phone_id: str | None = Field(
+        default=None,
+        description="Meta WhatsApp Cloud API phone_number_id used to route inbound webhooks.",
+    )
+    whatsapp_display_phone: str | None = Field(
+        default=None,
+        description="Human-readable E.164 business number shown in the owner dashboard.",
+    )
+    connected: bool = Field(..., description="True when whatsapp_phone_id is set.")
+    platform_secrets_note: str = Field(
+        default=(
+            "Meta App Secret and Verify Token are platform-managed in Super Admin → API Keys. "
+            "This kitchen only needs its Phone Number ID."
+        ),
+    )
+
+
+class KitchenWhatsAppIntegrationUpdate(BaseModel):
+    """Connect or disconnect Meta WhatsApp Business for this kitchen."""
+
+    whatsapp_phone_id: str | None = Field(
+        default=None,
+        max_length=100,
+        description="Meta phone_number_id. Pass null with clear=true to disconnect.",
+    )
+    whatsapp_display_phone: str | None = Field(
+        default=None,
+        max_length=20,
+        description="Optional E.164 display number, e.g. +919876543210.",
+    )
+    clear: bool = Field(
+        default=False,
+        description="When true, clears phone_number_id and display phone (disconnect).",
+    )
+
+    @field_validator("whatsapp_phone_id")
+    @classmethod
+    def normalize_phone_id(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        cleaned = value.strip()
+        return cleaned or None
+
+    @field_validator("whatsapp_display_phone")
+    @classmethod
+    def normalize_display_phone(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        cleaned = value.strip().replace(" ", "")
+        if not cleaned:
+            return None
+        if not cleaned.startswith("+"):
+            digits = "".join(c for c in cleaned if c.isdigit())
+            if len(digits) == 10:
+                return f"+91{digits}"
+            return f"+{digits}"
+        return cleaned
+
+
 class KitchenResponse(BaseModel):
     """Full kitchen record returned to the owning owner (create, list-mine, update)."""
 
@@ -382,6 +445,83 @@ async def update_kitchen_delivery_settings(
         raise ValueError("free_delivery_radius_km cannot exceed max_delivery_radius_km")
     await session.flush()
     return kitchen
+
+
+def kitchen_whatsapp_to_response(kitchen: Kitchen) -> KitchenWhatsAppIntegrationResponse:
+    settings_blob = kitchen.settings if isinstance(kitchen.settings, dict) else {}
+    display = settings_blob.get("whatsapp_display_phone")
+    phone_id = kitchen.whatsapp_phone_id
+    return KitchenWhatsAppIntegrationResponse(
+        kitchen_id=kitchen.id,
+        whatsapp_phone_id=phone_id,
+        whatsapp_display_phone=display if isinstance(display, str) else None,
+        connected=bool(phone_id),
+    )
+
+
+async def get_kitchen_whatsapp_integration(
+    session: AsyncSession,
+    kitchen: Kitchen,
+) -> KitchenWhatsAppIntegrationResponse:
+    _ = session
+    return kitchen_whatsapp_to_response(kitchen)
+
+
+async def update_kitchen_whatsapp_integration(
+    session: AsyncSession,
+    kitchen: Kitchen,
+    data: KitchenWhatsAppIntegrationUpdate,
+    publisher: "EventPublisher | None" = None,
+) -> KitchenWhatsAppIntegrationResponse:
+    from ckac_common.auth import stream_key
+    from ckac_common.event_bus import EventPublisher
+    from ckac_common.platform_config import require_kitchen_module
+
+    await require_kitchen_module(session, kitchen.id, "whatsapp")
+
+    settings_blob = dict(kitchen.settings) if isinstance(kitchen.settings, dict) else {}
+
+    if data.clear:
+        kitchen.whatsapp_phone_id = None
+        settings_blob.pop("whatsapp_display_phone", None)
+    else:
+        if data.whatsapp_phone_id is not None:
+            conflict = await session.execute(
+                select(Kitchen.id).where(
+                    Kitchen.whatsapp_phone_id == data.whatsapp_phone_id,
+                    Kitchen.id != kitchen.id,
+                ).limit(1)
+            )
+            if conflict.scalar_one_or_none():
+                raise ValueError("WhatsApp phone number ID is already linked to another kitchen")
+            kitchen.whatsapp_phone_id = data.whatsapp_phone_id
+        if "whatsapp_display_phone" in data.model_fields_set:
+            if data.whatsapp_display_phone:
+                settings_blob["whatsapp_display_phone"] = data.whatsapp_display_phone
+            else:
+                settings_blob.pop("whatsapp_display_phone", None)
+
+    kitchen.settings = settings_blob
+    from sqlalchemy.orm.attributes import flag_modified
+
+    flag_modified(kitchen, "settings")
+    await session.flush()
+
+    if publisher:
+        event = EventPublisher.build(
+            event_type="kitchen.whatsapp.updated",
+            aggregate_type="kitchen",
+            aggregate_id=str(kitchen.id),
+            producer="identity-service",
+            payload={
+                "kitchen_id": str(kitchen.id),
+                "connected": bool(kitchen.whatsapp_phone_id),
+                "whatsapp_phone_id": kitchen.whatsapp_phone_id,
+            },
+        )
+        await publisher.publish(stream_key("identity", "kitchen"), event, session=session)
+
+    return kitchen_whatsapp_to_response(kitchen)
 
 
 async def list_kitchens_nearby(
