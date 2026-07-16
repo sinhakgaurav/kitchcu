@@ -192,7 +192,7 @@ html.theme-brand-light .hero-copy-parallax__card {
   opacity: 0.85;
 }
 
-@media (max-width: 1100px) {
+@media (max-width: 900px) {
   html.theme-brand-light .hero__overlay .hero__content {
     text-align: center;
   }
@@ -205,6 +205,19 @@ html.theme-brand-light .hero-copy-parallax__card {
   html.theme-brand-light .brand-hero-art .brand-auth-art,
   html.theme-brand-light .brand-body-art .brand-auth-art {
     width: min(70%, 280px);
+  }
+
+  html.theme-brand-light .parallax-scene--hero {
+    opacity: 0.85;
+  }
+
+  html.theme-brand-light .parallax-scene .pl-photo {
+    display: none;
+  }
+
+  html.theme-brand-light .hero-copy-parallax__card--b,
+  html.theme-brand-light .hero-copy-parallax__card--c {
+    display: none;
   }
 }
 
@@ -323,11 +336,11 @@ html.theme-brand-light .parallax-scene .pl-glow--3 {
 
 @media (max-width: 1100px) {
   html.theme-brand-light .parallax-scene--hero {
-    opacity: 0.55;
+    opacity: 0.7;
   }
 
   html.theme-brand-light .parallax-scene .pl-photo {
-    max-width: min(42vw, 220px);
+    display: none;
   }
 }
 

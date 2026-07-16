@@ -1,5 +1,31 @@
 import { useEffect, useRef, useState, type RefObject } from "react";
 
+/** True on narrow screens, touch/coarse pointers, or prefers-reduced-motion — skip JS parallax. */
+export function useStaticMotion(): boolean {
+  const [staticMotion, setStaticMotion] = useState(() => {
+    if (typeof window === "undefined") return false;
+    return (
+      window.matchMedia("(max-width: 900px)").matches ||
+      window.matchMedia("(pointer: coarse)").matches ||
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches
+    );
+  });
+
+  useEffect(() => {
+    const mq = [
+      window.matchMedia("(max-width: 900px)"),
+      window.matchMedia("(pointer: coarse)"),
+      window.matchMedia("(prefers-reduced-motion: reduce)"),
+    ];
+    const sync = () => setStaticMotion(mq.some((m) => m.matches));
+    sync();
+    mq.forEach((m) => m.addEventListener("change", sync));
+    return () => mq.forEach((m) => m.removeEventListener("change", sync));
+  }, []);
+
+  return staticMotion;
+}
+
 export function useScrollProgress() {
   const [progress, setProgress] = useState(0);
   const [scrollY, setScrollY] = useState(0);

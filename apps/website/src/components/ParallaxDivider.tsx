@@ -1,7 +1,7 @@
 import { useRef } from "react";
 import type { CSSProperties } from "react";
 import { heroParallaxImages, images } from "../data/content";
-import { useScrollProgress, useSectionParallax } from "../hooks/useParallax";
+import { useScrollProgress, useSectionParallax, useStaticMotion } from "../hooks/useParallax";
 
 const STRIP = [
   images.menu,
@@ -22,19 +22,24 @@ type Props = {
 
 export function ParallaxDivider({ reverse = false }: Props) {
   const ref = useRef<HTMLDivElement>(null);
+  const staticMotion = useStaticMotion();
   const { scrollY } = useScrollProgress();
   const sectionOffset = useSectionParallax(ref);
-  const drift = scrollY * 0.04 + sectionOffset * 0.12;
+  const drift = staticMotion ? 0 : scrollY * 0.04 + sectionOffset * 0.12;
 
   return (
     <div
       ref={ref}
-      className={`parallax-divider ${reverse ? "parallax-divider--reverse" : ""}`}
+      className={`parallax-divider ${reverse ? "parallax-divider--reverse" : ""}${staticMotion ? " parallax-divider--static" : ""}`}
       aria-hidden="true"
     >
       <div
         className="parallax-divider__shift"
-        style={{ transform: `translate3d(0, ${reverse ? drift * -0.5 : drift * 0.35}px, 0)` }}
+        style={
+          staticMotion
+            ? undefined
+            : { transform: `translate3d(0, ${reverse ? drift * -0.5 : drift * 0.35}px, 0)` }
+        }
       >
         <div className="parallax-divider__track">
           {slides.map((img, i) => (

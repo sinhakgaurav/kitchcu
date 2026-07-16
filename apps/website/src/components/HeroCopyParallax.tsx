@@ -4,6 +4,7 @@ import {
   useMouseParallax,
   useScrollProgress,
   useSectionParallax,
+  useStaticMotion,
 } from "../hooks/useParallax";
 import { heroParallaxImages } from "../data/content";
 
@@ -15,13 +16,15 @@ type Props = {
 /**
  * Cursor-following food cards for the home banner.
  * When fullBleed, spans the entire hero width (moves with cursor).
+ * On phone / reduced-motion: static cards only (no scroll/cursor transforms).
  */
 export function HeroCopyParallax({ fullBleed = false }: Props) {
   const ref = useRef<HTMLDivElement>(null);
+  const staticMotion = useStaticMotion();
   const { scrollY } = useScrollProgress();
   const sectionOffset = useSectionParallax(ref);
-  const mouse = useMouseParallax(0.62);
-  const baseOffset = scrollY * 0.55 + sectionOffset * 0.25;
+  const mouse = useMouseParallax(staticMotion ? 0 : 0.62);
+  const baseOffset = staticMotion ? 0 : scrollY * 0.55 + sectionOffset * 0.25;
 
   const layers = [
     {
@@ -61,18 +64,22 @@ export function HeroCopyParallax({ fullBleed = false }: Props) {
   return (
     <div
       ref={ref}
-      className={`hero-copy-parallax${fullBleed ? " hero-copy-parallax--fullbleed" : ""}`}
+      className={`hero-copy-parallax${fullBleed ? " hero-copy-parallax--fullbleed" : ""}${staticMotion ? " hero-copy-parallax--static" : ""}`}
       aria-hidden="true"
     >
       {layers.map((layer) => (
         <div
           key={layer.key}
           className={layer.className}
-          style={{
-            transform: parallaxTransform(baseOffset, layer.speed, mouse, layer.factor, {
-              tilt: layer.tilt,
-            }),
-          }}
+          style={
+            staticMotion
+              ? undefined
+              : {
+                  transform: parallaxTransform(baseOffset, layer.speed, mouse, layer.factor, {
+                    tilt: layer.tilt,
+                  }),
+                }
+          }
         >
           <img src={layer.src} alt="" loading="lazy" draggable={false} />
         </div>
