@@ -1,5 +1,5 @@
 #!/bin/bash
-# kitchCU Ã¢â‚¬â€ GCE VM startup script (Ubuntu 22.04). Runs as root on every boot.
+# kitchCU - GCE VM startup script (Ubuntu 22.04). Runs as root on every boot.
 # Secrets are read from instance metadata (set once at `gcloud compute instances create`
 # via --metadata=...), never baked into this script or the git repo.
 set -euo pipefail
@@ -44,6 +44,29 @@ fi
 
 # --- 4. Write production .env from instance metadata ---------------------------------
 ENV_DIR="$REPO_DIR/infra/gcp-vm"
+MEDIA_BACKEND="$(meta media-backend)"
+MEDIA_BACKEND="${MEDIA_BACKEND:-minio}"
+
+if [ "$MEDIA_BACKEND" = "gcs" ]; then
+  MINIO_ENDPOINT="storage.googleapis.com"
+  MINIO_SECURE="true"
+  MINIO_PUBLIC_URL="https://storage.googleapis.com"
+  MINIO_ACCESS_KEY="$(meta minio-access-key)"
+  MINIO_SECRET_KEY="$(meta minio-secret-key)"
+  MINIO_BUCKET="$(meta minio-bucket)"
+else
+  # Default: local MinIO container (use when GCS HMAC creation is org-policy blocked).
+  MINIO_ENDPOINT="minio:9000"
+  MINIO_SECURE="false"
+  MINIO_PUBLIC_URL="https://media.kitchcu.com"
+  MINIO_ACCESS_KEY="$(meta minio-access-key)"
+  MINIO_SECRET_KEY="$(meta minio-secret-key)"
+  MINIO_ACCESS_KEY="${MINIO_ACCESS_KEY:-ckac}"
+  MINIO_SECRET_KEY="${MINIO_SECRET_KEY:-ckac_minio_dev}"
+  MINIO_BUCKET="$(meta minio-bucket)"
+  MINIO_BUCKET="${MINIO_BUCKET:-ckac-media}"
+fi
+
 cat > "$ENV_DIR/.env" <<EOF
 POSTGRES_USER=ckac
 POSTGRES_PASSWORD=$(meta db-password)
@@ -64,18 +87,18 @@ ADMIN_EMAIL=admin@kitchcu.com
 ADMIN_PASSWORD=$(meta admin-password)
 
 MEDIA_STORAGE_BACKEND=minio
-MINIO_ENDPOINT=storage.googleapis.com
-MINIO_SECURE=true
-MINIO_ACCESS_KEY=$(meta minio-access-key)
-MINIO_SECRET_KEY=$(meta minio-secret-key)
-MINIO_BUCKET=$(meta minio-bucket)
-MINIO_PUBLIC_URL=https://storage.googleapis.com
+MINIO_ENDPOINT=${MINIO_ENDPOINT}
+MINIO_SECURE=${MINIO_SECURE}
+MINIO_ACCESS_KEY=${MINIO_ACCESS_KEY}
+MINIO_SECRET_KEY=${MINIO_SECRET_KEY}
+MINIO_BUCKET=${MINIO_BUCKET}
+MINIO_PUBLIC_URL=${MINIO_PUBLIC_URL}
 
 CUSTOMER_OAUTH_REDIRECT_BASE=https://customer.kitchcu.com
 EOF
 chmod 600 "$ENV_DIR/.env"
 
-# --- 5. Build + start the full stack (idempotent Ã¢â‚¬â€ safe on every reboot) -------------
+# --- 5. Build + start the full stack (idempotent - safe on every reboot) -------------
 cd "$REPO_DIR"
 docker compose -f infra/gcp-vm/docker-compose.prod.yml --env-file infra/gcp-vm/.env up -d --build
 

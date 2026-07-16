@@ -21,3 +21,7 @@ admin.kitchcu.com {
 api.kitchcu.com {
 	reverse_proxy gateway:8000
 }
+
+media.kitchcu.com {
+	reverse_proxy minio:9000
+}
