@@ -1,8 +1,7 @@
 import { BrandHeroArt } from "./BrandHeroArt";
-import { BrandLogo } from "./BrandLogo";
 import { HeroCopyParallax } from "./HeroCopyParallax";
 import { ParallaxScene } from "./ParallaxScene";
-import { APP_NAME, APP_POSITIONING, APP_TAGLINE } from "../shared/brand";
+import { APP_NAME, APP_POSITIONING } from "../shared/brand";
 import { customerUrl, kitchenUrl } from "../shared/urls";
 
 /** Full-bleed home banner — cursor-follow images across entire width. */
@@ -15,8 +14,6 @@ export function PortalHero() {
 
         <div className="container hero__overlay hero__overlay--centered">
           <div className="hero__content hero__content--parallax hero__content--centered">
-            <BrandLogo variant="icon" className="hero__banner-icon" alt={APP_NAME} />
-            <p className="hero__brand-tagline">{APP_TAGLINE}</p>
             <p className="hero__positioning">{APP_POSITIONING}</p>
 
             <h1 className="hero__title">

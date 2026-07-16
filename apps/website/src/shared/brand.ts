@@ -3,8 +3,9 @@ export const APP_NAME = "kitchCU";
 /** localStorage / sessionStorage key prefix (camel brand, no spaces). */
 export const APP_STORAGE_PREFIX = "kitchCU";
 export const APP_NAME_LOWER = "kitchcu";
+/** Shown only under the logo in top chrome (BrandNavMark). Do not reuse in meta/heroes/footers. */
 export const APP_TAGLINE = "A complete kitchen care unit";
-/** Category-defining claim for marketing surfaces (portal / heroes). */
+/** Category-defining claim for marketing surfaces (portal / heroes / meta). */
 export const APP_POSITIONING =
   "India's first — and the world's third — platform with this feature stack";
 export const APP_POSITIONING_SHORT = "India's 1st · World's 3rd feature stack";

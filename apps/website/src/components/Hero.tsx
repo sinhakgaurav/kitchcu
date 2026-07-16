@@ -1,13 +1,11 @@
 import { Link } from "react-router-dom";
 import { BrandHeroArt } from "./BrandHeroArt";
-import { BrandLogo } from "./BrandLogo";
 import { HeroCopyParallax } from "./HeroCopyParallax";
 import { ParallaxScene } from "./ParallaxScene";
 import { stats } from "../data/content";
 import {
   APP_NAME,
   APP_POSITIONING_SHORT,
-  APP_TAGLINE,
   CUSTOMER_HOST,
   KITCHEN_HOST,
 } from "../shared/brand";
@@ -29,8 +27,6 @@ export function Hero({ variant }: Props) {
 
         <div className="container hero__overlay hero__overlay--centered">
           <div className="hero__content hero__content--parallax hero__content--centered">
-            <BrandLogo variant="icon" className="hero__banner-icon" alt={APP_NAME} />
-            <p className="hero__brand-tagline">{APP_TAGLINE}</p>
             <p className="hero__positioning">{APP_POSITIONING_SHORT}</p>
 
             <h1 className="hero__title">

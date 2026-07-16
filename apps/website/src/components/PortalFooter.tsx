@@ -10,7 +10,7 @@ export function PortalFooter() {
           <BrandNavMark height={40} />
           <p>
             Cloud Kitchen Analytics &amp; Control — India's first (and the world's third)
-            A complete kitchen care unit for home food businesses, tiffin services, and delivery-only kitchens.
+            Growth OS for home food businesses, tiffin services, and delivery-only kitchens.
             Zero food commission.
           </p>
         </div>
