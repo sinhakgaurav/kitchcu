@@ -1,6 +1,6 @@
 import { useRef } from "react";
 import type { CSSProperties } from "react";
-import { useInView, useItemParallax } from "../hooks/useParallax";
+import { useInView, useItemParallax, useStaticMotion } from "../hooks/useParallax";
 import { customerGallery } from "../data/content";
 
 function GalleryItem({
@@ -11,7 +11,8 @@ function GalleryItem({
   index: number;
 }) {
   const ref = useRef<figure>(null);
-  const offset = useItemParallax(ref, 0.1 + (index % 3) * 0.06);
+  const staticMotion = useStaticMotion();
+  const offset = useItemParallax(ref, staticMotion ? 0 : 0.1 + (index % 3) * 0.06);
 
   return (
     <figure
@@ -21,7 +22,7 @@ function GalleryItem({
     >
       <div
         className="floating-gallery__item-inner"
-        style={{ transform: `translate3d(0, ${offset}px, 0)` }}
+        style={staticMotion ? undefined : { transform: `translate3d(0, ${offset}px, 0)` }}
       >
         <img src={item.src} alt={item.alt} loading="lazy" draggable={false} />
         <figcaption>{item.label}</figcaption>
