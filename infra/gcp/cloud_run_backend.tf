@@ -6,32 +6,50 @@
 locals {
   media_services = toset(["identity", "catalog", "billing"])
 
+  # for_each SOURCE — must stay free of any reference to
+  # google_cloud_run_v2_service.backend itself (that would be a self-reference
+  # cycle: Terraform needs this fully resolved before it can even expand the
+  # for_each). Cross-service URLs are wired separately below via
+  # backend_service_deps, resolved inside the resource body per-instance.
   backend_services = {
-    identity = { port = 8001, extra_env = {} }
-    catalog  = { port = 8002, extra_env = {} }
-    order    = { port = 8003, extra_env = {} }
-    billing  = { port = 8004, extra_env = {
-      IDENTITY_SERVICE_URL = google_cloud_run_v2_service.backend["identity"].uri
-    } }
-    notification = { port = 8005, extra_env = {
-      ORDER_SERVICE_URL     = google_cloud_run_v2_service.backend["order"].uri
-      WHATSAPP_VERIFY_TOKEN = "REPLACE-VIA-SUPER-ADMIN-CONTROL" # bootstrap only — override in-app
-    } }
-    marketing = { port = 8006, extra_env = {} }
-    ratings   = { port = 8007, extra_env = {} }
-    growth = { port = 8008, extra_env = {
-      BILLING_SERVICE_URL      = google_cloud_run_v2_service.backend["billing"].uri
-      NOTIFICATION_SERVICE_URL = google_cloud_run_v2_service.backend["notification"].uri
-    } }
-    delivery = { port = 8009, extra_env = {} }
-    learning = { port = 8010, extra_env = {
-      CATALOG_SERVICE_URL      = google_cloud_run_v2_service.backend["catalog"].uri
-      NOTIFICATION_SERVICE_URL = google_cloud_run_v2_service.backend["notification"].uri
-    } }
-    community = { port = 8011, extra_env = {
-      COMMUNITY_MIN_ORDERS_RANKING = "3"
-    } }
-    streaming = { port = 8012, extra_env = {} }
+    identity     = { port = 8001 }
+    catalog      = { port = 8002 }
+    order        = { port = 8003 }
+    billing      = { port = 8004 }
+    notification = { port = 8005 }
+    marketing    = { port = 8006 }
+    ratings      = { port = 8007 }
+    growth       = { port = 8008 }
+    delivery     = { port = 8009 }
+    learning     = { port = 8010 }
+    community    = { port = 8011 }
+    streaming    = { port = 8012 }
+  }
+
+  # Static (non-cross-service) extra env vars per service.
+  backend_static_env = {
+    notification = { WHATSAPP_VERIFY_TOKEN = "REPLACE-VIA-SUPER-ADMIN-CONTROL" } # bootstrap only — DB value in Super Admin -> Control takes precedence
+    community    = { COMMUNITY_MIN_ORDERS_RANKING = "3" }
+  }
+
+  # Cross-service dependency wiring: service_key => { ENV_VAR_NAME = <other backend_services key> }.
+  # The `.uri` lookup happens inside the resource body (see dynamic "env" below),
+  # not here — that's what keeps this cycle-free.
+  backend_service_deps = {
+    billing = {
+      IDENTITY_SERVICE_URL = "identity"
+    }
+    notification = {
+      ORDER_SERVICE_URL = "order"
+    }
+    growth = {
+      BILLING_SERVICE_URL      = "billing"
+      NOTIFICATION_SERVICE_URL = "notification"
+    }
+    learning = {
+      CATALOG_SERVICE_URL      = "catalog"
+      NOTIFICATION_SERVICE_URL = "notification"
+    }
   }
 
   # Services with an alembic/ dir — see cloud_run_jobs.tf. Kept as a single
@@ -130,10 +148,22 @@ resource "google_cloud_run_v2_service" "backend" {
       }
 
       dynamic "env" {
-        for_each = each.value.extra_env
+        for_each = lookup(local.backend_static_env, each.key, {})
         content {
           name  = env.key
           value = env.value
+        }
+      }
+
+      # Cross-service URLs — resolved here (per-instance, inside the resource
+      # body) rather than in the for_each source, so referencing a sibling
+      # instance of this same resource collection is a normal, non-circular
+      # inter-instance dependency.
+      dynamic "env" {
+        for_each = lookup(local.backend_service_deps, each.key, {})
+        content {
+          name  = env.key
+          value = google_cloud_run_v2_service.backend[env.value].uri
         }
       }
 
