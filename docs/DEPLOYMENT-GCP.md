@@ -336,7 +336,25 @@ gcloud compute ssh ckac-vm --zone=asia-south1-a --command="sudo google_metadata_
 ```
 
 Re-runs `startup.sh`: `git reset --hard origin/main`, rewrites `.env` from the same
-metadata (unchanged), `docker compose up -d --build` (rebuilds only what changed).
+metadata, then **batch-builds** images (avoids `context deadline exceeded` on e2-small)
+and `docker compose up -d`.
+
+### 11.8b Fresh wipe on the same VM (keep static IP)
+
+Does **not** delete the VM or reserved IP (`ckac-vm-ip`). Wipes containers, volumes,
+and DB, then rebuilds + migrates + seeds:
+
+```bash
+gcloud compute ssh ckac-vm --zone=asia-south1-a --command="cd /opt/ckac && sudo git fetch origin main && sudo git reset --hard origin/main && sudo bash infra/gcp-vm/reset-fresh.sh"
+```
+
+### 11.8c Local dry-run of the GCP compose path
+
+From a Windows/macOS/Linux checkout (uses remapped ports so your normal `:18000` stack can stay up):
+
+```powershell
+.\infra\gcp-vm\dry-run-local.ps1
+```
 
 ### 11.9 What you still owe post-launch (same as §7 above)
 

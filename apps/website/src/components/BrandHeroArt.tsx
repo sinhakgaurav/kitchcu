@@ -1,4 +1,4 @@
-import { BrandAuthArt, BrandLogo } from "./BrandLogo";
+import { BrandAuthArt } from "./BrandLogo";
 import { APP_NAME, APP_POSITIONING_SHORT } from "../shared/brand";
 
 type Props = {
@@ -6,13 +6,11 @@ type Props = {
 };
 
 /**
- * Body-only brand block — image wordmark + creative art.
- * Tagline stays in top nav only (BrandNavMark); caption uses positioning claim.
+ * Body brand art only — no wordmark (logo + tagline live in top BrandNavMark).
  */
 export function BrandHeroArt({ surface = "portal" }: Props) {
   return (
     <div className="hero__art brand-hero-art brand-body-art" aria-hidden={false}>
-      <BrandLogo variant="wordmark" height={42} className="brand-body-art__wordmark" />
       <BrandAuthArt surface={surface} />
       <p className="brand-body-art__caption">
         <strong>{APP_NAME}</strong> · {APP_POSITIONING_SHORT}

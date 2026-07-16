@@ -18,6 +18,11 @@ def get_url() -> str:
 
     if url := os.environ.get("DATABASE_SYNC_URL"):
         return url
+    if url := os.environ.get("DATABASE_URL"):
+        return (
+            url.replace("postgresql+asyncpg://", "postgresql+psycopg2://")
+            .replace("postgresql+asyncpg", "postgresql+psycopg2")
+        )
     url = config.get_main_option("sqlalchemy.url")
     return url.replace("postgresql+asyncpg", "postgresql+psycopg2") if url else ""
 

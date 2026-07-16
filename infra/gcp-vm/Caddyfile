@@ -1,6 +1,6 @@
-# kitchCU â€” single-VM reverse proxy + automatic HTTPS (Let's Encrypt).
+# kitchCU — single-VM reverse proxy + automatic HTTPS (Let's Encrypt).
 # Each frontend container already proxies /api/* to gateway:8000 internally
-# (see apps/website/nginx.*.conf) â€” Caddy just terminates TLS and routes by host.
+# (see apps/website/nginx.*.conf). Caddy terminates TLS and routes by host.
 
 kitchcu.com, www.kitchcu.com {
 	reverse_proxy portal-web:80

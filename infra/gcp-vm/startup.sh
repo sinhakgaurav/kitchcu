@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # kitchCU - GCE VM startup script (Ubuntu 22.04). Runs as root on every boot.
 # Secrets are read from instance metadata (set once at `gcloud compute instances create`
 # via --metadata=...), never baked into this script or the git repo.
@@ -104,9 +104,15 @@ CUSTOMER_OAUTH_REDIRECT_BASE=https://customer.kitchcu.com
 EOF
 chmod 600 "$ENV_DIR/.env"
 
-# --- 5. Build + start the full stack (idempotent - safe on every reboot) -------------
+# --- 5. Build in batches then start (e2-small cannot parallel-build everything) ------
 cd "$REPO_DIR"
-docker compose -f infra/gcp-vm/docker-compose.prod.yml --env-file infra/gcp-vm/.env up -d --build
+export COMPOSE_PARALLEL_LIMIT=2
+export DOCKER_BUILDKIT=1
+COMPOSE=(docker compose -f infra/gcp-vm/docker-compose.prod.yml --env-file infra/gcp-vm/.env)
+"${COMPOSE[@]}" build identity catalog order billing notification gateway
+"${COMPOSE[@]}" build marketing ratings growth delivery learning community streaming
+"${COMPOSE[@]}" build portal-web kitchen-web customer-web admin-web
+"${COMPOSE[@]}" up -d
 
 # --- 6. Optional one-time bulk seed (metadata run-seed=1) ---------------------------
 RUN_SEED="$(meta run-seed)"
@@ -114,7 +120,7 @@ SEED_MARKER=/var/lib/ckac/.bulk-seeded
 if { [ "$RUN_SEED" = "1" ] || [ "$RUN_SEED" = "true" ]; } && [ ! -f "$SEED_MARKER" ]; then
   echo "Waiting for gateway before bulk seed..."
   ready=0
-  for _ in $(seq 1 60); do
+  for _ in $(seq 1 90); do
     if curl -sf http://127.0.0.1:18000/health/ready | grep -q '"status"'; then
       ready=1
       break
@@ -128,10 +134,10 @@ if { [ "$RUN_SEED" = "1" ] || [ "$RUN_SEED" = "true" ]; } && [ ! -f "$SEED_MARKE
       touch "$SEED_MARKER"
       echo "Bulk seed complete."
     else
-      echo "Bulk seed failed Ã¢â‚¬â€ marker not set; will retry on next boot." >&2
+      echo "Bulk seed failed — marker not set; will retry on next boot." >&2
     fi
   else
-    echo "Gateway not ready after 10 min Ã¢â‚¬â€ bulk seed skipped this boot." >&2
+    echo "Gateway not ready after ~15 min — bulk seed skipped this boot." >&2
   fi
 fi
 

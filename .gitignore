@@ -8,6 +8,9 @@ build/
 .venv/
 venv/
 .env
+.env.dryrun
+infra/gcp-vm/.env
+infra/gcp-vm/.env.dryrun
 *.local
 
 # Node

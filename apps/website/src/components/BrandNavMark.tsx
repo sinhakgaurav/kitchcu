@@ -17,7 +17,7 @@ type Props = {
 
 /**
  * Chrome brand mark — image wordmark from logos/ (public/brand).
- * Use in navbars, sidebars, and footers only.
+ * Pass APP_TAGLINE only in top portal/marketing nav; footers/app shells use host or omit subtitle.
  */
 export function BrandNavMark({
   to,

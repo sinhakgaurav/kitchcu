@@ -1,0 +1,27 @@
+# Local dry-run of the GCP single-VM stack (no Caddy / no host ports 80+443).
+# Use with project name ckac-gcp-dry so it does not collide with the root compose stack.
+# `!override` replaces prod port lists (Compose merges sequences by default).
+services:
+  postgres:
+    ports: !override
+      - "127.0.0.1:25432:5432"
+  redis:
+    ports: !override
+      - "127.0.0.1:26379:6379"
+  gateway:
+    ports: !override
+      - "127.0.0.1:28000:8000"
+  caddy:
+    profiles: ["caddy"]
+  customer-web:
+    ports: !override
+      - "127.0.0.1:23001:80"
+  kitchen-web:
+    ports: !override
+      - "127.0.0.1:23002:80"
+  portal-web:
+    ports: !override
+      - "127.0.0.1:23000:80"
+  admin-web:
+    ports: !override
+      - "127.0.0.1:23003:80"
