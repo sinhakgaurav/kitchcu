@@ -87,18 +87,18 @@ resource "google_cloud_run_v2_service" "gateway" {
 
       dynamic "env" {
         for_each = {
-          IDENTITY_SERVICE_URL     = google_cloud_run_v2_service.backend["identity"].uri
-          CATALOG_SERVICE_URL      = google_cloud_run_v2_service.backend["catalog"].uri
-          ORDER_SERVICE_URL         = google_cloud_run_v2_service.backend["order"].uri
-          BILLING_SERVICE_URL       = google_cloud_run_v2_service.backend["billing"].uri
-          NOTIFICATION_SERVICE_URL  = google_cloud_run_v2_service.backend["notification"].uri
-          MARKETING_SERVICE_URL     = google_cloud_run_v2_service.backend["marketing"].uri
-          RATINGS_SERVICE_URL        = google_cloud_run_v2_service.backend["ratings"].uri
-          GROWTH_SERVICE_URL         = google_cloud_run_v2_service.backend["growth"].uri
-          DELIVERY_SERVICE_URL       = google_cloud_run_v2_service.backend["delivery"].uri
-          LEARNING_SERVICE_URL       = google_cloud_run_v2_service.backend["learning"].uri
-          COMMUNITY_SERVICE_URL      = google_cloud_run_v2_service.backend["community"].uri
-          STREAMING_SERVICE_URL      = google_cloud_run_v2_service.backend["streaming"].uri
+          IDENTITY_SERVICE_URL    = local.backend_uris["identity"]
+          CATALOG_SERVICE_URL     = local.backend_uris["catalog"]
+          ORDER_SERVICE_URL       = local.backend_uris["order"]
+          BILLING_SERVICE_URL     = local.backend_uris["billing"]
+          NOTIFICATION_SERVICE_URL = local.backend_uris["notification"]
+          MARKETING_SERVICE_URL   = local.backend_uris["marketing"]
+          RATINGS_SERVICE_URL     = local.backend_uris["ratings"]
+          GROWTH_SERVICE_URL      = local.backend_uris["growth"]
+          DELIVERY_SERVICE_URL    = local.backend_uris["delivery"]
+          LEARNING_SERVICE_URL    = local.backend_uris["learning"]
+          COMMUNITY_SERVICE_URL   = local.backend_uris["community"]
+          STREAMING_SERVICE_URL   = local.backend_uris["streaming"]
         }
         content {
           name  = env.key
@@ -131,7 +131,7 @@ resource "google_cloud_run_v2_service" "gateway" {
     percent = 100
   }
 
-  depends_on = [google_cloud_run_v2_service.backend]
+  depends_on = [module.backend_tier0, module.backend_tier1, module.backend_tier2]
 }
 
 resource "google_cloud_run_v2_service_iam_member" "gateway_public_via_lb" {

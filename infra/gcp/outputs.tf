@@ -46,7 +46,7 @@ output "deployer_service_account" {
 }
 
 output "backend_service_urls" {
-  value = { for k, v in google_cloud_run_v2_service.backend : k => v.uri }
+  value = local.backend_uris
 }
 
 output "gateway_url_internal" {
