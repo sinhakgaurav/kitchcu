@@ -158,7 +158,7 @@ def ensure_enterprise_subscription(owner_token: str) -> None:
             f"/api/v1/billing/subscriptions/{create['id']}/activate",
             token=owner_token,
         )
-        log("  Enterprise subscription activated (₹1,799 bifurcation)")
+        log("  Enterprise subscription activated (Rs 1799 bifurcation)")
     except ApiError as exc:
         if "already" in str(exc).lower() or "409" in str(exc):
             log("  Enterprise subscription already active — skipped")
