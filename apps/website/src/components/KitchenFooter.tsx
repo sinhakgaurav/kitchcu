@@ -15,7 +15,7 @@ export function KitchenFooter() {
         <div className="footer__links">
           <Link to="/">Home</Link>
           <Link to="/login">Owner sign in</Link>
-          <a href={customerUrl("/")}>Customer app</a>
+          <a href={customerUrl("/")} target="_blank" rel="noopener noreferrer">Customer app</a>
         </div>
         <p className="footer__copy">
           © {new Date().getFullYear()} {APP_NAME} · Kitchen

@@ -164,10 +164,10 @@ export default function AdminApp() {
         </nav>
 
         <div className="admin-shell__foot">
-          <a href={customerUrl("/")} className="admin-app__ext-link" title={CUSTOMER_HOST}>
+          <a href={customerUrl("/")} className="admin-app__ext-link" title={CUSTOMER_HOST} target="_blank" rel="noopener noreferrer">
             Customer app
           </a>
-          <a href={kitchenUrl("/")} className="admin-app__ext-link" title={KITCHEN_HOST}>
+          <a href={kitchenUrl("/")} className="admin-app__ext-link" title={KITCHEN_HOST} target="_blank" rel="noopener noreferrer">
             Kitchen app
           </a>
         </div>
@@ -615,7 +615,7 @@ function AdminLogin({ onSuccess }: { onSuccess: (token: string) => void }) {
           <br />
           Owner demos: {DEMO_OWNERS.map((o) => o.phone).join(", ")} (OTP 123456)
           {" · "}
-          <a href={kitchenUrl("/login")}>Owner app</a>
+          <a href={kitchenUrl("/login")} target="_blank" rel="noopener noreferrer">Owner app</a>
         </p>
       </form>
       </div>

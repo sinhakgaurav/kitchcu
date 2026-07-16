@@ -43,7 +43,8 @@ export function AppTiles() {
           key={tile.id}
           className={`app-tile app-tile--${tile.accent}`}
           href={tile.href()}
-          rel="noopener"
+          target="_blank"
+          rel="noopener noreferrer"
         >
           <div className="app-tile__media">
             <img src={tile.image} alt="" loading="lazy" />

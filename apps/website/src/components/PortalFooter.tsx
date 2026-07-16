@@ -20,8 +20,8 @@ export function PortalFooter() {
           <a href="#support">Support</a>
           <a href="#contact">Contact</a>
           <a href="/openapi">API / OpenAPI</a>
-          <a href={customerUrl("/")}>Customer app</a>
-          <a href={kitchenUrl("/")}>Kitchen app</a>
+          <a href={customerUrl("/")} target="_blank" rel="noopener noreferrer">Customer app</a>
+          <a href={kitchenUrl("/")} target="_blank" rel="noopener noreferrer">Kitchen app</a>
         </div>
         <p className="footer__copy">
           © {new Date().getFullYear()} {APP_NAME} · {SUPPORT_EMAIL} · Pune, India

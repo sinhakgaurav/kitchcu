@@ -10,6 +10,7 @@ type Props = {
 
 export function HowItWorks({ ctaHref = "/login", ctaLabel = "Start as kitchen owner" }: Props) {
   const { ref, visible } = useInView();
+  const isCrossApp = ctaHref.startsWith("http");
 
   return (
     <section className="section how-it-works how-it-works--parallax" id="how" ref={ref as RefObject<HTMLElement>}>
@@ -41,7 +42,11 @@ export function HowItWorks({ ctaHref = "/login", ctaLabel = "Start as kitchen ow
         </div>
 
         <div className={`how-it-works__cta reveal ${visible ? "reveal--visible" : ""}`}>
-          <a href={ctaHref} className="btn btn--primary btn--lg">
+          <a
+            href={ctaHref}
+            className="btn btn--primary btn--lg"
+            {...(isCrossApp ? { target: "_blank", rel: "noopener noreferrer" } : {})}
+          >
             {ctaLabel}
           </a>
         </div>

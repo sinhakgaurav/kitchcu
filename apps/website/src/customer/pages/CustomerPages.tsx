@@ -224,7 +224,7 @@ export function CustomerLoginPage() {
             onError={setError}
           />
           <p className="auth-card__demo-note">
-            Kitchen owner? <a href={kitchenUrl("/login")}>Sign in on {KITCHEN_HOST} →</a>
+            Kitchen owner? <a href={kitchenUrl("/login")} target="_blank" rel="noopener noreferrer">Sign in on {KITCHEN_HOST} →</a>
           </p>
           <Link to="/" className="auth-card__back">← Back to customer home</Link>
         </div>

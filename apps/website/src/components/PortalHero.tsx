@@ -32,10 +32,10 @@ export function PortalHero() {
             </p>
 
             <div className="hero__actions">
-              <a href={kitchenUrl("/login")} className="btn btn--primary btn--lg">
+              <a href={kitchenUrl("/login")} className="btn btn--primary btn--lg" target="_blank" rel="noopener noreferrer">
                 Start as kitchen owner
               </a>
-              <a href={customerUrl("/")} className="btn btn--ghost btn--lg">
+              <a href={customerUrl("/")} className="btn btn--ghost btn--lg" target="_blank" rel="noopener noreferrer">
                 Browse as customer →
               </a>
             </div>

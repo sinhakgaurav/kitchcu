@@ -37,10 +37,22 @@ export function PortalNavbar() {
               </a>
             );
           })}
-          <a href={customerUrl("/")} className="btn btn--ghost btn--sm" onClick={() => setOpen(false)}>
+          <a
+            href={customerUrl("/")}
+            className="btn btn--ghost btn--sm"
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={() => setOpen(false)}
+          >
             Customer app
           </a>
-          <a href={kitchenUrl("/login")} className="btn btn--primary btn--sm" onClick={() => setOpen(false)}>
+          <a
+            href={kitchenUrl("/login")}
+            className="btn btn--primary btn--sm"
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={() => setOpen(false)}
+          >
             Owner login
           </a>
         </nav>

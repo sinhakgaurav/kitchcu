@@ -61,7 +61,7 @@ export function Hero({ variant }: Props) {
                   <Link to="/login" className="btn btn--primary btn--lg">
                     Owner sign in
                   </Link>
-                  <a href={customerUrl("/")} className="btn btn--ghost btn--lg">
+                  <a href={customerUrl("/")} className="btn btn--ghost btn--lg" target="_blank" rel="noopener noreferrer">
                     Customer app →
                   </a>
                 </>

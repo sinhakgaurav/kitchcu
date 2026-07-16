@@ -132,7 +132,7 @@ export function OwnerLayout() {
 
         <div className="owner-app__sidebar-foot">
           <span>{owner?.name}</span>
-          <a href={customerUrl("/")} className="owner-app__customer-link">Customer app</a>
+          <a href={customerUrl("/")} className="owner-app__customer-link" target="_blank" rel="noopener noreferrer">Customer app</a>
           <button type="button" className="owner-app__signout btn btn--ghost btn--sm" onClick={logout}>
             Sign out
           </button>

@@ -35,7 +35,13 @@ export function CustomerNavbar() {
           <Link to="/login" className="btn btn--ghost btn--sm" onClick={() => setOpen(false)}>
             {session ? session.name : "Customer sign in"}
           </Link>
-          <a href={kitchenUrl("/login")} className="btn btn--primary btn--sm" onClick={() => setOpen(false)}>
+          <a
+            href={kitchenUrl("/login")}
+            className="btn btn--primary btn--sm"
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={() => setOpen(false)}
+          >
             Kitchen owner →
           </a>
         </nav>

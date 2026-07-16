@@ -28,7 +28,13 @@ export function KitchenNavbar() {
         <nav className={`nav__links ${open ? "nav__links--open" : ""}`}>
           <a href={hashLink("/#features")} onClick={() => setOpen(false)}>Features</a>
           <a href={hashLink("/#how")} onClick={() => setOpen(false)}>How it works</a>
-          <a href={customerUrl("/")} className="btn btn--ghost btn--sm" onClick={() => setOpen(false)}>
+          <a
+            href={customerUrl("/")}
+            className="btn btn--ghost btn--sm"
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={() => setOpen(false)}
+          >
             Customer app →
           </a>
           <Link

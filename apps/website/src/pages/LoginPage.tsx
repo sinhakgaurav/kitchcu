@@ -219,7 +219,7 @@ export function LoginPage() {
           )}
 
           <p className="auth-card__demo-note">
-            Looking for menus? <a href={customerUrl("/")}>Go to {CUSTOMER_HOST} →</a>
+            Looking for menus? <a href={customerUrl("/")} target="_blank" rel="noopener noreferrer">Go to {CUSTOMER_HOST} →</a>
           </p>
           <Link to="/" className="auth-card__back">← Back to kitchen home</Link>
         </div>
