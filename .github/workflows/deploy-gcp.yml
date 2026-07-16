@@ -1,0 +1,123 @@
+name: Deploy to GCP (Cloud Run)
+
+# Manual promotion by design — go-live and every subsequent prod deploy is a
+# deliberate action, not an automatic side-effect of merging to main. Flip
+# `on.push` back on once staging has soaked if you want continuous deploy.
+on:
+  workflow_dispatch:
+    inputs:
+      services:
+        description: "Comma-separated service names to deploy, or 'all'"
+        default: "all"
+        required: true
+
+env:
+  GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+  GCP_REGION: ${{ secrets.GCP_REGION }}
+  REGISTRY: ${{ secrets.GCP_REGION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/ckac
+
+permissions:
+  id-token: write # Workload Identity Federation — no JSON key ever touches this repo
+  contents: read
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.tag.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - id: tag
+        run: echo "tag=$(git rev-parse --short HEAD)" >> "$GITHUB_OUTPUT"
+
+      - uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_DEPLOYER_SA }}
+
+      - uses: google-github-actions/setup-gcloud@v2
+
+      - run: gcloud auth configure-docker ${{ secrets.GCP_REGION }}-docker.pkg.dev --quiet
+
+      - name: Build + push backend service images
+        run: |
+          set -euo pipefail
+          for svc in identity catalog order billing notification marketing ratings growth delivery learning community streaming gateway; do
+            docker build -f services/$svc/Dockerfile -t "${REGISTRY}/${svc}:${{ steps.tag.outputs.tag }}" -t "${REGISTRY}/${svc}:latest" .
+            docker push "${REGISTRY}/${svc}:${{ steps.tag.outputs.tag }}"
+            docker push "${REGISTRY}/${svc}:latest"
+          done
+
+      - name: Build + push website images
+        run: |
+          set -euo pipefail
+          for app in portal customer kitchen admin; do
+            docker build ./apps/website \
+              --build-arg APP=$app \
+              --build-arg VITE_CUSTOMER_APP_URL=https://customer.${{ vars.DOMAIN_ROOT }} \
+              --build-arg VITE_KITCHEN_APP_URL=https://kitchen.${{ vars.DOMAIN_ROOT }} \
+              --build-arg VITE_ADMIN_APP_URL=https://admin.${{ vars.DOMAIN_ROOT }} \
+              -t "${REGISTRY}/${app}-web:${{ steps.tag.outputs.tag }}" \
+              -t "${REGISTRY}/${app}-web:latest"
+            docker push "${REGISTRY}/${app}-web:${{ steps.tag.outputs.tag }}"
+            docker push "${REGISTRY}/${app}-web:latest"
+          done
+
+  migrate:
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    steps:
+      - uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_DEPLOYER_SA }}
+      - uses: google-github-actions/setup-gcloud@v2
+
+      - name: Run Alembic migrations (Cloud Run Jobs, sequential + fail-fast)
+        run: |
+          set -euo pipefail
+          for svc in identity catalog order billing notification marketing ratings growth delivery learning community streaming; do
+            gcloud run jobs update "ckac-${svc}-migrate" \
+              --region "${GCP_REGION}" \
+              --image "${REGISTRY}/${svc}:${{ needs.build-and-push.outputs.tag }}"
+            gcloud run jobs execute "ckac-${svc}-migrate" --region "${GCP_REGION}" --wait
+          done
+
+  deploy:
+    needs: [build-and-push, migrate]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_DEPLOYER_SA }}
+      - uses: google-github-actions/setup-gcloud@v2
+
+      - name: Deploy backend services (migrations already applied above)
+        run: |
+          set -euo pipefail
+          for svc in identity catalog order billing notification marketing ratings growth delivery learning community streaming; do
+            gcloud run deploy "ckac-${svc}" \
+              --region "${GCP_REGION}" \
+              --image "${REGISTRY}/${svc}:${{ needs.build-and-push.outputs.tag }}"
+          done
+
+      - name: Deploy gateway last (depends on backend URLs already existing)
+        run: |
+          gcloud run deploy ckac-gateway \
+            --region "${GCP_REGION}" \
+            --image "${REGISTRY}/gateway:${{ needs.build-and-push.outputs.tag }}"
+
+      - name: Deploy website services
+        run: |
+          set -euo pipefail
+          for app in portal customer kitchen admin; do
+            gcloud run deploy "ckac-${app}-web" \
+              --region "${GCP_REGION}" \
+              --image "${REGISTRY}/${app}-web:${{ needs.build-and-push.outputs.tag }}"
+          done
+
+      - name: Smoke test gateway health
+        run: |
+          curl -sf "https://api.${{ vars.DOMAIN_ROOT }}/health/ready" | tee /dev/stderr | grep -q '"status":"ok"'

@@ -1,0 +1,27 @@
+# Copy to terraform.tfvars and fill in. NEVER commit terraform.tfvars (gitignored).
+
+project_id = "your-gcp-project-id"
+region     = "asia-south1"
+environment = "production"
+domain_root = "kitchcu.in"
+
+github_repository = "sinhakgaurav/kitchcu"
+
+# Generate: openssl rand -hex 32
+jwt_secret = "REPLACE_ME"
+# Generate: openssl rand -hex 32
+internal_api_key = "REPLACE_ME"
+# Generate: openssl rand -base64 24
+db_password = "REPLACE_ME"
+
+alert_notification_email = "you@example.com"
+
+# Sizing (defaults shown — tune for your traffic / budget):
+# db_tier               = "db-custom-2-7680"
+# db_availability_type   = "ZONAL"
+# redis_memory_gb        = 1
+# redis_tier             = "BASIC"
+# gateway_min_instances  = 1
+# backend_min_instances  = 0
+# frontend_min_instances = 0
+# max_instances          = 20
