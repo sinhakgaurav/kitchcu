@@ -1,6 +1,7 @@
 # Full platform seed — dev baseline + bulk data + all personas
 # Optional env:
-#   CKAC_BULK_ORDERS=300 CKAC_BULK_KITCHENS=22 CKAC_SEED_EXTRAS=1
+# Optional env:
+#   CKAC_BULK_KITCHENS=30 CKAC_BULK_FULL=1 CKAC_BULK_ORDERS_PER_KITCHEN=40 CKAC_SEED_EXTRAS=1
 $ErrorActionPreference = "Stop"
 $root = Split-Path -Parent $PSScriptRoot
 Set-Location $root

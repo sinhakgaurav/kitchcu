@@ -7,6 +7,7 @@ kitchens/dishes by name and adds orders/drafts until each target is reached.
 
 Usage:
   python scripts/seed-bulk-data.py
+  CKAC_BULK_KITCHENS=30 CKAC_BULK_FULL=1 python scripts/seed-bulk-data.py
   CKAC_BULK_ORDERS=300 python scripts/seed-bulk-data.py
   $env:CKAC_BULK_OWNERS=5; .\\scripts\\seed-bulk-data.ps1
 
@@ -36,7 +37,7 @@ from bulk_demo_data import (  # noqa: E402
 )
 from demo_data import DEMO_KITCHEN_CODE, DEMO_OTP, DEMO_OWNER  # noqa: E402
 from seed_common import ApiError, cuisine_map, dish_create_payload, ensure_dish_recipes, ensure_ingredients, login_owner, log, request, wait_for_gateway  # noqa: E402
-from seed_platform_extras import seed_platform_extras  # noqa: E402
+from seed_platform_extras import seed_kitchen_integrations, seed_kitchen_modules, seed_platform_extras  # noqa: E402
 from ingredient_demo_data import DEMO_PANTRY, DISH_PREP_STEPS, DISH_RECIPES  # noqa: E402
 
 def env_int(name: str, default: int, *, minimum: int = 0) -> int:
@@ -50,15 +51,18 @@ def env_int(name: str, default: int, *, minimum: int = 0) -> int:
     return value
 
 
-BULK_KITCHENS = env_int("CKAC_BULK_KITCHENS", 22, minimum=1)
-BULK_OWNERS = env_int("CKAC_BULK_OWNERS", 5)
+BULK_KITCHENS = env_int("CKAC_BULK_KITCHENS", 30, minimum=1)
+BULK_OWNERS = env_int("CKAC_BULK_OWNERS", 0)
 BULK_KITCHENS_PER_OWNER = env_int("CKAC_BULK_KITCHENS_PER_OWNER", 3, minimum=1)
 BULK_ORDERS = env_int("CKAC_BULK_ORDERS", 250)
 BULK_DRAFTS = env_int("CKAC_BULK_DRAFTS", 25)
 BULK_ORDERS_PER_OWNER = env_int("CKAC_BULK_ORDERS_PER_OWNER", 40)
 BULK_DRAFTS_PER_OWNER = env_int("CKAC_BULK_DRAFTS_PER_OWNER", 5)
+BULK_ORDERS_PER_KITCHEN = env_int("CKAC_BULK_ORDERS_PER_KITCHEN", 40)
+BULK_DRAFTS_PER_KITCHEN = env_int("CKAC_BULK_DRAFTS_PER_KITCHEN", 5)
 BULK_DISHES_PER_KITCHEN = env_int("CKAC_BULK_DISHES_PER_KITCHEN", 6, minimum=1)
 BACKDATE_DAYS = env_int("CKAC_BULK_BACKDATE_DAYS", 30)
+BULK_FULL = os.environ.get("CKAC_BULK_FULL", "1").strip().lower() not in ("0", "false", "no")
 POSTGRES_CONTAINER = os.environ.get("CKAC_POSTGRES_CONTAINER", "ckac-postgres-1")
 
 random.seed(42)
@@ -294,6 +298,32 @@ def primary_kitchen(kitchens: list[dict]) -> dict:
     return next((k for k in kitchens if k.get("code") == DEMO_KITCHEN_CODE), kitchens[0])
 
 
+def ensure_kitchen_complete(
+    token: str,
+    kitchen: dict,
+    dishes: list[dict],
+    *,
+    orders_target: int,
+    drafts_target: int,
+    with_modules: bool = True,
+) -> dict[str, str]:
+    """Full menu + pantry + recipes + orders + drafts + per-kitchen integrations."""
+    kid = kitchen["id"]
+    log(f"  [{kitchen['code']}] {kitchen['name']}")
+    dish_ids = ensure_dishes(token, kid, dishes)
+    log(f"    menu: {len(dish_ids)} dishes")
+    ingredient_ids = ensure_ingredients(token, kid, DEMO_PANTRY)
+    ensure_dish_recipes(token, kid, dish_ids, DISH_RECIPES, ingredient_ids, DISH_PREP_STEPS)
+    log(f"    pantry: {len(ingredient_ids)} ingredients, recipes on {len(DISH_RECIPES)} dishes")
+    ensure_orders(token, kid, dish_ids, orders_target)
+    ensure_drafts(token, kid, drafts_target)
+    backdate_orders(kid)
+    if with_modules:
+        seed_kitchen_modules(token, kid, dish_ids)
+        seed_kitchen_integrations(token, kid, kitchen["name"])
+    return dish_ids
+
+
 def main() -> None:
     owner_count = min(BULK_OWNERS, len(EXTRA_OWNERS))
     if BULK_OWNERS > len(EXTRA_OWNERS):
@@ -304,11 +334,21 @@ def main() -> None:
 
     log("CKAC bulk seed")
     log("=" * 50)
+    mode = "full data per kitchen" if BULK_FULL else "primary full + mini secondary menus"
     log(
-        f"Targets: {BULK_KITCHENS} primary-owner kitchens, {owner_count} extra owners x "
-        f"{BULK_KITCHENS_PER_OWNER} kitchens, {BULK_ORDERS} primary orders, "
-        f"{BULK_ORDERS_PER_OWNER} orders per extra owner"
+        f"Mode: {mode} | {BULK_KITCHENS} demo-owner kitchens, {owner_count} extra owners x "
+        f"{BULK_KITCHENS_PER_OWNER} kitchens"
     )
+    if BULK_FULL:
+        log(
+            f"Per kitchen: full menu, pantry, {BULK_ORDERS_PER_KITCHEN} orders, "
+            f"{BULK_DRAFTS_PER_KITCHEN} drafts, integrations"
+        )
+    else:
+        log(
+            f"Primary: {BULK_ORDERS} orders / {BULK_DRAFTS} drafts | "
+            f"Secondary: {BULK_DISHES_PER_KITCHEN} dishes"
+        )
     log("")
 
     wait_for_gateway()
@@ -323,33 +363,52 @@ def main() -> None:
     log(f"Demo owner has {len(demo_kitchens)} kitchen(s)")
 
     primary = primary_kitchen(demo_kitchens)
-    log(f"Primary kitchen: {primary['code']} — {primary['name']}")
-
     all_dishes = enriched_dishes()
-    primary_dish_ids = ensure_dishes(demo_token, primary["id"], all_dishes)
-    log(f"Primary menu: {len(primary_dish_ids)} dishes")
+    primary_dish_ids: dict[str, str] = {}
 
-    primary_ingredient_ids = ensure_ingredients(demo_token, primary["id"], DEMO_PANTRY)
-    ensure_dish_recipes(demo_token, primary["id"], primary_dish_ids, DISH_RECIPES, primary_ingredient_ids, DISH_PREP_STEPS)
-    log(f"Primary pantry: {len(primary_ingredient_ids)} ingredients")
+    if BULK_FULL:
+        log("")
+        log(f"Full seed for {len(demo_kitchens)} kitchens (demo owner)")
+        log("-" * 50)
+        for k in demo_kitchens:
+            dish_ids = ensure_kitchen_complete(
+                demo_token,
+                k,
+                all_dishes,
+                orders_target=BULK_ORDERS_PER_KITCHEN,
+                drafts_target=BULK_DRAFTS_PER_KITCHEN,
+            )
+            if k["id"] == primary["id"]:
+                primary_dish_ids = dish_ids
+        if not primary_dish_ids:
+            primary_dish_ids = ensure_dishes(demo_token, primary["id"], all_dishes)
+    else:
+        log(f"Primary kitchen: {primary['code']} — {primary['name']}")
+        primary_dish_ids = ensure_dishes(demo_token, primary["id"], all_dishes)
+        log(f"Primary menu: {len(primary_dish_ids)} dishes")
 
-    # Mini menus on other demo kitchens (customer browse + nearby cards)
-    subset = all_dishes[: max(BULK_DISHES_PER_KITCHEN, 6)]
-    secondary = 0
-    for k in demo_kitchens:
-        if k["id"] == primary["id"]:
-            continue
-        offset = secondary * 3
-        rotated = all_dishes[offset : offset + BULK_DISHES_PER_KITCHEN]
-        if len(rotated) < BULK_DISHES_PER_KITCHEN:
-            rotated = (rotated + all_dishes)[:BULK_DISHES_PER_KITCHEN]
-        ensure_dishes(demo_token, k["id"], rotated, limit=BULK_DISHES_PER_KITCHEN)
-        secondary += 1
-    log(f"Seeded mini menus on {secondary} secondary kitchens")
+        primary_ingredient_ids = ensure_ingredients(demo_token, primary["id"], DEMO_PANTRY)
+        ensure_dish_recipes(
+            demo_token, primary["id"], primary_dish_ids, DISH_RECIPES, primary_ingredient_ids, DISH_PREP_STEPS
+        )
+        log(f"Primary pantry: {len(primary_ingredient_ids)} ingredients")
 
-    ensure_orders(demo_token, primary["id"], primary_dish_ids, BULK_ORDERS)
-    ensure_drafts(demo_token, primary["id"], BULK_DRAFTS)
-    backdate_orders(primary["id"])
+        subset = all_dishes[: max(BULK_DISHES_PER_KITCHEN, 6)]
+        secondary = 0
+        for k in demo_kitchens:
+            if k["id"] == primary["id"]:
+                continue
+            offset = secondary * 3
+            rotated = all_dishes[offset : offset + BULK_DISHES_PER_KITCHEN]
+            if len(rotated) < BULK_DISHES_PER_KITCHEN:
+                rotated = (rotated + all_dishes)[:BULK_DISHES_PER_KITCHEN]
+            ensure_dishes(demo_token, k["id"], rotated, limit=BULK_DISHES_PER_KITCHEN)
+            secondary += 1
+        log(f"Seeded mini menus on {secondary} secondary kitchens")
+
+        ensure_orders(demo_token, primary["id"], primary_dish_ids, BULK_ORDERS)
+        ensure_drafts(demo_token, primary["id"], BULK_DRAFTS)
+        backdate_orders(primary["id"])
 
     seed_platform_extras(
         owner_token=demo_token,
@@ -368,32 +427,47 @@ def main() -> None:
         specs = owner_kitchen_specs(idx + 1, BULK_KITCHENS_PER_OWNER, owner["name"])
         kitchens = ensure_kitchens_for_owner(token, specs)
         owner_primary_dishes: dict[str, str] = {}
-        for j, k in enumerate(kitchens):
-            chunk = all_dishes[(idx * 5 + j * 3) : (idx * 5 + j * 3) + BULK_DISHES_PER_KITCHEN]
-            if not chunk:
-                chunk = subset
-            dish_ids = ensure_dishes(token, k["id"], chunk, limit=BULK_DISHES_PER_KITCHEN)
-            if j == 0:
-                owner_primary_dishes = dish_ids
+        if BULK_FULL:
+            for j, k in enumerate(kitchens):
+                dish_ids = ensure_kitchen_complete(
+                    token,
+                    k,
+                    all_dishes,
+                    orders_target=BULK_ORDERS_PER_OWNER,
+                    drafts_target=BULK_DRAFTS_PER_OWNER,
+                )
+                if j == 0:
+                    owner_primary_dishes = dish_ids
+        else:
+            subset = all_dishes[: max(BULK_DISHES_PER_KITCHEN, 6)]
+            for j, k in enumerate(kitchens):
+                chunk = all_dishes[(idx * 5 + j * 3) : (idx * 5 + j * 3) + BULK_DISHES_PER_KITCHEN]
+                if not chunk:
+                    chunk = subset
+                dish_ids = ensure_dishes(token, k["id"], chunk, limit=BULK_DISHES_PER_KITCHEN)
+                if j == 0:
+                    owner_primary_dishes = dish_ids
 
-        owner_primary = kitchens[0]
-        created_orders = ensure_orders(
-            token,
-            owner_primary["id"],
-            owner_primary_dishes,
-            BULK_ORDERS_PER_OWNER,
-        )
-        created_drafts = ensure_drafts(
-            token,
-            owner_primary["id"],
-            BULK_DRAFTS_PER_OWNER,
-        )
-        backdate_orders(owner_primary["id"])
+            owner_primary = kitchens[0]
+            created_orders = ensure_orders(
+                token,
+                owner_primary["id"],
+                owner_primary_dishes,
+                BULK_ORDERS_PER_OWNER,
+            )
+            created_drafts = ensure_drafts(
+                token,
+                owner_primary["id"],
+                BULK_DRAFTS_PER_OWNER,
+            )
+            backdate_orders(owner_primary["id"])
+            log(
+                f"  {owner['name']}: {len(kitchens)} kitchen(s), "
+                f"{created_orders} new orders, {created_drafts} new drafts"
+            )
         seeded_owners.append((owner, kitchens))
-        log(
-            f"  {owner['name']}: {len(kitchens)} kitchen(s), "
-            f"{created_orders} new orders, {created_drafts} new drafts"
-        )
+        if BULK_FULL:
+            log(f"  {owner['name']}: {len(kitchens)} kitchen(s) fully seeded")
 
     # Summary
     nearby = request(
@@ -407,7 +481,9 @@ def main() -> None:
     log("")
     log("Bulk seed complete")
     log("-" * 50)
-    log(f"  Nearby kitchens (50km): {nearby.get('total', 0)}")
+    total_kitchens = len(demo_kitchens) + sum(len(k) for _, k in seeded_owners)
+    log(f"  Kitchens seeded (total): {total_kitchens}")
+    log(f"  Nearby kitchens (50km):  {nearby.get('total', 0)}")
     log(f"  Primary menu dishes:    {len(menu_final.get('dishes', []))}")
     log(f"  Primary orders:         {orders_final.get('total', 0)}")
     log(f"  Primary drafts:         {drafts_final.get('total', 0)}")

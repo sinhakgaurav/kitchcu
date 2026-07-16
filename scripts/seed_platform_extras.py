@@ -399,15 +399,17 @@ def ensure_payment_gateway(owner_token: str, kitchen_id: str) -> None:
         log(f"  ! payment gateway: {exc}")
 
 
-def ensure_gst(owner_token: str, kitchen_id: str, kitchen_name: str) -> None:
+def ensure_gst(owner_token: str, kitchen_id: str, kitchen_name: str, *, gstin: str | None = None) -> None:
     """Register a GST profile and sync invoices from delivered orders."""
     now = datetime.now(UTC)
+    if gstin is None:
+        gstin = "27AAAPL1234C1Z5"
     try:
         request(
             "PUT",
             f"/api/v1/kitchens/{kitchen_id}/gst/profile",
             {
-                "gstin": "27AAAPL1234C1Z5",
+                "gstin": gstin,
                 "legal_name": kitchen_name,
                 "trade_name": kitchen_name,
                 "registered_address": "Koregaon Park, Lane 7, Pune, Maharashtra 411001",
@@ -658,6 +660,30 @@ def ensure_crm_and_coupon_extras(owner_token: str, kitchen_id: str, customers: l
         log("  Active promotions read (customer-facing)")
     except ApiError as exc:
         log(f"  ! promotions active: {exc}")
+
+
+def demo_gstin_for_kitchen(kitchen_id: str) -> str:
+    """Deterministic fake GSTIN per kitchen (global uq_kitchen_gst_profiles_gstin)."""
+    digest = int(kitchen_id.replace("-", "")[:10], 16) % 10_000
+    return f"27AAAA{digest:04d}C1Z5"
+
+
+def seed_kitchen_integrations(owner_token: str, kitchen_id: str, kitchen_name: str) -> None:
+    """Per-kitchen owner integrations (safe to run for every kitchen in bulk seed)."""
+    ensure_whatsapp_integration(owner_token, kitchen_id)
+    ensure_payment_gateway(owner_token, kitchen_id)
+    ensure_gst(owner_token, kitchen_id, kitchen_name, gstin=demo_gstin_for_kitchen(kitchen_id))
+    ensure_delivery_quote(kitchen_id)
+    ensure_streaming(owner_token, kitchen_id)
+
+
+def seed_kitchen_modules(owner_token: str, kitchen_id: str, dish_ids: dict[str, str]) -> None:
+    """Per-kitchen marketing + growth modules (tenant-scoped, idempotent)."""
+    if not dish_ids:
+        return
+    first_dish = next(iter(dish_ids.values()))
+    ensure_marketing(owner_token, kitchen_id, first_dish)
+    ensure_growth_suggestions(owner_token, kitchen_id)
 
 
 def seed_platform_extras(

@@ -124,14 +124,14 @@ if { [ "$RUN_SEED" = "1" ] || [ "$RUN_SEED" = "true" ]; } && [ ! -f "$SEED_MARKE
   if [ "$ready" -eq 1 ]; then
     echo "Running scripts/seed-bulk-data.py (APP_ENV=${APP_ENV})..."
     mkdir -p /var/lib/ckac
-    if CKAC_GATEWAY_URL=http://127.0.0.1:18000 python3 scripts/seed-bulk-data.py; then
+    if CKAC_GATEWAY_URL=http://127.0.0.1:18000 CKAC_BULK_KITCHENS=30 CKAC_BULK_FULL=1 python3 scripts/seed-bulk-data.py; then
       touch "$SEED_MARKER"
       echo "Bulk seed complete."
     else
-      echo "Bulk seed failed â€” marker not set; will retry on next boot." >&2
+      echo "Bulk seed failed Ã¢â‚¬â€ marker not set; will retry on next boot." >&2
     fi
   else
-    echo "Gateway not ready after 10 min â€” bulk seed skipped this boot." >&2
+    echo "Gateway not ready after 10 min Ã¢â‚¬â€ bulk seed skipped this boot." >&2
   fi
 fi
 
