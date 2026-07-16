@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 
 # ── Demo owner & kitchen ────────────────────────────────────────────────────
 
@@ -137,7 +137,7 @@ def unsplash(photo_id: str, width: int = 800) -> str:
     return f"https://images.unsplash.com/{photo_id}?w={width}&q=85&auto=format&fit=crop"
 
 
-CAPTURED_AT = datetime.now(UTC).isoformat()
+CAPTURED_AT = datetime.now(timezone.utc).isoformat()
 
 # Legacy category slugs mapped to diet types (veg / non_veg / vegan / eggetarian)
 CATEGORY_LEGACY_MAP: dict[str, str] = {

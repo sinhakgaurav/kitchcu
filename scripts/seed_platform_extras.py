@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import os
 import subprocess
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from demo_data import DEMO_ADMIN, DEMO_CUSTOMERS, DEMO_OTP
 from seed_common import ApiError, login_admin, login_customer, login_owner, log, request
@@ -201,7 +201,7 @@ def ensure_ratings(customers: list[dict], kitchen_id: str) -> int:
 
 
 def ensure_marketing(owner_token: str, kitchen_id: str, dish_id: str) -> None:
-    now = datetime.now(UTC)
+    now = datetime.now(timezone.utc)
     try:
         request(
             "POST",
@@ -401,7 +401,7 @@ def ensure_payment_gateway(owner_token: str, kitchen_id: str) -> None:
 
 def ensure_gst(owner_token: str, kitchen_id: str, kitchen_name: str, *, gstin: str | None = None) -> None:
     """Register a GST profile and sync invoices from delivered orders."""
-    now = datetime.now(UTC)
+    now = datetime.now(timezone.utc)
     if gstin is None:
         gstin = "27AAAPL1234C1Z5"
     try:

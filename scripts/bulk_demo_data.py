@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import math
 import random
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 
 from demo_data import CAPTURED_AT, DEMO_OTP, DEMO_OWNER, DEMO_OWNERS_EXTRA, unsplash
 
@@ -301,4 +301,4 @@ def random_phone() -> str:
 
 
 def captured_at() -> str:
-    return CAPTURED_AT or datetime.now(UTC).isoformat()
+    return CAPTURED_AT or datetime.now(timezone.utc).isoformat()
