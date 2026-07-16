@@ -1,0 +1,125 @@
+# Owner dashboard section assist — options + deep links + what AI can do
+version: "2026-07-15"
+base_url: "https://kitchen.kitchcu.in"
+# Local dev: http://localhost:13002
+
+sections:
+  - id: overview
+    path: /dashboard
+    label: Overview
+    help: |
+      Home pulse: revenue, active orders, WhatsApp drafts, menu dish count, quick actions.
+    ai_can:
+      - Explain each metric
+      - Point to New order / Reports / Add dish
+    options:
+      - {id: "1", label: "New order help", next: new_order}
+      - {id: "2", label: "WhatsApp drafts", next: orders}
+      - {id: "3", label: "Reports", next: reports}
+
+  - id: orders
+    path: /orders
+    label: Orders
+    help: |
+      List + lifecycle. Parse WhatsApp → draft → confirm. Manual new order.
+    ai_can:
+      - Explain statuses
+      - Guide paste-message → parse
+      - Propose ticket for stuck orders
+    options:
+      - {id: "1", label: "Parse WhatsApp message", next: wa_order}
+      - {id: "2", label: "Lifecycle explained", answer_id: owner.orders.lifecycle}
+      - {id: "3", label: "Order detail / receipt"}
+
+  - id: new_order
+    path: /orders/new
+    label: New order
+    help: Manual order form for phone/walk-in style intake.
+
+  - id: menu
+    path: /menu
+    label: Menu
+    help: |
+      Cuisines, categories, dishes. Hero must be live-capture.
+    ai_can:
+      - Explain live-capture rule
+      - Start WhatsApp catalog → dish propose flow
+    options:
+      - {id: "1", label: "Add dish", path: /menu/add}
+      - {id: "2", label: "Import from WhatsApp catalog", next: wa_menu}
+      - {id: "3", label: "Live-capture rules", answer_id: owner.menu.live_capture}
+
+  - id: ingredients
+    path: /ingredients
+    label: Ingredients
+    help: Recipe mapper, stock, low-stock warnings (F19).
+
+  - id: reports
+    path: /reports
+    label: Reports
+    help: Revenue, top dishes, peak hours, segments (Growth+).
+    answer_id: owner.reports.growth
+
+  - id: intelligence
+    path: /growth
+    label: Intelligence
+    help: Combos, patterns, suggestions, daily menu push tools.
+
+  - id: crm
+    path: /crm
+    label: CRM
+    help: Customer spend, segments, win-back — owned by the kitchen.
+
+  - id: coupons
+    path: /coupons
+    label: Coupons
+    help: Create discount codes and targeted promotions.
+
+  - id: stream
+    path: /stream
+    label: Live stream
+    help: Opt-in LiveKit sessions for live prep visibility.
+
+  - id: learning
+    path: /learning
+    label: Learning
+    help: Curated learning portal + dish trials.
+
+  - id: community
+    path: /community
+    label: Community
+    help: Recipe rewards and chef rankings.
+
+  - id: subscription
+    path: /subscription
+    label: Subscription
+    help: Plan status; Starter / Growth / Scale.
+    answer_id: owner.pricing.plans
+
+  - id: gst
+    path: /gst
+    label: GST & finance
+    help: GST profile, tax invoices, monthly audit, balance sheet tools.
+
+  - id: kitchen_setup
+    path: /kitchen-setup
+    label: Kitchen setup
+    help: Name, address, geo, WhatsApp phone id binding.
+
+main_options:
+  title: "Which section do you need?"
+  choices:
+    - {id: "1", label: "Overview", section: overview}
+    - {id: "2", label: "Orders / WhatsApp", section: orders}
+    - {id: "3", label: "Menu", section: menu}
+    - {id: "4", label: "Reports & CRM", section: reports}
+    - {id: "5", label: "Subscription / GST", section: subscription}
+    - {id: "6", label: "More sections…", section: _more}
+
+more_options:
+  - {id: "1", label: "Ingredients", section: ingredients}
+  - {id: "2", label: "Intelligence", section: intelligence}
+  - {id: "3", label: "Coupons", section: coupons}
+  - {id: "4", label: "Live stream", section: stream}
+  - {id: "5", label: "Learning / Community", section: learning}
+  - {id: "6", label: "Kitchen setup", section: kitchen_setup}

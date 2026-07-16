@@ -1,0 +1,71 @@
+# Intent registry — options-focused routing
+version: "2026-07-15"
+
+intents:
+  # --- Support ---
+  support.greeting:
+    audience: [owner, customer]
+    options_menu: [kitchen_main, customer_main]
+  support.faq:
+    audience: [owner, customer]
+    handler: faq_lookup
+  support.ticket.start:
+    audience: [owner, customer]
+    options_menu: ticket_flow
+    suggest_ticket: true
+  support.section.assist:
+    audience: [owner]
+    handler: section_lookup
+
+  # --- Orders (WhatsApp) ---
+  order.place:
+    audience: [customer, whatsapp]
+    options_menu: order_flow
+    extract: order_items
+  order.modify:
+    audience: [customer, whatsapp]
+    extract: order_items
+  order.cancel:
+    audience: [customer, whatsapp]
+  order.status:
+    audience: [customer, whatsapp, owner]
+  order.owner.confirm_draft:
+    audience: [owner]
+    tool: order_confirm_draft
+
+  # --- Menu ingest (business WhatsApp) ---
+  menu.ingest.catalog:
+    audience: [owner, whatsapp_business]
+    options_menu: menu_ingest_flow
+    extract: dish_proposals
+  menu.ingest.daily_specials:
+    audience: [owner, whatsapp_business]
+    extract: dish_proposals
+  menu.publish.review:
+    audience: [owner]
+    tool: catalog_propose_review
+
+  # --- Meta ---
+  meta.clarify:
+    audience: [owner, customer, whatsapp]
+    behavior: ask_options_between_intents
+  meta.fallback:
+    audience: [owner, customer]
+    suggest_ticket_if: help_patterns
+
+ticket_categories:
+  - order_issue
+  - delivery
+  - quality
+  - billing
+  - technical
+  - complaint
+  - general
+
+help_patterns:
+  - "speak to human"
+  - "talk to agent"
+  - "refund"
+  - "complaint"
+  - "lawyer"
+  - "chargeback"

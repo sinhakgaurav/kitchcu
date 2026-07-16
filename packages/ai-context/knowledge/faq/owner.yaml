@@ -1,0 +1,151 @@
+# Owner FAQ — paraphrase → answer_id → stable canonical_answer + options
+version: "2026-07-15"
+audience: owner
+entries:
+  - answer_id: owner.pricing.plans
+    option_set_id: owner.after_pricing
+    paraphrases:
+      - What are your prices?
+      - How much does kitchCU cost?
+      - Tell me about pricing plans
+      - Is there commission?
+      - Subscription fees
+      - Pricing / plan / cost / fee / charge / commission
+    canonical_answer: |
+      kitchCU is subscription-only — **zero food commission** on orders.
+
+      • **Starter** — ₹499/mo: 1 kitchen, manual + WhatsApp orders, live-capture menu
+      • **Growth** — ₹999/mo: growth reports, CRM, marketing tools
+      • **Scale** — ₹1,999/mo: multi-kitchen, priority support, advanced analytics
+
+      All plans include order lifecycle and customer menu links.
+    facts_refs: [plans, commission_on_food]
+
+  - answer_id: owner.whatsapp.orders
+    option_set_id: owner.after_whatsapp
+    paraphrases:
+      - How do WhatsApp orders work?
+      - How do I get orders from WhatsApp?
+      - Parse WhatsApp message
+      - WA chat order
+    canonical_answer: |
+      Customers message your kitchen WhatsApp → kitchCU turns the text into a **draft order** →
+      you review unmatched lines and **confirm** on kitchen.kitchcu.in (Orders).
+
+      You keep the customer relationship. No per-order food commission.
+    facts_refs: [order_lifecycle, commission_on_food]
+
+  - answer_id: owner.menu.live_capture
+    option_set_id: owner.after_menu
+    paraphrases:
+      - How do I add a menu?
+      - Live capture photos?
+      - Can I use stock images?
+      - Cuisine veg non-veg dish
+    canonical_answer: |
+      Menu hierarchy: **cuisine → veg/non-veg → dish**.
+      Hero photos must be **live-capture** in your kitchen — stock photos are not allowed for heroes.
+
+      Add dishes: kitchen.kitchcu.in → Menu → Add dish. Share your customer menu link from Overview.
+    facts_refs: [menu]
+
+  - answer_id: owner.menu.from_whatsapp
+    option_set_id: owner.after_menu_ingest
+    paraphrases:
+      - Create menu from WhatsApp catalog
+      - Import dishes from my business WhatsApp
+      - Read my price list from WA
+      - Today's specials as menu
+    canonical_answer: |
+      Send or paste your business WhatsApp catalog / price list. kitchCU proposes dishes
+      (name, price, veg/non-veg). You **review, attach live-capture photos, then publish** —
+      nothing goes live without your confirmation.
+    facts_refs: [menu]
+
+  - answer_id: owner.reports.growth
+    option_set_id: owner.after_reports
+    paraphrases:
+      - Show me analytics
+      - Revenue report
+      - Repeat customers
+      - Peak hours
+    canonical_answer: |
+      Growth Reports (kitchen.kitchcu.in → Reports):
+      • Revenue & trend · Top dishes · Peak hours (IST)
+      • Repeat-customer rate & VIP segments · Win-back list (3+ weeks inactive)
+    facts_refs: []
+
+  - answer_id: owner.onboarding.otp
+    option_set_id: owner.after_onboard
+    paraphrases:
+      - How do I sign up?
+      - Owner login OTP
+      - Create kitchen
+      - Onboarding steps
+    canonical_answer: |
+      1. Open **kitchen.kitchcu.in** → Owner sign in
+      2. Register phone → OTP verify
+      3. Create kitchen → add dishes with live photos
+      4. Share customer menu link
+    facts_refs: [auth, domains]
+
+  - answer_id: owner.orders.lifecycle
+    option_set_id: owner.after_orders
+    paraphrases:
+      - Order statuses
+      - Lifecycle
+      - Manual order
+      - Cancel order
+    canonical_answer: |
+      Order lifecycle: received → accepted → preparing → ready → out_for_delivery → delivered
+      (or cancelled). Create manual orders or confirm WhatsApp drafts on kitchen.kitchcu.in → Orders.
+    facts_refs: [order_lifecycle]
+
+  - answer_id: owner.support.contact
+    option_set_id: owner.after_support
+    paraphrases:
+      - Contact support
+      - Speak to a human
+      - Email help
+      - Agent
+    canonical_answer: |
+      Human support: **hello@kitchcu.in** · Pune · Mon–Sat 9am–7pm IST · weekday reply within 24h.
+      Or raise a ticket from this chat (I'll collect a few details).
+    facts_refs: [support]
+
+option_sets:
+  owner.after_pricing:
+    - {id: "1", label: "Compare Starter vs Growth"}
+    - {id: "2", label: "WhatsApp orders"}
+    - {id: "3", label: "Start owner signup"}
+    - {id: "4", label: "Raise billing ticket"}
+  owner.after_whatsapp:
+    - {id: "1", label: "Show parse example"}
+    - {id: "2", label: "Open Orders section help"}
+    - {id: "3", label: "Menu setup"}
+    - {id: "4", label: "Raise order ticket"}
+  owner.after_menu:
+    - {id: "1", label: "Import catalog from WhatsApp"}
+    - {id: "2", label: "Live-capture rules"}
+    - {id: "3", label: "Add dish walkthrough"}
+    - {id: "4", label: "Back to main menu"}
+  owner.after_menu_ingest:
+    - {id: "1", label: "Paste catalog text now"}
+    - {id: "2", label: "How live photos work"}
+    - {id: "3", label: "Back to main menu"}
+  owner.after_reports:
+    - {id: "1", label: "CRM & coupons"}
+    - {id: "2", label: "Subscription plans"}
+    - {id: "3", label: "Back to dashboard sections"}
+  owner.after_onboard:
+    - {id: "1", label: "Pricing"}
+    - {id: "2", label: "Create first dish"}
+    - {id: "3", label: "WhatsApp setup"}
+  owner.after_orders:
+    - {id: "1", label: "WhatsApp draft help"}
+    - {id: "2", label: "Manual new order"}
+    - {id: "3", label: "Raise order ticket"}
+  owner.after_support:
+    - {id: "1", label: "Raise a ticket"}
+    - {id: "2", label: "Pricing"}
+    - {id: "3", label: "Dashboard sections"}

@@ -1,0 +1,26 @@
+{
+  "menu_id": "ticket_flow",
+  "audience": ["owner", "customer"],
+  "channel": ["portal", "whatsapp"],
+  "header": "Raise a support ticket",
+  "body": "What is this about?",
+  "options": [
+    {"id": "1", "title": "Order / delivery", "category": "order_issue"},
+    {"id": "2", "title": "Food quality", "category": "quality"},
+    {"id": "3", "title": "Billing / subscription", "category": "billing"},
+    {"id": "4", "title": "Login / technical", "category": "technical"},
+    {"id": "5", "title": "Complaint", "category": "complaint"},
+    {"id": "6", "title": "Something else", "category": "general"}
+  ],
+  "collect_after_category": [
+    {"field": "subject", "ask": "One-line subject?"},
+    {"field": "description", "ask": "What happened? Include kitchen code or order code if you have it."},
+    {"field": "customer_phone", "ask": "Best phone (optional) — reply SKIP to skip."},
+    {"field": "order_code", "ask": "Order code if any (e.g. CKPNQ001-BILL-…) — or SKIP."}
+  ],
+  "confirm_options": [
+    {"id": "1", "title": "Submit ticket"},
+    {"id": "2", "title": "Edit details"},
+    {"id": "3", "title": "Cancel"}
+  ]
+}

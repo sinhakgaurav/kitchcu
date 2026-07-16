@@ -1,0 +1,26 @@
+{
+  "version": "2026-07-15",
+  "description": "Paraphrases must resolve to the same answer_id",
+  "cases": [
+    {
+      "audience": "owner",
+      "inputs": ["pricing?", "what are plans", "commission on food?"],
+      "answer_id": "owner.pricing.plans"
+    },
+    {
+      "audience": "owner",
+      "inputs": ["whatsapp orders", "parse WA message"],
+      "answer_id": "owner.whatsapp.orders"
+    },
+    {
+      "audience": "customer",
+      "inputs": ["find kitchen", "nearby cloud kitchens", "kitchen code help"],
+      "answer_id": "customer.find.kitchen"
+    },
+    {
+      "audience": "customer",
+      "inputs": ["stock photos?", "are photos real"],
+      "answer_id": "customer.trust.live_capture"
+    }
+  ]
+}

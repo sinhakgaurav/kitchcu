@@ -1,0 +1,77 @@
+# Canonical kitchCU facts — DO NOT contradict in any prompt/FAQ
+version: "2026-07-15"
+product:
+  name: kitchCU
+  positioning: "Growth OS for cloud kitchens & home food businesses"
+  claim: "India's first — and the world's third — platform with this feature stack"
+  commission_on_food: 0
+  model: owner_subscription_saas
+
+domains:
+  portal: kitchcu.in
+  customer: customer.kitchcu.in
+  kitchen: kitchen.kitchcu.in
+  admin: admin.kitchcu.in
+  api_prefix: /api/v1/
+
+plans:
+  - id: starter
+    price_inr_month: 499
+    highlights:
+      - 1 kitchen location
+      - Manual & WhatsApp orders
+      - Live-capture menu
+      - Order lifecycle
+      - Customer menu link
+  - id: growth
+    price_inr_month: 999
+    highlights:
+      - Everything in Starter
+      - Growth reports & analytics
+      - CRM & repeat-rate tracking
+      - Win-back lists
+  - id: scale
+    price_inr_month: 1999
+    highlights:
+      - Everything in Growth
+      - Up to 5 kitchens
+      - Advanced segmentation
+      - Priority support + AI assistant
+
+order_lifecycle:
+  - received
+  - accepted
+  - preparing
+  - ready
+  - out_for_delivery
+  - delivered
+  - cancelled
+
+menu:
+  hierarchy: "cuisine → diet (veg/non_veg/…) → dish"
+  hero_must_be_live_capture: true
+  stock_photos_allowed_for_hero: false
+
+support:
+  email: hello@kitchcu.in
+  hours: "Mon–Sat, 9am–7pm IST"
+  location: "Pune, Maharashtra, India"
+  response_sla: "Within 24 hours on weekdays"
+  admin_dev_email: admin@kitchcu.dev
+
+auth:
+  owner: OTP + JWT on kitchen.kitchcu.in
+  customer: WhatsApp OTP + social OAuth on customer.kitchcu.in
+  admin: email/password platform JWT on admin.kitchcu.in
+
+forbidden_product_claims:
+  - per-order food commission
+  - dine-in / table management
+  - restaurant POS / KDS / waiters
+  - hotel features
+  - fake 10-minute delivery races
+
+demo:
+  owner_phone_example: "9876543210"
+  otp_dev_only: "123456"
+  kitchen_code_example: CKPNQ001
