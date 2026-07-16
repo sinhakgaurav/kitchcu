@@ -152,7 +152,50 @@ def feature_http_status(exc: BaseException) -> int | None:
     detail = str(exc)
     if detail.startswith("Feature '") and detail.endswith("' is disabled"):
         return 403
+    if detail.startswith("Module '") and "is disabled for this kitchen" in detail:
+        return 403
     return None
+
+
+async def is_kitchen_module_enabled(
+    session: AsyncSession,
+    kitchen_id,
+    module_key: str,
+    *,
+    default: bool = True,
+) -> bool:
+    """Global flag + optional per-kitchen override (when ``kitchen_module_overrides`` is on)."""
+    from ckac_common.risk_config import KITCHEN_MODULE_GLOBAL_FLAGS, KITCHEN_MODULE_KEYS
+
+    if module_key not in KITCHEN_MODULE_KEYS:
+        return default
+
+    global_flag = KITCHEN_MODULE_GLOBAL_FLAGS.get(module_key)
+    if global_flag and not await is_feature_enabled(session, global_flag, default=True):
+        return False
+
+    if not await is_feature_enabled(session, "kitchen_module_overrides", default=False):
+        return True
+
+    result = await session.execute(
+        text(
+            """
+            SELECT enabled FROM ckac_identity.kitchen_module_flags
+            WHERE kitchen_id = CAST(:kid AS uuid) AND module_key = :mk
+            LIMIT 1
+            """
+        ),
+        {"kid": str(kitchen_id), "mk": module_key},
+    )
+    row = result.scalar_one_or_none()
+    if row is None:
+        return default
+    return bool(row)
+
+
+async def require_kitchen_module(session: AsyncSession, kitchen_id, module_key: str) -> None:
+    if not await is_kitchen_module_enabled(session, kitchen_id, module_key):
+        raise ValueError(f"Module '{module_key}' is disabled for this kitchen")
 
 
 def verify_razorpay_webhook_signature(

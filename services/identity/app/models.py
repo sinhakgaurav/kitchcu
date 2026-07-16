@@ -95,6 +95,18 @@ class FeatureFlag(Base):
     )
 
 
+class KitchenModuleFlag(Base):
+    __tablename__ = "kitchen_module_flags"
+    __table_args__ = {"schema": "ckac_identity"}
+
+    kitchen_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True)
+    module_key: Mapped[str] = mapped_column(String(64), primary_key=True)
+    enabled: Mapped[bool] = mapped_column(Boolean, default=True)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(UTC)
+    )
+
+
 class PlatformApiKey(Base):
     __tablename__ = "platform_api_keys"
     __table_args__ = {"schema": "ckac_identity"}

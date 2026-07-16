@@ -222,11 +222,39 @@ async def growth_daily_menu_push(
     publisher: Annotated[EventPublisher, Depends(get_publisher)],
 ) -> DailyMenuPushResponse:
     await verify_kitchen_owner(kitchen_id, owner_id, session)
+    from ckac_common.platform_config import require_kitchen_module
+
     try:
+        await require_kitchen_module(session, kitchen_id, "marketing_broadcast")
         result = await push_daily_menu(session, kitchen_id, body, publisher)
     except ValueError as exc:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+        status_code = status.HTTP_403_FORBIDDEN
+        from ckac_common.platform_config import feature_http_status
+
+        if feature_http_status(exc) != 403:
+            status_code = status.HTTP_400_BAD_REQUEST
+        raise HTTPException(status_code=status_code, detail=str(exc)) from exc
     await session.commit()
+
+    from ckac_common.risk_config import is_risk_capability_enabled, messaging_fee_per_recipient_inr
+
+    if await is_risk_capability_enabled(session, "messaging_wallet_deduct", default=True):
+        fee = round(result.recipient_count * messaging_fee_per_recipient_inr(), 2)
+        if fee > 0:
+            from app.billing_client import deduct_messaging_wallet
+
+            ok = await deduct_messaging_wallet(
+                kitchen_id,
+                amount_inr=fee,
+                reason="daily_menu_blast",
+                recipient_count=result.recipient_count,
+            )
+            if not ok:
+                raise HTTPException(
+                    status_code=status.HTTP_402_PAYMENT_REQUIRED,
+                    detail="Insufficient messaging wallet balance for broadcast",
+                )
+
     await notify_daily_menu_blast(
         kitchen_id=kitchen_id,
         message=result.message,

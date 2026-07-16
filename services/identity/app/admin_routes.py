@@ -770,6 +770,102 @@ async def admin_feature_flag_update(
     return FeatureFlagRow.model_validate(flag)
 
 
+class KitchenModuleFlagRow(BaseModel):
+    module_key: str
+    enabled: bool
+    updated_at: datetime
+
+
+class KitchenModuleFlagsResponse(BaseModel):
+    kitchen_id: uuid.UUID
+    kitchen_code: str
+    modules: list[KitchenModuleFlagRow]
+
+
+class KitchenModuleFlagUpdate(BaseModel):
+    enabled: bool
+
+
+@router.get(
+    "/kitchens/{kitchen_id}/module-flags",
+    response_model=KitchenModuleFlagsResponse,
+    responses=auth_errors(include_404=True),
+)
+async def admin_kitchen_module_flags_list(
+    kitchen_id: uuid.UUID,
+    admin: Annotated[PlatformAdmin, Depends(get_current_admin)],
+    session: Annotated[AsyncSession, Depends(get_db)],
+) -> KitchenModuleFlagsResponse:
+    _ = admin
+    from app.models import KitchenModuleFlag
+    from ckac_common.risk_config import KITCHEN_MODULE_KEYS
+
+    kitchen = await session.get(Kitchen, kitchen_id)
+    if not kitchen:
+        raise HTTPException(status_code=404, detail="Kitchen not found")
+    rows = list(
+        (
+            await session.execute(
+                select(KitchenModuleFlag).where(KitchenModuleFlag.kitchen_id == kitchen_id)
+            )
+        )
+        .scalars()
+        .all()
+    )
+    by_key = {r.module_key: r for r in rows}
+    modules = []
+    for key in KITCHEN_MODULE_KEYS:
+        row = by_key.get(key)
+        modules.append(
+            KitchenModuleFlagRow(
+                module_key=key,
+                enabled=bool(row.enabled) if row else True,
+                updated_at=row.updated_at if row else datetime.now(UTC),
+            )
+        )
+    return KitchenModuleFlagsResponse(
+        kitchen_id=kitchen_id,
+        kitchen_code=kitchen.code,
+        modules=modules,
+    )
+
+
+@router.patch(
+    "/kitchens/{kitchen_id}/module-flags/{module_key}",
+    response_model=KitchenModuleFlagRow,
+    responses=auth_errors(include_404=True),
+)
+async def admin_kitchen_module_flag_update(
+    kitchen_id: uuid.UUID,
+    module_key: str,
+    body: KitchenModuleFlagUpdate,
+    admin: Annotated[PlatformAdmin, Depends(get_current_admin)],
+    session: Annotated[AsyncSession, Depends(get_db)],
+) -> KitchenModuleFlagRow:
+    _ = admin
+    from app.models import KitchenModuleFlag
+    from ckac_common.risk_config import KITCHEN_MODULE_KEYS
+
+    if module_key not in KITCHEN_MODULE_KEYS:
+        raise HTTPException(status_code=404, detail="Unknown module key")
+    kitchen = await session.get(Kitchen, kitchen_id)
+    if not kitchen:
+        raise HTTPException(status_code=404, detail="Kitchen not found")
+    row = await session.get(KitchenModuleFlag, (kitchen_id, module_key))
+    if row is None:
+        row = KitchenModuleFlag(kitchen_id=kitchen_id, module_key=module_key, enabled=body.enabled)
+        session.add(row)
+    else:
+        row.enabled = body.enabled
+    row.updated_at = datetime.now(UTC)
+    await session.flush()
+    return KitchenModuleFlagRow(
+        module_key=row.module_key,
+        enabled=bool(row.enabled),
+        updated_at=row.updated_at,
+    )
+
+
 @router.get("/api-keys", response_model=list[PlatformApiKeyRow], responses=auth_errors())
 async def admin_api_keys_list(
     admin: Annotated[PlatformAdmin, Depends(get_current_admin)],

@@ -1125,11 +1125,10 @@ async def create_draft_from_message(
     publisher: EventPublisher | None,
 ) -> "OrderDraft":
     from app.models import OrderDraft
-    from app.parser import match_dishes, parse_message_text
+    from app.llm_parser import parse_order_message
 
     menu = await _load_kitchen_menu(session, kitchen_id)
-    parsed = parse_message_text(data.message_text)
-    parsed = match_dishes(parsed, menu)
+    parsed = await parse_order_message(session, data.message_text, menu)
 
     parsed_items = [
         {

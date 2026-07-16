@@ -45,8 +45,11 @@ class EventPublisher:
         from ckac_common.auth import event_to_stream_fields
 
         for stream, event in pending:
-            await self._redis.xadd(stream, event_to_stream_fields(event))
-            await self._mark_outbox_published(session, event.event_id)
+            try:
+                await self._redis.xadd(stream, event_to_stream_fields(event))
+                await self._mark_outbox_published(session, event.event_id)
+            except Exception as exc:
+                await self._write_dlq(session, stream, event, str(exc))
         await session.commit()
 
     async def _publish_to_redis(self, stream: str, event: EventEnvelope) -> str | None:
@@ -87,6 +90,33 @@ class EventPublisher:
                 "WHERE event_id = CAST(:event_id AS uuid)"
             ),
             {"event_id": event_id},
+        )
+
+    @staticmethod
+    async def _write_dlq(
+        session: AsyncSession,
+        stream: str,
+        event: EventEnvelope,
+        error_message: str,
+    ) -> None:
+        await session.execute(
+            text(
+                """
+                INSERT INTO ckac_events.outbox_dlq
+                (event_id, event_type, stream_key, error_message, payload)
+                VALUES (
+                    CAST(:event_id AS uuid), :event_type, :stream_key, :error_message,
+                    CAST(:payload AS jsonb)
+                )
+                """
+            ),
+            {
+                "event_id": event.event_id,
+                "event_type": event.event_type,
+                "stream_key": stream,
+                "error_message": error_message[:2000],
+                "payload": json.dumps(event.payload),
+            },
         )
 
     @staticmethod

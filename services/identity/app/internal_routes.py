@@ -19,7 +19,9 @@ router = APIRouter(prefix="/internal", dependencies=[Depends(verify_internal_key
 
 
 class OwnerSubscriptionSyncRequest(BaseModel):
-    plan_tier: Literal["starter", "growth", "pro"] = Field(..., description="Activated SaaS tier.")
+    plan_tier: Literal["starter", "growth", "pro", "enterprise"] = Field(
+        ..., description="Activated SaaS tier."
+    )
     subscription_status: Literal["active"] = Field(default="active")
     subscription_expires_at: datetime = Field(..., description="Current billing period end (UTC).")
 

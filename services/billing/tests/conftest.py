@@ -92,6 +92,8 @@ def _truncate_all() -> None:
         cur.execute("TRUNCATE TABLE ckac_billing.refunds CASCADE")
         cur.execute("TRUNCATE TABLE ckac_billing.settlements CASCADE")
         cur.execute("TRUNCATE TABLE ckac_billing.payments CASCADE")
+        cur.execute("TRUNCATE TABLE ckac_billing.subscription_ledger_entries CASCADE")
+        cur.execute("TRUNCATE TABLE ckac_billing.kitchen_messaging_wallets CASCADE")
         cur.execute("TRUNCATE TABLE ckac_billing.owner_subscriptions CASCADE")
         cur.execute("TRUNCATE TABLE ckac_orders.order_items CASCADE")
         cur.execute("TRUNCATE TABLE ckac_orders.order_status_events CASCADE")
@@ -100,6 +102,7 @@ def _truncate_all() -> None:
         cur.execute("TRUNCATE TABLE ckac_identity.customers CASCADE")
         cur.execute("TRUNCATE TABLE ckac_identity.kitchens CASCADE")
         cur.execute("TRUNCATE TABLE ckac_identity.owners CASCADE")
+        cur.execute("TRUNCATE TABLE ckac_events.outbox_dlq")
         cur.execute("TRUNCATE TABLE ckac_events.outbox")
     conn.close()
 
@@ -115,6 +118,7 @@ async def _flush_billing_streams() -> None:
             "ckac:billing:settlement",
             "ckac:billing:gst",
             "ckac:billing:refund",
+            "ckac:billing:wallet",
         )
     finally:
         await client.aclose()

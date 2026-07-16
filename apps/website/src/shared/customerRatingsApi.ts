@@ -1,5 +1,6 @@
 /** Customer ratings API (F16–F18) */
 
+import { apiHeaders } from "./http";
 import { getCustomerToken } from "./customerApi";
 
 export type DishRatingSummary = {
@@ -30,10 +31,16 @@ export type DishRating = {
   created_at: string;
 };
 
+export type HealthNudge = {
+  message: string;
+  walk_minutes: number;
+  water_ml: number;
+};
+
 async function ratingsFetch<T>(path: string, init?: RequestInit): Promise<T> {
   const token = getCustomerToken();
   const headers: Record<string, string> = {
-    "Content-Type": "application/json",
+    ...apiHeaders(),
     ...(init?.headers as Record<string, string> | undefined),
   };
   if (token) headers.Authorization = `Bearer ${token}`;
@@ -56,7 +63,7 @@ export async function fetchKitchenRatingSummaries(
 export async function submitOrderRatings(
   orderId: string,
   ratings: DishRatingInput[],
-): Promise<{ ratings: DishRating[] }> {
+): Promise<{ ratings: DishRating[]; health_nudge: HealthNudge }> {
   return ratingsFetch(`/api/v1/customers/me/orders/${orderId}/ratings`, {
     method: "POST",
     body: JSON.stringify({ ratings }),

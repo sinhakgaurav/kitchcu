@@ -76,7 +76,7 @@
 | **Streaming service** | `services/streaming/`, `apps/website/` | **S18** — F46 LiveKit sessions, F47 owner opt-in go-live, F48 customer live filter |
 | **Owner analytics** | `services/order/app/analytics.py` | F07–F08 revenue, top dishes, peak hours, customer segments |
 | Shared lib | `packages/ckac-common/` | Config, DB, auth, `EventPublisher`, cache, health, internal auth |
-| Event bus | Redis Streams | `ckac:catalog:dish`, `ckac:catalog:ingredient`, `ckac:orders:order`, `ckac:orders:draft`, `ckac:orders:master_order`, `ckac:billing:payment`, `ckac:billing:settlement`, `ckac:billing:subscription`, `ckac:billing:gst`, `ckac:billing:refund`, `ckac:marketing:coupon`, `ckac:marketing:promotion`, `ckac:marketing:crm`, `ckac:ratings:rating`, `ckac:ratings:dish`, `ckac:growth:suggestion`, `ckac:growth:daily_menu`, `ckac:delivery:quote`, `ckac:delivery:tracking`, `ckac:learning:trial`, `ckac:community:recipe`, `ckac:community:reward`, `ckac:community:ranking`, `ckac:streaming:session`, `ckac:notify:whatsapp`, `ckac:notify:dispatch`, `ckac:notify:tracking` |
+| Event bus | Redis Streams | `ckac:catalog:dish`, `ckac:catalog:ingredient`, `ckac:orders:order`, `ckac:orders:draft`, `ckac:orders:master_order`, `ckac:billing:payment`, `ckac:billing:settlement`, `ckac:billing:subscription`, `ckac:billing:wallet`, `ckac:billing:gst`, `ckac:billing:refund`, `ckac:marketing:coupon`, `ckac:marketing:promotion`, `ckac:marketing:crm`, `ckac:ratings:rating`, `ckac:ratings:dish`, `ckac:growth:suggestion`, `ckac:growth:daily_menu`, `ckac:delivery:quote`, `ckac:delivery:tracking`, `ckac:learning:trial`, `ckac:community:recipe`, `ckac:community:reward`, `ckac:community:ranking`, `ckac:streaming:session`, `ckac:notify:whatsapp`, `ckac:notify:dispatch`, `ckac:notify:tracking` |
 | PostgreSQL + PostGIS | `infra/postgres/init/` | Schema-per-domain |
 | Docker stack | `docker-compose.yml` | postgres, redis, minio, gateway, identity, catalog, order, billing, marketing, ratings, growth, delivery, learning, community, streaming, notification |
 | Tests | `services/*/tests/` | TDD — run `scripts/run-tests.ps1` |
@@ -424,7 +424,7 @@ Delivered order only → home_taste (1–5) + quality (1–5) → optional anony
 | Where does business logic go? | `schemas.py` domain functions or `domain/` package — not in routes |
 | How to handle phone numbers? | Normalize to E.164 (`+91...`) via Pydantic validator |
 | Default OTP in dev? | `123456` (replace with Redis + WhatsApp in prod) |
-| Demo owner / kitchen? | Run `python scripts/seed-dev-data.py` → phones `9876543210`–`9876543213`, OTP `123456`, primary kitchen `CKPNQ001` |
+| Demo owner / kitchen? | Run `python scripts/seed-dev-data.py` or `.\scripts\seed-all.ps1` (bulk + all personas) → phones `9876543210`–`9876543213`, OTP `123456`, primary kitchen `CKPNQ001` |
 | Demo customers? | WhatsApp OTP `123456` — `9123456789`, `9123456780`, `9988776655` |
 | Platform admin? | `admin@kitchcu.dev` / `admin123456` (dev default) |
 | Primary user for Phase 1? | Owner — optimize owner flows before customer PWA |

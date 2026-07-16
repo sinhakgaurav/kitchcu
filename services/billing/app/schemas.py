@@ -20,6 +20,7 @@ SUBSCRIPTION_PLANS: dict[str, dict[str, float]] = {
     "starter": {"monthly": 499.0, "yearly": 4990.0},
     "growth": {"monthly": 999.0, "yearly": 9990.0},
     "pro": {"monthly": 1999.0, "yearly": 19990.0},
+    "enterprise": {"monthly": 1799.0, "yearly": 17990.0},
 }
 
 BILLING_CYCLE_DAYS = {"monthly": 30, "yearly": 365}
@@ -139,7 +140,9 @@ class SubscriptionPlansResponse(BaseModel):
 class SubscriptionCreateRequest(BaseModel):
     """Start an owner's platform subscription — kitchCU's SaaS revenue model (zero per-order food commission)."""
 
-    plan_tier: Literal["starter", "growth", "pro"] = Field(..., description="Subscription tier to start.")
+    plan_tier: Literal["starter", "growth", "pro", "enterprise"] = Field(
+        ..., description="Subscription tier to start."
+    )
     billing_cycle: Literal["monthly", "yearly"] = Field(default="monthly", description="Billing cadence.")
 
 
@@ -695,6 +698,10 @@ async def activate_subscription(
         plan_tier=sub.plan_tier,
         subscription_expires_at=sub.current_period_end,
     )
+
+    from app.messaging_wallet import apply_enterprise_subscription_bifurcation
+
+    await apply_enterprise_subscription_bifurcation(session, sub, publisher)
 
     if publisher:
         event = EventPublisher.build(

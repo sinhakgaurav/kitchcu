@@ -57,10 +57,22 @@ class DishRatingResponse(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class HealthNudgeResponse(BaseModel):
+    """Personalized health nudge shown immediately after rating."""
+
+    message: str = Field(..., description="Friendly wellness message for the customer.")
+    walk_minutes: int = Field(..., ge=5, le=45, description="Suggested walk duration in minutes.")
+    water_ml: int = Field(..., ge=200, le=750, description="Suggested water intake in millilitres.")
+
+
 class OrderRatingsCreateResponse(BaseModel):
     """Result of submitting ratings for an order."""
 
     ratings: list[DishRatingResponse] = Field(..., description="The created rating rows, one per dish rated.")
+    health_nudge: HealthNudgeResponse = Field(
+        ...,
+        description="Warm post-meal wellness tip based on what was ordered.",
+    )
 
 
 class DishRatingSummaryResponse(BaseModel):
@@ -200,6 +212,48 @@ async def _dish_in_order(session: AsyncSession, order_id: uuid.UUID, dish_id: uu
     return result.scalar_one_or_none() is not None
 
 
+async def _health_nudge_for_order(session: AsyncSession, order_id: uuid.UUID) -> HealthNudgeResponse:
+    result = await session.execute(
+        text(
+            """
+            SELECT oi.quantity, COALESCE(c.slug, 'veg') AS diet
+            FROM ckac_orders.order_items oi
+            LEFT JOIN ckac_catalog.dishes d ON d.id = oi.dish_id
+            LEFT JOIN ckac_catalog.categories c ON c.id = d.category_id
+            WHERE oi.order_id = :oid
+            LIMIT 5
+            """
+        ),
+        {"oid": order_id},
+    )
+    rows = result.mappings().all()
+    walk = 15
+    water = 300
+    if rows:
+        qty_total = sum(max(1, int(r["quantity"])) for r in rows)
+        diets = {(r["diet"] or "veg").lower() for r in rows}
+        if "non_veg" in diets:
+            walk = min(45, 20 * qty_total)
+            water = min(750, 350 * qty_total)
+            detail = "a short walk and some water"
+        elif diets == {"vegan"}:
+            walk = min(45, 12 * qty_total)
+            water = min(750, 300 * qty_total)
+            detail = "a light stroll and steady hydration"
+        else:
+            walk = min(45, 15 * qty_total)
+            water = min(750, 300 * qty_total)
+            detail = "a 15-minute walk or a glass of warm water"
+    else:
+        detail = "a 15-minute walk or a glass of warm water"
+
+    return HealthNudgeResponse(
+        message=f"Hope you loved the meal! A quick {detail} would be a perfect finish.",
+        walk_minutes=walk,
+        water_ml=water,
+    )
+
+
 async def _update_aggregate(
     session: AsyncSession,
     kitchen_id: uuid.UUID,
@@ -317,7 +371,11 @@ async def submit_order_ratings(
         )
         await publisher.publish(stream_key("ratings", "rating"), event, session=session)
 
-    return OrderRatingsCreateResponse(ratings=[rating_to_response(r) for r in created])
+    nudge = await _health_nudge_for_order(session, order_id)
+    return OrderRatingsCreateResponse(
+        ratings=[rating_to_response(r) for r in created],
+        health_nudge=nudge,
+    )
 
 
 async def get_dish_summary(

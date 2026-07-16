@@ -135,6 +135,31 @@ class OwnerSubscription(Base):
     updated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
+class KitchenMessagingWallet(Base):
+    __tablename__ = "kitchen_messaging_wallets"
+    __table_args__ = {"schema": "ckac_billing"}
+
+    kitchen_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True)
+    balance_inr: Mapped[float] = mapped_column(Numeric(12, 2), default=0)
+    low_balance_alerted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default="now()")
+
+
+class SubscriptionLedgerEntry(Base):
+    __tablename__ = "subscription_ledger_entries"
+    __table_args__ = {"schema": "ckac_billing"}
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    subscription_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False, index=True)
+    owner_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
+    kitchen_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True, index=True)
+    total_amount: Mapped[float] = mapped_column(Numeric(10, 2), nullable=False)
+    platform_revenue_amount: Mapped[float] = mapped_column(Numeric(10, 2), nullable=False)
+    wallet_credit_amount: Mapped[float] = mapped_column(Numeric(10, 2), nullable=False)
+    currency: Mapped[str] = mapped_column(String(3), default="INR")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default="now()")
+
+
 class KitchenGstProfile(Base):
     __tablename__ = "kitchen_gst_profiles"
     __table_args__ = (

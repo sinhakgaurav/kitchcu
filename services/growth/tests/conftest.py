@@ -13,6 +13,7 @@ os.environ.setdefault(
 os.environ.setdefault("REDIS_URL", "redis://localhost:16379/0")
 os.environ.setdefault("JWT_SECRET", "test-secret-key-for-pytest")
 os.environ.setdefault("INTERNAL_API_KEY", "test-internal-key-for-pytest")
+os.environ.setdefault("BILLING_SERVICE_URL", "http://test")
 os.environ.setdefault("NOTIFICATION_SERVICE_URL", "http://test")
 os.environ.setdefault("APP_ENV", "test")
 
@@ -259,6 +260,20 @@ def _seed_growth_ctx() -> dict:
         "dish_c": dish_c,
         "owner_token": _make_owner_token(owner_id),
     }
+
+
+@pytest.fixture(autouse=True)
+def wire_wallet_and_notify_shims(monkeypatch):
+    async def _noop_deduct(*_args, **_kwargs) -> bool:
+        return True
+
+    async def _noop_notify(*_args, **_kwargs) -> None:
+        return None
+
+    from app import billing_client, notify_client
+
+    monkeypatch.setattr(billing_client, "deduct_messaging_wallet", _noop_deduct)
+    monkeypatch.setattr(notify_client, "notify_daily_menu_blast", _noop_notify)
 
 
 @pytest.fixture(autouse=True)

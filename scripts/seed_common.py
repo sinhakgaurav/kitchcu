@@ -62,6 +62,29 @@ def login_owner(phone_e164: str, otp: str) -> str:
     return token_resp["access_token"]
 
 
+def login_customer(phone_e164: str, otp: str) -> str:
+    request("POST", "/api/v1/auth/customer/whatsapp/request", {"phone": phone_e164})
+    token_resp = request(
+        "POST",
+        "/api/v1/auth/customer/whatsapp/verify",
+        {"phone": phone_e164, "otp": otp},
+    )
+    return token_resp["access_token"]
+
+
+def login_admin(email: str, password: str) -> str:
+    token_resp = request(
+        "POST",
+        "/api/v1/admin/auth/login",
+        {"email": email, "password": password},
+    )
+    return token_resp["access_token"]
+
+
+def log(msg: str) -> None:
+    print(msg, flush=True)
+
+
 def cuisine_map(token: str, kitchen_id: str) -> dict[str, str]:
     cuisines = request("GET", f"/api/v1/kitchens/{kitchen_id}/cuisines", token=token)
     return {c["slug"]: c["id"] for c in cuisines}

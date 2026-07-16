@@ -35,7 +35,8 @@ from bulk_demo_data import (  # noqa: E402
     owner_kitchen_specs,
 )
 from demo_data import DEMO_KITCHEN_CODE, DEMO_OTP, DEMO_OWNER  # noqa: E402
-from seed_common import ApiError, cuisine_map, dish_create_payload, ensure_dish_recipes, ensure_ingredients, login_owner, request, wait_for_gateway  # noqa: E402
+from seed_common import ApiError, cuisine_map, dish_create_payload, ensure_dish_recipes, ensure_ingredients, login_owner, log, request, wait_for_gateway  # noqa: E402
+from seed_platform_extras import seed_platform_extras  # noqa: E402
 from ingredient_demo_data import DEMO_PANTRY, DISH_PREP_STEPS, DISH_RECIPES  # noqa: E402
 
 def env_int(name: str, default: int, *, minimum: int = 0) -> int:
@@ -349,6 +350,12 @@ def main() -> None:
     ensure_orders(demo_token, primary["id"], primary_dish_ids, BULK_ORDERS)
     ensure_drafts(demo_token, primary["id"], BULK_DRAFTS)
     backdate_orders(primary["id"])
+
+    seed_platform_extras(
+        owner_token=demo_token,
+        kitchen_id=primary["id"],
+        dish_ids=primary_dish_ids,
+    )
 
     # Additional owners — more kitchens for nearby density
     log("")

@@ -75,7 +75,7 @@ conn.autocommit = True
 with conn.cursor() as cur:
     cur.execute('CREATE EXTENSION IF NOT EXISTS \"uuid-ossp\"')
     cur.execute('CREATE SCHEMA IF NOT EXISTS ckac_events')
-    for name in ('02-events.sql', '03-events-fix.sql'):
+    for name in ('02-events.sql', '03-events-fix.sql', '04-outbox-dlq.sql'):
         cur.execute((root / 'infra' / 'postgres' / 'init' / name).read_text(encoding='utf-8'))
 conn.close()
 "@

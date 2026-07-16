@@ -27,6 +27,9 @@ async def test_submit_rating_for_delivered_order(client: AsyncClient, ratings_ct
     body = response.json()
     assert len(body["ratings"]) == 1
     assert body["ratings"][0]["home_taste_score"] == 5
+    assert "health_nudge" in body
+    assert body["health_nudge"]["walk_minutes"] >= 5
+    assert "Hope you loved the meal" in body["health_nudge"]["message"]
 
 
 @pytest.mark.asyncio

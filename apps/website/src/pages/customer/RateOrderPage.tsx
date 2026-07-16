@@ -23,6 +23,7 @@ export function RateOrderPage() {
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState(false);
+  const [healthNudge, setHealthNudge] = useState<{ message: string; walk_minutes: number; water_ml: number } | null>(null);
 
   useEffect(() => {
     if (!token || !orderId) return;
@@ -63,7 +64,8 @@ export function RateOrderPage() {
           ? { media_url: r.media_url.trim(), media_type: "video" as const }
           : {}),
       }));
-      await submitOrderRatings(orderId, payload);
+      const result = await submitOrderRatings(orderId, payload);
+      setHealthNudge(result.health_nudge);
       setDone(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not submit ratings");
@@ -78,6 +80,15 @@ export function RateOrderPage() {
         <section className="glass">
           <h1>Thank you!</h1>
           <p>Your home-taste ratings help this kitchen grow with trust.</p>
+          {healthNudge && (
+            <p className="customer-wellness-nudge" role="status">
+              {healthNudge.message}
+              {" "}
+              <span className="customer-wellness-nudge__meta">
+                (~{healthNudge.walk_minutes} min walk · ~{healthNudge.water_ml} ml water)
+              </span>
+            </p>
+          )}
           <Link to="/orders" className="btn btn--primary">Back to orders</Link>
         </section>
       </div>

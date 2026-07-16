@@ -6,6 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.routes import router
 from app.admin_routes import router as admin_router
+from app.internal_routes import router as internal_router
 from ckac_common.config import get_settings
 from ckac_common.database import check_db_connection
 from ckac_common.event_bus import EventPublisher
@@ -52,6 +53,7 @@ app.add_middleware(
 
 app.include_router(router, prefix="/api/v1")
 app.include_router(admin_router, prefix="/api/v1")
+app.include_router(internal_router, prefix="/api/v1")
 
 
 @app.get("/health/live")
