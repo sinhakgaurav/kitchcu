@@ -311,33 +311,47 @@ html.theme-brand-light .brand-nav-mark__sub {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 0.85rem;
+  gap: 0.75rem;
   width: 100%;
+  max-width: 26rem;
+  margin-inline: auto;
   height: 100%;
   min-height: 100%;
   box-sizing: border-box;
   overflow-y: auto;
-  padding: clamp(1.25rem, 3vh, 2rem) clamp(1.25rem, 3vw, 2.5rem);
+  padding: clamp(1.5rem, 4vh, 2.5rem) clamp(1.25rem, 3vw, 2rem);
   text-align: center;
 }
 
-.auth-page__brand-stack .brand-logo--wordmark {
-  height: 52px;
-  filter: drop-shadow(0 8px 24px rgba(0, 0, 0, 0.55));
+.auth-page__brand-stack .brand-logo--wordmark,
+.auth-page__brand-stack .brand-logo--lg.brand-logo--wordmark {
+  height: 64px;
+  filter: none;
+}
+
+.auth-page__brand-stack .brand-logo--badge {
+  height: 80px;
+  width: auto;
 }
 
 .auth-page__brand-stack h1 {
   font-family: var(--font-display);
-  font-size: clamp(1.35rem, 2.3vw, 1.9rem);
-  max-width: 16ch;
+  font-size: clamp(1.45rem, 2.4vw, 2rem);
+  max-width: 18ch;
   margin: 0;
+  line-height: 1.15;
 }
 
 .auth-page__brand-stack p {
-  max-width: 32ch;
+  max-width: 34ch;
   margin: 0;
   color: rgba(245, 245, 247, 0.88);
-  font-size: 0.95rem;
+  font-size: 0.92rem;
+  line-height: 1.45;
+}
+
+.auth-page__mobile-brand {
+  display: none;
 }
 
 .nav__links {
@@ -2246,10 +2260,6 @@ form.auth-card > .btn,
     max-height: none;
   }
 
-  .auth-page__brand-stack {
-    padding: 1.25rem 1.25rem 0.75rem;
-  }
-
   .contact__grid {
     grid-template-columns: 1fr;
   }
@@ -2399,21 +2409,6 @@ form.auth-card > .btn,
     width: min(1140px, calc(100% - 1.25rem));
   }
 
-  .auth-page__brand-stack {
-    justify-content: flex-start;
-    gap: 0.65rem;
-    padding: 1.25rem 1rem 0.5rem;
-    min-height: 0;
-    height: auto;
-  }
-
-  .auth-page.auth-page--brand .auth-page__brand-stack .brand-auth-art,
-  .auth-page.auth-page--kitchen .auth-page__brand-stack .brand-auth-art,
-  .auth-page.auth-page--customer .auth-page__brand-stack .brand-auth-art,
-  .admin-login .auth-page__brand-stack .brand-auth-art {
-    width: min(52%, 180px);
-    margin-top: 0.25rem;
-  }
 }
 
 @media (prefers-reduced-motion: reduce) {

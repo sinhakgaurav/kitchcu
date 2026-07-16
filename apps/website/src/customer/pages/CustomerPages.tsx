@@ -129,6 +129,10 @@ export function CustomerLoginPage() {
       </div>
 
       <div className="auth-page__form-wrap">
+        <div className="auth-page__mobile-brand">
+          <BrandLogo variant="wordmark" className="brand-logo--lg" />
+          <p>Customer sign in · {CUSTOMER_HOST}</p>
+        </div>
         <div className="auth-card glass">
           <div className="auth-card__demo">
             <strong>Demo customer accounts</strong>

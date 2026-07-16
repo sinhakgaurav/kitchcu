@@ -593,31 +593,35 @@ function AdminLogin({ onSuccess }: { onSuccess: (token: string) => void }) {
         </div>
       </div>
       <div className="auth-page__form-wrap">
-      <form className="auth-card admin-login__card" onSubmit={submit}>
-        <p className="admin-login__eyebrow">Super admin</p>
-        <BrandLogo variant="wordmark" className="brand-logo--lg" />
-        <h1>Sign in</h1>
-        <p>Use the platform admin credentials for {ADMIN_HOST}.</p>
-        {error && <div className="auth-card__error">{error}</div>}
-        <label>
-          Email
-          <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
-        </label>
-        <label>
-          Password
-          <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required />
-        </label>
-        <button type="submit" className="btn btn--primary btn--lg" disabled={busy}>
-          {busy ? "Signing in..." : "Sign in"}
-        </button>
-        <p className="auth-card__hint">
-          Dev admin: {DEMO_ADMIN.email} / {DEMO_ADMIN.password}
-          <br />
-          Owner demos: {DEMO_OWNERS.map((o) => o.phone).join(", ")} (OTP 123456)
-          {" · "}
-          <a href={kitchenUrl("/login")} target="_blank" rel="noopener noreferrer">Owner app</a>
-        </p>
-      </form>
+        <div className="auth-page__mobile-brand">
+          <BrandLogo variant="wordmark" className="brand-logo--lg" />
+          <p>Platform control · {ADMIN_HOST}</p>
+        </div>
+        <form className="auth-card admin-login__card" onSubmit={submit}>
+          <p className="admin-login__eyebrow">Super admin</p>
+          <BrandLogo variant="wordmark" className="brand-logo--lg auth-card__desktop-logo" />
+          <h1>Sign in</h1>
+          <p>Use the platform admin credentials for {ADMIN_HOST}.</p>
+          {error && <div className="auth-card__error">{error}</div>}
+          <label>
+            Email
+            <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
+          </label>
+          <label>
+            Password
+            <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required />
+          </label>
+          <button type="submit" className="btn btn--primary btn--lg" disabled={busy}>
+            {busy ? "Signing in..." : "Sign in"}
+          </button>
+          <p className="auth-card__hint">
+            Dev admin: {DEMO_ADMIN.email} / {DEMO_ADMIN.password}
+            <br />
+            Owner demos: {DEMO_OWNERS.map((o) => o.phone).join(", ")} (OTP 123456)
+            {" · "}
+            <a href={kitchenUrl("/login")} target="_blank" rel="noopener noreferrer">Owner app</a>
+          </p>
+        </form>
       </div>
     </div>
   );
