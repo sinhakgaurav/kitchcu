@@ -104,15 +104,12 @@ CUSTOMER_OAUTH_REDIRECT_BASE=https://customer.kitchcu.com
 EOF
 chmod 600 "$ENV_DIR/.env"
 
-# --- 5. Build in batches then start (e2-small cannot parallel-build everything) ------
+# --- 5. Build serially (one image at a time — Bake ignores parallel limits and OOMs
+#        an e2-small on concurrent builds), then start ------------------------------
 cd "$REPO_DIR"
-export COMPOSE_PARALLEL_LIMIT=2
-export DOCKER_BUILDKIT=1
 COMPOSE=(docker compose -f infra/gcp-vm/docker-compose.prod.yml --env-file infra/gcp-vm/.env)
-"${COMPOSE[@]}" build identity catalog order billing notification gateway
-"${COMPOSE[@]}" build marketing ratings growth delivery learning community streaming
-"${COMPOSE[@]}" build portal-web kitchen-web customer-web admin-web
-"${COMPOSE[@]}" up -d
+bash infra/gcp-vm/build-serial.sh
+"${COMPOSE[@]}" up -d --no-build
 
 # --- 6. Optional one-time bulk seed (metadata run-seed=1) ---------------------------
 RUN_SEED="$(meta run-seed)"
@@ -121,7 +118,7 @@ if { [ "$RUN_SEED" = "1" ] || [ "$RUN_SEED" = "true" ]; } && [ ! -f "$SEED_MARKE
   echo "Waiting for gateway before bulk seed..."
   ready=0
   for _ in $(seq 1 90); do
-    if curl -sf http://127.0.0.1:18000/health/ready | grep -q '"status"'; then
+    if curl -sf http://127.0.0.1:18000/health/ready | grep -q '"status"[[:space:]]*:[[:space:]]*"ok"'; then
       ready=1
       break
     fi

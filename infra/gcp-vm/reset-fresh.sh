@@ -37,21 +37,16 @@ if grep -q '^APP_ENV=' infra/gcp-vm/.env; then
 fi
 rm -f "$SEED_MARKER"
 
-echo "=== Building images in batches (avoids context deadline on e2-small) ==="
-export COMPOSE_PARALLEL_LIMIT=2
-export DOCKER_BUILDKIT=1
-"${COMPOSE[@]}" build postgres redis minio
-"${COMPOSE[@]}" build identity catalog order billing notification gateway
-"${COMPOSE[@]}" build marketing ratings growth delivery learning community streaming
-"${COMPOSE[@]}" build portal-web kitchen-web customer-web admin-web
+echo "=== Building images ONE AT A TIME (Bake ignores parallel limits and OOMs e2-small) ==="
+bash infra/gcp-vm/build-serial.sh
 
-echo "=== Starting stack ==="
-"${COMPOSE[@]}" up -d
+echo "=== Starting stack (images already built) ==="
+"${COMPOSE[@]}" up -d --no-build
 
-echo "=== Waiting for gateway /health/ready ==="
+echo "=== Waiting for gateway /health/ready (status=ok) ==="
 ready=0
 for _ in $(seq 1 90); do
-  if curl -sf http://127.0.0.1:18000/health/ready | grep -q '"status"'; then
+  if curl -sf http://127.0.0.1:18000/health/ready | grep -q '"status"[[:space:]]*:[[:space:]]*"ok"'; then
     ready=1
     break
   fi
