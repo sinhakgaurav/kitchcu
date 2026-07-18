@@ -93,7 +93,7 @@ Status tags: ✅ Done well · 🟡 Partial · 🔴 Gap / not built · 📋 Desig
 | **Solution** | Nearby live card → Watch → LiveKit viewer token → phase overlay from showcase API. |
 | **Implementation (CTO)** | Exists: go-live, showcase phases, `POST .../viewer-token`. Missing: customer route + player. Feature `live_streaming`; module `streaming`/`livekit`. |
 | **Achievements / done well** | ✅ Session + phases + live discovery filter · ✅ Viewer-token API · ✅ Customer `/live/:sessionId` Watch + Nearby CTA · ✅ Showcase phase poll |
-| **Gaps** | 🟡 Embedded LiveKit player (token + URL shown; player next) · 🟡 Viewer count proof on owner side |
+| **Gaps** | ✅ Embedded LiveKit player · 🟡 Viewer count proof · 🟡 Prod LiveKit credentials |
 | **Architecture enhancements** | Short-lived viewer tokens; rate-limit token mint; CDN for LiveKit; kill via module flags. |
 | **DB enhancements** | Already on `live_sessions` (dish_id, showcase_phase, prepared_at); add `viewer_joins` counters table if analytics needed. |
 | **UX enhancements** | Phase chips read-only; embed LiveKit JS SDK when `LIVEKIT_URL` set. |
@@ -280,7 +280,7 @@ Status tags: ✅ Done well · 🟡 Partial · 🔴 Gap / not built · 📋 Desig
 | **Solution** | Control tab (done) + perm `flags:write` / `api_keys:write` enforced + audit. |
 | **Implementation (CTO)** | Asserts on feature-flag + api-key routes; audit rows. |
 | **Achievements / done well** | ✅ Flags + journeys UI · ✅ DB-backed secrets · ✅ `flags:*` + `api_keys:write` enforced · ✅ Tabs hidden without perms |
-| **Gaps** | 🔴 No audit trail UI |
+| **Gaps** | ✅ Audit trail UI · 🟡 Confirm modal on secret rotate polish |
 | **Architecture / DB** | As C1 audit. |
 | **UX** | Confirm modal on secret rotate; last-rotated display. |
 
@@ -315,7 +315,7 @@ Status tags: ✅ Done well · 🟡 Partial · 🔴 Gap / not built · 📋 Desig
 | **CPO** | Inbound drafts strong; outbound + templates incomplete. |
 | **CTO** | Notify service owns dispatch; marketing owns template content; wallet owns cost. |
 | **Achievements** | ✅ Webhook → drafts · ✅ Order/status notify (S14) · ✅ Support chat/tickets |
-| **Gaps** | 🟡 Per-recipient WA fan-out (blast count today) · 🟡 Prod OTP · 🟡 Wallet UX · ✅ Template send API + owner Preview/Send |
+| **Gaps** | ✅ Per-phone fan-out · 🟡 Meta Cloud outbound · 🟡 Prod OTP · 🟡 Wallet UX |
 | **Arch** | Single dispatch pipeline for daily-menu + template send |
 | **DB** | `notify_dispatches` already patterned; link `template_send_id` |
 | **UX** | Delivery receipts on owner Templates page |
