@@ -295,11 +295,20 @@ export function OrderDetailPage() {
             {order.courier_partner ? ` · ${order.courier_partner}` : ""}
             {order.courier_job_id ? ` · job ${order.courier_job_id}` : ""}
             {order.courier_status ? ` · courier ${order.courier_status}` : ""}
+            {order.delivery_fee_payment ? ` · fee ${order.delivery_fee_payment}` : ""}
             {order.owner_delivery_cost
               ? ` · kitchen cost ${inr(order.owner_delivery_cost)}`
               : ""}
             {order.delivery_fee > 0 ? ` · customer fee ${inr(order.delivery_fee)}` : ""}
           </p>
+          {order.delivery_mode === "platform"
+            && (order.delivery_payer === "shared" || order.delivery_fee_payment === "prepaid")
+            && order.delivery_fee > 0
+            && !order.courier_job_id && (
+            <p className="report-hint" style={{ marginTop: "0.35rem" }}>
+              Porter books after the customer’s prepaid delivery share is captured (UPI/online).
+            </p>
+          )}
           {order.status !== "delivered" && order.status !== "cancelled" && (
             <div className="od-board__hero-actions" style={{ flexDirection: "row", flexWrap: "wrap" }}>
               <button

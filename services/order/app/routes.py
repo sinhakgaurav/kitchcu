@@ -669,7 +669,22 @@ async def order_status_update(
             and not getattr(order, "courier_job_id", None)
         ):
             try:
+                from app.delivery_fee_payment import porter_requires_prepaid_capture
+                from app.payment_gate import order_has_captured_payment
                 from app.porter_client import quote_and_book_porter
+
+                if porter_requires_prepaid_capture(
+                    delivery_mode=order.delivery_mode,
+                    delivery_fee_payment=getattr(order, "delivery_fee_payment", None),
+                    delivery_payer=getattr(order, "delivery_payer", None),
+                    customer_fee=float(order.delivery_fee or 0),
+                ):
+                    if not await order_has_captured_payment(session, order.id):
+                        logging.getLogger("order.porter").warning(
+                            "Porter book deferred — prepaid delivery fee not captured order_id=%s",
+                            order.id,
+                        )
+                        return await order_to_response(session, order)
 
                 booked = await quote_and_book_porter(session, order)
                 if booked:

@@ -189,6 +189,7 @@ export type Order = {
   courier_partner?: string | null;
   courier_job_id?: string | null;
   courier_status?: string | null;
+  delivery_fee_payment?: string | null;
   customer_latitude?: number | null;
   customer_longitude?: number | null;
   tracking_token?: string | null;

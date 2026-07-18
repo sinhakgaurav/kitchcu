@@ -89,6 +89,7 @@ For **architecture + end-to-end flows** see [PLATFORM-ARCHITECTURE-FLOWS.md](./P
 | P32 | **Porter + delivery cost share + camera fix** | In-range kitchen pays 100%; extended min-order → kitchen subsidy %; Porter quote/book; LiveKit camera preview | ✅ | Identity `017`; order `007` |
 | P32.1 | **Checkout→order Porter wire-up** | Customer sends `delivery_mode`; order validates platform fees + cost share; Porter books on accept; owner delivery settings UI | ✅ | — |
 | P33 | **Prod OTP WhatsApp + Porter webhooks** | Identity OTP → Redis + notify WhatsApp; `POST /webhooks/porter` → `courier_status`; kitchen staff design pack | ✅ | Order `008`; design `docs/design/KITCHEN-STAFF-RBAC-DESIGN.md` |
+| P34 | **Delivery fee collection rules** | Shared → prepaid only; customer-only → pay-first or pay-on-delivery; Porter gated on prepaid capture | ✅ | Order `009` |
 
 ---
 

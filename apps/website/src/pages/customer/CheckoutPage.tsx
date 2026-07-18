@@ -28,6 +28,7 @@ import { denyDeliveryFee, fetchDeliveryQuote, type DeliveryQuote } from "../../s
 
 type DeliveryType = "pickup" | "delivery";
 type PaymentMethod = "cod" | "online" | "upi";
+type DeliveryFeePayment = "prepaid" | "pay_on_delivery";
 
 const PUNE_FALLBACK = { latitude: 18.5362, longitude: 73.8958 };
 
@@ -46,6 +47,10 @@ function selectedModeFee(quote: DeliveryQuote | undefined, mode: string): number
   return quote?.fee ?? 0;
 }
 
+function selectedModePayer(quote: DeliveryQuote | undefined, mode: string): string {
+  return quote?.modes?.find((m) => m.mode === mode)?.payer || "customer";
+}
+
 function buildGroupPayload(
   kitchen: KitchenCartGroup,
   deliveryType: DeliveryType,
@@ -53,9 +58,14 @@ function buildGroupPayload(
   feeAccepted: boolean,
   coords: { latitude: number; longitude: number },
   deliveryMode: string,
+  deliveryFeePayment: DeliveryFeePayment | undefined,
 ) {
   const isDelivery = deliveryType === "delivery";
   const fee = isDelivery ? selectedModeFee(quote, deliveryMode) : 0;
+  const payer = isDelivery ? selectedModePayer(quote, deliveryMode) : "owner";
+  let feePay = deliveryFeePayment;
+  if (isDelivery && fee > 0 && payer === "shared") feePay = "prepaid";
+  if (!isDelivery || fee <= 0 || payer === "owner") feePay = undefined;
   return {
     kitchen_id: kitchen.kitchenId,
     items: kitchen.lines.map((line) => ({
@@ -64,6 +74,7 @@ function buildGroupPayload(
     })),
     delivery_type: deliveryType,
     delivery_mode: isDelivery ? deliveryMode : undefined,
+    delivery_fee_payment: feePay,
     delivery_fee: fee,
     distance_km: isDelivery ? quote?.distance_km : undefined,
     delivery_fee_accepted: isDelivery && fee > 0 ? feeAccepted : isDelivery ? true : undefined,
@@ -82,11 +93,33 @@ export function CheckoutPage() {
   const [quotes, setQuotes] = useState<Record<string, DeliveryQuote>>({});
   const [feeAccepted, setFeeAccepted] = useState<Record<string, boolean>>({});
   const [modeByKitchen, setModeByKitchen] = useState<Record<string, string>>({});
+  const [feePayByKitchen, setFeePayByKitchen] = useState<Record<string, DeliveryFeePayment>>({});
   const [quoteLoading, setQuoteLoading] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("cod");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [deniedFeeKitchens, setDeniedFeeKitchens] = useState<Record<string, boolean>>({});
+
+  const requiresPrepaid = useMemo(() => {
+    if (!cart) return false;
+    return cart.kitchens.some((kitchen) => {
+      const dtype = deliveryByKitchen[kitchen.kitchenId] ?? "pickup";
+      if (dtype !== "delivery") return false;
+      const mode = modeByKitchen[kitchen.kitchenId] || "self";
+      const quote = quotes[kitchen.kitchenId];
+      const fee = selectedModeFee(quote, mode);
+      if (fee <= 0) return false;
+      const payer = selectedModePayer(quote, mode);
+      if (payer === "shared") return true;
+      return (feePayByKitchen[kitchen.kitchenId] || "pay_on_delivery") === "prepaid";
+    });
+  }, [cart, deliveryByKitchen, modeByKitchen, quotes, feePayByKitchen]);
+
+  useEffect(() => {
+    if (requiresPrepaid && paymentMethod === "cod") {
+      setPaymentMethod("upi");
+    }
+  }, [requiresPrepaid, paymentMethod]);
 
   const denyFee = async (kitchenId: string) => {
     const quote = quotes[kitchenId];
@@ -195,8 +228,32 @@ export function CheckoutPage() {
       }
       const mode = modeByKitchen[kitchen.kitchenId] || "self";
       const fee = selectedModeFee(quote, mode);
+      const payer = selectedModePayer(quote, mode);
       if (dtype === "delivery" && fee > 0 && !feeAccepted[kitchen.kitchenId]) {
         setError(`Accept the delivery fee for ${kitchen.kitchenName} to continue`);
+        return;
+      }
+      if (dtype === "delivery" && fee > 0 && payer === "shared" && paymentMethod === "cod") {
+        setError("Shared delivery cost must be prepaid (UPI or online) — COD is not available");
+        return;
+      }
+      if (
+        dtype === "delivery"
+        && fee > 0
+        && payer === "customer"
+        && !feePayByKitchen[kitchen.kitchenId]
+      ) {
+        setError(`Choose pay first or pay on delivery for ${kitchen.kitchenName}`);
+        return;
+      }
+      if (
+        dtype === "delivery"
+        && fee > 0
+        && payer === "customer"
+        && feePayByKitchen[kitchen.kitchenId] === "prepaid"
+        && paymentMethod === "cod"
+      ) {
+        setError("Pay-first delivery fee requires UPI or online payment");
         return;
       }
     }
@@ -214,6 +271,7 @@ export function CheckoutPage() {
               feeAccepted[kitchen.kitchenId] ?? false,
               coords,
               modeByKitchen[kitchen.kitchenId] || "self",
+              feePayByKitchen[kitchen.kitchenId],
             )),
           },
           checkoutKey(cart),
@@ -247,6 +305,7 @@ export function CheckoutPage() {
             feeAccepted[kitchen.kitchenId] ?? false,
             coords,
             modeByKitchen[kitchen.kitchenId] || "self",
+            feePayByKitchen[kitchen.kitchenId],
           ),
           payment_method: paymentMethod,
         },
@@ -388,9 +447,35 @@ export function CheckoutPage() {
                       const mode = modeByKitchen[kitchen.kitchenId] || quote.modes?.[0]?.mode || "self";
                       const opt = quote.modes?.find((m) => m.mode === mode);
                       const fee = opt?.customer_fee ?? quote.fee;
+                      const payer = opt?.payer || "customer";
                       return (
                         <>
                           {opt && <p style={{ marginTop: "0.35rem" }}>{opt.description}</p>}
+                          {fee > 0 && payer === "shared" && (
+                            <p style={{ marginTop: "0.5rem", color: "var(--teal-dark, #0f766e)" }}>
+                              Shared delivery cost — your share (₹{Math.round(fee)}) must be prepaid
+                              before the kitchen books Porter. COD is not available for this fee.
+                            </p>
+                          )}
+                          {fee > 0 && payer === "customer" && (
+                            <label style={{ display: "block", marginTop: "0.65rem" }}>
+                              Delivery fee payment
+                              <select
+                                value={feePayByKitchen[kitchen.kitchenId] || ""}
+                                onChange={(e) => {
+                                  const v = e.target.value as DeliveryFeePayment;
+                                  setFeePayByKitchen((c) => ({ ...c, [kitchen.kitchenId]: v }));
+                                  if (v === "prepaid") setPaymentMethod((m) => (m === "cod" ? "upi" : m));
+                                }}
+                              >
+                                <option value="" disabled>
+                                  Choose…
+                                </option>
+                                <option value="prepaid">Pay first (UPI / online)</option>
+                                <option value="pay_on_delivery">Pay on delivery</option>
+                              </select>
+                            </label>
+                          )}
                           {fee > 0 && (
                       <>
                         <label style={{ display: "block", marginTop: "0.5rem" }}>
@@ -452,11 +537,18 @@ export function CheckoutPage() {
             value={paymentMethod}
             onChange={(event) => setPaymentMethod(event.target.value as PaymentMethod)}
           >
-            <option value="cod">Cash on delivery / pickup</option>
+            {!requiresPrepaid && (
+              <option value="cod">Cash on delivery / pickup</option>
+            )}
             <option value="upi">UPI{isMultiKitchen ? " (split to kitchens)" : ""}</option>
             <option value="online">Card / wallet{isMultiKitchen ? " (split to kitchens)" : ""}</option>
           </select>
         </label>
+        {requiresPrepaid && (
+          <p className="nearby-kitchens__geo-hint">
+            Prepaid required for shared or pay-first delivery fees — capture UPI/online before Porter is booked.
+          </p>
+        )}
         {isMultiKitchen && paymentMethod !== "cod" && (
           <p className="nearby-kitchens__geo-hint">
             One payment is captured at checkout and split to each kitchen via Razorpay Route.

@@ -16,6 +16,18 @@ Porter is **booked on kitchen accept** (not at cart place) so cancelled carts do
 
 Owner configures radius + `min_order_for_free_delivery` + `delivery_subsidy_percent` on Kitchen settings.
 
+## Delivery fee collection (P34)
+
+| `delivery_payer` | Customer fee | Collection rule |
+|------------------|--------------|-----------------|
+| `owner` | ₹0 | No delivery-fee payment |
+| `shared` | > 0 | **Must prepaid** (UPI/online). COD rejected. Porter book waits until payment `captured`. |
+| `customer` | > 0 | Choose **`prepaid`** (pay first) or **`pay_on_delivery`**. Prepaid → online/UPI; POD → COD OK; Porter only gated when prepaid. |
+
+Field: `orders.delivery_fee_payment` = `prepaid` | `pay_on_delivery` | null.
+
+Agreement = quote shown + `delivery_fee_accepted` + (for shared) prepaid capture before Porter.
+
 ## Porter integration (CTO)
 
 `services/delivery/app/platform_courier.py`
@@ -32,8 +44,9 @@ Order booking: owner `POST .../delivery-mode` with `mode=platform` → `order.po
 
 - `delivery_mode`: `self` | `platform`
 - `delivery_payer`: `owner` | `customer` | `shared`
+- `delivery_fee_payment`: `prepaid` | `pay_on_delivery` | null
 - `owner_delivery_cost`: kitchen share (INR)
-- `courier_partner` / `courier_job_id`: Porter job (nullable)
+- `courier_partner` / `courier_job_id` / `courier_status`: Porter job (nullable)
 
 ## Env
 

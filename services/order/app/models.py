@@ -60,6 +60,7 @@ class Order(Base):
     delivery_fee_accepted: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
     delivery_mode: Mapped[str | None] = mapped_column(String(16), nullable=True)
     delivery_payer: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    delivery_fee_payment: Mapped[str | None] = mapped_column(String(32), nullable=True)
     owner_delivery_cost: Mapped[float] = mapped_column(Numeric(10, 2), default=0)
     courier_partner: Mapped[str | None] = mapped_column(String(32), nullable=True)
     courier_job_id: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)

@@ -110,6 +110,14 @@ class ManualOrderCreateRequest(BaseModel):
             "'platform' — Porter/platform courier quote with the same kitchen/customer cost-share rules."
         ),
     )
+    delivery_fee_payment: Literal["prepaid", "pay_on_delivery"] | None = Field(
+        default=None,
+        description=(
+            "How the customer pays their delivery fee share. "
+            "Required when delivery_payer=customer (prepaid|pay_on_delivery). "
+            "Forced prepaid when delivery_payer=shared. Omit when fee is 0 / owner pays."
+        ),
+    )
 
 
 class CustomerOrderCreateRequest(BaseModel):
@@ -152,6 +160,10 @@ class CustomerOrderCreateRequest(BaseModel):
         default="self",
         description="'self' or 'platform' (Porter) — must match the delivery quote mode used at checkout.",
     )
+    delivery_fee_payment: Literal["prepaid", "pay_on_delivery"] | None = Field(
+        default=None,
+        description="prepaid (required for shared) or pay_on_delivery (customer-only fee).",
+    )
 
 
 class MasterOrderGroupInput(BaseModel):
@@ -180,6 +192,10 @@ class MasterOrderGroupInput(BaseModel):
     delivery_mode: Literal["self", "platform"] = Field(
         default="self",
         description="'self' or 'platform' (Porter) for this kitchen's sub-order.",
+    )
+    delivery_fee_payment: Literal["prepaid", "pay_on_delivery"] | None = Field(
+        default=None,
+        description="prepaid (required for shared) or pay_on_delivery (customer-only fee).",
     )
 
 
@@ -287,6 +303,10 @@ class OrderResponse(BaseModel):
     courier_status: str | None = Field(
         default=None,
         description="Logistics status from Porter webhook (accepted|assigned|picked_up|in_transit|delivered|…). Separate from food lifecycle status.",
+    )
+    delivery_fee_payment: str | None = Field(
+        default=None,
+        description="'prepaid' | 'pay_on_delivery' when customer owes a delivery fee; null when kitchen pays / fee 0.",
     )
     customer_latitude: float | None = Field(default=None)
     customer_longitude: float | None = Field(default=None)
@@ -407,6 +427,22 @@ async def set_delivery_fulfillment(
     partner_name = "mock"
     porter_job = None
     if data.mode == "platform" and (os.getenv("DELIVERY_PARTNER") or "").lower() == "porter":
+        from app.delivery_fee_payment import porter_requires_prepaid_capture
+        from app.payment_gate import order_has_captured_payment
+
+        # Fee share not finalized until below — use provisional customer fee on order.
+        provisional_customer = float(order.delivery_fee or 0)
+        provisional_payer = getattr(order, "delivery_payer", None)
+        if porter_requires_prepaid_capture(
+            delivery_mode="platform",
+            delivery_fee_payment=getattr(order, "delivery_fee_payment", None),
+            delivery_payer=provisional_payer,
+            customer_fee=provisional_customer,
+        ) and not await order_has_captured_payment(session, order.id):
+            raise ValueError(
+                "Customer must prepay the delivery fee (UPI/online capture) before Porter booking "
+                "when the fee is shared or pay-first was chosen"
+            )
         try:
             from app.porter_client import quote_and_book_porter
 
@@ -765,6 +801,15 @@ async def create_manual_order(
         customer_longitude=data.customer_longitude,
         delivery_mode=delivery_mode,
     )
+    from app.delivery_fee_payment import resolve_delivery_fee_payment
+
+    fee_payment = resolve_delivery_fee_payment(
+        delivery_type=data.delivery_type,
+        delivery_payer=delivery_payer,
+        customer_fee=delivery_fee,
+        payment_method=data.payment_method,
+        delivery_fee_payment=getattr(data, "delivery_fee_payment", None),
+    )
     total = subtotal + delivery_fee
     eta_minutes = max_projected or max_prep
     estimated_ready_at = datetime.now(UTC) + timedelta(minutes=eta_minutes)
@@ -786,6 +831,7 @@ async def create_manual_order(
         delivery_fee_accepted=fee_accepted,
         delivery_mode=delivery_mode if data.delivery_type == "delivery" else None,
         delivery_payer=delivery_payer if data.delivery_type == "delivery" else None,
+        delivery_fee_payment=fee_payment,
         owner_delivery_cost=owner_delivery_cost if data.delivery_type == "delivery" else 0,
         courier_partner="porter" if delivery_mode == "platform" else None,
         customer_latitude=data.customer_latitude,
@@ -879,6 +925,7 @@ async def create_customer_order(
         customer_latitude=data.customer_latitude,
         customer_longitude=data.customer_longitude,
         delivery_mode=data.delivery_mode,
+        delivery_fee_payment=data.delivery_fee_payment,
     )
     return await create_manual_order(
         session,
@@ -960,6 +1007,7 @@ async def create_master_order(
             customer_latitude=group.customer_latitude,
             customer_longitude=group.customer_longitude,
             delivery_mode=group.delivery_mode,
+            delivery_fee_payment=group.delivery_fee_payment,
         )
         order, _created = await create_manual_order(
             session,
@@ -1149,6 +1197,7 @@ async def order_to_response(session: AsyncSession, order: Order) -> OrderRespons
         courier_partner=getattr(order, "courier_partner", None),
         courier_job_id=getattr(order, "courier_job_id", None),
         courier_status=getattr(order, "courier_status", None),
+        delivery_fee_payment=getattr(order, "delivery_fee_payment", None),
         customer_latitude=getattr(order, "customer_latitude", None),
         customer_longitude=getattr(order, "customer_longitude", None),
         tracking_token=order.tracking_token,
