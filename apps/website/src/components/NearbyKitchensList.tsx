@@ -2,7 +2,8 @@ import { useCallback, useEffect, useMemo, useState, type CSSProperties, type Ref
 import { useNavigate } from "react-router-dom";
 import { kitchenCardImage } from "../data/content";
 import { DEMO } from "../shared/demo";
-import type { KitchenNearby } from "../shared/api";
+import type { KitchenNearby, LiveKitchenSummary } from "../shared/api";
+import { fetchLiveKitchens } from "../shared/api";
 import { fetchPublicNearbyKitchens } from "../shared/publicApi";
 import { useCustomerAuth } from "../shared/customerAuth";
 import { saveKitchenToSession } from "../shared/customerSession";
@@ -18,6 +19,7 @@ export function NearbyKitchensList() {
   const { ref, visible } = useInView(0.06);
   const { coords, status, error: geoError, refresh, setCoords } = useGeolocation(DEMO.defaultLocation);
   const [kitchens, setKitchens] = useState<KitchenNearby[]>([]);
+  const [liveByKitchen, setLiveByKitchen] = useState<Record<string, LiveKitchenSummary>>({});
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState("");
   const [sort, setSort] = useState<SortOrder>("asc");
@@ -38,17 +40,25 @@ export function NearbyKitchensList() {
     setLoading(true);
     setFetchError("");
     try {
-      const data = await fetchPublicNearbyKitchens({
-        latitude: coords.latitude,
-        longitude: coords.longitude,
-        limit: 30,
-        max_km: maxKm,
-        sort,
-        diet: diet || undefined,
-        live_capture: liveCaptureOnly || undefined,
-        live_only: liveOnly || undefined,
-      });
+      const [data, liveRes] = await Promise.all([
+        fetchPublicNearbyKitchens({
+          latitude: coords.latitude,
+          longitude: coords.longitude,
+          limit: 30,
+          max_km: maxKm,
+          sort,
+          diet: diet || undefined,
+          live_capture: liveCaptureOnly || undefined,
+          live_only: liveOnly || undefined,
+        }),
+        fetchLiveKitchens().catch(() => ({ kitchens: [] as LiveKitchenSummary[], total: 0 })),
+      ]);
       setKitchens(data.kitchens);
+      const map: Record<string, LiveKitchenSummary> = {};
+      for (const live of liveRes.kitchens) {
+        map[live.kitchen_id] = live;
+      }
+      setLiveByKitchen(map);
     } catch (err) {
       setFetchError(err instanceof Error ? err.message : "Could not load nearby kitchens");
       setKitchens([]);
@@ -159,7 +169,9 @@ export function NearbyKitchensList() {
           </div>
         ) : (
           <ul className={`nearby-kitchens__list reveal-stagger ${visible ? "reveal--visible" : ""}`}>
-            {kitchens.map((k, i) => (
+            {kitchens.map((k, i) => {
+              const live = liveByKitchen[k.id];
+              return (
               <li key={k.id} style={{ "--i": i } as CSSProperties}>
                 <button type="button" className="nearby-kitchens__card glass" onClick={() => openKitchen(k)}>
                   <div className="nearby-kitchens__card-img">
@@ -172,18 +184,28 @@ export function NearbyKitchensList() {
                       {k.code}
                       {k.city ? ` · ${k.city}` : ""}
                       {k.state ? `, ${k.state}` : ""}
+                      {live?.dish_name
+                        ? ` · cooking ${live.dish_name}${
+                            live.showcase_phase && live.showcase_phase !== "idle"
+                              ? ` (${live.showcase_phase})`
+                              : ""
+                          }`
+                        : ""}
                     </span>
                     <span className="nearby-kitchens__badges">
                       {k.has_veg && <span className="nearby-kitchens__badge">Veg</span>}
                       {k.has_non_veg && <span className="nearby-kitchens__badge">Non-veg</span>}
                       {k.has_live_capture && <span className="nearby-kitchens__badge">Live photo</span>}
-                      {k.is_live_now && <span className="nearby-kitchens__badge nearby-kitchens__badge--live">LIVE</span>}
+                      {(k.is_live_now || live) && (
+                        <span className="nearby-kitchens__badge nearby-kitchens__badge--live">LIVE</span>
+                      )}
                     </span>
                   </div>
                   <span className="nearby-kitchens__arrow" aria-hidden="true">→</span>
                 </button>
               </li>
-            ))}
+            );
+            })}
           </ul>
         )}
       </div>

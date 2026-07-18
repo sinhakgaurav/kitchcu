@@ -53,12 +53,18 @@ def _truncate_all() -> None:
     conn.autocommit = True
     with conn.cursor() as cur:
         cur.execute("TRUNCATE TABLE ckac_growth.suggestions CASCADE")
+        cur.execute("TRUNCATE TABLE ckac_growth.golden_recipe_pins CASCADE")
         cur.execute("TRUNCATE TABLE ckac_growth.seasonal_patterns CASCADE")
         cur.execute("TRUNCATE TABLE ckac_marketing.kitchen_customers CASCADE")
+        cur.execute("TRUNCATE TABLE ckac_ratings.dish_suggestions CASCADE")
+        cur.execute("TRUNCATE TABLE ckac_ratings.dish_ratings CASCADE")
         cur.execute("TRUNCATE TABLE ckac_ratings.dish_rating_aggregates CASCADE")
         cur.execute("TRUNCATE TABLE ckac_orders.order_items CASCADE")
         cur.execute("TRUNCATE TABLE ckac_orders.order_status_events CASCADE")
         cur.execute("TRUNCATE TABLE ckac_orders.orders CASCADE")
+        cur.execute("TRUNCATE TABLE ckac_catalog.dish_prep_steps CASCADE")
+        cur.execute("TRUNCATE TABLE ckac_catalog.dish_ingredients CASCADE")
+        cur.execute("TRUNCATE TABLE ckac_catalog.ingredients CASCADE")
         cur.execute("TRUNCATE TABLE ckac_catalog.dish_media CASCADE")
         cur.execute("TRUNCATE TABLE ckac_catalog.dishes CASCADE")
         cur.execute("TRUNCATE TABLE ckac_catalog.categories CASCADE")
@@ -249,6 +255,95 @@ def _seed_growth_ctx() -> dict:
             (str(uuid.uuid4()),),
         )
 
+        # Golden-day fixture: dish_c has a clear peak day with strong ratings + comments
+        for day_offset, qty in [(0, 10), (1, 2), (2, 3), (3, 2)]:
+            order_id = uuid.uuid4()
+            created = now - timedelta(days=day_offset, hours=10)
+            cur.execute(
+                """
+                INSERT INTO ckac_orders.orders
+                (id, kitchen_id, bill_id, order_code, status, source, delivery_type,
+                 payment_method, customer_phone, customer_name, subtotal, delivery_fee, total, created_at)
+                VALUES (
+                    %s::uuid, %s::uuid, %s, %s, 'delivered', 'pwa',
+                    'pickup', 'upi', %s, 'Growth Customer', 199.00, 0, 199.00, %s
+                )
+                """,
+                (
+                    str(order_id),
+                    str(kitchen_id),
+                    f"BILL-GOLD-{day_offset:02d}",
+                    f"{code}-BILL-GOLD-{day_offset:02d}",
+                    customer_phone,
+                    created,
+                ),
+            )
+            cur.execute(
+                """
+                INSERT INTO ckac_orders.order_items
+                (id, order_id, dish_id, dish_name, quantity, unit_price)
+                VALUES (%s::uuid, %s::uuid, %s::uuid, 'Paneer Tikka', %s, 199.00)
+                """,
+                (str(uuid.uuid4()), str(order_id), str(dish_c), qty),
+            )
+            if day_offset == 0:
+                cur.execute(
+                    """
+                    INSERT INTO ckac_ratings.dish_ratings
+                    (id, kitchen_id, dish_id, order_id, customer_id,
+                     home_taste_score, quality_score, is_anonymous, is_verified_purchase,
+                     moderation_status, created_at)
+                    VALUES (
+                        %s::uuid, %s::uuid, %s::uuid, %s::uuid, %s::uuid,
+                        5, 5, true, true, 'approved', %s
+                    )
+                    """,
+                    (
+                        str(uuid.uuid4()),
+                        str(kitchen_id),
+                        str(dish_c),
+                        str(order_id),
+                        str(customer_id),
+                        created,
+                    ),
+                )
+                cur.execute(
+                    """
+                    INSERT INTO ckac_ratings.dish_suggestions
+                    (id, kitchen_id, dish_id, customer_id, order_id, suggestion_text, status, created_at)
+                    VALUES (
+                        %s::uuid, %s::uuid, %s::uuid, %s::uuid, %s::uuid,
+                        'Absolutely delicious, tasted just like homemade!', 'pending', %s
+                    )
+                    """,
+                    (
+                        str(uuid.uuid4()),
+                        str(kitchen_id),
+                        str(dish_c),
+                        str(customer_id),
+                        str(order_id),
+                        created,
+                    ),
+                )
+
+        ingredient_id = uuid.uuid4()
+        cur.execute(
+            """
+            INSERT INTO ckac_catalog.ingredients
+            (id, kitchen_id, name, unit, current_stock, low_stock_threshold)
+            VALUES (%s::uuid, %s::uuid, 'Paneer', 'g', 2000, 200)
+            """,
+            (str(ingredient_id), str(kitchen_id)),
+        )
+        cur.execute(
+            """
+            INSERT INTO ckac_catalog.dish_ingredients
+            (dish_id, ingredient_id, quantity, unit, sort_order)
+            VALUES (%s::uuid, %s::uuid, 150, 'g', 0)
+            """,
+            (str(dish_c), str(ingredient_id)),
+        )
+
     conn.close()
 
     return {
@@ -274,6 +369,7 @@ def wire_wallet_and_notify_shims(monkeypatch):
 
     monkeypatch.setattr(billing_client, "deduct_messaging_wallet", _noop_deduct)
     monkeypatch.setattr(notify_client, "notify_daily_menu_blast", _noop_notify)
+    monkeypatch.setattr(notify_client, "notify_golden_performance_day", _noop_notify)
 
 
 @pytest.fixture(autouse=True)

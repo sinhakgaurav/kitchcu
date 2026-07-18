@@ -156,8 +156,10 @@ Run workflow. It will:
 
 ## 7. Populate runtime secrets (post-deploy, in-app)
 
-Log in as Super Admin (`admin@kitchcu.dev` bootstrap, **change this immediately**
-via the identity service admin user table) → **Control → API Keys**, and set:
+Log in as Super Admin at `https://admin.kitchcu.com` with **`admin@kitchcu.com`**
+and the GCE metadata password (`admin-password` → VM `ADMIN_PASSWORD`). The identity
+service re-syncs the password hash from env on every login bootstrap — do **not** use
+`admin@kitchcu.dev` in production. Then open **Control → API Keys**, and set:
 
 - `razorpay_key_id`, `razorpay_key_secret`, `razorpay_webhook_secret` — live Razorpay keys
 - `whatsapp_verify_token`, `whatsapp_app_secret` — from Meta App dashboard

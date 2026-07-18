@@ -1,6 +1,7 @@
 import { FormEvent, useEffect, useState } from "react";
 import { OwnerPageShell, OwnerPanel } from "../../components/owner/OwnerPageShell";
 import {
+  clearKitchenPaymentGateway,
   fetchKitchenPaymentGateway,
   upsertKitchenPaymentGateway,
   type KitchenPaymentGateway,
@@ -56,6 +57,28 @@ export function PaymentGatewayPage() {
       setOk("Payment gateway saved. Secrets are stored encrypted and never shown in full.");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Save failed");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const onClear = async () => {
+    if (!kitchenId) return;
+    if (!window.confirm("Remove Razorpay credentials for this kitchen?")) return;
+    setError("");
+    setOk("");
+    setBusy(true);
+    try {
+      const next = await clearKitchenPaymentGateway(kitchenId);
+      setCfg(next);
+      setKeyId("");
+      setKeySecret("");
+      setWebhookSecret("");
+      setLinkedAccountId("");
+      setIsActive(true);
+      setOk("Payment gateway cleared for this kitchen.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Clear failed");
     } finally {
       setBusy(false);
     }
@@ -132,13 +155,21 @@ export function PaymentGatewayPage() {
             />
             Active for this kitchen
           </label>
-          <button type="submit" className="btn btn--primary" disabled={busy}>
-            {busy ? "Saving…" : "Save payment gateway"}
-          </button>
+          <div className="owner-forms__actions">
+            <button type="submit" className="btn btn--primary" disabled={busy}>
+              {busy ? "Saving…" : "Save payment gateway"}
+            </button>
+            {(cfg?.key_id || cfg?.key_secret_configured || cfg?.linked_account_id) && (
+              <button type="button" className="btn btn--ghost" disabled={busy} onClick={onClear}>
+                Clear credentials
+              </button>
+            )}
+          </div>
         </form>
         <p className="owner-forms__hint">
-          Dev mode can still mock captures when keys are unset. Production kitchens should use live
-          Razorpay credentials here. Platform SaaS keys are managed separately by super admin.
+          These keys belong to this kitchen (customer checkout + Route settlements). Platform
+          subscription Razorpay keys and Meta WhatsApp App Secret live under Super Admin → API Keys
+          — not here.
         </p>
       </OwnerPanel>
     </OwnerPageShell>

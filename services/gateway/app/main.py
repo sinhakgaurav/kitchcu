@@ -58,6 +58,11 @@ def resolve_service_url(path: str) -> str | None:
         "/api/v1/admin/money-stats",
     )):
         return settings.billing_service_url
+    # Kitchen Razorpay credentials travel with kitchen ops — billing owns the table.
+    if path.startswith("/api/v1/admin/kitchens/") and path.rstrip("/").endswith(
+        "/payment-gateway"
+    ):
+        return settings.billing_service_url
     if any(path.startswith(p) for p in IDENTITY_PREFIXES):
         if path.startswith("/api/v1/admin/tickets"):
             return settings.notification_service_url

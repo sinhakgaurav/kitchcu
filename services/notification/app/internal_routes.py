@@ -6,6 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.notification_domain import (
     DailyMenuBlastRequest,
     DeliveryFeeDeniedNotifyRequest,
+    GoldenPerformanceDayNotifyRequest,
     NotificationDispatchResponse,
     OrderPlacedNotifyRequest,
     OrderStatusChangedNotifyRequest,
@@ -13,6 +14,7 @@ from app.notification_domain import (
     TrackingTickResponse,
     notify_daily_menu_blast,
     notify_delivery_fee_denied,
+    notify_golden_performance_day,
     notify_order_placed,
     notify_order_status_changed,
     notify_trial_sample_blast,
@@ -121,6 +123,28 @@ async def internal_daily_menu_blast(
     publisher: Annotated[EventPublisher, Depends(get_publisher)],
 ) -> NotificationDispatchResponse:
     result = await notify_daily_menu_blast(session, body, publisher)
+    await session.commit()
+    return result
+
+
+@router.post(
+    "/golden-performance-day",
+    response_model=NotificationDispatchResponse,
+    tags=[TAG_INTERNAL],
+    summary="[Internal] Alert owner about a golden performance day for a dish",
+    description=(
+        "Internal service-to-service (`X-Internal-Key`) — called by the growth service when "
+        "order volume, ratings, and ML comment sentiment show a standout day for a dish. "
+        "Sends a WhatsApp alert to the owner to save that day's recipe/ingredient combo."
+    ),
+    responses={401: RESP_401},
+)
+async def internal_golden_performance_day(
+    body: GoldenPerformanceDayNotifyRequest,
+    session: Annotated[AsyncSession, Depends(get_db)],
+    publisher: Annotated[EventPublisher, Depends(get_publisher)],
+) -> NotificationDispatchResponse:
+    result = await notify_golden_performance_day(session, body, publisher)
     await session.commit()
     return result
 

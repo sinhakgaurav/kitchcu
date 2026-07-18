@@ -63,7 +63,7 @@ python scripts/seed-bulk-data.py
 | Admin | http://localhost:13003 |
 | API | http://localhost:18000 |
 
-**Demo:** Owner `9876543210` / OTP `123456` · Admin `admin@kitchcu.dev` / `admin123456`
+**Demo:** Owner `9876543210` / OTP `123456` · Admin local `admin@kitchcu.dev` / `admin123456` · Prod `admin@kitchcu.com` + `ADMIN_PASSWORD` (see [ADVANCEMENT-TRACKER.md](./ADVANCEMENT-TRACKER.md))
 
 ## Test coverage
 

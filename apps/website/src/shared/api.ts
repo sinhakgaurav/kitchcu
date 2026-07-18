@@ -36,6 +36,12 @@ export type OwnerProfile = {
   subscription_status: string;
 };
 
+export type KitchenBrandedPage = {
+  enabled: boolean;
+  tagline: string | null;
+  accent_color: string | null;
+};
+
 export type Kitchen = {
   id: string;
   owner_id: string;
@@ -50,6 +56,7 @@ export type Kitchen = {
   max_delivery_radius_km: number;
   latitude: number;
   longitude: number;
+  branded_page?: KitchenBrandedPage;
 };
 
 export type KitchenPublic = {
@@ -59,6 +66,8 @@ export type KitchenPublic = {
   city: string | null;
   state: string | null;
   status: string;
+  description?: string | null;
+  branded_page?: KitchenBrandedPage;
 };
 
 export type KitchenNearby = KitchenPublic & {
@@ -397,6 +406,20 @@ export async function fetchKitchens(): Promise<Kitchen[]> {
   return apiFetch("/api/v1/kitchens/me");
 }
 
+export async function updateKitchenBrandedPage(
+  kitchenId: string,
+  data: {
+    enabled?: boolean;
+    tagline?: string | null;
+    accent_color?: string | null;
+  },
+): Promise<Kitchen> {
+  return apiFetch(`/api/v1/kitchens/${kitchenId}/branded-page`, {
+    method: "PATCH",
+    body: JSON.stringify(data),
+  });
+}
+
 export async function fetchKitchenByCode(code: string): Promise<KitchenPublic> {
   // Public lookup — never attach owner JWT or redirect to owner login
   const res = await fetch(
@@ -631,6 +654,14 @@ export async function upsertKitchenPaymentGateway(
   return apiFetch(`/api/v1/billing/kitchens/${kitchenId}/payment-gateway`, {
     method: "PUT",
     body: JSON.stringify(data),
+  });
+}
+
+export async function clearKitchenPaymentGateway(
+  kitchenId: string,
+): Promise<KitchenPaymentGateway> {
+  return apiFetch(`/api/v1/billing/kitchens/${kitchenId}/payment-gateway`, {
+    method: "DELETE",
   });
 }
 
@@ -947,6 +978,46 @@ export async function dismissGrowthSuggestion(
     method: "PATCH",
     body: JSON.stringify({ dismissed: true }),
   });
+}
+
+export interface GoldenRecipePin {
+  id: string;
+  kitchen_id: string;
+  dish_id: string;
+  suggestion_id: string | null;
+  performance_date: string;
+  dish_name: string;
+  recipe_snapshot: {
+    dish_id?: string;
+    dish_name?: string;
+    lines?: {
+      ingredient_id: string;
+      ingredient_name: string;
+      quantity: number;
+      unit: string;
+    }[];
+    prep_steps?: { step_order: number; title?: string; body_html?: string }[];
+  };
+  metrics: Record<string, unknown>;
+  created_at: string;
+}
+
+export async function saveGoldenRecipe(
+  kitchenId: string,
+  suggestionId: string,
+): Promise<GoldenRecipePin> {
+  return apiFetch(
+    `/api/v1/kitchens/${kitchenId}/growth/suggestions/${suggestionId}/save-golden-recipe`,
+    { method: "POST" },
+  );
+}
+
+export async function fetchGoldenRecipes(
+  kitchenId: string,
+  dishId?: string,
+): Promise<{ pins: GoldenRecipePin[]; total: number }> {
+  const q = dishId ? `?dish_id=${encodeURIComponent(dishId)}` : "";
+  return apiFetch(`/api/v1/kitchens/${kitchenId}/growth/golden-recipes${q}`);
 }
 
 export async function fetchDishCombos(
@@ -1431,6 +1502,8 @@ export type StreamSettings = {
   livekit_configured: boolean;
 };
 
+export type ShowcasePhase = "idle" | "ingredients" | "prep" | "prepared";
+
 export type LiveSession = {
   id: string;
   kitchen_id: string;
@@ -1438,11 +1511,42 @@ export type LiveSession = {
   room_name: string;
   status: string;
   order_id: string | null;
+  dish_id: string | null;
+  dish_name: string | null;
+  showcase_phase: ShowcasePhase | string;
+  active_prep_step_order: number | null;
+  prepared_at: string | null;
   viewer_count: number;
   started_at: string;
   ended_at: string | null;
   livekit_url: string | null;
   publisher_token: string | null;
+};
+
+export type LiveShowcase = {
+  session_id: string;
+  kitchen_id: string;
+  title: string;
+  status: string;
+  dish_id: string | null;
+  dish_name: string | null;
+  showcase_phase: ShowcasePhase | string;
+  active_prep_step_order: number | null;
+  prepared_at: string | null;
+  ingredients: {
+    ingredient_name: string;
+    quantity: number;
+    unit: string;
+    photo_url?: string | null;
+    sort_order: number;
+  }[];
+  prep_steps: {
+    step_order: number;
+    title?: string | null;
+    body_html?: string | null;
+    photo_url?: string | null;
+    duration_min?: number | null;
+  }[];
 };
 
 export type LiveKitchenSummary = {
@@ -1452,6 +1556,9 @@ export type LiveKitchenSummary = {
   session_id: string;
   title: string;
   started_at: string;
+  dish_id?: string | null;
+  dish_name?: string | null;
+  showcase_phase?: string;
 };
 
 export async function fetchStreamSettings(kitchenId: string): Promise<StreamSettings> {
@@ -1470,7 +1577,12 @@ export async function updateStreamSettings(
 
 export async function goKitchenLive(
   kitchenId: string,
-  data: { title?: string; order_id?: string },
+  data: {
+    title?: string;
+    order_id?: string;
+    dish_id?: string;
+    showcase_phase?: ShowcasePhase | string;
+  },
 ): Promise<LiveSession> {
   return apiFetch(`/api/v1/kitchens/${kitchenId}/stream/go-live`, {
     method: "POST",
@@ -1484,6 +1596,25 @@ export async function endKitchenStream(kitchenId: string): Promise<LiveSession> 
 
 export async function fetchStreamSession(kitchenId: string): Promise<LiveSession | null> {
   return apiFetch(`/api/v1/kitchens/${kitchenId}/stream/session`);
+}
+
+export async function updateStreamShowcase(
+  kitchenId: string,
+  data: {
+    dish_id?: string | null;
+    showcase_phase?: ShowcasePhase | string;
+    active_prep_step_order?: number | null;
+    clear_dish?: boolean;
+  },
+): Promise<LiveSession> {
+  return apiFetch(`/api/v1/kitchens/${kitchenId}/stream/showcase`, {
+    method: "PATCH",
+    body: JSON.stringify(data),
+  });
+}
+
+export async function fetchLiveShowcase(sessionId: string): Promise<LiveShowcase> {
+  return apiFetch(`/api/v1/stream/sessions/${sessionId}/showcase`);
 }
 
 export async function fetchLiveKitchens(): Promise<{ kitchens: LiveKitchenSummary[]; total: number }> {

@@ -1,8 +1,13 @@
 import { FormEvent, useEffect, useState } from "react";
 import {
   adminLogin,
+  clearAdminKitchenPaymentGateway,
   clearAdminToken,
+  fetchAdminKitchen,
+  fetchAdminKitchenModuleFlags,
+  fetchAdminKitchenPaymentGateway,
   fetchAdminKitchens,
+  fetchAdminKitchenWhatsApp,
   fetchAdminOrders,
   fetchAdminOwners,
   fetchAdminStats,
@@ -11,9 +16,17 @@ import {
   getAdminToken,
   replyAdminTicket,
   setAdminToken,
+  updateAdminKitchenModuleFlag,
   updateAdminTicket,
   updateAdminOwnerSubscription,
   updateKitchenStatus,
+  upsertAdminKitchenPaymentGateway,
+  upsertAdminKitchenWhatsApp,
+  type AdminKitchen,
+  type AdminKitchenDetail,
+  type AdminKitchenModuleFlags,
+  type AdminKitchenPaymentGateway,
+  type AdminKitchenWhatsApp,
   type AdminTicket,
   type PlatformStats,
 } from "./adminApi";
@@ -25,7 +38,7 @@ import {
   buildTopKitchens,
 } from "./adminCharts";
 import { ADMIN_DEV_EMAIL, ADMIN_HOST, CUSTOMER_HOST, KITCHEN_HOST } from "../shared/brand";
-import { DEMO_ADMIN, DEMO_OWNERS } from "../shared/demo";
+import { DEMO_OWNERS, adminLoginDefaults } from "../shared/demo";
 import { AuthLoginHighlights } from "../components/AuthLoginHighlights";
 import { BrandAuthArt, BrandLogo } from "../components/BrandLogo";
 import { BrandNavMark } from "../components/BrandNavMark";
@@ -66,7 +79,10 @@ const TAB_META: Record<Tab, { title: string; desc: string }> = {
     title: "Platform overview",
     desc: "Health snapshot across kitchens, customers, money, and support",
   },
-  kitchens: { title: "Kitchens", desc: "Activate, suspend, and monitor cloud kitchens" },
+  kitchens: {
+    title: "Kitchens",
+    desc: "Kitchen workspace — status, WhatsApp phone ID, Razorpay keys, module flags",
+  },
   owners: { title: "Owners", desc: "Subscription tiers and kitchen counts — force plan changes" },
   customers: {
     title: "Customers",
@@ -80,7 +96,7 @@ const TAB_META: Record<Tab, { title: string; desc: string }> = {
   tickets: { title: "Support tickets", desc: "Customer and owner escalations from AI chat" },
   "api-keys": {
     title: "Platform API keys",
-    desc: "Add, update, or clear Razorpay, LiveKit, WhatsApp, Maps, OAuth, and AI secrets",
+    desc: "Meta App Secret / Verify Token, platform Razorpay (SaaS), LiveKit, Maps, OAuth — not per-kitchen keys",
   },
   control: {
     title: "Control plane",
@@ -550,7 +566,12 @@ function AdminOverview({
             </button>
           </div>
           <div className="admin-panel__note">
-            <p><strong>Dev access:</strong> {ADMIN_DEV_EMAIL} / admin123456</p>
+            <p>
+              <strong>Access:</strong>{" "}
+              {adminLoginDefaults().isProductionHost
+                ? "admin@kitchcu.com (VM ADMIN_PASSWORD)"
+                : `${ADMIN_DEV_EMAIL} / admin123456`}
+            </p>
             <p>Gateway API: <code>/api/v1/admin/*</code> · Port <code>13003</code> locally</p>
           </div>
         </section>
@@ -560,8 +581,9 @@ function AdminOverview({
 }
 
 function AdminLogin({ onSuccess }: { onSuccess: (token: string) => void }) {
-  const [email, setEmail] = useState(DEMO_ADMIN.email || ADMIN_DEV_EMAIL);
-  const [password, setPassword] = useState(DEMO_ADMIN.password);
+  const defaults = adminLoginDefaults();
+  const [email, setEmail] = useState(defaults.email);
+  const [password, setPassword] = useState(defaults.password);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
 
@@ -614,7 +636,17 @@ function AdminLogin({ onSuccess }: { onSuccess: (token: string) => void }) {
             {busy ? "Signing in..." : "Sign in"}
           </button>
           <p className="auth-card__hint">
-            Dev admin: {DEMO_ADMIN.email} / {DEMO_ADMIN.password}
+            {defaults.isProductionHost ? (
+              <>
+                Production admin: <strong>admin@kitchcu.com</strong> — password from VM{" "}
+                <code>ADMIN_PASSWORD</code> / GCE metadata <code>admin-password</code> (synced on login).
+                Do not use <code>admin@kitchcu.dev</code> here.
+              </>
+            ) : (
+              <>
+                Dev admin: {defaults.email} / {defaults.password}
+              </>
+            )}
             <br />
             Owner demos: {DEMO_OWNERS.map((o) => o.phone).join(", ")} (OTP 123456)
             {" · "}
@@ -627,21 +659,174 @@ function AdminLogin({ onSuccess }: { onSuccess: (token: string) => void }) {
 }
 
 function AdminKitchens() {
-  const [rows, setRows] = useState<Awaited<ReturnType<typeof fetchAdminKitchens>>>([]);
+  const [rows, setRows] = useState<AdminKitchen[]>([]);
   const [loading, setLoading] = useState(true);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [detail, setDetail] = useState<AdminKitchenDetail | null>(null);
+  const [wa, setWa] = useState<AdminKitchenWhatsApp | null>(null);
+  const [pgw, setPgw] = useState<AdminKitchenPaymentGateway | null>(null);
+  const [modules, setModules] = useState<AdminKitchenModuleFlags | null>(null);
+  const [panelTab, setPanelTab] = useState<"profile" | "whatsapp" | "payments" | "modules">("profile");
+  const [error, setError] = useState("");
+  const [ok, setOk] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [phoneId, setPhoneId] = useState("");
+  const [displayPhone, setDisplayPhone] = useState("");
+  const [keyId, setKeyId] = useState("");
+  const [keySecret, setKeySecret] = useState("");
+  const [webhookSecret, setWebhookSecret] = useState("");
+  const [linkedAccountId, setLinkedAccountId] = useState("");
+  const [pgwActive, setPgwActive] = useState(true);
+
+  const reloadList = async () => {
+    setRows(await fetchAdminKitchens());
+  };
+
   useEffect(() => {
-    fetchAdminKitchens()
-      .then(setRows)
+    reloadList()
       .catch(() => {})
       .finally(() => setLoading(false));
   }, []);
 
+  const openKitchen = async (id: string) => {
+    setSelectedId(id);
+    setError("");
+    setOk("");
+    setPanelTab("profile");
+    try {
+      const [d, w, p, m] = await Promise.all([
+        fetchAdminKitchen(id),
+        fetchAdminKitchenWhatsApp(id),
+        fetchAdminKitchenPaymentGateway(id),
+        fetchAdminKitchenModuleFlags(id),
+      ]);
+      setDetail(d);
+      setWa(w);
+      setPgw(p);
+      setModules(m);
+      setPhoneId(w.whatsapp_phone_id ?? "");
+      setDisplayPhone(w.whatsapp_display_phone ?? "");
+      setKeyId(p.key_id ?? "");
+      setLinkedAccountId(p.linked_account_id ?? "");
+      setPgwActive(p.is_active);
+      setKeySecret("");
+      setWebhookSecret("");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to load kitchen workspace");
+    }
+  };
+
   const active = rows.filter((k) => k.status === "active").length;
   const suspended = rows.filter((k) => k.status === "suspended").length;
+  const waLinked = rows.filter((k) => k.whatsapp_connected).length;
+  const pgwReady = rows.filter((k) => k.payment_gateway_configured).length;
 
   const setStatus = async (id: string, status: string) => {
-    await updateKitchenStatus(id, status);
-    setRows(await fetchAdminKitchens());
+    setBusy(true);
+    try {
+      await updateKitchenStatus(id, status);
+      await reloadList();
+      if (selectedId === id) await openKitchen(id);
+      setOk(`Kitchen marked ${status}.`);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Status update failed");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const saveWhatsApp = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!selectedId) return;
+    setBusy(true);
+    setError("");
+    try {
+      const next = await upsertAdminKitchenWhatsApp(selectedId, {
+        whatsapp_phone_id: phoneId.trim() || null,
+        whatsapp_display_phone: displayPhone.trim() || null,
+      });
+      setWa(next);
+      await reloadList();
+      setOk("WhatsApp phone ID saved for this kitchen.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "WhatsApp save failed");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const clearWhatsApp = async () => {
+    if (!selectedId) return;
+    setBusy(true);
+    try {
+      const next = await upsertAdminKitchenWhatsApp(selectedId, { clear: true });
+      setWa(next);
+      setPhoneId("");
+      setDisplayPhone("");
+      await reloadList();
+      setOk("WhatsApp disconnected for this kitchen.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Disconnect failed");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const savePayments = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!selectedId) return;
+    setBusy(true);
+    setError("");
+    try {
+      const next = await upsertAdminKitchenPaymentGateway(selectedId, {
+        key_id: keyId,
+        key_secret: keySecret || undefined,
+        webhook_secret: webhookSecret || undefined,
+        linked_account_id: linkedAccountId,
+        is_active: pgwActive,
+      });
+      setPgw(next);
+      setKeySecret("");
+      setWebhookSecret("");
+      await reloadList();
+      setOk("Kitchen Razorpay credentials saved (secrets encrypted).");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Payment gateway save failed");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const clearPayments = async () => {
+    if (!selectedId) return;
+    if (!window.confirm("Clear Razorpay credentials for this kitchen?")) return;
+    setBusy(true);
+    try {
+      const next = await clearAdminKitchenPaymentGateway(selectedId);
+      setPgw(next);
+      setKeyId("");
+      setLinkedAccountId("");
+      await reloadList();
+      setOk("Kitchen payment gateway cleared.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Clear failed");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const toggleModule = async (moduleKey: string, enabled: boolean) => {
+    if (!selectedId) return;
+    setBusy(true);
+    try {
+      await updateAdminKitchenModuleFlag(selectedId, moduleKey, enabled);
+      setModules(await fetchAdminKitchenModuleFlags(selectedId));
+      setOk(`${moduleKey} ${enabled ? "enabled" : "disabled"}.`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Module update failed");
+    } finally {
+      setBusy(false);
+    }
   };
 
   return (
@@ -659,44 +844,208 @@ function AdminKitchens() {
           <strong>{suspended}</strong>
           <span>Suspended</span>
         </div>
+        <div className="dash-card admin-stat-card admin-stat-card--purple">
+          <strong>{waLinked}/{pgwReady}</strong>
+          <span>WA / payments linked</span>
+        </div>
       </div>
-    <div className="dash-card admin-table-wrap">
-      {loading ? <p className="admin-panel__empty">Loading kitchens…</p> : (
-      <table className="admin-table">
-        <thead>
-          <tr>
-            <th>Code</th>
-            <th>Name</th>
-            <th>Owner</th>
-            <th>Status</th>
-            <th>Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((k) => (
-            <tr key={k.id}>
-              <td><code className="admin-code">{k.code}</code></td>
-              <td>{k.name}</td>
-              <td>{k.owner_name}</td>
-              <td><span className={`status-badge status-badge--${k.status}`}>{k.status}</span></td>
-              <td>
-                {k.status !== "active" && (
-                  <button type="button" className="btn btn--sm btn--primary" onClick={() => setStatus(k.id, "active")}>
+
+      {error && <p className="auth-card__error">{error}</p>}
+      {ok && <p className="auth-card__success">{ok}</p>}
+
+      <div className="admin-kitchen-workspace">
+        <div className="dash-card admin-table-wrap">
+          {loading ? (
+            <p className="admin-panel__empty">Loading kitchens…</p>
+          ) : (
+            <table className="admin-table">
+              <thead>
+                <tr>
+                  <th>Code</th>
+                  <th>Name</th>
+                  <th>Owner</th>
+                  <th>WA</th>
+                  <th>Pay</th>
+                  <th>Status</th>
+                  <th>Workspace</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((k) => (
+                  <tr key={k.id} className={selectedId === k.id ? "admin-table__row--active" : undefined}>
+                    <td><code className="admin-code">{k.code}</code></td>
+                    <td>{k.name}</td>
+                    <td>{k.owner_name}</td>
+                    <td>{k.whatsapp_connected ? "●" : "○"}</td>
+                    <td>{k.payment_gateway_configured ? "●" : "○"}</td>
+                    <td><span className={`status-badge status-badge--${k.status}`}>{k.status}</span></td>
+                    <td>
+                      <button
+                        type="button"
+                        className="btn btn--sm btn--primary"
+                        onClick={() => openKitchen(k.id)}
+                      >
+                        Open
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+
+        {detail && selectedId && (
+          <section className="dash-card admin-kitchen-panel">
+            <header className="admin-kitchen-panel__head">
+              <div>
+                <h2>{detail.name}</h2>
+                <p>
+                  <code className="admin-code">{detail.code}</code>
+                  {" · "}
+                  {detail.owner_name} · {detail.city ?? "—"}
+                </p>
+              </div>
+              <div className="admin-kitchen-panel__status">
+                {detail.status !== "active" && (
+                  <button type="button" className="btn btn--sm btn--primary" disabled={busy} onClick={() => setStatus(selectedId, "active")}>
                     Activate
                   </button>
                 )}
-                {k.status === "active" && (
-                  <button type="button" className="btn btn--sm btn--ghost" onClick={() => setStatus(k.id, "suspended")}>
+                {detail.status === "active" && (
+                  <button type="button" className="btn btn--sm btn--ghost" disabled={busy} onClick={() => setStatus(selectedId, "suspended")}>
                     Suspend
                   </button>
                 )}
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-      )}
-    </div>
+              </div>
+            </header>
+
+            <div className="admin-kitchen-panel__tabs">
+              {(["profile", "whatsapp", "payments", "modules"] as const).map((t) => (
+                <button
+                  key={t}
+                  type="button"
+                  className={panelTab === t ? "active" : ""}
+                  onClick={() => setPanelTab(t)}
+                >
+                  {t === "whatsapp" ? "WhatsApp" : t === "payments" ? "Payments" : t[0].toUpperCase() + t.slice(1)}
+                </button>
+              ))}
+            </div>
+
+            {panelTab === "profile" && (
+              <div className="admin-kitchen-panel__body">
+                <p className="report-hint">{detail.platform_secrets_note}</p>
+                <dl className="admin-kv">
+                  <div><dt>Owner phone</dt><dd>{detail.owner_phone}</dd></div>
+                  <div><dt>Address</dt><dd>{detail.address_line ?? "—"}</dd></div>
+                  <div><dt>State / PIN</dt><dd>{detail.state ?? "—"} / {detail.pincode ?? "—"}</dd></div>
+                  <div><dt>WhatsApp</dt><dd>{detail.whatsapp_connected ? "Linked" : "Not linked"}</dd></div>
+                  <div><dt>Payment gateway</dt><dd>{detail.payment_gateway_configured ? "Configured" : "Not set"}</dd></div>
+                </dl>
+              </div>
+            )}
+
+            {panelTab === "whatsapp" && wa && (
+              <form className="admin-kitchen-panel__body owner-forms" onSubmit={saveWhatsApp}>
+                <p className="report-hint">{wa.platform_secrets_note}</p>
+                <label>
+                  Meta phone_number_id
+                  <input value={phoneId} onChange={(e) => setPhoneId(e.target.value)} placeholder="1099…" autoComplete="off" />
+                </label>
+                <label>
+                  Display phone (E.164)
+                  <input value={displayPhone} onChange={(e) => setDisplayPhone(e.target.value)} placeholder="+91…" autoComplete="off" />
+                </label>
+                <div className="owner-forms__actions">
+                  <button type="submit" className="btn btn--primary" disabled={busy}>Save WhatsApp</button>
+                  {wa.connected && (
+                    <button type="button" className="btn btn--ghost" disabled={busy} onClick={clearWhatsApp}>
+                      Disconnect
+                    </button>
+                  )}
+                </div>
+              </form>
+            )}
+
+            {panelTab === "payments" && pgw && (
+              <form className="admin-kitchen-panel__body owner-forms" onSubmit={savePayments}>
+                <p className="report-hint">
+                  Kitchen Razorpay keys for checkout / Route. Platform SaaS Razorpay stays under API Keys.
+                </p>
+                <label>
+                  Key ID
+                  <input value={keyId} onChange={(e) => setKeyId(e.target.value)} placeholder="rzp_live_…" autoComplete="off" />
+                </label>
+                <label>
+                  Key secret
+                  <input
+                    type="password"
+                    value={keySecret}
+                    onChange={(e) => setKeySecret(e.target.value)}
+                    placeholder={
+                      pgw.key_secret_configured
+                        ? `Configured (${pgw.key_secret_masked ?? "••••"}) — blank to keep`
+                        : "Enter secret"
+                    }
+                    autoComplete="new-password"
+                  />
+                </label>
+                <label>
+                  Webhook secret
+                  <input
+                    type="password"
+                    value={webhookSecret}
+                    onChange={(e) => setWebhookSecret(e.target.value)}
+                    placeholder={
+                      pgw.webhook_secret_configured
+                        ? `Configured (${pgw.webhook_secret_masked ?? "••••"}) — blank to keep`
+                        : "Optional"
+                    }
+                    autoComplete="new-password"
+                  />
+                </label>
+                <label>
+                  Route linked account
+                  <input value={linkedAccountId} onChange={(e) => setLinkedAccountId(e.target.value)} placeholder="acc_…" autoComplete="off" />
+                </label>
+                <label className="owner-forms__check">
+                  <input type="checkbox" checked={pgwActive} onChange={(e) => setPgwActive(e.target.checked)} />
+                  Active for this kitchen
+                </label>
+                <div className="owner-forms__actions">
+                  <button type="submit" className="btn btn--primary" disabled={busy}>Save payments</button>
+                  {(pgw.key_id || pgw.key_secret_configured || pgw.linked_account_id) && (
+                    <button type="button" className="btn btn--ghost" disabled={busy} onClick={clearPayments}>
+                      Clear credentials
+                    </button>
+                  )}
+                </div>
+              </form>
+            )}
+
+            {panelTab === "modules" && modules && (
+              <ul className="admin-kitchen-panel__body report-rank">
+                {modules.modules.map((m) => (
+                  <li key={m.module_key}>
+                    <div className="report-rank__row">
+                      <span><strong>{m.module_key}</strong></span>
+                      <button
+                        type="button"
+                        className={`btn btn--sm ${m.enabled ? "btn--ghost" : "btn--primary"}`}
+                        disabled={busy}
+                        onClick={() => toggleModule(m.module_key, !m.enabled)}
+                      >
+                        {m.enabled ? "Disable" : "Enable"}
+                      </button>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+        )}
+      </div>
     </>
   );
 }

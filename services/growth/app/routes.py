@@ -5,18 +5,23 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.deps import get_current_owner_id, verify_kitchen_owner
-from app.notify_client import notify_daily_menu_blast
+from app.golden_day import SUGGESTION_TYPE as GOLDEN_SUGGESTION_TYPE
+from app.notify_client import notify_daily_menu_blast, notify_golden_performance_day
 from app.schemas import (
     DailyMenuPushRequest,
     DailyMenuPushResponse,
     DishCombosResponse,
+    GoldenRecipePinListResponse,
+    GoldenRecipePinResponse,
     OrderPatternsResponse,
     SeasonalPatternListResponse,
     SuggestionListResponse,
     SuggestionResponse,
     SuggestionUpdateRequest,
+    accept_golden_recipe,
     dish_combinations,
     generate_suggestions,
+    list_golden_recipe_pins,
     list_seasonal_patterns,
     list_suggestions,
     order_patterns,
@@ -125,8 +130,9 @@ async def growth_suggestions_list(
         "**Auth:** Owner JWT — caller must own `kitchen_id`.\n\n"
         "**Query:** `days` (7-365, default 90) lookback window for the underlying analysis.\n\n"
         "**Behavior:** Runs the suggestion engine (churn win-back, combo bundling, peak-hour "
-        "staffing, seasonal, under-performing dish promo) and persists any new suggestions found, "
-        "publishing `suggestion.generated` per suggestion.\n\n"
+        "staffing, seasonal, under-performing dish promo, golden performance day from orders × "
+        "ratings × ML comment sentiment) and persists any new suggestions found, publishing "
+        "`suggestion.generated` per suggestion. Golden-day hits also notify the owner.\n\n"
         "**Response:** `SuggestionListResponse` — only the newly-created suggestions from this run."
     ),
     responses=auth_errors(include_403=True),
@@ -141,6 +147,20 @@ async def growth_suggestions_generate(
     await verify_kitchen_owner(kitchen_id, owner_id, session)
     result = await generate_suggestions(session, kitchen_id, publisher, days=days)
     await session.commit()
+    for sug in result.suggestions:
+        if sug.suggestion_type != GOLDEN_SUGGESTION_TYPE:
+            continue
+        payload = sug.action_payload or {}
+        await notify_golden_performance_day(
+            kitchen_id=kitchen_id,
+            dish_id=uuid.UUID(str(payload["dish_id"])),
+            dish_name=str(payload.get("dish_name") or "your dish"),
+            performance_date=str(payload.get("performance_date") or ""),
+            order_qty=int(payload.get("order_qty") or 0),
+            avg_rating=float(payload["avg_rating"]) if payload.get("avg_rating") is not None else None,
+            sentiment_label=str(payload.get("sentiment_label") or "positive"),
+            suggestion_id=sug.id,
+        )
     return result
 
 
@@ -171,6 +191,59 @@ async def growth_suggestion_update(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
     await session.commit()
     return row
+
+
+@router.post(
+    "/kitchens/{kitchen_id}/growth/suggestions/{suggestion_id}/save-golden-recipe",
+    response_model=GoldenRecipePinResponse,
+    status_code=status.HTTP_201_CREATED,
+    tags=[TAG_SUGGESTIONS],
+    summary="Save golden-day recipe & ingredient combo for future",
+    description=(
+        "**Auth:** Owner JWT — caller must own `kitchen_id`.\n\n"
+        "**Behavior:** Accepts a `golden_performance_day` suggestion, pins the captured recipe "
+        "snapshot under the dish for reuse, marks the suggestion as saved, and publishes "
+        "`golden_recipe.pinned`.\n\n"
+        "**Response:** `GoldenRecipePinResponse`."
+    ),
+    responses=auth_errors(include_403=True, include_404=True),
+)
+async def growth_save_golden_recipe(
+    kitchen_id: uuid.UUID,
+    suggestion_id: uuid.UUID,
+    owner_id: Annotated[uuid.UUID, Depends(get_current_owner_id)],
+    session: Annotated[AsyncSession, Depends(get_db)],
+    publisher: Annotated[EventPublisher, Depends(get_publisher)],
+) -> GoldenRecipePinResponse:
+    await verify_kitchen_owner(kitchen_id, owner_id, session)
+    try:
+        pin = await accept_golden_recipe(session, kitchen_id, suggestion_id, publisher)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    await session.commit()
+    return pin
+
+
+@router.get(
+    "/kitchens/{kitchen_id}/growth/golden-recipes",
+    response_model=GoldenRecipePinListResponse,
+    tags=[TAG_SUGGESTIONS],
+    summary="List saved golden recipe pins",
+    description=(
+        "**Auth:** Owner JWT — caller must own `kitchen_id`.\n\n"
+        "**Query:** optional `dish_id` to filter pins for one dish (menu / recipe UI).\n\n"
+        "**Response:** `GoldenRecipePinListResponse`."
+    ),
+    responses=auth_errors(include_403=True),
+)
+async def growth_list_golden_recipes(
+    kitchen_id: uuid.UUID,
+    owner_id: Annotated[uuid.UUID, Depends(get_current_owner_id)],
+    session: Annotated[AsyncSession, Depends(get_db)],
+    dish_id: uuid.UUID | None = Query(default=None, description="Optional dish filter."),
+) -> GoldenRecipePinListResponse:
+    await verify_kitchen_owner(kitchen_id, owner_id, session)
+    return await list_golden_recipe_pins(session, kitchen_id, dish_id=dish_id)
 
 
 @router.get(

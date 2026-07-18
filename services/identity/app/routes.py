@@ -12,6 +12,7 @@ from app.schemas import (
     KitchenCreateRequest,
     KitchenDeliverySettingsUpdate,
     KitchenNearbyListResponse,
+    KitchenBrandedPageUpdate,
     KitchenPublicResponse,
     KitchenResponse,
     KitchenWhatsAppIntegrationResponse,
@@ -24,9 +25,11 @@ from app.schemas import (
     create_access_token,
     create_kitchen,
     get_kitchen_whatsapp_integration,
+    kitchen_to_public_response,
     kitchen_to_response,
     list_kitchens_nearby,
     register_owner,
+    update_kitchen_branded_page,
     update_kitchen_delivery_settings,
     update_kitchen_whatsapp_integration,
 )
@@ -283,6 +286,39 @@ async def kitchen_delivery_settings_update(
     return await kitchen_to_response(session, kitchen)
 
 
+@router.patch(
+    "/kitchens/{kitchen_id}/branded-page",
+    response_model=KitchenResponse,
+    summary="Publish / customize the kitchen branded storefront",
+    description=(
+        "Owner-only — enable a kitchen-first public page at `customer…/k/{code}` for menu showcase, "
+        "checkout, and bill download, with a **Powered by kitchCU** footer. Settings live in "
+        "`kitchens.settings.branded_page` (no schema migration). Publishes `kitchen.branded_page.updated`."
+    ),
+    responses={**auth_errors(include_404=True), 400: RESP_400, 422: RESP_422},
+    tags=["Kitchens"],
+)
+async def kitchen_branded_page_update(
+    kitchen_id: uuid.UUID,
+    body: KitchenBrandedPageUpdate,
+    owner: Annotated[Owner, Depends(get_current_owner)],
+    session: Annotated[AsyncSession, Depends(get_db)],
+    publisher: Annotated[EventPublisher, Depends(get_publisher)],
+) -> KitchenResponse:
+    result = await session.execute(
+        select(Kitchen).where(Kitchen.id == kitchen_id, Kitchen.owner_id == owner.id)
+    )
+    kitchen = result.scalar_one_or_none()
+    if not kitchen:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Kitchen not found")
+    try:
+        kitchen = await update_kitchen_branded_page(session, kitchen, body, publisher)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    await session.commit()
+    return await kitchen_to_response(session, kitchen)
+
+
 @router.get(
     "/kitchens/{kitchen_id}/whatsapp-integration",
     response_model=KitchenWhatsAppIntegrationResponse,
@@ -413,11 +449,4 @@ async def kitchen_public_by_code(
     kitchen = result.scalar_one_or_none()
     if not kitchen or kitchen.status != "active":
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Kitchen not found")
-    return KitchenPublicResponse(
-        id=kitchen.id,
-        code=kitchen.code,
-        name=kitchen.name,
-        city=kitchen.city,
-        state=kitchen.state,
-        status=kitchen.status,
-    )
+    return kitchen_to_public_response(kitchen)

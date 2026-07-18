@@ -9,7 +9,7 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 import bcrypt
 from jose import JWTError, jwt
 from pydantic import BaseModel, EmailStr, Field
-from sqlalchemy import func, select, text
+from sqlalchemy import bindparam, func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import (
@@ -22,6 +22,12 @@ from app.models import (
     PlatformApiKey,
 )
 from app.routes import get_publisher
+from app.schemas import (
+    KitchenWhatsAppIntegrationResponse,
+    KitchenWhatsAppIntegrationUpdate,
+    kitchen_whatsapp_to_response,
+    update_kitchen_whatsapp_integration,
+)
 from ckac_common.secret_box import decrypt_secret, encrypt_secret, mask_secret
 from ckac_common.config import get_settings
 from ckac_common.database import get_db
@@ -31,6 +37,49 @@ from ckac_common.openapi import RESP_400, RESP_401, RESP_422, auth_errors
 router = APIRouter(prefix="/admin", tags=["Admin"])
 security = HTTPBearer(auto_error=False)
 settings = get_settings()
+
+
+async def _payment_gateway_kitchen_ids(
+    session: AsyncSession,
+    kitchen_ids: list[uuid.UUID],
+) -> set[uuid.UUID]:
+    """Cross-schema read — which kitchens have Razorpay kitchen credentials configured."""
+    if not kitchen_ids:
+        return set()
+    stmt = text(
+        """
+        SELECT kitchen_id
+        FROM ckac_billing.kitchen_payment_gateways
+        WHERE kitchen_id IN :ids
+          AND provider = 'razorpay'
+          AND (
+            NULLIF(TRIM(COALESCE(key_id, '')), '') IS NOT NULL
+            OR key_secret_enc IS NOT NULL
+            OR NULLIF(TRIM(COALESCE(linked_account_id, '')), '') IS NOT NULL
+          )
+        """
+    ).bindparams(bindparam("ids", expanding=True))
+    rows = (await session.execute(stmt, {"ids": list(kitchen_ids)})).scalars().all()
+    return {uuid.UUID(str(r)) for r in rows}
+
+
+def _admin_kitchen_row(
+    kitchen: Kitchen,
+    owner: Owner,
+    *,
+    payment_gateway_configured: bool = False,
+) -> AdminKitchenRow:
+    return AdminKitchenRow(
+        id=kitchen.id,
+        code=kitchen.code,
+        name=kitchen.name,
+        city=kitchen.city,
+        status=kitchen.status,
+        owner_name=owner.name,
+        owner_phone=owner.phone,
+        whatsapp_connected=bool(kitchen.whatsapp_phone_id),
+        payment_gateway_configured=payment_gateway_configured,
+    )
 
 
 def _mask_account(account: str | None) -> str | None:
@@ -219,6 +268,31 @@ class AdminKitchenRow(BaseModel):
     status: str = Field(..., description="Kitchen lifecycle status.", examples=["active", "suspended", "pending_verification"])
     owner_name: str = Field(..., description="Name of the owning owner.", examples=["Priya Sharma"])
     owner_phone: str = Field(..., description="Phone of the owning owner.", examples=["+919876543210"])
+    whatsapp_connected: bool = Field(
+        default=False,
+        description="True when this kitchen has a Meta WhatsApp phone_number_id linked.",
+    )
+    payment_gateway_configured: bool = Field(
+        default=False,
+        description="True when Razorpay kitchen credentials / linked account exist in billing.",
+    )
+
+
+class AdminKitchenDetail(AdminKitchenRow):
+    """Kitchen workspace for super-admin ops — profile + WhatsApp travel with the kitchen."""
+
+    owner_id: uuid.UUID = Field(..., description="Owning owner UUID.")
+    address_line: str | None = Field(default=None, description="Street address, if set.")
+    state: str | None = Field(default=None, description="State / region.")
+    pincode: str | None = Field(default=None, description="PIN code.")
+    whatsapp_phone_id: str | None = Field(default=None, description="Meta phone_number_id, if linked.")
+    whatsapp_display_phone: str | None = Field(default=None, description="E.164 display number, if set.")
+    platform_secrets_note: str = Field(
+        default=(
+            "Meta App Secret / Verify Token and platform Razorpay (SaaS) live under Super Admin → API Keys. "
+            "Kitchen WhatsApp phone ID and kitchen Razorpay keys travel with this kitchen."
+        ),
+    )
 
 
 class AdminOrderRow(BaseModel):
@@ -281,18 +355,31 @@ async def get_current_admin(
 
 
 async def ensure_default_admin(session: AsyncSession) -> None:
-    email = settings.admin_email.lower()
+    """Bootstrap / sync the platform admin from ADMIN_EMAIL + ADMIN_PASSWORD.
+
+    Password is kept aligned with env on every login bootstrap call so GCP metadata
+    rotations and fresh resets do not leave a stale hash (common cause of
+    'Invalid credentials' on admin.kitchcu.com).
+    """
+    email = settings.admin_email.lower().strip()
     result = await session.execute(select(PlatformAdmin).where(PlatformAdmin.email == email))
-    if result.scalar_one_or_none():
-        return
-    session.add(
-        PlatformAdmin(
-            email=email,
-            password_hash=hash_password(settings.admin_password),
-            name="kitchCU Platform Admin",
-            role="superadmin",
+    admin = result.scalar_one_or_none()
+    if admin is None:
+        session.add(
+            PlatformAdmin(
+                email=email,
+                password_hash=hash_password(settings.admin_password),
+                name="kitchCU Platform Admin",
+                role="superadmin",
+                is_active=True,
+            )
         )
-    )
+        await session.flush()
+        return
+
+    admin.is_active = True
+    if not verify_password(settings.admin_password, admin.password_hash):
+        admin.password_hash = hash_password(settings.admin_password)
     await session.flush()
 
 
@@ -458,18 +545,112 @@ async def admin_kitchens(
         .order_by(Kitchen.created_at.desc())
         .limit(300)
     )
+    pairs = list(result.all())
+    gateway_ids = await _payment_gateway_kitchen_ids(session, [k.id for k, _ in pairs])
     return [
-        AdminKitchenRow(
-            id=k.id,
-            code=k.code,
-            name=k.name,
-            city=k.city,
-            status=k.status,
-            owner_name=o.name,
-            owner_phone=o.phone,
-        )
-        for k, o in result.all()
+        _admin_kitchen_row(k, o, payment_gateway_configured=k.id in gateway_ids)
+        for k, o in pairs
     ]
+
+
+@router.get(
+    "/kitchens/{kitchen_id}",
+    response_model=AdminKitchenDetail,
+    summary="Kitchen workspace detail (super admin)",
+    description=(
+        "Ops workspace for one kitchen — profile, WhatsApp linkage flags, and payment-gateway "
+        "configured flag. Kitchen Razorpay CRUD is on billing "
+        "`/admin/kitchens/{id}/payment-gateway`. Platform Meta/Razorpay SaaS secrets stay under "
+        "`/admin/api-keys`.\n\n"
+        "**Auth:** admin JWT required."
+    ),
+    responses=auth_errors(include_404=True),
+    tags=["Admin"],
+)
+async def admin_kitchen_detail(
+    kitchen_id: uuid.UUID,
+    admin: Annotated[PlatformAdmin, Depends(get_current_admin)],
+    session: Annotated[AsyncSession, Depends(get_db)],
+) -> AdminKitchenDetail:
+    _ = admin
+    result = await session.execute(
+        select(Kitchen, Owner)
+        .join(Owner, Owner.id == Kitchen.owner_id)
+        .where(Kitchen.id == kitchen_id)
+    )
+    row = result.first()
+    if not row:
+        raise HTTPException(status_code=404, detail="Kitchen not found")
+    kitchen, owner = row
+    wa = kitchen_whatsapp_to_response(kitchen)
+    gateway_ids = await _payment_gateway_kitchen_ids(session, [kitchen.id])
+    base = _admin_kitchen_row(kitchen, owner, payment_gateway_configured=kitchen.id in gateway_ids)
+    return AdminKitchenDetail(
+        **base.model_dump(),
+        owner_id=owner.id,
+        address_line=kitchen.address_line,
+        state=kitchen.state,
+        pincode=kitchen.pincode,
+        whatsapp_phone_id=wa.whatsapp_phone_id,
+        whatsapp_display_phone=wa.whatsapp_display_phone,
+    )
+
+
+@router.get(
+    "/kitchens/{kitchen_id}/whatsapp-integration",
+    response_model=KitchenWhatsAppIntegrationResponse,
+    summary="Get kitchen WhatsApp Business linkage (super admin)",
+    responses=auth_errors(include_404=True),
+    tags=["Admin"],
+)
+async def admin_kitchen_whatsapp_get(
+    kitchen_id: uuid.UUID,
+    admin: Annotated[PlatformAdmin, Depends(get_current_admin)],
+    session: Annotated[AsyncSession, Depends(get_db)],
+) -> KitchenWhatsAppIntegrationResponse:
+    _ = admin
+    kitchen = await session.get(Kitchen, kitchen_id)
+    if not kitchen:
+        raise HTTPException(status_code=404, detail="Kitchen not found")
+    return kitchen_whatsapp_to_response(kitchen)
+
+
+@router.put(
+    "/kitchens/{kitchen_id}/whatsapp-integration",
+    response_model=KitchenWhatsAppIntegrationResponse,
+    summary="Upsert / clear kitchen WhatsApp Business linkage (super admin)",
+    description=(
+        "Connect or disconnect Meta `phone_number_id` for this kitchen (onboarding support). "
+        "Does not store App Secret / Verify Token — those are platform API keys. "
+        "Publishes `kitchen.whatsapp.updated`. Bypasses kitchen module kill-switch so ops can "
+        "pre-configure before enabling the WhatsApp module."
+    ),
+    responses=auth_errors(include_404=True),
+    tags=["Admin"],
+)
+async def admin_kitchen_whatsapp_put(
+    kitchen_id: uuid.UUID,
+    body: KitchenWhatsAppIntegrationUpdate,
+    admin: Annotated[PlatformAdmin, Depends(get_current_admin)],
+    session: Annotated[AsyncSession, Depends(get_db)],
+    publisher: Annotated[EventPublisher, Depends(get_publisher)],
+) -> KitchenWhatsAppIntegrationResponse:
+    _ = admin
+    kitchen = await session.get(Kitchen, kitchen_id)
+    if not kitchen:
+        raise HTTPException(status_code=404, detail="Kitchen not found")
+    try:
+        result = await update_kitchen_whatsapp_integration(
+            session,
+            kitchen,
+            body,
+            publisher,
+            enforce_module=False,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    await session.commit()
+    return result
 
 
 @router.patch(
@@ -504,14 +685,9 @@ async def admin_kitchen_status(
     kitchen, owner = row
     kitchen.status = body.status
     await session.commit()
-    return AdminKitchenRow(
-        id=kitchen.id,
-        code=kitchen.code,
-        name=kitchen.name,
-        city=kitchen.city,
-        status=kitchen.status,
-        owner_name=owner.name,
-        owner_phone=owner.phone,
+    gateway_ids = await _payment_gateway_kitchen_ids(session, [kitchen.id])
+    return _admin_kitchen_row(
+        kitchen, owner, payment_gateway_configured=kitchen.id in gateway_ids
     )
 
 

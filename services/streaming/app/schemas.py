@@ -16,10 +16,27 @@ from app.livekit_tokens import (
     resolve_livekit_creds,
     viewer_identity,
 )
-from app.models import KitchenStreamSettings, LiveSession
+from app.models import SHOWCASE_PHASES, KitchenStreamSettings, LiveSession
+from app.showcase import SHOWCASE_PHASE_SET, load_dish_showcase_snapshot
 from ckac_common.auth import stream_key
 from ckac_common.event_bus import EventPublisher
 from ckac_common.platform_config import require_feature
+
+
+class ShowcaseIngredient(BaseModel):
+    ingredient_name: str
+    quantity: float
+    unit: str
+    photo_url: str | None = None
+    sort_order: int = 0
+
+
+class ShowcasePrepStep(BaseModel):
+    step_order: int
+    title: str | None = None
+    body_html: str | None = None
+    photo_url: str | None = None
+    duration_min: int | None = None
 
 
 class StreamSettingsResponse(BaseModel):
@@ -45,7 +62,40 @@ class GoLiveRequest(BaseModel):
     """Owner request to start a live publisher session."""
 
     title: str = Field(default="Live kitchen prep", max_length=255, description="Session title shown to viewers.")
-    order_id: uuid.UUID | None = Field(default=None, description="Optionally tie this stream to a specific order (e.g. showing live prep for that customer's order).")
+    order_id: uuid.UUID | None = Field(
+        default=None,
+        description="Optionally tie this stream to a specific order (e.g. showing live prep for that customer's order).",
+    )
+    dish_id: uuid.UUID | None = Field(
+        default=None,
+        description="Feature this dish on go-live — loads ingredients + prep steps for the showcase.",
+    )
+    showcase_phase: str | None = Field(
+        default=None,
+        description="Initial phase when dish_id is set: 'ingredients', 'prep', or 'prepared'. Default 'ingredients'.",
+    )
+
+
+class ShowcaseUpdateRequest(BaseModel):
+    """Owner updates the per-dish showcase while live (feature dish / change phase / advance prep)."""
+
+    dish_id: uuid.UUID | None = Field(
+        default=None,
+        description="Switch featured dish (reloads recipe snapshot). Omit to keep current dish.",
+    )
+    showcase_phase: str | None = Field(
+        default=None,
+        description=f"One of {list(SHOWCASE_PHASES)}.",
+    )
+    active_prep_step_order: int | None = Field(
+        default=None,
+        ge=1,
+        description="Highlight this prep step order while phase is 'prep'.",
+    )
+    clear_dish: bool = Field(
+        default=False,
+        description="When true, clears dish showcase back to idle.",
+    )
 
 
 class LiveSessionResponse(BaseModel):
@@ -57,6 +107,17 @@ class LiveSessionResponse(BaseModel):
     room_name: str = Field(..., description="LiveKit room name, derived deterministically from the kitchen ID.")
     status: str = Field(..., description="'live' or 'ended'.")
     order_id: uuid.UUID | None = Field(default=None, description="Linked order, if this stream is tied to a specific order.")
+    dish_id: uuid.UUID | None = Field(default=None, description="Featured dish for this live session, if any.")
+    dish_name: str | None = Field(default=None, description="Featured dish name.")
+    showcase_phase: str = Field(
+        default="idle",
+        description="Per-dish stage: idle | ingredients | prep | prepared.",
+    )
+    active_prep_step_order: int | None = Field(
+        default=None,
+        description="Active prep step order while showcasing prep.",
+    )
+    prepared_at: datetime | None = Field(default=None, description="When the dish was marked prepared, UTC.")
     viewer_count: int = Field(..., description="Running count of viewer tokens issued for this session.")
     started_at: datetime = Field(..., description="Session start timestamp, UTC.")
     ended_at: datetime | None = Field(default=None, description="Session end timestamp, UTC, once ended.")
@@ -64,6 +125,22 @@ class LiveSessionResponse(BaseModel):
     publisher_token: str | None = Field(default=None, description="Short-lived LiveKit publish token for the owner's broadcasting client; only returned to the owner (go-live/current-session calls), never to viewers.")
 
     model_config = {"from_attributes": True}
+
+
+class LiveShowcaseResponse(BaseModel):
+    """Public/customer view of the dish showcase for a live session."""
+
+    session_id: uuid.UUID
+    kitchen_id: uuid.UUID
+    title: str
+    status: str
+    dish_id: uuid.UUID | None = None
+    dish_name: str | None = None
+    showcase_phase: str = "idle"
+    active_prep_step_order: int | None = None
+    prepared_at: datetime | None = None
+    ingredients: list[ShowcaseIngredient] = Field(default_factory=list)
+    prep_steps: list[ShowcasePrepStep] = Field(default_factory=list)
 
 
 class ViewerTokenResponse(BaseModel):
@@ -85,6 +162,9 @@ class LiveKitchenSummary(BaseModel):
     session_id: uuid.UUID = Field(..., description="Active live session UUID.")
     title: str = Field(..., description="Current session title.")
     started_at: datetime = Field(..., description="Session start timestamp, UTC.")
+    dish_id: uuid.UUID | None = Field(default=None, description="Featured dish, if any.")
+    dish_name: str | None = Field(default=None, description="Featured dish name.")
+    showcase_phase: str = Field(default="idle", description="Current showcase phase.")
 
 
 class LiveKitchenListResponse(BaseModel):
@@ -132,12 +212,63 @@ async def _session_response(
         room_name=session_row.room_name,
         status=session_row.status,
         order_id=session_row.order_id,
+        dish_id=session_row.dish_id,
+        dish_name=session_row.dish_name,
+        showcase_phase=session_row.showcase_phase or "idle",
+        active_prep_step_order=session_row.active_prep_step_order,
+        prepared_at=session_row.prepared_at,
         viewer_count=session_row.viewer_count,
         started_at=session_row.started_at,
         ended_at=session_row.ended_at,
         livekit_url=url or None,
         publisher_token=publisher_token,
     )
+
+
+def _showcase_from_session(live: LiveSession) -> LiveShowcaseResponse:
+    snap = live.showcase_snapshot if isinstance(live.showcase_snapshot, dict) else {}
+    ingredients = [ShowcaseIngredient.model_validate(i) for i in (snap.get("ingredients") or [])]
+    prep_steps = [ShowcasePrepStep.model_validate(s) for s in (snap.get("prep_steps") or [])]
+    return LiveShowcaseResponse(
+        session_id=live.id,
+        kitchen_id=live.kitchen_id,
+        title=live.title,
+        status=live.status,
+        dish_id=live.dish_id,
+        dish_name=live.dish_name,
+        showcase_phase=live.showcase_phase or "idle",
+        active_prep_step_order=live.active_prep_step_order,
+        prepared_at=live.prepared_at,
+        ingredients=ingredients,
+        prep_steps=prep_steps,
+    )
+
+
+async def _apply_dish_to_session(
+    session: AsyncSession,
+    live: LiveSession,
+    kitchen_id: uuid.UUID,
+    dish_id: uuid.UUID,
+    *,
+    phase: str | None = None,
+) -> None:
+    snapshot = await load_dish_showcase_snapshot(session, kitchen_id, dish_id)
+    live.dish_id = dish_id
+    live.dish_name = snapshot["dish_name"]
+    live.showcase_snapshot = snapshot
+    next_phase = (phase or "ingredients").strip().lower()
+    if next_phase not in SHOWCASE_PHASE_SET or next_phase == "idle":
+        next_phase = "ingredients"
+    live.showcase_phase = next_phase
+    steps = snapshot.get("prep_steps") or []
+    if next_phase == "prep" and steps:
+        live.active_prep_step_order = int(steps[0]["step_order"])
+    elif next_phase != "prep":
+        live.active_prep_step_order = None
+    if next_phase == "prepared":
+        live.prepared_at = datetime.now(UTC)
+    else:
+        live.prepared_at = None
 
 
 async def get_stream_settings(session: AsyncSession, kitchen_id: uuid.UUID) -> StreamSettingsResponse:
@@ -203,9 +334,21 @@ async def go_live(
         room_name=room_name,
         status="live",
         order_id=data.order_id,
+        showcase_phase="idle",
+        showcase_snapshot={},
     )
     session.add(live)
     await session.flush()
+
+    if data.dish_id is not None:
+        await _apply_dish_to_session(
+            session,
+            live,
+            kitchen_id,
+            data.dish_id,
+            phase=data.showcase_phase,
+        )
+        await session.flush()
 
     token = await build_livekit_token(
         room_name=room_name,
@@ -224,10 +367,101 @@ async def go_live(
             "session_id": str(live.id),
             "room_name": room_name,
             "title": live.title,
+            "dish_id": str(live.dish_id) if live.dish_id else None,
+            "showcase_phase": live.showcase_phase,
         },
     )
     await publisher.publish(stream_key("streaming", "session"), event, session=session)
     return await _session_response(session, live, publisher_token=token)
+
+
+async def update_live_showcase(
+    session: AsyncSession,
+    kitchen_id: uuid.UUID,
+    data: ShowcaseUpdateRequest,
+    publisher: EventPublisher,
+) -> LiveSessionResponse:
+    live = await _active_session(session, kitchen_id)
+    if not live:
+        raise ValueError("No active live session")
+
+    if data.clear_dish:
+        live.dish_id = None
+        live.dish_name = None
+        live.showcase_phase = "idle"
+        live.active_prep_step_order = None
+        live.prepared_at = None
+        live.showcase_snapshot = {}
+    else:
+        if data.dish_id is not None:
+            await _apply_dish_to_session(
+                session,
+                live,
+                kitchen_id,
+                data.dish_id,
+                phase=data.showcase_phase or live.showcase_phase or "ingredients",
+            )
+        elif data.showcase_phase is not None:
+            phase = data.showcase_phase.strip().lower()
+            if phase not in SHOWCASE_PHASE_SET:
+                raise ValueError(f"Invalid showcase_phase — use one of {list(SHOWCASE_PHASES)}")
+            if phase != "idle" and not live.dish_id:
+                raise ValueError("Feature a dish before setting showcase phase")
+            live.showcase_phase = phase
+            if phase == "prepared":
+                live.prepared_at = datetime.now(UTC)
+                live.active_prep_step_order = None
+            elif phase == "prep":
+                live.prepared_at = None
+                snap = live.showcase_snapshot if isinstance(live.showcase_snapshot, dict) else {}
+                steps = snap.get("prep_steps") or []
+                if data.active_prep_step_order is not None:
+                    live.active_prep_step_order = data.active_prep_step_order
+                elif steps and live.active_prep_step_order is None:
+                    live.active_prep_step_order = int(steps[0]["step_order"])
+            else:
+                live.prepared_at = None
+                if phase != "prep":
+                    live.active_prep_step_order = None
+
+        if data.active_prep_step_order is not None and not data.clear_dish:
+            if live.showcase_phase != "prep":
+                live.showcase_phase = "prep"
+                live.prepared_at = None
+            live.active_prep_step_order = data.active_prep_step_order
+
+    await session.flush()
+
+    event = EventPublisher.build(
+        event_type="stream.showcase_updated",
+        aggregate_type="live_session",
+        aggregate_id=str(live.id),
+        producer="streaming-service",
+        payload={
+            "kitchen_id": str(kitchen_id),
+            "session_id": str(live.id),
+            "dish_id": str(live.dish_id) if live.dish_id else None,
+            "dish_name": live.dish_name,
+            "showcase_phase": live.showcase_phase,
+            "active_prep_step_order": live.active_prep_step_order,
+        },
+    )
+    await publisher.publish(stream_key("streaming", "session"), event, session=session)
+    return await _session_response(session, live)
+
+
+async def get_live_showcase(
+    session: AsyncSession,
+    session_id: uuid.UUID,
+) -> LiveShowcaseResponse:
+    live = (
+        await session.execute(select(LiveSession).where(LiveSession.id == session_id))
+    ).scalar_one_or_none()
+    if not live:
+        raise ValueError("Live session not found")
+    if live.status != "live":
+        raise ValueError("Live session is not active")
+    return _showcase_from_session(live)
 
 
 async def end_live(
@@ -316,7 +550,8 @@ async def list_live_kitchens(session: AsyncSession) -> LiveKitchenListResponse:
         await session.execute(
             text(
                 """
-                SELECT s.id, s.kitchen_id, s.title, s.started_at, k.code, k.name
+                SELECT s.id, s.kitchen_id, s.title, s.started_at, k.code, k.name,
+                       s.dish_id, s.dish_name, s.showcase_phase
                 FROM ckac_streaming.live_sessions s
                 JOIN ckac_identity.kitchens k ON k.id = s.kitchen_id
                 JOIN ckac_streaming.kitchen_stream_settings st ON st.kitchen_id = s.kitchen_id
@@ -325,15 +560,18 @@ async def list_live_kitchens(session: AsyncSession) -> LiveKitchenListResponse:
                 """
             )
         )
-    ).fetchall()
+    ).mappings().all()
     kitchens = [
         LiveKitchenSummary(
-            kitchen_id=uuid.UUID(str(r[1])),
-            session_id=uuid.UUID(str(r[0])),
-            title=r[2],
-            started_at=r[3],
-            kitchen_code=r[4],
-            kitchen_name=r[5],
+            kitchen_id=uuid.UUID(str(r["kitchen_id"])),
+            session_id=uuid.UUID(str(r["id"])),
+            title=r["title"],
+            started_at=r["started_at"],
+            kitchen_code=r["code"],
+            kitchen_name=r["name"],
+            dish_id=uuid.UUID(str(r["dish_id"])) if r["dish_id"] else None,
+            dish_name=r["dish_name"],
+            showcase_phase=r["showcase_phase"] or "idle",
         )
         for r in rows
     ]

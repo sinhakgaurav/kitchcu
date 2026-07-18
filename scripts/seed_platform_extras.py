@@ -560,8 +560,28 @@ def ensure_support_tickets(customers: list[dict]) -> None:
             log(f"  ! customer ticket: {exc}")
 
 
-def ensure_streaming(owner_token: str, kitchen_id: str) -> None:
-    """Opt in to live streaming and run a completed go-live session (F46-F47)."""
+def ensure_branded_page(owner_token: str, kitchen_id: str, kitchen_name: str) -> None:
+    """Publish the customer branded storefront at /k/{code}."""
+    try:
+        request(
+            "PATCH",
+            f"/api/v1/kitchens/{kitchen_id}/branded-page",
+            {
+                "enabled": True,
+                "tagline": f"Home-taste from {kitchen_name}",
+                "accent_color": "#0F766E",
+            },
+            token=owner_token,
+        )
+        log("  Branded storefront published")
+    except ApiError as exc:
+        log(f"  ! branded page: {exc}")
+
+
+def ensure_streaming(
+    owner_token: str, kitchen_id: str, dish_id: str | None = None
+) -> None:
+    """Opt in to live streaming and run a completed go-live with dish showcase (F46–F48)."""
     try:
         request(
             "PATCH",
@@ -575,14 +595,37 @@ def ensure_streaming(owner_token: str, kitchen_id: str) -> None:
         if session and session.get("status") == "live":
             log("  Streaming session already live — skipped go-live")
             return
-        request(
+        body: dict = {"title": "Live: Weekend prep at the kitchen"}
+        if dish_id:
+            body["dish_id"] = dish_id
+            body["showcase_phase"] = "ingredients"
+        live = request(
             "POST",
             f"/api/v1/kitchens/{kitchen_id}/stream/go-live",
-            {"title": "Live: Weekend prep at the kitchen"},
+            body,
             token=owner_token,
         )
+        if dish_id and live.get("id"):
+            try:
+                request(
+                    "PATCH",
+                    f"/api/v1/kitchens/{kitchen_id}/stream/showcase",
+                    {"showcase_phase": "prep", "active_prep_step_order": 1},
+                    token=owner_token,
+                )
+                request(
+                    "PATCH",
+                    f"/api/v1/kitchens/{kitchen_id}/stream/showcase",
+                    {"showcase_phase": "prepared"},
+                    token=owner_token,
+                )
+            except ApiError as phase_exc:
+                log(f"  ! stream showcase phases: {phase_exc}")
         request("POST", f"/api/v1/kitchens/{kitchen_id}/stream/end", token=owner_token)
-        log("  Streaming go-live opt-in + one completed session recorded")
+        if dish_id:
+            log("  Streaming go-live with dish showcase (ingredients→prep→prepared) recorded")
+        else:
+            log("  Streaming go-live opt-in + one completed session recorded")
     except ApiError as exc:
         log(f"  ! streaming: {exc}")
 
@@ -711,6 +754,7 @@ def seed_kitchen_integrations(
     kitchen_name: str,
     *,
     kitchen_code: str | None = None,
+    dish_id: str | None = None,
 ) -> None:
     """Per-kitchen owner integrations (safe to run for every kitchen in bulk seed)."""
     ensure_whatsapp_integration(owner_token, kitchen_id)
@@ -723,7 +767,8 @@ def seed_kitchen_integrations(
         kitchen_code=kitchen_code,
     )
     ensure_delivery_quote(kitchen_id)
-    ensure_streaming(owner_token, kitchen_id)
+    ensure_branded_page(owner_token, kitchen_id, kitchen_name)
+    ensure_streaming(owner_token, kitchen_id, dish_id=dish_id)
 
 
 def seed_kitchen_modules(owner_token: str, kitchen_id: str, dish_ids: dict[str, str]) -> None:
@@ -781,7 +826,9 @@ def seed_platform_extras(
     ensure_refund(owner_token, kitchen_id)
     ensure_delivery_quote(kitchen_id)
     ensure_support_tickets(customers)
-    ensure_streaming(owner_token, kitchen_id)
+    ensure_branded_page(owner_token, kitchen_id, kitchen_name)
+    first_dish = next(iter(dish_ids.values()), None) if dish_ids else None
+    ensure_streaming(owner_token, kitchen_id, dish_id=first_dish)
     if dish_ids:
         ensure_learning_trial(owner_token, kitchen_id)
 

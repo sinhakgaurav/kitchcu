@@ -1,5 +1,6 @@
 import { Link, useParams } from "react-router-dom";
 import { useEffect, useState } from "react";
+import { useBrandedStorefront } from "../../customer/BrandedStorefront";
 import { RichHtml } from "../../components/RichTextEditor";
 import { sampleDishImages } from "../../data/content";
 import type { CuisineMenuGroup, Dish, Menu } from "../../shared/api";
@@ -21,17 +22,24 @@ const DIET_LABELS: Record<string, string> = {
 };
 
 export function KitchenMenuPage() {
-  const { kitchenId } = useParams<{ kitchenId: string }>();
+  const { kitchenId: kitchenIdParam } = useParams<{ kitchenId: string }>();
+  const branded = useBrandedStorefront();
+  const kitchenId = kitchenIdParam || branded?.kitchen.id;
   const [menu, setMenu] = useState<Menu | null>(null);
-  const [kitchenName, setKitchenName] = useState("");
-  const [kitchenCode, setKitchenCode] = useState("");
+  const [kitchenName, setKitchenName] = useState(branded?.kitchen.name ?? "");
+  const [kitchenCode, setKitchenCode] = useState(branded?.kitchen.code ?? "");
   const [error, setError] = useState("");
   const [cartLines, setCartLines] = useState(0);
   const [cartReadyMin, setCartReadyMin] = useState(0);
   const [ratingMap, setRatingMap] = useState<Record<string, DishRatingSummary>>({});
+  const checkoutHref = branded ? `${branded.basePath}/checkout` : "/checkout";
 
   useEffect(() => {
     if (!kitchenId) return;
+    if (branded) {
+      setKitchenName(branded.kitchen.name);
+      setKitchenCode(branded.kitchen.code);
+    }
     fetchPublicMenu(kitchenId)
       .then((m) => {
         setMenu(m);
@@ -39,6 +47,9 @@ export function KitchenMenuPage() {
         if (saved) {
           setKitchenName(saved.name);
           setKitchenCode(saved.code);
+        } else if (branded) {
+          setKitchenName(branded.kitchen.name);
+          setKitchenCode(branded.kitchen.code);
         }
       })
       .catch((err) =>
@@ -60,7 +71,7 @@ export function KitchenMenuPage() {
     refreshCart();
     window.addEventListener("storage", refreshCart);
     return () => window.removeEventListener("storage", refreshCart);
-  }, [kitchenId]);
+  }, [kitchenId, branded]);
 
   const groups = menu?.grouped?.length ? menu.grouped : fallbackGroups(menu);
 
@@ -77,15 +88,15 @@ export function KitchenMenuPage() {
   };
 
   return (
-    <div className="container customer-menu">
-      <Link to="/" className="owner-back">← Back to discover</Link>
+    <div className={`container customer-menu${branded ? " customer-menu--branded" : ""}`}>
+      {!branded && <Link to="/" className="owner-back">← Back to discover</Link>}
       {error && <p className="auth-card__error">{error}</p>}
       {!menu && !error && <p className="app-loading">Loading menu...</p>}
 
       {menu && (
         <>
           <header className="customer-menu__head">
-            <h1>{kitchenName || "Kitchen Menu"}</h1>
+            {!branded && <h1>{kitchenName || "Kitchen Menu"}</h1>}
             <p>
               {menu.dishes.length} dishes · Cuisine → diet → dish · Live-capture verified heroes
             </p>
@@ -119,7 +130,7 @@ export function KitchenMenuPage() {
               <span>
                 {cartLines} item{cartLines === 1 ? "" : "s"} · ready within ~{cartReadyMin} min
               </span>
-              <Link to="/checkout" className="btn btn--primary btn--sm">
+              <Link to={checkoutHref} className="btn btn--primary btn--sm">
                 Checkout
               </Link>
             </div>

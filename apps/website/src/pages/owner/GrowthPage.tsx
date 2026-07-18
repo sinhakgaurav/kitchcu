@@ -3,27 +3,36 @@ import { OwnerEmpty, OwnerPageShell, OwnerPanel } from "../../components/owner/O
 import {
   dismissGrowthSuggestion,
   fetchDishCombos,
+  fetchGoldenRecipes,
   fetchGrowthSuggestions,
   fetchMenu,
   fetchOrderPatterns,
   generateGrowthSuggestions,
   pushDailyMenu,
+  saveGoldenRecipe,
   type DishCombo,
+  type GoldenRecipePin,
   type GrowthSuggestion,
   type OrderPatternInsight,
 } from "../../lib/api";
 import { useKitchen } from "../../lib/kitchen";
+
+function isGolden(s: GrowthSuggestion) {
+  return s.suggestion_type === "golden_performance_day";
+}
 
 export function GrowthPage() {
   const { kitchen } = useKitchen();
   const [suggestions, setSuggestions] = useState<GrowthSuggestion[]>([]);
   const [combos, setCombos] = useState<DishCombo[]>([]);
   const [patterns, setPatterns] = useState<OrderPatternInsight | null>(null);
+  const [goldenPins, setGoldenPins] = useState<GoldenRecipePin[]>([]);
   const [dishOptions, setDishOptions] = useState<{ id: string; name: string }[]>([]);
   const [selectedDishes, setSelectedDishes] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
   const [pushing, setPushing] = useState(false);
+  const [savingId, setSavingId] = useState<string | null>(null);
   const [error, setError] = useState("");
   const [pushResult, setPushResult] = useState("");
 
@@ -32,15 +41,17 @@ export function GrowthPage() {
     setLoading(true);
     setError("");
     try {
-      const [sug, comboRes, pat, menu] = await Promise.all([
+      const [sug, comboRes, pat, menu, pins] = await Promise.all([
         fetchGrowthSuggestions(kitchen.id),
         fetchDishCombos(kitchen.id),
         fetchOrderPatterns(kitchen.id),
         fetchMenu(kitchen.id),
+        fetchGoldenRecipes(kitchen.id),
       ]);
       setSuggestions(sug.suggestions);
       setCombos(comboRes.combos);
       setPatterns(pat);
+      setGoldenPins(pins.pins);
       const dishes = menu.dishes
         .filter((d) => d.is_active)
         .map((d) => ({ id: d.id, name: d.name }));
@@ -80,6 +91,27 @@ export function GrowthPage() {
     }
   };
 
+  const onSaveGolden = async (id: string) => {
+    if (!kitchen) return;
+    setSavingId(id);
+    setError("");
+    try {
+      const pin = await saveGoldenRecipe(kitchen.id, id);
+      setGoldenPins((prev) => [pin, ...prev.filter((p) => p.id !== pin.id)]);
+      setSuggestions((prev) =>
+        prev.map((s) =>
+          s.id === id
+            ? { ...s, action_payload: { ...s.action_payload, recipe_saved: true } }
+            : s,
+        ),
+      );
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not save golden recipe");
+    } finally {
+      setSavingId(null);
+    }
+  };
+
   const onPushMenu = async () => {
     if (!kitchen || selectedDishes.length === 0) return;
     setPushing(true);
@@ -105,6 +137,9 @@ export function GrowthPage() {
 
   if (!kitchen) return null;
 
+  const goldenSuggestions = suggestions.filter(isGolden);
+  const otherSuggestions = suggestions.filter((s) => !isGolden(s));
+
   return (
     <OwnerPageShell
       eyebrow="Growth"
@@ -122,12 +157,81 @@ export function GrowthPage() {
         <div className="app-loading">Loading growth insights…</div>
       ) : (
         <>
+          {(goldenSuggestions.length > 0 || goldenPins.length > 0) && (
+            <OwnerPanel
+              title="Golden performance days"
+              description="Peak order days with strong ratings & positive comments — save that recipe"
+            >
+              {goldenSuggestions.length > 0 && (
+                <ul className="report-rank golden-day-list">
+                  {goldenSuggestions.map((s) => {
+                    const saved = Boolean(s.action_payload.recipe_saved);
+                    const qty = Number(s.action_payload.order_qty ?? 0);
+                    const rating = s.action_payload.avg_rating;
+                    return (
+                      <li key={s.id} className="golden-day-card">
+                        <div className="report-rank__row">
+                          <span>
+                            <strong>{s.title}</strong>
+                            <span className="report-rank__meta">
+                              {" "}
+                              · {qty} portions
+                              {rating != null ? ` · ${Number(rating).toFixed(1)}★` : ""}
+                            </span>
+                          </span>
+                          <div className="golden-day-card__actions">
+                            {!saved && (
+                              <button
+                                type="button"
+                                className="btn btn--primary btn--sm"
+                                disabled={savingId === s.id}
+                                onClick={() => onSaveGolden(s.id)}
+                              >
+                                {savingId === s.id ? "Saving…" : "Save recipe"}
+                              </button>
+                            )}
+                            {saved && <span className="golden-day-badge">Saved</span>}
+                            <button type="button" className="btn btn--ghost btn--sm" onClick={() => onDismiss(s.id)}>
+                              Dismiss
+                            </button>
+                          </div>
+                        </div>
+                        <p className="report-hint">{s.description}</p>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+              {goldenPins.length > 0 && (
+                <ul className="report-rank" style={{ marginTop: goldenSuggestions.length ? "1rem" : 0 }}>
+                  {goldenPins.map((p) => (
+                    <li key={p.id}>
+                      <div className="report-rank__row">
+                        <span>
+                          <strong>{p.dish_name}</strong>
+                          <span className="report-rank__meta">
+                            {" "}
+                            · pinned {p.performance_date}
+                            {p.recipe_snapshot.lines?.length
+                              ? ` · ${p.recipe_snapshot.lines.length} ingredients`
+                              : ""}
+                          </span>
+                        </span>
+                        <span className="golden-day-badge">Golden baseline</span>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </OwnerPanel>
+          )}
+
           <OwnerPanel title="Suggestions" description="AI-powered actions from your order data">
-            {suggestions.length === 0 ? (
+            {otherSuggestions.length === 0 ? (
               <OwnerEmpty message="No active suggestions — click Generate to analyze your orders." />
             ) : (
               <ul className="report-rank">
-                {suggestions.map((s) => (
+                {otherSuggestions.map((s) => (
                   <li key={s.id}>
                     <div className="report-rank__row">
                       <span>

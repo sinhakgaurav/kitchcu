@@ -13,6 +13,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.admin_auth import AdminContext, get_current_admin
 from app.models import Payment, Refund
+from app.payment_gateway import (
+    PaymentGatewayResponse,
+    PaymentGatewayUpsertRequest,
+    delete_kitchen_payment_gateway,
+    get_kitchen_payment_gateway,
+    upsert_kitchen_payment_gateway,
+)
 from app.refunds import refund_to_response, RefundResponse
 from app.schemas import PaymentResponse, SettlementResponse, payment_to_response, settlement_to_response
 from app.models import Settlement
@@ -27,6 +34,83 @@ def get_publisher() -> EventPublisher:
     from app.main import event_publisher
 
     return event_publisher
+
+
+async def _kitchen_exists(session: AsyncSession, kitchen_id: uuid.UUID) -> bool:
+    row = (
+        await session.execute(
+            text("SELECT 1 FROM ckac_identity.kitchens WHERE id = :kid LIMIT 1"),
+            {"kid": kitchen_id},
+        )
+    ).scalar_one_or_none()
+    return row is not None
+
+
+@router.get(
+    "/kitchens/{kitchen_id}/payment-gateway",
+    response_model=PaymentGatewayResponse,
+    summary="Get kitchen Razorpay payment gateway (super admin)",
+    description=(
+        "Kitchen-scoped Razorpay credentials for checkout / Route. Secrets masked. "
+        "Platform SaaS Razorpay keys remain under identity `/admin/api-keys`."
+    ),
+    responses={**auth_errors(), 404: RESP_404},
+)
+async def admin_kitchen_payment_gateway_get(
+    kitchen_id: uuid.UUID,
+    admin: Annotated[AdminContext, Depends(get_current_admin)],
+    session: Annotated[AsyncSession, Depends(get_db)],
+) -> PaymentGatewayResponse:
+    _ = admin
+    if not await _kitchen_exists(session, kitchen_id):
+        raise HTTPException(status_code=404, detail="Kitchen not found")
+    return await get_kitchen_payment_gateway(session, kitchen_id)
+
+
+@router.put(
+    "/kitchens/{kitchen_id}/payment-gateway",
+    response_model=PaymentGatewayResponse,
+    summary="Upsert kitchen Razorpay payment gateway (super admin)",
+    description=(
+        "Onboarding / support path to set kitchen Razorpay key id, secrets, and Route "
+        "linked account. Publishes `kitchen_payment_gateway.updated`."
+    ),
+    responses={**auth_errors(), 400: RESP_400, 404: RESP_404},
+)
+async def admin_kitchen_payment_gateway_put(
+    kitchen_id: uuid.UUID,
+    body: PaymentGatewayUpsertRequest,
+    admin: Annotated[AdminContext, Depends(get_current_admin)],
+    session: Annotated[AsyncSession, Depends(get_db)],
+    publisher: Annotated[EventPublisher, Depends(get_publisher)],
+) -> PaymentGatewayResponse:
+    _ = admin
+    if not await _kitchen_exists(session, kitchen_id):
+        raise HTTPException(status_code=404, detail="Kitchen not found")
+    result = await upsert_kitchen_payment_gateway(session, publisher, kitchen_id, body)
+    await session.commit()
+    return result
+
+
+@router.delete(
+    "/kitchens/{kitchen_id}/payment-gateway",
+    response_model=PaymentGatewayResponse,
+    summary="Clear kitchen Razorpay payment gateway (super admin)",
+    description="Removes kitchen payment credentials. Publishes `kitchen_payment_gateway.cleared`.",
+    responses={**auth_errors(), 404: RESP_404},
+)
+async def admin_kitchen_payment_gateway_delete(
+    kitchen_id: uuid.UUID,
+    admin: Annotated[AdminContext, Depends(get_current_admin)],
+    session: Annotated[AsyncSession, Depends(get_db)],
+    publisher: Annotated[EventPublisher, Depends(get_publisher)],
+) -> PaymentGatewayResponse:
+    _ = admin
+    if not await _kitchen_exists(session, kitchen_id):
+        raise HTTPException(status_code=404, detail="Kitchen not found")
+    result = await delete_kitchen_payment_gateway(session, publisher, kitchen_id)
+    await session.commit()
+    return result
 
 
 class AdminRefundPatch(BaseModel):

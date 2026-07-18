@@ -143,13 +143,28 @@ export const features = [
     image: { src: m("skewers.jpg"), alt: "Live cooking" },
   },
   {
+    title: "Branded kitchen page",
+    desc: "Publish a shareable storefront at /k/your-code — your brand, menu, and checkout.",
+    image: { src: m("dining.jpg"), alt: "Branded kitchen storefront" },
+  },
+  {
+    title: "Golden performance day",
+    desc: "ML reads ratings and comments to pin your best cooking days and recipes.",
+    image: { src: m("bowls.jpg"), alt: "Peak kitchen performance" },
+  },
+  {
+    title: "Live dish showcase",
+    desc: "Go live with ingredients → prep → prepared so customers see the real dish.",
+    image: { src: m("kitchen.jpg"), alt: "Live cooking showcase" },
+  },
+  {
     title: "Order Lifecycle",
     desc: "Track every order from received to delivered with status updates.",
     image: { src: m("service.jpg"), alt: "Kitchen service" },
   },
   {
     title: "Owner Dashboard",
-    desc: "Manage kitchens, menus, orders, and customer menu links in one portal.",
+    desc: "Menus, orders, WhatsApp & payments, growth — one kitchen workspace.",
     image: { src: m("restaurant.jpg"), alt: "Commercial kitchen" },
   },
 ];
@@ -226,10 +241,12 @@ export const pricingPlans = [
     features: [
       "Everything in Starter",
       "Growth reports & revenue analytics",
+      "Golden performance day + recipe pins",
       "Top dishes & peak-hour insights",
+      "Branded customer storefront (/k/code)",
       "Customer CRM & repeat-rate tracking",
       "Churn win-back customer list",
-      "WhatsApp marketing (coming soon)",
+      "Kitchen WhatsApp + Razorpay integrations",
       "Priority email support",
     ],
     cta: "Most popular",
@@ -247,6 +264,7 @@ export const pricingPlans = [
       "Multi-kitchen dashboard",
       "Advanced customer segmentation",
       "Festival & daily menu campaigns",
+      "Live dish showcase (ingredients → prep → prepared)",
       "Dedicated onboarding call",
       "Priority support + AI assistant",
     ],
@@ -272,11 +290,19 @@ export const supportFaqs = {
       q: "Can I see revenue and repeat customers?",
       a: "Yes — Growth and Scale plans include Reports: revenue trend, top dishes, busy hours (IST), repeat-customer rate, VIP segments, and win-back lists.",
     },
+    {
+      q: "What is a Golden performance day?",
+      a: "Growth intelligence scores recent orders, home-taste ratings, and comment sentiment. When a day stands out, KitchCu suggests pinning that recipe so you can recreate peak performance.",
+    },
+    {
+      q: "How do kitchen WhatsApp and Razorpay work?",
+      a: "Each kitchen connects its own WhatsApp Business phone ID and Razorpay keys under Integrations. Platform Meta/Razorpay SaaS keys stay under Admin → API Keys — kitchen credentials never overwrite those.",
+    },
   ],
   customer: [
     {
       q: "How do I find a kitchen?",
-      a: "Open customer.kitchCU.in, enter a kitchen code (e.g. CKPNQ001) from your home chef, or use Nearby with your location to discover cloud kitchens sorted by distance.",
+      a: "Open the customer app, enter a kitchen code (e.g. CKPNQ001), open a branded link like /k/CKPNQ001, or use Nearby with your location to discover cloud kitchens sorted by distance.",
     },
     {
       q: "Can I order online?",

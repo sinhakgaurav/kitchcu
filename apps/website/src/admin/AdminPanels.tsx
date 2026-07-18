@@ -104,8 +104,9 @@ export function AdminApiKeysPanel() {
           <div>
             <h3>Platform API keys</h3>
             <p style={{ margin: "0.35rem 0 0", color: "var(--text-muted)" }}>
-              Add or replace secrets for Razorpay, LiveKit, WhatsApp, Maps, OAuth, and AI support.
-              Values are encrypted at rest; only masked previews are shown after save.
+              Platform-wide secrets only: Meta WhatsApp App Secret / Verify Token, SaaS Razorpay,
+              LiveKit, Maps, OAuth, AI. Per-kitchen WhatsApp phone ID and kitchen Razorpay keys
+              live under Kitchens → workspace. Values encrypted at rest; masked after save.
             </p>
           </div>
           <button type="button" className="btn btn--ghost btn--sm" onClick={() => load()} disabled={loading}>

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { LiveCapturePhotoField } from "../../components/LiveCapturePhotoField";
 import { RichTextEditor } from "../../components/RichTextEditor";
 import { OwnerPageShell, OwnerPanel } from "../../components/owner/OwnerPageShell";
@@ -7,10 +7,14 @@ import {
   adjustIngredientStock,
   createIngredient,
   fetchDishRecipe,
+  fetchGoldenRecipes,
+  fetchGrowthSuggestions,
   fetchIngredients,
   fetchMenu,
   saveDishRecipe,
   type DishRecipe,
+  type GoldenRecipePin,
+  type GrowthSuggestion,
   type Ingredient,
   type PrepStep,
   type RecipeLine,
@@ -46,6 +50,7 @@ export function IngredientsPage() {
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [savedMsg, setSavedMsg] = useState("");
+  const [dishGolden, setDishGolden] = useState<GrowthSuggestion | GoldenRecipePin | null>(null);
 
   const [newName, setNewName] = useState("");
   const [newUnit, setNewUnit] = useState("g");
@@ -99,6 +104,21 @@ export function IngredientsPage() {
           prep_steps: [],
         }),
       );
+    Promise.all([
+      fetchGoldenRecipes(kitchen.id, selectedDishId).catch(() => ({ pins: [] as GoldenRecipePin[] })),
+      fetchGrowthSuggestions(kitchen.id).catch(() => ({ suggestions: [] as GrowthSuggestion[] })),
+    ]).then(([pins, sug]) => {
+      if (pins.pins[0]) {
+        setDishGolden(pins.pins[0]);
+        return;
+      }
+      const hit = sug.suggestions.find(
+        (s) =>
+          s.suggestion_type === "golden_performance_day" &&
+          String(s.action_payload.dish_id) === selectedDishId,
+      );
+      setDishGolden(hit ?? null);
+    });
   }, [kitchen, selectedDishId, dishes]);
 
   const onAddIngredient = async (e: React.FormEvent) => {
@@ -319,6 +339,24 @@ export function IngredientsPage() {
                 ))}
               </select>
             </label>
+
+            {dishGolden && (
+              <div className="owner-dish-card__golden" style={{ marginTop: "0.75rem" }}>
+                <span className="golden-day-badge">
+                  {"performance_date" in dishGolden && "recipe_snapshot" in dishGolden
+                    ? "Golden recipe saved"
+                    : "Golden day"}
+                </span>
+                <p>
+                  {"performance_date" in dishGolden && "recipe_snapshot" in dishGolden
+                    ? `Pinned baseline from ${dishGolden.performance_date} — keep this ingredient mix as your reference.`
+                    : String((dishGolden as GrowthSuggestion).description).slice(0, 140) + "…"}
+                </p>
+                <Link to="/dashboard/growth" className="od-panel__link">
+                  Open Growth →
+                </Link>
+              </div>
+            )}
 
             {recipe && (
               <>

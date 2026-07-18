@@ -330,8 +330,13 @@ def ensure_kitchen_complete(
     backdate_orders(kid)
     if with_modules:
         seed_kitchen_modules(token, kid, dish_ids)
+        first_dish = next(iter(dish_ids.values()), None)
         seed_kitchen_integrations(
-            token, kid, kitchen["name"], kitchen_code=kitchen.get("code")
+            token,
+            kid,
+            kitchen["name"],
+            kitchen_code=kitchen.get("code"),
+            dish_id=first_dish,
         )
     return dish_ids
 

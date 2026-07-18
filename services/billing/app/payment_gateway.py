@@ -143,3 +143,31 @@ async def upsert_kitchen_payment_gateway(
     )
     await publisher.publish("ckac:billing:payment", event, session=session)
     return _to_response(row)
+
+
+async def delete_kitchen_payment_gateway(
+    session: AsyncSession,
+    publisher: EventPublisher,
+    kitchen_id: uuid.UUID,
+) -> PaymentGatewayResponse:
+    """Remove kitchen Razorpay credentials (owner disconnect / admin clear)."""
+    row = (
+        await session.execute(
+            select(KitchenPaymentGateway).where(
+                KitchenPaymentGateway.kitchen_id == kitchen_id,
+                KitchenPaymentGateway.provider == PROVIDER,
+            )
+        )
+    ).scalar_one_or_none()
+    if row:
+        await session.delete(row)
+        await session.flush()
+        event = EventPublisher.build(
+            event_type="kitchen_payment_gateway.cleared",
+            aggregate_type="kitchen_payment_gateway",
+            aggregate_id=str(kitchen_id),
+            producer="billing-service",
+            payload={"kitchen_id": str(kitchen_id), "provider": PROVIDER},
+        )
+        await publisher.publish("ckac:billing:payment", event, session=session)
+    return await get_kitchen_payment_gateway(session, kitchen_id)

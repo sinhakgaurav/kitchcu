@@ -1,20 +1,43 @@
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { OwnerEmpty, OwnerPageShell } from "../../components/owner/OwnerPageShell";
-import { fetchMenu, updateDish, type Dish } from "../../lib/api";
+import {
+  fetchGoldenRecipes,
+  fetchGrowthSuggestions,
+  fetchMenu,
+  updateDish,
+  type Dish,
+  type GoldenRecipePin,
+  type GrowthSuggestion,
+} from "../../lib/api";
 import { useKitchen } from "../../lib/kitchen";
 
 export function MenuPage() {
   const { kitchen } = useKitchen();
   const [dishes, setDishes] = useState<Dish[]>([]);
+  const [goldenByDish, setGoldenByDish] = useState<Record<string, GrowthSuggestion | GoldenRecipePin>>({});
   const [loading, setLoading] = useState(true);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [error, setError] = useState("");
 
   const reload = async () => {
     if (!kitchen) return;
-    const m = await fetchMenu(kitchen.id);
+    const [m, sug, pins] = await Promise.all([
+      fetchMenu(kitchen.id),
+      fetchGrowthSuggestions(kitchen.id).catch(() => ({ suggestions: [] as GrowthSuggestion[] })),
+      fetchGoldenRecipes(kitchen.id).catch(() => ({ pins: [] as GoldenRecipePin[] })),
+    ]);
     setDishes(m.dishes);
+    const map: Record<string, GrowthSuggestion | GoldenRecipePin> = {};
+    for (const p of pins.pins) {
+      map[p.dish_id] = p;
+    }
+    for (const s of sug.suggestions) {
+      if (s.suggestion_type !== "golden_performance_day") continue;
+      const dishId = String(s.action_payload.dish_id ?? "");
+      if (dishId && !map[dishId]) map[dishId] = s;
+    }
+    setGoldenByDish(map);
   };
 
   useEffect(() => {
@@ -25,13 +48,15 @@ export function MenuPage() {
       .finally(() => setLoading(false));
   }, [kitchen]);
 
+  const goldenCount = useMemo(() => Object.keys(goldenByDish).length, [goldenByDish]);
+
   if (!kitchen) return null;
 
   return (
     <OwnerPageShell
       eyebrow="Operations"
       title="Menu"
-      description={`${dishes.length} live-capture dish${dishes.length !== 1 ? "es" : ""} · set prep, delivery & max time per dish`}
+      description={`${dishes.length} live-capture dish${dishes.length !== 1 ? "es" : ""} · set prep, delivery & max time per dish${goldenCount ? ` · ${goldenCount} golden day signal${goldenCount !== 1 ? "s" : ""}` : ""}`}
       actions={<Link to="/dashboard/menu/new" className="btn btn--primary">Add dish</Link>}
     >
       {error && <p className="auth-card__error">{error}</p>}
@@ -46,6 +71,8 @@ export function MenuPage() {
         <div className="owner-menu-grid">
           {dishes.map((d) => {
             const hero = d.media.find((m) => m.is_hero) ?? d.media[0];
+            const golden = goldenByDish[d.id];
+            const isPin = golden && "performance_date" in golden && "recipe_snapshot" in golden;
             return (
               <article key={d.id} className="dash-card owner-dish-card">
                 {hero && <img src={hero.url} alt={d.name} loading="lazy" />}
@@ -59,6 +86,21 @@ export function MenuPage() {
                   </p>
                   {d.description && <p className="owner-dish-card__desc">{d.description}</p>}
                   {hero?.is_live_capture && <span className="live-badge">Live capture</span>}
+                  {golden && (
+                    <div className="owner-dish-card__golden">
+                      <span className="golden-day-badge">
+                        {isPin ? "Golden recipe saved" : "Golden day"}
+                      </span>
+                      <p>
+                        {isPin
+                          ? `Baseline from ${(golden as GoldenRecipePin).performance_date}`
+                          : String((golden as GrowthSuggestion).description).slice(0, 120) + "…"}
+                      </p>
+                      <Link to="/dashboard/growth" className="od-panel__link">
+                        {isPin ? "View in Growth →" : "Save recipe in Growth →"}
+                      </Link>
+                    </div>
+                  )}
                   <div className="owner-dish-card__actions">
                     <button
                       type="button"

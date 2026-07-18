@@ -1,5 +1,6 @@
 import { Link, Navigate, useNavigate } from "react-router-dom";
 import { useEffect, useMemo, useState } from "react";
+import { useBrandedStorefront } from "../../customer/BrandedStorefront";
 import { useGeolocation } from "../../hooks/useGeolocation";
 import { getCustomerToken } from "../../shared/customerApi";
 import { useCustomerAuth } from "../../shared/customerAuth";
@@ -141,15 +142,21 @@ export function CheckoutPage() {
     [cart, deliveryByKitchen, quotes],
   );
 
+  const branded = useBrandedStorefront();
+  const loginNext = branded ? `${branded.basePath}/checkout` : "/checkout";
+  const menuBack = branded ? `${branded.basePath}/menu` : "/#nearby";
+
   if (!loading && !token) {
-    return <Navigate to="/login?next=/checkout" replace />;
+    return <Navigate to={`/login?next=${encodeURIComponent(loginNext)}`} replace />;
   }
 
   if (!cart) {
     return (
       <div className="container customer-checkout">
         <p className="owner-empty">Your cart is empty.</p>
-        <Link to="/#nearby" className="btn btn--primary">Discover kitchens</Link>
+        <Link to={menuBack} className="btn btn--primary">
+          {branded ? "Back to menu" : "Discover kitchens"}
+        </Link>
       </div>
     );
   }
@@ -197,9 +204,12 @@ export function CheckoutPage() {
         }
 
         clearCart();
-        navigate(`/master-orders/${master.id}/confirm`, {
-          state: { master, paymentMethod, settlements },
-        });
+        navigate(
+          branded
+            ? `${branded.basePath}/master-orders/${master.id}/confirm`
+            : `/master-orders/${master.id}/confirm`,
+          { state: { master, paymentMethod, settlements } },
+        );
         return;
       }
 
@@ -227,7 +237,12 @@ export function CheckoutPage() {
       }
 
       clearCart();
-      navigate(`/orders/${order.id}/confirm`, { state: { order, paymentMethod } });
+      navigate(
+        branded
+          ? `${branded.basePath}/orders/${order.id}/confirm`
+          : `/orders/${order.id}/confirm`,
+        { state: { order, paymentMethod } },
+      );
     } catch (err) {
       setError(err instanceof Error ? err.message : "Checkout failed");
     } finally {
@@ -237,7 +252,9 @@ export function CheckoutPage() {
 
   return (
     <div className="container customer-checkout">
-      <Link to="/#nearby" className="owner-back">← Add from another kitchen</Link>
+      <Link to={menuBack} className="owner-back">
+        {branded ? "← Back to menu" : "← Add from another kitchen"}
+      </Link>
       <header className="owner-page__head">
         <div>
           <h1>{isMultiKitchen ? "Multi-kitchen checkout" : "Checkout"}</h1>

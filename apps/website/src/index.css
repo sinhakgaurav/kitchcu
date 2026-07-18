@@ -2813,11 +2813,53 @@ form.auth-card > .btn,
 .admin-breakdown__bar--delivered { background: linear-gradient(90deg, #81c784, rgba(76, 175, 80, 0.35)); }
 .admin-breakdown__bar--cancelled { background: linear-gradient(90deg, #e57373, rgba(244, 67, 54, 0.35)); }
 .admin-tab-kpis {
-  display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; margin-bottom: 1.25rem;
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 1rem; margin-bottom: 1.25rem;
 }
 @media (max-width: 700px) {
   .admin-tab-kpis { grid-template-columns: 1fr; }
 }
+.admin-kitchen-workspace {
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(300px, 0.95fr);
+  gap: 1.25rem;
+  align-items: start;
+}
+@media (max-width: 980px) {
+  .admin-kitchen-workspace { grid-template-columns: 1fr; }
+}
+.admin-table__row--active td { background: rgba(0, 137, 123, 0.08); }
+.admin-kitchen-panel { padding: 1.25rem; }
+.admin-kitchen-panel__head {
+  display: flex; justify-content: space-between; gap: 1rem; align-items: flex-start;
+  margin-bottom: 1rem;
+}
+.admin-kitchen-panel__head h2 { margin: 0 0 0.25rem; font-size: 1.2rem; }
+.admin-kitchen-panel__head p { margin: 0; color: var(--text-muted); font-size: 0.85rem; }
+.admin-kitchen-panel__tabs {
+  display: flex; flex-wrap: wrap; gap: 0.4rem; margin-bottom: 1rem;
+}
+.admin-kitchen-panel__tabs button {
+  border: 1px solid var(--surface-border);
+  background: transparent;
+  color: var(--text-muted);
+  padding: 0.4rem 0.75rem;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.85rem;
+}
+.admin-kitchen-panel__tabs button.active {
+  border-color: var(--teal);
+  color: var(--teal-light, var(--teal));
+  background: rgba(0, 137, 123, 0.12);
+}
+.admin-kitchen-panel__body { display: flex; flex-direction: column; gap: 0.75rem; }
+.admin-kv { display: grid; gap: 0.65rem; margin: 0; }
+.admin-kv > div {
+  display: grid; grid-template-columns: 140px 1fr; gap: 0.5rem; font-size: 0.9rem;
+}
+.admin-kv dt { margin: 0; color: var(--text-muted); }
+.admin-kv dd { margin: 0; }
+.owner-forms__actions { display: flex; flex-wrap: wrap; gap: 0.65rem; margin-top: 0.5rem; }
 
 .admin-toolbar {
   display: flex;

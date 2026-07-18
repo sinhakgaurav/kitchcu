@@ -1,5 +1,6 @@
 import { Link, useLocation, useParams } from "react-router-dom";
 import { useState } from "react";
+import { useBrandedStorefront } from "../../customer/BrandedStorefront";
 import { downloadCustomerOrderBillPdf } from "../../shared/customerCheckoutApi";
 import type { Order } from "../../shared/api";
 
@@ -11,16 +12,20 @@ type ConfirmState = {
 export function OrderConfirmPage() {
   const { orderId } = useParams<{ orderId: string }>();
   const location = useLocation();
+  const branded = useBrandedStorefront();
   const state = location.state as ConfirmState | null;
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const menuHref = branded ? `${branded.basePath}/menu` : "/";
 
   if (!state?.order || state.order.id !== orderId) {
     return (
       <div className="container customer-checkout">
         <h1>Order placed</h1>
         <p>Thank you! Your kitchen will confirm shortly.</p>
-        <Link to="/" className="btn btn--primary">Back to home</Link>
+        <Link to={menuHref} className="btn btn--primary">
+          {branded ? "Back to menu" : "Back to home"}
+        </Link>
       </div>
     );
   }
@@ -66,8 +71,12 @@ export function OrderConfirmPage() {
       <button type="button" className="btn btn--secondary" disabled={busy} onClick={onDownload}>
         {busy ? "Preparing PDF…" : "Download PDF bill"}
       </button>
-      <Link to="/orders" className="btn btn--primary">View my orders</Link>
-      <Link to="/" className="btn btn--ghost">Discover more kitchens</Link>
+      {!branded && (
+        <Link to="/orders" className="btn btn--primary">View my orders</Link>
+      )}
+      <Link to={menuHref} className="btn btn--ghost">
+        {branded ? "Order again" : "Discover more kitchens"}
+      </Link>
     </div>
   );
 }

@@ -14,7 +14,8 @@
 | **`docs/KITCHCU-ENGINEERING-STANDARDS.md`** | **Engineering constitution — DDD, EDD, quality, security, phase targets** |
 | **`docs/templates/MODULE-DESIGN-PACK.md`** | **Required pre-code design template (10-step gate)** |
 | **`packages/ai-context/`** | **WhatsApp + support AI training/context pack** (options-first, FAQ answer_ids, order/menu extract, tickets) — branch `feature/whatsapp-ai-model-training` |
-| `docs/CKAC-COMPLETE-GUIDE.md` | **Master guide v3.1** — CEO + CPO + CTO encyclopedia (definitions, how/why, flows, UI Catalog, aggregated OpenAPI reference + PDF) |
+| `docs/ADVANCEMENT-TRACKER.md` | **Living release board** — S1–S18 + post-S18 increments, credentials, seed checklist |
+| `docs/CKAC-COMPLETE-GUIDE.md` | **Master guide v3.2** — CEO + CPO + CTO encyclopedia (definitions, how/why, flows, UI Catalog, aggregated OpenAPI reference + PDF) |
 | `docs/CKAC-USERFLOWS.md` | **Full user journey pack** — every persona, every screen, every API call, step-by-step (+ PDF) |
 | `docs/API.md` | **Public API reference** — auth, body/response examples; live aggregated OpenAPI at gateway `/openapi.json`/`/docs`/`/redoc` + portal `/openapi` |
 | `docs/CKAC-ARCHITECTURE-CTO.md` | **CTO layers + CPO product ↔ code map** |
@@ -74,7 +75,10 @@
 | **Ingredient mapper** | `services/catalog/`, `apps/website/` | **S15** — F19 recipes, stock deduct on accept, low-stock warnings |
 | **Learning service** | `services/learning/`, `apps/website/` | **S16** — F21 curated portal, F22 dish trials + promote |
 | **Community service** | `services/community/`, `apps/website/` | **S17** — F23 recipe rewards, F24 chef rankings |
-| **Streaming service** | `services/streaming/`, `apps/website/` | **S18** — F46 LiveKit sessions, F47 owner opt-in go-live, F48 customer live filter |
+| **Streaming service** | `services/streaming/`, `apps/website/` | **S18** — F46 LiveKit sessions, F47 owner opt-in go-live, F48 customer live filter; **P22** per-dish showcase phases |
+| **Growth golden day** | `services/growth/` | **P20** — ML comment sentiment + golden performance day pins |
+| **Branded storefront** | `services/identity/`, `apps/website/` | **P19** — kitchen `branded_page` + customer `/k/:code` |
+| **Kitchen integrations admin** | identity + billing admin APIs, admin PWA | **P21** — WhatsApp / Razorpay per kitchen (platform keys stay Admin API Keys) |
 | **Owner analytics** | `services/order/app/analytics.py` | F07–F08 revenue, top dishes, peak hours, customer segments |
 | Shared lib | `packages/ckac-common/` | Config, DB, auth, `EventPublisher`, cache, health, internal auth |
 | Event bus | Redis Streams | `ckac:catalog:dish`, `ckac:catalog:ingredient`, `ckac:orders:order`, `ckac:orders:draft`, `ckac:orders:master_order`, `ckac:billing:payment`, `ckac:billing:settlement`, `ckac:billing:subscription`, `ckac:billing:wallet`, `ckac:billing:gst`, `ckac:billing:refund`, `ckac:identity:kitchen`, `ckac:marketing:coupon`, `ckac:marketing:promotion`, `ckac:marketing:crm`, `ckac:ratings:rating`, `ckac:ratings:dish`, `ckac:growth:suggestion`, `ckac:growth:daily_menu`, `ckac:delivery:quote`, `ckac:delivery:tracking`, `ckac:learning:trial`, `ckac:community:recipe`, `ckac:community:reward`, `ckac:community:ranking`, `ckac:streaming:session`, `ckac:notify:whatsapp`, `ckac:notify:dispatch`, `ckac:notify:tracking` |
@@ -427,7 +431,9 @@ Delivered order only → home_taste (1–5) + quality (1–5) → optional anony
 | Default OTP in dev? | `123456` (replace with Redis + WhatsApp in prod) |
 | Demo owner / kitchen? | Run `python scripts/seed-dev-data.py` or `.\scripts\seed-all.ps1` (bulk + all personas) → phones `9876543210`–`9876543213`, OTP `123456`, primary kitchen `CKPNQ001` |
 | Demo customers? | WhatsApp OTP `123456` — `9123456789`, `9123456780`, `9988776655`, `9123456781`, `9123456782` (5 total — needed for CRM/learning-trial invite minimum) |
-| Platform admin? | `admin@kitchcu.dev` / `admin123456` (dev default) |
+| Platform admin (local)? | `admin@kitchcu.dev` / `admin123456` |
+| Platform admin (prod `admin.kitchcu.com`)? | `admin@kitchcu.com` + GCE metadata `admin-password` (`ADMIN_PASSWORD`) — hash synced on login |
+| Advancement tracker? | `docs/ADVANCEMENT-TRACKER.md` |
 | Primary user for Phase 1? | Owner — optimize owner flows before customer PWA |
 
 ---
@@ -446,4 +452,4 @@ Delivered order only → home_taste (1–5) + quality (1–5) → optional anony
 
 ---
 
-*Last updated: Phase 1 S1–S18 complete (gateway + 13 domain services + PWAs + GST). Docs: Complete Guide v3.0 + UI Catalog. Next design: E1–E2 Quality Loop.*
+*Last updated: Phase 1 S1–S18 + P19–P24 (branded page, golden day, kitchen integrations, dish showcase, admin password sync). Tracker: `docs/ADVANCEMENT-TRACKER.md`. Prod: `*.kitchcu.com`. Next design: E1–E2 Quality Loop.*

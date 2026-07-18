@@ -77,6 +77,26 @@ export const DEMO_ADMIN = {
   password: "admin123456",
 } as const;
 
+/** Login defaults: local/dev prefill; production hosts use admin@kitchcu.com with empty password. */
+export function adminLoginDefaults(): {
+  email: string;
+  password: string;
+  isProductionHost: boolean;
+} {
+  if (typeof window === "undefined") {
+    return { email: DEMO_ADMIN.email, password: DEMO_ADMIN.password, isProductionHost: false };
+  }
+  const host = window.location.hostname.toLowerCase();
+  const isProductionHost =
+    host === "admin.kitchcu.com" ||
+    host.endsWith(".kitchcu.com") ||
+    host === "kitchcu.com";
+  if (isProductionHost) {
+    return { email: "admin@kitchcu.com", password: "", isProductionHost: true };
+  }
+  return { email: DEMO_ADMIN.email, password: DEMO_ADMIN.password, isProductionHost: false };
+}
+
 export const DEMO_DISH_NAMES = [
   "Paneer Tikka",
   "Chicken Biryani",

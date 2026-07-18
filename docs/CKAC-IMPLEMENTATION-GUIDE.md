@@ -5,8 +5,9 @@
 | Field | Value |
 |-------|-------|
 | Version | **2.0** |
-| Status | **S1–S18 shipped** (13 domain services + gateway + 4 PWAs + GST); E1/E2 quality loop = design pack only |
+| Status | **S1–S18 shipped** + post-S18 P19–P24 (branded page, golden day, kitchen integrations, dish showcase, admin password sync); E1/E2 = design pack only |
 | Last updated | July 2026 |
+| Advancement | **[ADVANCEMENT-TRACKER.md](./ADVANCEMENT-TRACKER.md)** — sprint board + release gate |
 | Encyclopedia | **[CKAC-COMPLETE-GUIDE.md](./CKAC-COMPLETE-GUIDE.md) v3.2** — definitions, how/why, flows (§17.9–17.10), ER, **UI Catalog (8 surfaces)**, super-admin Control, delivery payer, dish timing, aggregated OpenAPI |
 | Companion docs | [Planning Benchmark](./CKAC-COMPLETE-PLANNING-BENCHMARK.md) · [System Benchmark](./CKAC-SYSTEM-BENCHMARK.md) · [CPO Blueprint v4.2](./CKAC-CPO-PRODUCT-BLUEPRINT.md) · [CTO Architecture](./CKAC-ARCHITECTURE-CTO.md) · [Development Phases](./DEVELOPMENT-PHASES.md) · [User Flows](./CKAC-USERFLOWS.md) · [API.md](./API.md) · [AGENTS.md](../AGENTS.md) · [UI shots](./assets/ui/) |
 

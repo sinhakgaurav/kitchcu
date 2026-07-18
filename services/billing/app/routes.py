@@ -92,6 +92,7 @@ def _http_from_domain(exc: ValueError) -> HTTPException:
 from app.payment_gateway import (
     PaymentGatewayResponse,
     PaymentGatewayUpsertRequest,
+    delete_kitchen_payment_gateway,
     get_kitchen_payment_gateway,
     upsert_kitchen_payment_gateway,
 )
@@ -165,6 +166,29 @@ async def payment_gateway_upsert(
 ) -> PaymentGatewayResponse:
     await verify_kitchen_owner(kitchen_id, owner_id, session)
     return await upsert_kitchen_payment_gateway(session, publisher, kitchen_id, body)
+
+
+@router.delete(
+    "/billing/kitchens/{kitchen_id}/payment-gateway",
+    response_model=PaymentGatewayResponse,
+    tags=[TAG_PAYMENT_GATEWAY],
+    summary="Clear kitchen payment gateway config",
+    description=(
+        "Owner-only — removes Razorpay key id/secret/webhook/linked account for this kitchen. "
+        "Publishes `kitchen_payment_gateway.cleared`."
+    ),
+    responses=auth_errors(),
+)
+async def payment_gateway_delete(
+    kitchen_id: uuid.UUID,
+    owner_id: Annotated[uuid.UUID, Depends(get_current_owner_id)],
+    session: Annotated[AsyncSession, Depends(get_db)],
+    publisher: Annotated[EventPublisher, Depends(get_publisher)],
+) -> PaymentGatewayResponse:
+    await verify_kitchen_owner(kitchen_id, owner_id, session)
+    result = await delete_kitchen_payment_gateway(session, publisher, kitchen_id)
+    await session.commit()
+    return result
 
 
 @router.get(

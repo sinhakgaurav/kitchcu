@@ -209,6 +209,85 @@ class KitchenWhatsAppIntegrationUpdate(BaseModel):
         return cleaned
 
 
+class KitchenBrandedPageSettings(BaseModel):
+    """Owner-controlled kitchen-first storefront (menu → order → bill) with Powered-by kitchCU."""
+
+    enabled: bool = Field(
+        default=False,
+        description="When true, the public branded storefront at `/k/{code}` is published for customers.",
+    )
+    tagline: str | None = Field(
+        default=None,
+        max_length=160,
+        description="Optional short line under the kitchen name on the branded page.",
+        examples=["Home-style thalis · live-capture menu"],
+    )
+    accent_color: str | None = Field(
+        default=None,
+        max_length=7,
+        description="Optional hex accent for the branded header (e.g. `#0F766E`).",
+        examples=["#0F766E"],
+    )
+
+    @field_validator("tagline")
+    @classmethod
+    def normalize_tagline(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        cleaned = value.strip()
+        return cleaned or None
+
+    @field_validator("accent_color")
+    @classmethod
+    def normalize_accent(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        cleaned = value.strip()
+        if not cleaned:
+            return None
+        if not re.fullmatch(r"#[0-9A-Fa-f]{6}", cleaned):
+            raise ValueError("accent_color must be a 6-digit hex color like #0F766E")
+        return cleaned.upper()
+
+
+class KitchenBrandedPageUpdate(BaseModel):
+    """Partial update for `PATCH /kitchens/{kitchen_id}/branded-page`."""
+
+    enabled: bool | None = Field(
+        default=None,
+        description="Publish or unpublish the branded storefront. Omit to leave unchanged.",
+    )
+    tagline: str | None = Field(
+        default=None,
+        max_length=160,
+        description="Tagline under the kitchen name. Pass empty string to clear.",
+    )
+    accent_color: str | None = Field(
+        default=None,
+        max_length=7,
+        description="Hex accent. Pass empty string to clear.",
+    )
+
+    @field_validator("tagline")
+    @classmethod
+    def normalize_tagline(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        return value.strip()
+
+    @field_validator("accent_color")
+    @classmethod
+    def normalize_accent(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        cleaned = value.strip()
+        if not cleaned:
+            return ""
+        if not re.fullmatch(r"#[0-9A-Fa-f]{6}", cleaned):
+            raise ValueError("accent_color must be a 6-digit hex color like #0F766E")
+        return cleaned.upper()
+
+
 class KitchenResponse(BaseModel):
     """Full kitchen record returned to the owning owner (create, list-mine, update)."""
 
@@ -229,6 +308,10 @@ class KitchenResponse(BaseModel):
     pincode: str | None = Field(default=None, description="Kitchen postal PIN code.")
     latitude: float = Field(..., description="Kitchen latitude (WGS84).", examples=[18.5204])
     longitude: float = Field(..., description="Kitchen longitude (WGS84).", examples=[73.8567])
+    branded_page: KitchenBrandedPageSettings = Field(
+        default_factory=KitchenBrandedPageSettings,
+        description="Kitchen-first branded storefront settings (menu/order/bill + Powered by kitchCU).",
+    )
 
     model_config = {"from_attributes": True}
 
@@ -242,6 +325,14 @@ class KitchenPublicResponse(BaseModel):
     city: str | None = Field(default=None, description="Kitchen city.", examples=["Pune"])
     state: str | None = Field(default=None, description="Kitchen state.", examples=["Maharashtra"])
     status: str = Field(..., description="Kitchen lifecycle status.", examples=["active"])
+    description: str | None = Field(
+        default=None,
+        description="Short kitchen bio shown on the branded storefront.",
+    )
+    branded_page: KitchenBrandedPageSettings = Field(
+        default_factory=KitchenBrandedPageSettings,
+        description="Kitchen-first storefront settings (Powered by kitchCU).",
+    )
 
     model_config = {"from_attributes": True}
 
@@ -390,6 +481,30 @@ async def create_kitchen(
     return kitchen
 
 
+def branded_page_from_settings(settings_blob: dict | None) -> KitchenBrandedPageSettings:
+    blob = settings_blob if isinstance(settings_blob, dict) else {}
+    raw = blob.get("branded_page") if isinstance(blob.get("branded_page"), dict) else {}
+    try:
+        return KitchenBrandedPageSettings.model_validate(raw or {})
+    except Exception:
+        return KitchenBrandedPageSettings()
+
+
+def kitchen_to_public_response(kitchen: Kitchen) -> KitchenPublicResponse:
+    return KitchenPublicResponse(
+        id=kitchen.id,
+        code=kitchen.code,
+        name=kitchen.name,
+        city=kitchen.city,
+        state=kitchen.state,
+        status=kitchen.status,
+        description=kitchen.description,
+        branded_page=branded_page_from_settings(
+            kitchen.settings if isinstance(kitchen.settings, dict) else {}
+        ),
+    )
+
+
 async def kitchen_to_response(session: AsyncSession, kitchen: Kitchen) -> KitchenResponse:
     result = await session.execute(
         text(
@@ -421,7 +536,53 @@ async def kitchen_to_response(session: AsyncSession, kitchen: Kitchen) -> Kitche
         pincode=kitchen.pincode,
         latitude=float(row.lat),
         longitude=float(row.lng),
+        branded_page=branded_page_from_settings(
+            kitchen.settings if isinstance(kitchen.settings, dict) else {}
+        ),
     )
+
+
+async def update_kitchen_branded_page(
+    session: AsyncSession,
+    kitchen: Kitchen,
+    data: KitchenBrandedPageUpdate,
+    publisher: "EventPublisher | None" = None,
+) -> Kitchen:
+    from sqlalchemy.orm.attributes import flag_modified
+
+    from ckac_common.auth import stream_key
+    from ckac_common.event_bus import EventPublisher
+
+    settings_blob = dict(kitchen.settings) if isinstance(kitchen.settings, dict) else {}
+    current = branded_page_from_settings(settings_blob).model_dump()
+
+    if data.enabled is not None:
+        current["enabled"] = data.enabled
+    if "tagline" in data.model_fields_set:
+        current["tagline"] = data.tagline or None
+    if "accent_color" in data.model_fields_set:
+        current["accent_color"] = data.accent_color or None
+
+    settings_blob["branded_page"] = KitchenBrandedPageSettings.model_validate(current).model_dump()
+    kitchen.settings = settings_blob
+    flag_modified(kitchen, "settings")
+    await session.flush()
+
+    if publisher:
+        event = EventPublisher.build(
+            event_type="kitchen.branded_page.updated",
+            aggregate_type="kitchen",
+            aggregate_id=str(kitchen.id),
+            producer="identity-service",
+            payload={
+                "kitchen_id": str(kitchen.id),
+                "kitchen_code": kitchen.code,
+                "enabled": bool(current["enabled"]),
+            },
+        )
+        await publisher.publish(stream_key("identity", "kitchen"), event, session=session)
+
+    return kitchen
 
 
 async def update_kitchen_delivery_settings(
@@ -472,12 +633,16 @@ async def update_kitchen_whatsapp_integration(
     kitchen: Kitchen,
     data: KitchenWhatsAppIntegrationUpdate,
     publisher: "EventPublisher | None" = None,
+    *,
+    enforce_module: bool = True,
 ) -> KitchenWhatsAppIntegrationResponse:
     from ckac_common.auth import stream_key
     from ckac_common.event_bus import EventPublisher
     from ckac_common.platform_config import require_kitchen_module
 
-    await require_kitchen_module(session, kitchen.id, "whatsapp")
+    # Super-admin ops may configure linkage even while the module kill-switch is off.
+    if enforce_module:
+        await require_kitchen_module(session, kitchen.id, "whatsapp")
 
     settings_blob = dict(kitchen.settings) if isinstance(kitchen.settings, dict) else {}
 

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import uuid
 from collections import Counter
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 from itertools import combinations
 from zoneinfo import ZoneInfo
 
@@ -12,7 +12,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import bindparam, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models import SeasonalPattern, Suggestion
+from app.models import GoldenRecipePin, SeasonalPattern, Suggestion
 from ckac_common.auth import stream_key
 from ckac_common.event_bus import EventPublisher
 
@@ -72,7 +72,11 @@ class SuggestionResponse(BaseModel):
     id: uuid.UUID = Field(..., description="Suggestion UUID.")
     kitchen_id: uuid.UUID = Field(..., description="Kitchen this suggestion was generated for.")
     suggestion_type: str = Field(
-        ..., description="Category: 'customer_winback', 'combo_opportunity', 'peak_staffing', 'seasonal', or 'dish_promo'.",
+        ...,
+        description=(
+            "Category: 'customer_winback', 'combo_opportunity', 'peak_staffing', 'seasonal', "
+            "'dish_promo', or 'golden_performance_day'."
+        ),
         examples=["combo_opportunity"],
     )
     title: str = Field(..., description="Short suggestion headline.")
@@ -96,6 +100,27 @@ class SuggestionUpdateRequest(BaseModel):
     """Owner request to dismiss (or un-dismiss) a suggestion."""
 
     dismissed: bool = Field(default=True, description="Set true to hide the suggestion from the default list view.")
+
+
+class GoldenRecipePinResponse(BaseModel):
+    """Pinned recipe/ingredient combo from a standout performance day."""
+
+    id: uuid.UUID = Field(..., description="Pin UUID.")
+    kitchen_id: uuid.UUID = Field(..., description="Owning kitchen.")
+    dish_id: uuid.UUID = Field(..., description="Dish the golden recipe belongs to.")
+    suggestion_id: uuid.UUID | None = Field(default=None, description="Source golden-day suggestion, if any.")
+    performance_date: date = Field(..., description="Calendar day (IST) of the standout performance.")
+    dish_name: str = Field(..., description="Dish name at pin time.")
+    recipe_snapshot: dict = Field(..., description="Ingredient lines + prep steps captured that day.")
+    metrics: dict = Field(..., description="Order qty, rating, sentiment snapshot.")
+    created_at: datetime = Field(..., description="When the owner saved this pin.")
+
+    model_config = {"from_attributes": True}
+
+
+class GoldenRecipePinListResponse(BaseModel):
+    pins: list[GoldenRecipePinResponse] = Field(..., description="Golden recipe pins, newest performance day first.")
+    total: int = Field(..., description="Number of pins returned.")
 
 
 class SeasonalPatternResponse(BaseModel):
@@ -486,6 +511,14 @@ async def generate_suggestions(
         session.add(row)
         created.append(row)
 
+    from app.golden_day import GOLDEN_WINDOW_DAYS, build_golden_suggestion, detect_golden_days
+
+    golden_window = min(GOLDEN_WINDOW_DAYS, days)
+    for candidate in await detect_golden_days(session, kitchen_id, window_days=golden_window):
+        row = build_golden_suggestion(kitchen_id, candidate)
+        session.add(row)
+        created.append(row)
+
     await session.flush()
 
     for row in created:
@@ -505,6 +538,59 @@ async def generate_suggestions(
     return SuggestionListResponse(
         suggestions=[suggestion_to_response(r) for r in created],
         total=len(created),
+    )
+
+
+async def accept_golden_recipe(
+    session: AsyncSession,
+    kitchen_id: uuid.UUID,
+    suggestion_id: uuid.UUID,
+    publisher: EventPublisher,
+) -> GoldenRecipePinResponse:
+    from app.golden_day import pin_golden_recipe
+
+    pin = await pin_golden_recipe(session, kitchen_id, suggestion_id)
+    event = publisher.build(
+        event_type="golden_recipe.pinned",
+        aggregate_type="golden_recipe",
+        aggregate_id=str(pin.id),
+        producer="growth-service",
+        payload={
+            "kitchen_id": str(kitchen_id),
+            "dish_id": str(pin.dish_id),
+            "performance_date": pin.performance_date.isoformat(),
+            "suggestion_id": str(suggestion_id),
+        },
+    )
+    await publisher.publish(stream_key("growth", "suggestion"), event, session=session)
+    return _golden_pin_to_response(pin)
+
+
+async def list_golden_recipe_pins(
+    session: AsyncSession,
+    kitchen_id: uuid.UUID,
+    dish_id: uuid.UUID | None = None,
+) -> GoldenRecipePinListResponse:
+    from app.golden_day import list_golden_pins
+
+    pins = await list_golden_pins(session, kitchen_id, dish_id=dish_id)
+    return GoldenRecipePinListResponse(
+        pins=[_golden_pin_to_response(p) for p in pins],
+        total=len(pins),
+    )
+
+
+def _golden_pin_to_response(pin: GoldenRecipePin) -> GoldenRecipePinResponse:
+    return GoldenRecipePinResponse(
+        id=pin.id,
+        kitchen_id=pin.kitchen_id,
+        dish_id=pin.dish_id,
+        suggestion_id=pin.suggestion_id,
+        performance_date=pin.performance_date,
+        dish_name=pin.dish_name,
+        recipe_snapshot=pin.recipe_snapshot or {},
+        metrics=pin.metrics or {},
+        created_at=pin.created_at,
     )
 
 

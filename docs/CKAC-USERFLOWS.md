@@ -72,7 +72,8 @@ This document is the **single source of truth for "how does a user actually get 
 | Customer | `9123456789` | OTP `123456` | Priya Customer — default diner |
 | Customer | `9123456780` | OTP `123456` | Rahul Menon — repeat/VIP segment |
 | Customer | `9988776655` | OTP `123456` | Ananya Guest — guest checkout |
-| Admin | `admin@kitchcu.dev` | `admin123456` | Platform scope only |
+| Admin (local) | `admin@kitchcu.dev` | `admin123456` | Platform scope only |
+| Admin (prod `admin.kitchcu.com`) | `admin@kitchcu.com` | GCE `admin-password` → `ADMIN_PASSWORD` | Synced to DB on login — do not use `.dev` email in prod |
 
 ---
 
@@ -482,7 +483,7 @@ flowchart LR
 **Screenshots:** [`07-admin-login.png`](./assets/ui/07-admin-login.png) · [`05-admin-overview.png`](./assets/ui/05-admin-overview.png) · [`08-admin-control.png`](./assets/ui/08-admin-control.png)
 
 ### Preconditions
-- Admin account seeded: `admin@kitchcu.dev` / `admin123456`.
+- Admin account: local `admin@kitchcu.dev` / `admin123456`; production `admin@kitchcu.com` + VM `ADMIN_PASSWORD` (see [ADVANCEMENT-TRACKER.md](./ADVANCEMENT-TRACKER.md)).
 
 ### Step-by-step UI actions
 
@@ -493,12 +494,13 @@ flowchart LR
 5. **Control** — application data journeys grid; toggle feature flags (`refunds_gateway`, `refunds_direct`, journey keys); owner subscription overrides; recent payments.
 6. **Tickets** — support queue including AI-chat escalations; reply and resolve.
 7. **Kitchens / Owners** — activate/suspend kitchens; override SaaS tier when needed.
+8. **Kitchen workspace** — open a kitchen → Profile / WhatsApp / Payments / Modules tabs; set kitchen WhatsApp phone ID and kitchen Razorpay keys (platform Meta/Razorpay SaaS keys stay under **Control → API Keys**).
 
 ### API calls
 
 | Step | Method + Path | Auth | Notes |
 |------|----------------|------|-------|
-| 1 | `POST /api/v1/admin/auth/login` | none | `AdminLoginRequest{email, password}` -> `AdminTokenResponse` (JWT `type:"admin"`) |
+| 1 | `POST /api/v1/admin/auth/login` | none | Bootstraps/syncs default admin from `ADMIN_EMAIL`/`ADMIN_PASSWORD`; returns JWT `type:"admin"` |
 | 2 | `GET /api/v1/admin/me` | admin | Profile |
 | 2 | `GET /api/v1/admin/stats` | admin | `PlatformStats` (incl. customers, refunds_open, payments_captured) |
 | 3 | `GET /api/v1/admin/customers` (+ suspend/reset) | admin | Identity customer control |
@@ -506,6 +508,8 @@ flowchart LR
 | 3 | `PATCH /api/v1/admin/kitchens/{kitchen_id}/status` | admin | `KitchenStatusUpdate{status}` -> `AdminKitchenRow` |
 | 4 | `GET /api/v1/admin/refunds` / `payments` / `settlements` / `money-stats` | admin | Billing admin (gateway routes billing before identity catch-all) |
 | 5 | `GET/PATCH /api/v1/admin/feature-flags` · journeys | admin | Kill-switches + journey stats |
+| 8 | `GET/PUT /api/v1/admin/kitchens/{id}/whatsapp-integration` | admin | Kitchen WhatsApp phone id |
+| 8 | `GET/PUT/DELETE /api/v1/admin/kitchens/{id}/payment-gateway` | admin | Kitchen Razorpay (billing) |
 | 6 | `GET /api/v1/admin/tickets` | admin | `TicketListResponse` |
 | 6 | `GET /api/v1/admin/tickets/{ticket_id}` | admin | Detail + timeline |
 | 6 | `PATCH /api/v1/admin/tickets/{ticket_id}` | admin | `TicketUpdateRequest{status, priority, ...}` |

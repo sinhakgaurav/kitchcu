@@ -72,6 +72,19 @@ class DailyMenuBlastRequest(BaseModel):
     recipient_count: int = Field(ge=0, description="Number of CRM-known recipients targeted (logged for audit).")
 
 
+class GoldenPerformanceDayNotifyRequest(BaseModel):
+    """Internal request from growth when a dish has a standout order+rating+sentiment day."""
+
+    kitchen_id: uuid.UUID = Field(..., description="Kitchen to alert.")
+    dish_id: uuid.UUID = Field(..., description="Dish that had the golden day.")
+    dish_name: str = Field(..., description="Dish display name.")
+    performance_date: str = Field(..., description="ISO date (IST calendar day) of the standout.")
+    order_qty: int = Field(..., ge=0, description="Portions sold that day.")
+    avg_rating: float | None = Field(default=None, description="Average rating that day, if any.")
+    sentiment_label: str = Field(default="positive", description="ML comment sentiment label.")
+    suggestion_id: uuid.UUID = Field(..., description="Growth suggestion UUID for deep-link context.")
+
+
 class TrialSampleBlastRequest(BaseModel):
     """Internal request from the learning service to notify customers of a dish trial sample offer (S16)."""
 
@@ -358,6 +371,45 @@ async def notify_delivery_fee_denied(
     return NotificationDispatchResponse(
         notification_id=row.id,
         template_id="delivery_fee_denied",
+        channel=row.channel,
+        status=row.status,
+    )
+
+
+async def notify_golden_performance_day(
+    session: AsyncSession,
+    body: GoldenPerformanceDayNotifyRequest,
+    publisher: EventPublisher,
+) -> NotificationDispatchResponse:
+    """Owner alert: today's dish performance was exceptional — save the recipe combo."""
+    owner_phone = await _owner_phone_for_kitchen(session, body.kitchen_id)
+    rating_bit = f", rating {body.avg_rating:.1f}/5" if body.avg_rating is not None else ""
+    text_body = (
+        f"Golden day for {body.dish_name} on {body.performance_date}: "
+        f"{body.order_qty} portions{rating_bit}, comments felt {body.sentiment_label}. "
+        f"Open Growth → save today's recipe & ingredients as a golden baseline."
+    )
+    row = await _send_notification(
+        session,
+        publisher,
+        template_id="golden_performance_day",
+        body=text_body,
+        kitchen_id=body.kitchen_id,
+        order_id=None,
+        recipient_phone=owner_phone,
+        payload={
+            "dish_id": str(body.dish_id),
+            "dish_name": body.dish_name,
+            "performance_date": body.performance_date,
+            "order_qty": body.order_qty,
+            "avg_rating": body.avg_rating,
+            "sentiment_label": body.sentiment_label,
+            "suggestion_id": str(body.suggestion_id),
+        },
+    )
+    return NotificationDispatchResponse(
+        notification_id=row.id,
+        template_id="golden_performance_day",
         channel=row.channel,
         status=row.status,
     )

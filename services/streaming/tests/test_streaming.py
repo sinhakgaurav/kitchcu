@@ -149,6 +149,72 @@ async def test_viewer_token_increments_count(client: AsyncClient, stream_ctx):
 
 
 @pytest.mark.asyncio
+async def test_go_live_with_dish_showcase_phases(client: AsyncClient, stream_ctx):
+    kid = stream_ctx["kitchen_id"]
+    dish_id = str(stream_ctx["dish_id"])
+    owner_headers = {"Authorization": f"Bearer {stream_ctx['owner_token']}"}
+
+    await client.patch(
+        f"/api/v1/kitchens/{kid}/stream/settings",
+        json={"live_sharing_enabled": True},
+        headers=owner_headers,
+    )
+    live = await client.post(
+        f"/api/v1/kitchens/{kid}/stream/go-live",
+        json={
+            "title": "Paneer live cook",
+            "dish_id": dish_id,
+            "showcase_phase": "ingredients",
+        },
+        headers=owner_headers,
+    )
+    assert live.status_code == 200, live.text
+    body = live.json()
+    assert body["dish_id"] == dish_id
+    assert body["dish_name"] == "Paneer Tikka"
+    assert body["showcase_phase"] == "ingredients"
+    session_id = body["id"]
+
+    public = await client.get(f"/api/v1/stream/sessions/{session_id}/showcase")
+    assert public.status_code == 200
+    showcase = public.json()
+    assert showcase["showcase_phase"] == "ingredients"
+    assert len(showcase["ingredients"]) >= 1
+    assert showcase["ingredients"][0]["ingredient_name"] == "Paneer"
+    assert len(showcase["prep_steps"]) == 2
+
+    prep = await client.patch(
+        f"/api/v1/kitchens/{kid}/stream/showcase",
+        json={"showcase_phase": "prep", "active_prep_step_order": 1},
+        headers=owner_headers,
+    )
+    assert prep.status_code == 200
+    assert prep.json()["showcase_phase"] == "prep"
+    assert prep.json()["active_prep_step_order"] == 1
+
+    step2 = await client.patch(
+        f"/api/v1/kitchens/{kid}/stream/showcase",
+        json={"active_prep_step_order": 2},
+        headers=owner_headers,
+    )
+    assert step2.status_code == 200
+    assert step2.json()["active_prep_step_order"] == 2
+
+    done = await client.patch(
+        f"/api/v1/kitchens/{kid}/stream/showcase",
+        json={"showcase_phase": "prepared"},
+        headers=owner_headers,
+    )
+    assert done.status_code == 200
+    assert done.json()["showcase_phase"] == "prepared"
+    assert done.json()["prepared_at"] is not None
+
+    listed = await client.get("/api/v1/stream/live-kitchens")
+    assert listed.json()["kitchens"][0]["dish_name"] == "Paneer Tikka"
+    assert listed.json()["kitchens"][0]["showcase_phase"] == "prepared"
+
+
+@pytest.mark.asyncio
 async def test_viewer_token_blocked_when_streaming_flag_disabled(client: AsyncClient, stream_ctx):
     kid = stream_ctx["kitchen_id"]
     owner_headers = {"Authorization": f"Bearer {stream_ctx['owner_token']}"}

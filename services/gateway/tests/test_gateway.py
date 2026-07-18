@@ -114,6 +114,15 @@ def test_resolve_service_url_billing():
     assert resolve_service_url("/api/v1/admin/payments") == settings.billing_service_url
     assert resolve_service_url("/api/v1/admin/settlements") == settings.billing_service_url
     assert resolve_service_url("/api/v1/admin/money-stats") == settings.billing_service_url
+    assert (
+        resolve_service_url("/api/v1/admin/kitchens/abc/payment-gateway")
+        == settings.billing_service_url
+    )
+    assert resolve_service_url("/api/v1/admin/kitchens/abc") == settings.identity_service_url
+    assert (
+        resolve_service_url("/api/v1/admin/kitchens/abc/whatsapp-integration")
+        == settings.identity_service_url
+    )
     assert resolve_service_url("/api/v1/admin/customers") == settings.identity_service_url
     assert resolve_service_url("/api/v1/admin/feature-flags") == settings.identity_service_url
     assert resolve_service_url("/api/v1/admin/journeys") == settings.identity_service_url

@@ -10,15 +10,36 @@ export const APP_POSITIONING =
   "India's first — and the world's third — platform with this feature stack";
 export const APP_POSITIONING_SHORT = "India's 1st · World's 3rd feature stack";
 /** Registrable domain — production subdomains hang off this. */
-export const APP_DOMAIN = "kitchcu.in";
+function resolveAppDomain(): string {
+  const fromEnv = (import.meta.env.VITE_APP_DOMAIN as string | undefined)?.trim();
+  if (fromEnv) {
+    return fromEnv.replace(/^https?:\/\//i, "").replace(/\/$/, "");
+  }
+  // Infer from baked app URLs (GCP builds set VITE_ADMIN_APP_URL=https://admin.kitchcu.com)
+  for (const key of ["VITE_ADMIN_APP_URL", "VITE_KITCHEN_APP_URL", "VITE_CUSTOMER_APP_URL"] as const) {
+    const raw = (import.meta.env[key] as string | undefined)?.trim();
+    if (!raw || raw.includes("localhost")) continue;
+    try {
+      const host = new URL(raw).hostname.toLowerCase();
+      return host.replace(/^(www|customer|kitchen|admin|api|media)\./, "");
+    } catch {
+      /* continue */
+    }
+  }
+  return "kitchcu.in";
+}
+
+export const APP_DOMAIN = resolveAppDomain();
 
 export const CUSTOMER_HOST = `customer.${APP_DOMAIN}`;
 export const KITCHEN_HOST = `kitchen.${APP_DOMAIN}`;
 export const ADMIN_HOST = `admin.${APP_DOMAIN}`;
 export const PORTAL_HOST = APP_DOMAIN;
 
-export const SUPPORT_EMAIL = "hello@kitchcu.in";
+export const SUPPORT_EMAIL = `hello@${APP_DOMAIN}`;
 export const ADMIN_DEV_EMAIL = "admin@kitchcu.dev";
+/** Production bootstrap email (GCP ADMIN_EMAIL). */
+export const ADMIN_PROD_EMAIL = "admin@kitchcu.com";
 
 export const PAGE_TITLE = `${APP_NAME} — Cloud Kitchen Platform`;
 

@@ -39,6 +39,12 @@ def _truncate_all() -> None:
     with conn.cursor() as cur:
         cur.execute("TRUNCATE TABLE ckac_streaming.live_sessions CASCADE")
         cur.execute("TRUNCATE TABLE ckac_streaming.kitchen_stream_settings CASCADE")
+        cur.execute("TRUNCATE TABLE ckac_catalog.dish_prep_steps CASCADE")
+        cur.execute("TRUNCATE TABLE ckac_catalog.dish_ingredients CASCADE")
+        cur.execute("TRUNCATE TABLE ckac_catalog.ingredients CASCADE")
+        cur.execute("TRUNCATE TABLE ckac_catalog.dish_media CASCADE")
+        cur.execute("TRUNCATE TABLE ckac_catalog.dishes CASCADE")
+        cur.execute("TRUNCATE TABLE ckac_catalog.categories CASCADE")
         cur.execute("TRUNCATE TABLE ckac_identity.customers CASCADE")
         cur.execute("TRUNCATE TABLE ckac_identity.kitchens CASCADE")
         cur.execute("TRUNCATE TABLE ckac_identity.owners CASCADE")
@@ -70,6 +76,9 @@ def _seed_stream_ctx() -> dict:
     owner_id = uuid.uuid4()
     kitchen_id = uuid.uuid4()
     customer_id = uuid.uuid4()
+    dish_id = uuid.uuid4()
+    category_id = uuid.uuid4()
+    ingredient_id = uuid.uuid4()
     phone = f"+919{owner_id.int % 900000000 + 100000000}"
     customer_phone = f"+919{customer_id.int % 900000000 + 100000000}"
     code = f"CKS{owner_id.hex[:4].upper()}"
@@ -97,12 +106,54 @@ def _seed_stream_ctx() -> dict:
             "INSERT INTO ckac_identity.customers (id, phone, name, status) VALUES (%s::uuid, %s, 'Viewer', 'active')",
             (str(customer_id), customer_phone),
         )
+        cur.execute(
+            """
+            INSERT INTO ckac_catalog.categories (id, kitchen_id, name, slug, sort_order)
+            VALUES (%s::uuid, %s::uuid, 'Veg', 'veg', 1)
+            """,
+            (str(category_id), str(kitchen_id)),
+        )
+        cur.execute(
+            """
+            INSERT INTO ckac_catalog.dishes
+            (id, kitchen_id, category_id, name, price, prep_time_min, delivery_time_min, max_time_min, is_active)
+            VALUES (%s::uuid, %s::uuid, %s::uuid, 'Paneer Tikka', 199.0, 25, 15, 40, true)
+            """,
+            (str(dish_id), str(kitchen_id), str(category_id)),
+        )
+        cur.execute(
+            """
+            INSERT INTO ckac_catalog.ingredients
+            (id, kitchen_id, name, unit, current_stock, low_stock_threshold)
+            VALUES (%s::uuid, %s::uuid, 'Paneer', 'g', 2000, 200)
+            """,
+            (str(ingredient_id), str(kitchen_id)),
+        )
+        cur.execute(
+            """
+            INSERT INTO ckac_catalog.dish_ingredients
+            (dish_id, ingredient_id, quantity, unit, sort_order)
+            VALUES (%s::uuid, %s::uuid, 150, 'g', 0)
+            """,
+            (str(dish_id), str(ingredient_id)),
+        )
+        cur.execute(
+            """
+            INSERT INTO ckac_catalog.dish_prep_steps
+            (id, dish_id, step_order, title, body_html, duration_min)
+            VALUES
+              (%s::uuid, %s::uuid, 1, 'Marinate', '<p>Mix spices</p>', 10),
+              (%s::uuid, %s::uuid, 2, 'Grill', '<p>Cook until charred</p>', 15)
+            """,
+            (str(uuid.uuid4()), str(dish_id), str(uuid.uuid4()), str(dish_id)),
+        )
     conn.close()
 
     return {
         "owner_id": owner_id,
         "kitchen_id": kitchen_id,
         "customer_id": customer_id,
+        "dish_id": dish_id,
         "owner_token": _make_owner_token(owner_id),
         "customer_token": _make_customer_token(customer_id),
     }

@@ -115,3 +115,41 @@ async def test_daily_menu_push_invalid_dish(client: AsyncClient, growth_ctx):
         headers=headers,
     )
     assert response.status_code == 400
+
+
+@pytest.mark.asyncio
+async def test_golden_performance_day_suggestion_and_save(client: AsyncClient, growth_ctx):
+    kid = growth_ctx["kitchen_id"]
+    dish_c = str(growth_ctx["dish_c"])
+    headers = {"Authorization": f"Bearer {growth_ctx['owner_token']}"}
+
+    gen = await client.post(
+        f"/api/v1/kitchens/{kid}/growth/suggestions/generate?days=90",
+        headers=headers,
+    )
+    assert gen.status_code == 201
+    suggestions = gen.json()["suggestions"]
+    golden = [s for s in suggestions if s["suggestion_type"] == "golden_performance_day"]
+    assert len(golden) >= 1
+    g = golden[0]
+    assert g["action_payload"]["dish_id"] == dish_c
+    assert g["action_payload"]["order_qty"] >= 10
+    assert g["action_payload"]["recipe_snapshot"]["lines"]
+    assert g["priority"] >= 90
+
+    save = await client.post(
+        f"/api/v1/kitchens/{kid}/growth/suggestions/{g['id']}/save-golden-recipe",
+        headers=headers,
+    )
+    assert save.status_code == 201
+    pin = save.json()
+    assert pin["dish_id"] == dish_c
+    assert pin["recipe_snapshot"]["lines"][0]["ingredient_name"] == "Paneer"
+
+    listed = await client.get(
+        f"/api/v1/kitchens/{kid}/growth/golden-recipes?dish_id={dish_c}",
+        headers=headers,
+    )
+    assert listed.status_code == 200
+    assert listed.json()["total"] >= 1
+    assert listed.json()["pins"][0]["id"] == pin["id"]

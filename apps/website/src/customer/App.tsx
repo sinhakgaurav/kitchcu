@@ -18,6 +18,8 @@ import { RateOrderPage } from "../pages/customer/RateOrderPage";
 import { TrackOrderPage } from "../pages/customer/TrackOrderPage";
 import { CustomerAccountPage } from "../pages/customer/CustomerAccountPage";
 import { CustomerDashboardPage } from "../pages/customer/CustomerDashboardPage";
+import { BrandedMenuRedirect, BrandedStorefrontLayout } from "./BrandedStorefront";
+
 function CustomerShell({ children }: { children: React.ReactNode }) {
   return (
     <div className="customer-app">
@@ -56,6 +58,14 @@ export default function CustomerApp() {
               </CustomerShell>
             }
           />
+          {/* Kitchen-first branded storefront — open in new tab from owner dashboard */}
+          <Route path="/k/:code" element={<BrandedStorefrontLayout />}>
+            <Route index element={<BrandedMenuRedirect />} />
+            <Route path="menu" element={<KitchenMenuPage />} />
+            <Route path="checkout" element={<CheckoutPage />} />
+            <Route path="orders/:orderId/confirm" element={<OrderConfirmPage />} />
+            <Route path="master-orders/:masterOrderId/confirm" element={<MasterOrderConfirmPage />} />
+          </Route>
           <Route
             path="/checkout"
             element={

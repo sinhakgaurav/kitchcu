@@ -9,15 +9,19 @@ from app.schemas import (
     GoLiveRequest,
     LiveKitchenListResponse,
     LiveSessionResponse,
+    LiveShowcaseResponse,
+    ShowcaseUpdateRequest,
     StreamSettingsResponse,
     StreamSettingsUpdate,
     ViewerTokenResponse,
     end_live,
     get_current_session,
+    get_live_showcase,
     get_stream_settings,
     go_live,
     issue_viewer_token,
     list_live_kitchens,
+    update_live_showcase,
     update_stream_settings,
 )
 from ckac_common.database import get_db
@@ -108,8 +112,9 @@ async def stream_settings_update(
     summary="Start a live publisher session",
     description=(
         "**Auth:** Owner JWT — caller must own `kitchen_id`.\n\n"
-        "**Body:** `GoLiveRequest` — title, optional linked `order_id`. Rejects if "
-        "`live_sharing_enabled` is false or the kitchen already has an active session (400).\n\n"
+        "**Body:** `GoLiveRequest` — title, optional linked `order_id`, optional `dish_id` to "
+        "feature ingredients/prep/prepared showcase. Rejects if `live_sharing_enabled` is false "
+        "or the kitchen already has an active session (400).\n\n"
         "**Behavior:** Creates a `LiveSession` in a deterministic LiveKit room and issues the "
         "owner's publish-capable token. Publishes `stream.started`.\n\n"
         "**Response:** `LiveSessionResponse` including `publisher_token` (owner-only — never "
@@ -183,6 +188,59 @@ async def stream_current_session(
 ) -> LiveSessionResponse | None:
     await verify_kitchen_owner(kitchen_id, owner_id, session)
     return await get_current_session(session, kitchen_id)
+
+
+@router.patch(
+    "/kitchens/{kitchen_id}/stream/showcase",
+    response_model=LiveSessionResponse,
+    tags=[TAG_STREAMING],
+    summary="Update per-dish live showcase (prep / ingredients / prepared)",
+    description=(
+        "**Auth:** Owner JWT — caller must own `kitchen_id`.\n\n"
+        "**Body:** `ShowcaseUpdateRequest` — feature a dish, set phase "
+        "(`ingredients` | `prep` | `prepared`), advance prep step, or clear.\n\n"
+        "**Behavior:** Reloads recipe snapshot from catalog when dish changes. Publishes "
+        "`stream.showcase_updated`.\n\n"
+        "**Response:** Updated `LiveSessionResponse`."
+    ),
+    responses={**auth_errors(include_403=True), 400: RESP_400},
+)
+async def stream_showcase_update(
+    kitchen_id: uuid.UUID,
+    body: ShowcaseUpdateRequest,
+    owner_id: Annotated[uuid.UUID, Depends(get_current_owner_id)],
+    session: Annotated[AsyncSession, Depends(get_db)],
+    publisher: Annotated[EventPublisher, Depends(get_publisher)],
+) -> LiveSessionResponse:
+    await verify_kitchen_owner(kitchen_id, owner_id, session)
+    try:
+        result = await update_live_showcase(session, kitchen_id, body, publisher)
+        await session.commit()
+        return result
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+
+
+@router.get(
+    "/stream/sessions/{session_id}/showcase",
+    response_model=LiveShowcaseResponse,
+    tags=[TAG_STREAMING],
+    summary="Get live dish showcase (ingredients, prep steps, prepared state)",
+    description=(
+        "**Auth:** None — public while the session is live (customers watching prep).\n\n"
+        "**Response:** `LiveShowcaseResponse` with phase + ingredient/prep snapshot.\n\n"
+        "**404:** session missing or not live."
+    ),
+    responses={404: RESP_404},
+)
+async def stream_showcase_public(
+    session_id: uuid.UUID,
+    session: Annotated[AsyncSession, Depends(get_db)],
+) -> LiveShowcaseResponse:
+    try:
+        return await get_live_showcase(session, session_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
 
 
 @router.post(

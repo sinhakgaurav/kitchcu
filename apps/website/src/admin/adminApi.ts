@@ -236,18 +236,127 @@ export async function fetchAdminJourneys() {
   }>("/api/v1/admin/journeys");
 }
 
+export type AdminKitchen = {
+  id: string;
+  code: string;
+  name: string;
+  city: string | null;
+  status: string;
+  owner_name: string;
+  owner_phone: string;
+  whatsapp_connected: boolean;
+  payment_gateway_configured: boolean;
+};
+
+export type AdminKitchenDetail = AdminKitchen & {
+  owner_id: string;
+  address_line: string | null;
+  state: string | null;
+  pincode: string | null;
+  whatsapp_phone_id: string | null;
+  whatsapp_display_phone: string | null;
+  platform_secrets_note: string;
+};
+
+export type AdminKitchenWhatsApp = {
+  kitchen_id: string;
+  whatsapp_phone_id: string | null;
+  whatsapp_display_phone: string | null;
+  connected: boolean;
+  platform_secrets_note: string;
+};
+
+export type AdminKitchenPaymentGateway = {
+  kitchen_id: string;
+  provider: string;
+  key_id: string | null;
+  key_secret_configured: boolean;
+  key_secret_masked: string | null;
+  webhook_secret_configured: boolean;
+  webhook_secret_masked: string | null;
+  linked_account_id: string | null;
+  is_active: boolean;
+  updated_at: string | null;
+};
+
+export type AdminKitchenModuleFlags = {
+  kitchen_id: string;
+  kitchen_code: string;
+  modules: { module_key: string; enabled: boolean; updated_at: string }[];
+};
+
 export async function fetchAdminKitchens() {
-  return adminFetch<
-    {
-      id: string;
-      code: string;
-      name: string;
-      city: string | null;
-      status: string;
-      owner_name: string;
-      owner_phone: string;
-    }[]
-  >("/api/v1/admin/kitchens");
+  return adminFetch<AdminKitchen[]>("/api/v1/admin/kitchens");
+}
+
+export async function fetchAdminKitchen(kitchenId: string) {
+  return adminFetch<AdminKitchenDetail>(`/api/v1/admin/kitchens/${kitchenId}`);
+}
+
+export async function fetchAdminKitchenWhatsApp(kitchenId: string) {
+  return adminFetch<AdminKitchenWhatsApp>(
+    `/api/v1/admin/kitchens/${kitchenId}/whatsapp-integration`,
+  );
+}
+
+export async function upsertAdminKitchenWhatsApp(
+  kitchenId: string,
+  data: {
+    whatsapp_phone_id?: string | null;
+    whatsapp_display_phone?: string | null;
+    clear?: boolean;
+  },
+) {
+  return adminFetch<AdminKitchenWhatsApp>(
+    `/api/v1/admin/kitchens/${kitchenId}/whatsapp-integration`,
+    { method: "PUT", body: JSON.stringify(data) },
+  );
+}
+
+export async function fetchAdminKitchenPaymentGateway(kitchenId: string) {
+  return adminFetch<AdminKitchenPaymentGateway>(
+    `/api/v1/admin/kitchens/${kitchenId}/payment-gateway`,
+  );
+}
+
+export async function upsertAdminKitchenPaymentGateway(
+  kitchenId: string,
+  data: {
+    key_id?: string | null;
+    key_secret?: string | null;
+    webhook_secret?: string | null;
+    linked_account_id?: string | null;
+    is_active?: boolean;
+  },
+) {
+  return adminFetch<AdminKitchenPaymentGateway>(
+    `/api/v1/admin/kitchens/${kitchenId}/payment-gateway`,
+    { method: "PUT", body: JSON.stringify(data) },
+  );
+}
+
+export async function clearAdminKitchenPaymentGateway(kitchenId: string) {
+  return adminFetch<AdminKitchenPaymentGateway>(
+    `/api/v1/admin/kitchens/${kitchenId}/payment-gateway`,
+    { method: "DELETE" },
+  );
+}
+
+export async function fetchAdminKitchenModuleFlags(kitchenId: string) {
+  return adminFetch<AdminKitchenModuleFlags>(
+    `/api/v1/admin/kitchens/${kitchenId}/module-flags`,
+  );
+}
+
+export async function updateAdminKitchenModuleFlag(
+  kitchenId: string,
+  moduleKey: string,
+  enabled: boolean,
+) {
+  return adminFetch<{ module_key: string; enabled: boolean; updated_at: string }>(
+    `/api/v1/admin/kitchens/${kitchenId}/module-flags/${moduleKey}`,
+    { method: "PATCH", body: JSON.stringify({ enabled }) },
+  );
 }
 
 export async function fetchAdminOrders(limit = 100) {
