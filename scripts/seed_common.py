@@ -4,12 +4,36 @@ from __future__ import annotations
 
 import json
 import os
+import subprocess
 import time
 import urllib.error
 import urllib.request
 
 GATEWAY = os.environ.get("CKAC_GATEWAY_URL", "http://localhost:18000").rstrip("/")
 MAX_WAIT_SEC = int(os.environ.get("CKAC_SEED_WAIT_SEC", "120"))
+
+
+def resolve_postgres_container() -> str:
+    """Return the running Postgres container name (local `ckac-postgres-1` or GCP `gcp-vm-postgres-1`)."""
+    override = os.environ.get("CKAC_POSTGRES_CONTAINER", "").strip()
+    if override:
+        return override
+    try:
+        out = subprocess.check_output(
+            ["docker", "ps", "--format", "{{.Names}}"],
+            text=True,
+            timeout=15,
+        )
+    except (FileNotFoundError, subprocess.CalledProcessError, subprocess.TimeoutExpired):
+        return "ckac-postgres-1"
+    names = [line.strip() for line in out.splitlines() if line.strip()]
+    for name in names:
+        if name.endswith("-postgres-1") or name.endswith("_postgres_1"):
+            return name
+    for name in names:
+        if "postgres" in name.lower():
+            return name
+    return "ckac-postgres-1"
 
 
 class ApiError(Exception):

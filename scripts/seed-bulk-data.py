@@ -36,7 +36,18 @@ from bulk_demo_data import (  # noqa: E402
     owner_kitchen_specs,
 )
 from demo_data import DEMO_KITCHEN_CODE, DEMO_OTP, DEMO_OWNER  # noqa: E402
-from seed_common import ApiError, cuisine_map, dish_create_payload, ensure_dish_recipes, ensure_ingredients, login_owner, log, request, wait_for_gateway  # noqa: E402
+from seed_common import (  # noqa: E402
+    ApiError,
+    cuisine_map,
+    dish_create_payload,
+    ensure_dish_recipes,
+    ensure_ingredients,
+    login_owner,
+    log,
+    request,
+    resolve_postgres_container,
+    wait_for_gateway,
+)
 from seed_platform_extras import seed_kitchen_integrations, seed_kitchen_modules, seed_platform_extras  # noqa: E402
 from ingredient_demo_data import DEMO_PANTRY, DISH_PREP_STEPS, DISH_RECIPES  # noqa: E402
 
@@ -63,7 +74,6 @@ BULK_DRAFTS_PER_KITCHEN = env_int("CKAC_BULK_DRAFTS_PER_KITCHEN", 5)
 BULK_DISHES_PER_KITCHEN = env_int("CKAC_BULK_DISHES_PER_KITCHEN", 6, minimum=1)
 BACKDATE_DAYS = env_int("CKAC_BULK_BACKDATE_DAYS", 30)
 BULK_FULL = os.environ.get("CKAC_BULK_FULL", "1").strip().lower() not in ("0", "false", "no")
-POSTGRES_CONTAINER = os.environ.get("CKAC_POSTGRES_CONTAINER", "ckac-postgres-1")
 
 random.seed(42)
 
@@ -271,7 +281,7 @@ def backdate_orders(kitchen_id: str) -> None:
             [
                 "docker",
                 "exec",
-                POSTGRES_CONTAINER,
+                resolve_postgres_container(),
                 "psql",
                 "-U",
                 "ckac",
@@ -320,7 +330,9 @@ def ensure_kitchen_complete(
     backdate_orders(kid)
     if with_modules:
         seed_kitchen_modules(token, kid, dish_ids)
-        seed_kitchen_integrations(token, kid, kitchen["name"])
+        seed_kitchen_integrations(
+            token, kid, kitchen["name"], kitchen_code=kitchen.get("code")
+        )
     return dish_ids
 
 

@@ -186,7 +186,11 @@ class GstTaxInvoice(Base):
     __tablename__ = "gst_tax_invoices"
     __table_args__ = (
         UniqueConstraint("order_id", name="uq_gst_tax_invoices_order"),
-        UniqueConstraint("invoice_number", name="uq_gst_tax_invoices_number"),
+        UniqueConstraint(
+            "kitchen_id",
+            "invoice_number",
+            name="uq_gst_tax_invoices_kitchen_number",
+        ),
         {"schema": "ckac_billing"},
     )
 

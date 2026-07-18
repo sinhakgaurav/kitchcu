@@ -61,6 +61,12 @@ fi
 
 echo "=== Gateway ready — running bulk seed ==="
 mkdir -p /var/lib/ckac
+# Export ADMIN_* / POSTGRES_* from compose .env so seed can login as the bootstrapped admin
+# (GCP uses admin@kitchcu.com + metadata password — not the local demo@kitchcu.dev defaults).
+set -a
+# shellcheck disable=SC1091
+source infra/gcp-vm/.env
+set +a
 CKAC_GATEWAY_URL=http://127.0.0.1:18000 \
 CKAC_BULK_KITCHENS="${CKAC_BULK_KITCHENS:-30}" \
 CKAC_BULK_FULL="${CKAC_BULK_FULL:-1}" \

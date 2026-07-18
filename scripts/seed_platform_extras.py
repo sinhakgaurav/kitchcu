@@ -8,10 +8,17 @@ import subprocess
 from datetime import datetime, timedelta, timezone
 
 from demo_data import DEMO_ADMIN, DEMO_CUSTOMERS, DEMO_OTP
-from seed_common import ApiError, login_admin, login_customer, login_owner, log, request
+from seed_common import (
+    ApiError,
+    login_admin,
+    login_customer,
+    login_owner,
+    log,
+    request,
+    resolve_postgres_container,
+)
 
 MIN_TRIAL_INVITES = 5
-POSTGRES_CONTAINER = os.environ.get("CKAC_POSTGRES_CONTAINER", "ckac-postgres-1")
 
 # Mirrors the CURATED_SEED fixture in services/learning/alembic/versions/001_initial_learning.py.
 # Re-inserted here only as a safety net when the (reference-data) table has been emptied by a
@@ -73,7 +80,20 @@ def ensure_curated_recipes_present() -> bool:
     )
     try:
         proc = subprocess.run(
-            ["docker", "exec", POSTGRES_CONTAINER, "psql", "-U", "ckac", "-d", "ckac", "-v", "ON_ERROR_STOP=1", "-c", sql],
+            [
+                "docker",
+                "exec",
+                resolve_postgres_container(),
+                "psql",
+                "-U",
+                "ckac",
+                "-d",
+                "ckac",
+                "-v",
+                "ON_ERROR_STOP=1",
+                "-c",
+                sql,
+            ],
             capture_output=True,
             text=True,
             timeout=60,
@@ -104,8 +124,11 @@ def _sql_json(value: list[str]) -> str:
 
 
 def ensure_admin_session() -> str:
-    token = login_admin(DEMO_ADMIN["email"], DEMO_ADMIN["password"])
-    log("  Admin login OK")
+    """Login with GCP/prod ADMIN_* env when set; fall back to local DEMO_ADMIN."""
+    email = os.environ.get("ADMIN_EMAIL", DEMO_ADMIN["email"]).strip() or DEMO_ADMIN["email"]
+    password = os.environ.get("ADMIN_PASSWORD", DEMO_ADMIN["password"]).strip() or DEMO_ADMIN["password"]
+    token = login_admin(email, password)
+    log(f"  Admin login OK ({email})")
     return token
 
 
@@ -399,11 +422,21 @@ def ensure_payment_gateway(owner_token: str, kitchen_id: str) -> None:
         log(f"  ! payment gateway: {exc}")
 
 
-def ensure_gst(owner_token: str, kitchen_id: str, kitchen_name: str, *, gstin: str | None = None) -> None:
+def ensure_gst(
+    owner_token: str,
+    kitchen_id: str,
+    kitchen_name: str,
+    *,
+    gstin: str | None = None,
+    kitchen_code: str | None = None,
+) -> None:
     """Register a GST profile and sync invoices from delivered orders."""
     now = datetime.now(timezone.utc)
     if gstin is None:
         gstin = "27AAAPL1234C1Z5"
+    # Invoice numbers are unique per kitchen; still use a distinct prefix so seeded
+    # invoices are readable in admin tooling (kitchen code or short kitchen_id).
+    prefix = (kitchen_code or f"K{kitchen_id.replace('-', '')[:6]}").upper()[:20]
     try:
         request(
             "PUT",
@@ -414,7 +447,7 @@ def ensure_gst(owner_token: str, kitchen_id: str, kitchen_name: str, *, gstin: s
                 "trade_name": kitchen_name,
                 "registered_address": "Koregaon Park, Lane 7, Pune, Maharashtra 411001",
                 "default_tax_rate": 5,
-                "invoice_prefix": "SHK",
+                "invoice_prefix": prefix,
                 "is_active": True,
             },
             token=owner_token,
@@ -672,11 +705,23 @@ def demo_gstin_for_kitchen(kitchen_id: str) -> str:
     return f"27AAAAA{digest:04d}C1Z5"
 
 
-def seed_kitchen_integrations(owner_token: str, kitchen_id: str, kitchen_name: str) -> None:
+def seed_kitchen_integrations(
+    owner_token: str,
+    kitchen_id: str,
+    kitchen_name: str,
+    *,
+    kitchen_code: str | None = None,
+) -> None:
     """Per-kitchen owner integrations (safe to run for every kitchen in bulk seed)."""
     ensure_whatsapp_integration(owner_token, kitchen_id)
     ensure_payment_gateway(owner_token, kitchen_id)
-    ensure_gst(owner_token, kitchen_id, kitchen_name, gstin=demo_gstin_for_kitchen(kitchen_id))
+    ensure_gst(
+        owner_token,
+        kitchen_id,
+        kitchen_name,
+        gstin=demo_gstin_for_kitchen(kitchen_id),
+        kitchen_code=kitchen_code,
+    )
     ensure_delivery_quote(kitchen_id)
     ensure_streaming(owner_token, kitchen_id)
 
@@ -726,7 +771,13 @@ def seed_platform_extras(
     log("-" * 50)
     ensure_whatsapp_integration(owner_token, kitchen_id)
     ensure_payment_gateway(owner_token, kitchen_id)
-    ensure_gst(owner_token, kitchen_id, kitchen_name)
+    ensure_gst(
+        owner_token,
+        kitchen_id,
+        kitchen_name,
+        gstin=demo_gstin_for_kitchen(kitchen_id),
+        kitchen_code="CKPNQ001",
+    )
     ensure_refund(owner_token, kitchen_id)
     ensure_delivery_quote(kitchen_id)
     ensure_support_tickets(customers)

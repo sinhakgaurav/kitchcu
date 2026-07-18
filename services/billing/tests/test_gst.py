@@ -1,7 +1,7 @@
 import pytest
 from httpx import AsyncClient
 
-from tests.conftest import VALID_GSTIN, _mark_order_delivered
+from tests.conftest import VALID_GSTIN, _mark_order_delivered, _seed_owner_with_order
 
 
 def _profile_payload(**overrides):
@@ -45,6 +45,35 @@ async def test_upsert_gst_profile_rejects_invalid_gstin(client: AsyncClient, bil
         headers=headers,
     )
     assert response.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_two_kitchens_same_invoice_prefix_can_both_sync(client: AsyncClient):
+    """Invoice numbers are unique per kitchen (GSTIN), not globally — bulk seed
+    previously 500'd when every kitchen reused prefix SHK."""
+    _, kitchen_a, order_a, _, token_a = _seed_owner_with_order()
+    _, kitchen_b, order_b, _, token_b = _seed_owner_with_order()
+    _mark_order_delivered(order_a)
+    _mark_order_delivered(order_b)
+
+    for kitchen_id, token, gstin in (
+        (kitchen_a, token_a, "27AAAAA0001C1Z5"),
+        (kitchen_b, token_b, "27AAAAA0002C1Z5"),
+    ):
+        headers = {"Authorization": f"Bearer {token}"}
+        profile = await client.put(
+            f"/api/v1/kitchens/{kitchen_id}/gst/profile",
+            json=_profile_payload(gstin=gstin, invoice_prefix="SHK"),
+            headers=headers,
+        )
+        assert profile.status_code == 200, profile.text
+        sync = await client.post(
+            f"/api/v1/kitchens/{kitchen_id}/gst/sync",
+            headers=headers,
+        )
+        assert sync.status_code == 200, sync.text
+        assert sync.json()["synced_count"] == 1
+        assert sync.json()["invoices"][0]["invoice_number"].startswith("SHK-GST-")
 
 
 @pytest.mark.asyncio

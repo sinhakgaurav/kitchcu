@@ -127,6 +127,10 @@ if { [ "$RUN_SEED" = "1" ] || [ "$RUN_SEED" = "true" ]; } && [ ! -f "$SEED_MARKE
   if [ "$ready" -eq 1 ]; then
     echo "Running scripts/seed-bulk-data.py (APP_ENV=${APP_ENV})..."
     mkdir -p /var/lib/ckac
+    set -a
+    # shellcheck disable=SC1091
+    source infra/gcp-vm/.env
+    set +a
     if CKAC_GATEWAY_URL=http://127.0.0.1:18000 CKAC_BULK_KITCHENS=30 CKAC_BULK_FULL=1 python3 scripts/seed-bulk-data.py; then
       touch "$SEED_MARKER"
       echo "Bulk seed complete."
