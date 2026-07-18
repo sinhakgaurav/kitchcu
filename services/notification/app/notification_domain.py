@@ -51,6 +51,19 @@ class OrderStatusChangedNotifyRequest(BaseModel):
     tracking_token: str | None = Field(default=None, description="Public tracking token, if issued.")
 
 
+class DeliveryFeeDeniedNotifyRequest(BaseModel):
+    """Internal request from the delivery service when a customer denies a quoted
+    delivery fee at checkout (F28) — alerts the owner so they can call the customer
+    and offer a waiver/pickup instead of silently losing the sale."""
+
+    kitchen_id: uuid.UUID = Field(..., description="Kitchen the denied quote was for.")
+    quote_id: uuid.UUID = Field(..., description="The DeliveryQuote that was denied.")
+    distance_km: float = Field(..., description="Quoted distance in km.")
+    fee: float = Field(..., description="Delivery fee the customer denied, in INR.")
+    subtotal: float = Field(default=0, description="Cart subtotal at the time of denial, in INR.")
+    customer_phone: str | None = Field(default=None, description="Customer phone, if known, for owner callback.")
+
+
 class DailyMenuBlastRequest(BaseModel):
     """Internal request from the growth service to dispatch a daily-menu WhatsApp blast (F39)."""
 
@@ -292,6 +305,59 @@ async def notify_order_status_changed(
     return NotificationDispatchResponse(
         notification_id=row.id,
         template_id="order_status_update",
+        channel=row.channel,
+        status=row.status,
+    )
+
+
+async def _owner_phone_for_kitchen(session: AsyncSession, kitchen_id: uuid.UUID) -> str | None:
+    row = (
+        await session.execute(
+            text(
+                "SELECT o.phone FROM ckac_identity.owners o "
+                "JOIN ckac_identity.kitchens k ON k.owner_id = o.id "
+                "WHERE k.id = :kid LIMIT 1"
+            ),
+            {"kid": kitchen_id},
+        )
+    ).scalar_one_or_none()
+    return row
+
+
+async def notify_delivery_fee_denied(
+    session: AsyncSession,
+    body: DeliveryFeeDeniedNotifyRequest,
+    publisher: EventPublisher,
+) -> NotificationDispatchResponse:
+    """F28 deny path — owner gets an actionable alert, not a silent lost order."""
+    owner_phone = await _owner_phone_for_kitchen(session, body.kitchen_id)
+    text_body = (
+        f"A customer {body.distance_km:.1f}km away denied your ₹{body.fee:.0f} delivery fee "
+        f"(cart ₹{body.subtotal:.0f}). Call them to offer free delivery or pickup — "
+        "or the order will be lost."
+    )
+    if body.customer_phone:
+        text_body += f" Customer: {body.customer_phone}"
+
+    row = await _send_notification(
+        session,
+        publisher,
+        template_id="delivery_fee_denied",
+        body=text_body,
+        kitchen_id=body.kitchen_id,
+        order_id=None,
+        recipient_phone=owner_phone,
+        payload={
+            "quote_id": str(body.quote_id),
+            "distance_km": body.distance_km,
+            "fee": body.fee,
+            "subtotal": body.subtotal,
+            "customer_phone": body.customer_phone,
+        },
+    )
+    return NotificationDispatchResponse(
+        notification_id=row.id,
+        template_id="delivery_fee_denied",
         channel=row.channel,
         status=row.status,
     )

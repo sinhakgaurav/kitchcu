@@ -3,17 +3,46 @@ import { FormEvent, useState } from "react";
 import { useInView } from "../hooks/useParallax";
 import { images } from "../data/content";
 import { ContactParallaxBg } from "./ContactParallaxBg";
+import { createSupportTicket } from "../lib/supportApi";
 
-type FormState = "idle" | "sending" | "sent";
+type FormState = "idle" | "sending" | "sent" | "error";
 
 export function Contact() {
   const { ref, visible } = useInView();
   const [state, setState] = useState<FormState>("idle");
+  const [error, setError] = useState("");
 
-  const handleSubmit = (e: FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setState("sending");
-    setTimeout(() => setState("sent"), 900);
+    setError("");
+    const form = new FormData(e.currentTarget);
+    const name = String(form.get("name") || "").trim();
+    const kitchen = String(form.get("kitchen") || "").trim();
+    const phone = String(form.get("phone") || "").trim();
+    const city = String(form.get("city") || "").trim();
+    const message = String(form.get("message") || "").trim();
+    try {
+      await createSupportTicket({
+        audience: "owner",
+        category: "general",
+        source: "web_form",
+        subject: `Pilot access request — ${kitchen}`,
+        description: [
+          `Kitchen: ${kitchen}`,
+          `City: ${city}`,
+          message ? `Message: ${message}` : null,
+        ]
+          .filter(Boolean)
+          .join("\n"),
+        customer_name: name,
+        customer_phone: phone,
+      });
+      setState("sent");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not submit request");
+      setState("error");
+    }
   };
 
   return (
@@ -80,6 +109,7 @@ export function Contact() {
                 Message (optional)
                 <textarea name="message" rows={3} placeholder="Orders per day, current channels..." />
               </label>
+              {state === "error" && <div className="auth-card__error">{error}</div>}
               <button type="submit" className="btn btn--primary btn--lg" disabled={state === "sending"}>
                 {state === "sending" ? "Sending..." : "Submit Request"}
               </button>

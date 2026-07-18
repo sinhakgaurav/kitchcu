@@ -9,6 +9,7 @@ from fastapi.openapi.docs import get_redoc_html, get_swagger_ui_html
 from fastapi.responses import JSONResponse
 
 from app.openapi_aggregate import build_gateway_openapi
+from app.rate_limit import check_rate_limit
 from ckac_common.config import get_settings
 from ckac_common.health import gateway_ready_response, live_response
 from ckac_common.observability import CorrelationMiddleware, correlation_headers
@@ -260,6 +261,15 @@ async def proxy(path: str, request: Request) -> Response:
         return JSONResponse(status_code=404, content={"detail": "Not found"})
     if request.method == "OPTIONS":
         return Response(status_code=204)
+
+    allowed, retry_after, _rule_name = await check_rate_limit(redis_client, request, full_path)
+    if not allowed:
+        return JSONResponse(
+            status_code=429,
+            content={"detail": f"Too many requests — try again in {retry_after}s"},
+            headers={"Retry-After": str(retry_after)},
+        )
+
     base_url = resolve_service_url(full_path)
     if not base_url:
         return JSONResponse(status_code=404, content={"detail": "Route not found on gateway"})

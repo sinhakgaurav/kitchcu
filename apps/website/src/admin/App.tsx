@@ -585,7 +585,7 @@ function AdminLogin({ onSuccess }: { onSuccess: (token: string) => void }) {
       <div className="auth-page__visual admin-login__visual">
         <div className="auth-page__overlay" />
         <div className="auth-page__brand-stack">
-          <BrandLogo variant="badge" height={72} />
+          <BrandLogo variant="wordmark" className="brand-logo--lg" />
           <h1>Platform control</h1>
           <p>Full visibility over kitchens, owners, orders, and support.</p>
           <AuthLoginHighlights surface="admin" />
@@ -599,7 +599,6 @@ function AdminLogin({ onSuccess }: { onSuccess: (token: string) => void }) {
         </div>
         <form className="auth-card admin-login__card" onSubmit={submit}>
           <p className="admin-login__eyebrow">Super admin</p>
-          <BrandLogo variant="wordmark" className="brand-logo--lg auth-card__desktop-logo" />
           <h1>Sign in</h1>
           <p>Use the platform admin credentials for {ADMIN_HOST}.</p>
           {error && <div className="auth-card__error">{error}</div>}

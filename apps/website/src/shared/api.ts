@@ -1014,6 +1014,17 @@ export async function fetchDeliveryQuote(data: {
   });
 }
 
+/** F28: customer denies the quoted delivery fee — alerts the owner instead of a silent lost sale. */
+export async function denyDeliveryFee(
+  quoteId: string,
+  data: { subtotal?: number; customer_phone?: string },
+): Promise<{ acknowledged: boolean; kitchen_id: string }> {
+  return apiFetch(`/api/v1/delivery/quote/${quoteId}/deny`, {
+    method: "POST",
+    body: JSON.stringify({ quote_id: quoteId, ...data }),
+  });
+}
+
 export type TrackingInfo = {
   tracking_token: string;
   order_id: string;

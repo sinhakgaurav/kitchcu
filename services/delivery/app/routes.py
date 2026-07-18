@@ -4,9 +4,12 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.schemas import (
+    DeliveryFeeDenialRequest,
+    DeliveryFeeDenialResponse,
     DeliveryQuoteRequest,
     DeliveryQuoteResponse,
     TrackingResponse,
+    deny_delivery_fee,
     quote_delivery,
     track_by_token,
 )
@@ -55,6 +58,39 @@ async def delivery_quote(
 ) -> DeliveryQuoteResponse:
     try:
         result = await quote_delivery(session, body, publisher)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    await session.commit()
+    return result
+
+
+@router.post(
+    "/delivery/quote/{quote_id}/deny",
+    response_model=DeliveryFeeDenialResponse,
+    tags=["Delivery"],
+    summary="Customer denies a quoted delivery fee at checkout (F28)",
+    description=(
+        "**Auth:** None — called from the checkout screen before an order exists, same as "
+        "`POST /delivery/quote`.\n\n"
+        "**Behavior:** Records the denial against the quote and alerts the **owner** via "
+        "WhatsApp (distance/fee/cart subtotal + customer phone if known) so they can call and "
+        "offer a waiver or pickup instead of losing the sale. No order is created — the "
+        "customer never proceeded past the fee prompt, so there is nothing to cancel. Emits "
+        "`delivery.fee_denied`.\n\n"
+        "**Response:** `DeliveryFeeDenialResponse` acknowledging the alert was sent."
+    ),
+    responses={404: RESP_404, 422: RESP_422},
+)
+async def delivery_quote_deny(
+    quote_id: str,
+    body: DeliveryFeeDenialRequest,
+    session: Annotated[AsyncSession, Depends(get_db)],
+    publisher: Annotated[EventPublisher, Depends(get_publisher)],
+) -> DeliveryFeeDenialResponse:
+    if str(body.quote_id) != quote_id:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="quote_id mismatch")
+    try:
+        result = await deny_delivery_fee(session, body, publisher)
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
     await session.commit()

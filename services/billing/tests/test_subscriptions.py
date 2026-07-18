@@ -33,6 +33,41 @@ async def test_create_and_activate_subscription(client: AsyncClient, billing_ctx
 
 
 @pytest.mark.asyncio
+async def test_create_subscription_replay_returns_existing_not_duplicate(
+    client: AsyncClient, billing_ctx
+):
+    """A double-submitted/retried subscription create (network timeout, double-tap) must
+    never create a second live subscription for the same owner."""
+    _, _, _, _, token = billing_ctx
+    headers = {"Authorization": f"Bearer {token}"}
+
+    first = await client.post(
+        "/api/v1/billing/subscriptions",
+        json={"plan_tier": "growth", "billing_cycle": "monthly"},
+        headers=headers,
+    )
+    assert first.status_code == 201
+    sub_id = first.json()["id"]
+
+    replay = await client.post(
+        "/api/v1/billing/subscriptions",
+        json={"plan_tier": "growth", "billing_cycle": "monthly"},
+        headers=headers,
+    )
+    assert replay.status_code == 200
+    assert replay.json()["id"] == sub_id
+
+    different_plan_retry = await client.post(
+        "/api/v1/billing/subscriptions",
+        json={"plan_tier": "pro", "billing_cycle": "yearly"},
+        headers=headers,
+    )
+    assert different_plan_retry.status_code == 200
+    assert different_plan_retry.json()["id"] == sub_id
+    assert different_plan_retry.json()["plan_tier"] == "growth"
+
+
+@pytest.mark.asyncio
 async def test_activate_updates_identity_owner(client: AsyncClient, billing_ctx):
     owner_id, _, _, _, token = billing_ctx
     headers = {"Authorization": f"Bearer {token}"}

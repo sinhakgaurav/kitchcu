@@ -567,7 +567,25 @@ async def create_manual_order(
     source: str = "manual",
     customer_phone: str | None = None,
     status_note: str = "Manual order created",
-) -> Order:
+    idempotency_key: str | None = None,
+) -> tuple[Order, bool]:
+    if idempotency_key:
+        # Same pattern as create_master_order: advisory lock + existing-row check
+        # so a client retry (double-tap, network timeout) never double-charges/orders.
+        await session.execute(
+            text("SELECT pg_advisory_xact_lock(hashtext(:lock_key))"),
+            {"lock_key": f"order_idempotency:{kitchen_id}:{idempotency_key}"},
+        )
+        existing_result = await session.execute(
+            select(Order).where(
+                Order.kitchen_id == kitchen_id,
+                Order.idempotency_key == idempotency_key,
+            )
+        )
+        existing = existing_result.scalar_one_or_none()
+        if existing:
+            return existing, False
+
     bill_id, order_code = await _next_bill_id(session, kitchen_id)
 
     line_items: list[tuple[str, float, int, int, OrderItemInput]] = []
@@ -623,6 +641,7 @@ async def create_manual_order(
         customer_latitude=data.customer_latitude,
         customer_longitude=data.customer_longitude,
         tracking_token=tracking_token,
+        idempotency_key=idempotency_key,
         total=total,
         estimated_prep_min=max_prep,
         estimated_ready_at=estimated_ready_at,
@@ -684,7 +703,7 @@ async def create_manual_order(
             )
             await publisher.publish(stream_key("delivery", "tracking"), track_event, session=session)
 
-    return order
+    return order, True
 
 
 async def create_customer_order(
@@ -695,7 +714,9 @@ async def create_customer_order(
     customer_phone: str,
     data: CustomerOrderCreateRequest,
     publisher: EventPublisher | None,
-) -> Order:
+    *,
+    idempotency_key: str | None = None,
+) -> tuple[Order, bool]:
     manual = ManualOrderCreateRequest(
         items=data.items,
         delivery_type=data.delivery_type,
@@ -717,6 +738,7 @@ async def create_customer_order(
         source="customer_pwa",
         customer_phone=customer_phone,
         status_note="Customer checkout order placed",
+        idempotency_key=idempotency_key,
     )
 
 
@@ -787,7 +809,7 @@ async def create_master_order(
             customer_latitude=group.customer_latitude,
             customer_longitude=group.customer_longitude,
         )
-        order = await create_manual_order(
+        order, _created = await create_manual_order(
             session,
             group.kitchen_id,
             customer_id,
@@ -885,7 +907,7 @@ async def repeat_customer_order(
         payment_method=order.payment_method,  # type: ignore[arg-type]
         delivery_fee=float(order.delivery_fee),
     )
-    return await create_customer_order(
+    new_order, _created = await create_customer_order(
         session,
         order.kitchen_id,
         customer_id,
@@ -894,6 +916,7 @@ async def repeat_customer_order(
         request,
         publisher,
     )
+    return new_order
 
 
 async def update_order_status(
@@ -1223,7 +1246,7 @@ async def confirm_draft(
         items=items,
         customer_phone=draft.customer_phone,
     )
-    order = await create_manual_order(
+    order, _created = await create_manual_order(
         session,
         kitchen_id,
         owner_id,

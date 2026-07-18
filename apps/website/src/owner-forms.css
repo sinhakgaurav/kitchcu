@@ -4,7 +4,9 @@
   --kc-field-h: 3rem;
   --kc-field-radius: 12px;
   --kc-field-bg: var(--dark-3);
-  --kc-field-border: rgba(255, 255, 255, 0.12);
+  --kc-field-border: var(--hover-veil-5);
+  --kc-field-border-hover: var(--hover-veil-5);
+  --kc-field-bg-hover: var(--dash-surface-2, var(--dark-2));
   --kc-field-border-focus: rgba(230, 81, 0, 0.55);
   --kc-field-shadow-focus: 0 0 0 3px rgba(230, 81, 0, 0.15);
   /* Vertical rhythm */
@@ -104,8 +106,8 @@
 .auth-card input:hover,
 .auth-card select:hover,
 .auth-card textarea:hover {
-  border-color: rgba(255, 255, 255, 0.2);
-  background: #1e1e2a;
+  border-color: var(--kc-field-border-hover);
+  background: var(--kc-field-bg-hover);
 }
 
 .kc-input:focus,
@@ -128,7 +130,10 @@
   outline: none;
   border-color: var(--kc-field-border-focus);
   box-shadow: var(--kc-field-shadow-focus);
-  background: #1a1a28;
+  /* Keep the same theme-aware fill as the resting state — a hardcoded dark
+     navy here previously caused every field to flash dark-navy on focus,
+     even on the light theme (the visible "dark theme" + flicker reports). */
+  background: var(--kc-field-bg);
 }
 
 .kc-input:disabled,
@@ -284,7 +289,7 @@ form.auth-card > .btn {
   padding: 0.55rem 1.15rem;
   border-radius: 999px;
   border: 1px solid var(--surface-border);
-  background: rgba(0, 0, 0, 0.25);
+  background: var(--veil-3);
   color: var(--text-muted);
   font-family: var(--font-body);
   font-size: 0.875rem;
@@ -296,7 +301,7 @@ form.auth-card > .btn {
 
 .kc-tabs button:hover,
 .owner-tabs button:hover {
-  border-color: rgba(255, 255, 255, 0.18);
+  border-color: var(--kc-field-border-hover);
   color: var(--text);
 }
 
@@ -362,7 +367,7 @@ form.auth-card > .btn {
   padding: 0.85rem 1rem;
   border-radius: var(--kc-field-radius);
   border: 1px solid var(--surface-border);
-  background: rgba(0, 0, 0, 0.35);
+  background: var(--veil-5);
   font-size: 0.8rem;
   line-height: 1.45;
   word-break: break-all;

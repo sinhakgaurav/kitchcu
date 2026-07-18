@@ -58,6 +58,46 @@ async def test_quote_out_of_range_extended(client: AsyncClient, delivery_ctx):
 
 
 @pytest.mark.asyncio
+async def test_deny_delivery_fee_acknowledges_and_does_not_create_order(
+    client: AsyncClient, delivery_ctx
+):
+    """F28 deny path — customer denies the quoted fee; owner is alerted (fire-and-forget),
+    no order/charge exists because the customer never proceeded past the fee prompt."""
+    quote = await client.post(
+        "/api/v1/delivery/quote",
+        json={
+            "kitchen_id": str(delivery_ctx["kitchen_id"]),
+            "latitude": delivery_ctx["far_lat"],
+            "longitude": delivery_ctx["far_lng"],
+            "subtotal": 200,
+        },
+    )
+    assert quote.status_code == 200
+    quote_id = quote.json()["quote_id"]
+
+    deny = await client.post(
+        f"/api/v1/delivery/quote/{quote_id}/deny",
+        json={"quote_id": quote_id, "subtotal": 200, "customer_phone": "+919876500001"},
+    )
+    assert deny.status_code == 200
+    data = deny.json()
+    assert data["acknowledged"] is True
+    assert data["kitchen_id"] == str(delivery_ctx["kitchen_id"])
+
+
+@pytest.mark.asyncio
+async def test_deny_delivery_fee_unknown_quote_404(client: AsyncClient, delivery_ctx):
+    import uuid as _uuid
+
+    fake_id = str(_uuid.uuid4())
+    response = await client.post(
+        f"/api/v1/delivery/quote/{fake_id}/deny",
+        json={"quote_id": fake_id},
+    )
+    assert response.status_code == 404
+
+
+@pytest.mark.asyncio
 async def test_track_by_token(client: AsyncClient, delivery_ctx):
     import psycopg2
 

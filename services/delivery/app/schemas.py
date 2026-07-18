@@ -17,7 +17,7 @@ import uuid
 from datetime import datetime
 
 from pydantic import BaseModel, Field
-from sqlalchemy import text
+from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import DeliveryQuote
@@ -68,6 +68,21 @@ class DeliveryQuoteResponse(BaseModel):
     )
     breakdown: dict
     quote_id: uuid.UUID | None = None
+
+
+class DeliveryFeeDenialRequest(BaseModel):
+    """Customer denies a previously quoted delivery fee at checkout (F28)."""
+
+    quote_id: uuid.UUID = Field(..., description="The `quote_id` returned by `POST /delivery/quote`.")
+    subtotal: float = Field(default=0, ge=0, description="Cart subtotal at time of denial, in INR.")
+    customer_phone: str | None = Field(
+        default=None, description="Customer phone (E.164), so the owner can call back."
+    )
+
+
+class DeliveryFeeDenialResponse(BaseModel):
+    acknowledged: bool = Field(..., description="Always true — owner has been alerted.")
+    kitchen_id: uuid.UUID
 
 
 class TrackingResponse(BaseModel):
@@ -281,6 +296,54 @@ async def quote_delivery(
         breakdown=breakdown,
         quote_id=quote.id,
     )
+
+
+async def deny_delivery_fee(
+    session: AsyncSession,
+    body: DeliveryFeeDenialRequest,
+    publisher: EventPublisher | None = None,
+) -> DeliveryFeeDenialResponse:
+    """F28 deny path: 'If denied -> owner notified -> cancel OR deliver free if order >= min_amount'.
+
+    The free-delivery-above-minimum waiver is already applied automatically inside the
+    quote itself (see `_kitchen_self_fee` / `quote_delivery`), so a quote only reaches this
+    endpoint when a *real* fee was denied. No order exists yet at quote time — the customer
+    never proceeded to checkout — so there is nothing to cancel; this just makes the deny an
+    actionable, owner-visible event instead of a silently lost sale.
+    """
+    quote = (
+        await session.execute(select(DeliveryQuote).where(DeliveryQuote.id == body.quote_id))
+    ).scalar_one_or_none()
+    if quote is None:
+        raise ValueError("Delivery quote not found")
+
+    if publisher is not None:
+        event = publisher.build(
+            event_type="delivery.fee_denied",
+            aggregate_type="quote",
+            aggregate_id=str(quote.id),
+            producer="delivery-service",
+            payload={
+                "kitchen_id": str(quote.kitchen_id),
+                "distance_km": float(quote.distance_km),
+                "fee": float(quote.fee),
+                "customer_phone": body.customer_phone,
+            },
+        )
+        await publisher.publish(stream_key("delivery", "quote"), event, session=session)
+
+    from app.notify_client import notify_delivery_fee_denied
+
+    await notify_delivery_fee_denied(
+        kitchen_id=quote.kitchen_id,
+        quote_id=quote.id,
+        distance_km=float(quote.distance_km),
+        fee=float(quote.fee),
+        subtotal=body.subtotal,
+        customer_phone=body.customer_phone,
+    )
+
+    return DeliveryFeeDenialResponse(acknowledged=True, kitchen_id=quote.kitchen_id)
 
 
 async def track_by_token(session: AsyncSession, token: str) -> TrackingResponse:

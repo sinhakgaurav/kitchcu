@@ -1,7 +1,7 @@
 import uuid
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, File, HTTPException, Query, Request, UploadFile, status
+from fastapi import APIRouter, Depends, File, HTTPException, Query, Request, Response, UploadFile, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.deps import (
@@ -231,7 +231,10 @@ async def subscription_me(
     description=(
         "Owner-only — start a platform SaaS subscription (starter/growth/pro, monthly or yearly). "
         "Created in `trial` status; call the activate endpoint (or await the Razorpay subscription "
-        "webhook in production) to move to `active`. Publishes `subscription.created`."
+        "webhook in production) to move to `active`. Publishes `subscription.created`. "
+        "**Idempotent per owner** — an owner can only have one live (trial/active/past_due) "
+        "subscription; a retried request returns the existing one with `200` instead of creating "
+        "a duplicate."
     ),
     responses=auth_errors(),
 )
@@ -240,8 +243,11 @@ async def subscription_create(
     owner_id: Annotated[uuid.UUID, Depends(get_current_owner_id)],
     session: Annotated[AsyncSession, Depends(get_db)],
     publisher: Annotated[EventPublisher, Depends(get_publisher)],
+    response: Response,
 ) -> SubscriptionResponse:
-    sub = await create_owner_subscription(session, owner_id, body, publisher)
+    sub, created = await create_owner_subscription(session, owner_id, body, publisher)
+    if not created:
+        response.status_code = status.HTTP_200_OK
     return subscription_to_response(sub)
 
 

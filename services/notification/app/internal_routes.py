@@ -5,12 +5,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.notification_domain import (
     DailyMenuBlastRequest,
+    DeliveryFeeDeniedNotifyRequest,
     NotificationDispatchResponse,
     OrderPlacedNotifyRequest,
     OrderStatusChangedNotifyRequest,
     TrialSampleBlastRequest,
     TrackingTickResponse,
     notify_daily_menu_blast,
+    notify_delivery_fee_denied,
     notify_order_placed,
     notify_order_status_changed,
     notify_trial_sample_blast,
@@ -73,6 +75,30 @@ async def internal_order_status_changed(
     publisher: Annotated[EventPublisher, Depends(get_publisher)],
 ) -> NotificationDispatchResponse:
     result = await notify_order_status_changed(session, body, publisher)
+    await session.commit()
+    return result
+
+
+@router.post(
+    "/delivery-fee-denied",
+    response_model=NotificationDispatchResponse,
+    tags=[TAG_INTERNAL],
+    summary="[Internal] Alert the owner that a customer denied the quoted delivery fee (F28)",
+    description=(
+        "Internal service-to-service (`X-Internal-Key`) — called by the delivery service when "
+        "a customer denies a quoted delivery fee at checkout instead of accepting or switching "
+        "to pickup. Sends a WhatsApp alert to the **owner** (resolved from `kitchen_id`) with "
+        "the distance/fee/subtotal and customer phone (if known) so the owner can call and "
+        "offer a waiver or pickup before the sale is lost. Publishes `notification.sent`."
+    ),
+    responses={401: RESP_401},
+)
+async def internal_delivery_fee_denied(
+    body: DeliveryFeeDeniedNotifyRequest,
+    session: Annotated[AsyncSession, Depends(get_db)],
+    publisher: Annotated[EventPublisher, Depends(get_publisher)],
+) -> NotificationDispatchResponse:
+    result = await notify_delivery_fee_denied(session, body, publisher)
     await session.commit()
     return result
 

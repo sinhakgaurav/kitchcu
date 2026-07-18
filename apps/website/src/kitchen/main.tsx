@@ -9,7 +9,7 @@ import "../owner-forms.css";
 import "../owner-app.css";
 import "../dashboard-shell.css";
 
-applyAppTheme("ops-dark");
+applyAppTheme("brand-light");
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>

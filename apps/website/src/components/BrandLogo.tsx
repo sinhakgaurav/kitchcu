@@ -65,23 +65,22 @@ type BrandAuthArtProps = {
   className?: string;
 };
 
-/** Full-bleed auth / landing art from logos/ creative set — body surfaces only */
+/**
+ * Auth hero mark — the plain kitchCU app icon (pot mascot, no wordmark)
+ * at a large size. One consistent icon across kitchen/customer/admin/portal
+ * auth screens keeps the brand mark from repeating alongside the wordmark
+ * already shown above it in the same brand stack.
+ */
 export function BrandAuthArt({ surface = "kitchen", className = "" }: BrandAuthArtProps) {
-  const src =
-    surface === "customer"
-      ? BRAND_ASSETS.creativeChef
-      : surface === "admin"
-        ? BRAND_ASSETS.creativeNeon
-        : surface === "portal"
-          ? BRAND_ASSETS.creativeHero
-          : BRAND_ASSETS.mascot;
-
   return (
     <img
-      src={src}
+      src={BRAND_ASSETS.appicon}
       alt=""
+      width={340}
+      height={340}
       className={`brand-auth-art brand-auth-art--${surface} ${className}`.trim()}
       decoding="async"
+      fetchPriority="high"
     />
   );
 }

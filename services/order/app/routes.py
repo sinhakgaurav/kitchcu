@@ -122,13 +122,14 @@ async def manual_order_create(
 ) -> OrderResponse:
     await verify_kitchen_owner(kitchen_id, owner_id, session)
     try:
-        order = await create_manual_order(session, kitchen_id, owner_id, body, publisher)
+        order, created = await create_manual_order(session, kitchen_id, owner_id, body, publisher)
         await session.commit()
         await session.refresh(order)
     except ValueError as exc:
         await session.rollback()
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
-    await dispatch_order_placed(order)
+    if created:
+        await dispatch_order_placed(order)
     return await order_to_response(session, order)
 
 
@@ -140,21 +141,29 @@ async def manual_order_create(
     summary="Place a single-kitchen checkout order",
     description=(
         "**Auth:** Customer JWT (Bearer, `type: customer`).\n\n"
+        "**Headers:** `Idempotency-Key` (optional, 8-128 chars) — replaying the same key for the "
+        "same kitchen returns the previously created order with `200 OK` instead of creating a "
+        "duplicate; a new (or omitted) key creates a fresh order with `201 Created`.\n\n"
         "**Body:** `CustomerOrderCreateRequest` — cart line items, delivery type, payment "
         "method, and optional delivery location/fee acknowledgement.\n\n"
         "**Behavior:** Verifies the kitchen is active, resolves the customer's phone from their "
         "profile (or the request), then creates the order exactly like a manual order but tagged "
         "`source=\"customer_pwa\"`. Emits `order.placed` and, for delivery, `delivery.tracking_created`.\n\n"
-        "**Response:** `201` with the created `OrderResponse`."
+        "**Response:** `201` with the created `OrderResponse` (or `200` on idempotent replay)."
     ),
     responses={**auth_errors(include_404=True), 400: RESP_400},
 )
 async def customer_order_create(
     kitchen_id: uuid.UUID,
     body: CustomerOrderCreateRequest,
+    response: Response,
     customer_id: Annotated[uuid.UUID, Depends(get_current_customer_id)],
     session: Annotated[AsyncSession, Depends(get_db)],
     publisher: Annotated[EventPublisher, Depends(get_publisher)],
+    idempotency_key: Annotated[
+        str | None,
+        Header(alias="Idempotency-Key", min_length=8, max_length=128),
+    ] = None,
 ) -> OrderResponse:
     await verify_kitchen_active(kitchen_id, session)
     profile = await load_customer_profile(customer_id, session)
@@ -165,7 +174,7 @@ async def customer_order_create(
             detail="Phone number required — sign in with WhatsApp OTP",
         )
     try:
-        order = await create_customer_order(
+        order, created = await create_customer_order(
             session,
             kitchen_id,
             customer_id,
@@ -173,13 +182,17 @@ async def customer_order_create(
             phone,
             body,
             publisher,
+            idempotency_key=idempotency_key,
         )
         await session.commit()
         await session.refresh(order)
     except ValueError as exc:
         await session.rollback()
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
-    await dispatch_order_placed(order)
+    if created:
+        await dispatch_order_placed(order)
+    else:
+        response.status_code = status.HTTP_200_OK
     return await order_to_response(session, order)
 
 

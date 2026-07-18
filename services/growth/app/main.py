@@ -10,6 +10,7 @@ from ckac_common.database import check_db_connection
 from ckac_common.event_bus import EventPublisher
 from ckac_common.events_context import set_event_publisher
 from ckac_common.health import live_response, ready_response
+from ckac_common.observability import CorrelationMiddleware
 
 settings = get_settings()
 redis_client: redis.Redis | None = None
@@ -51,6 +52,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+app.add_middleware(CorrelationMiddleware)
 
 app.include_router(router, prefix="/api/v1")
 

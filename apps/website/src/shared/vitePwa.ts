@@ -16,13 +16,13 @@ export function kitchcuPwaPlugin(appName: string, shortName: string): PluginOpti
       icons: [
         {
           src: "/brand/appicon.png",
-          sizes: "512x512",
+          sizes: "768x768",
           type: "image/png",
           purpose: "any",
         },
         {
           src: "/brand/appicon.png",
-          sizes: "512x512",
+          sizes: "768x768",
           type: "image/png",
           purpose: "maskable",
         },

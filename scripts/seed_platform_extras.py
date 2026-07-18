@@ -663,9 +663,13 @@ def ensure_crm_and_coupon_extras(owner_token: str, kitchen_id: str, customers: l
 
 
 def demo_gstin_for_kitchen(kitchen_id: str) -> str:
-    """Deterministic fake GSTIN per kitchen (global uq_kitchen_gst_profiles_gstin)."""
+    """Deterministic fake GSTIN per kitchen (global uq_kitchen_gst_profiles_gstin).
+
+    Must match GSTIN_RE in services/billing/app/gst.py:
+    2 digits (state) + 5 letters (PAN) + 4 digits (PAN) + 1 letter (PAN) + 1 alnum (entity) + "Z" + 1 alnum (checksum) = 15 chars.
+    """
     digest = int(kitchen_id.replace("-", "")[:10], 16) % 10_000
-    return f"27AAAA{digest:04d}C1Z5"
+    return f"27AAAAA{digest:04d}C1Z5"
 
 
 def seed_kitchen_integrations(owner_token: str, kitchen_id: str, kitchen_name: str) -> None:

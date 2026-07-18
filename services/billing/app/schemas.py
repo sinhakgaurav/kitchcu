@@ -333,6 +333,10 @@ async def create_master_payment(
     if master_order["payment_method"] not in ("online", "upi"):
         raise ValueError("Unsupported master order payment method")
 
+    await session.execute(
+        text("SELECT pg_advisory_xact_lock(hashtext(:lock_key))"),
+        {"lock_key": f"master_payment_idempotency:{master_order['id']}:{method}"},
+    )
     existing = await session.execute(
         select(Payment).where(
             Payment.master_order_id == master_order["id"],
@@ -495,6 +499,13 @@ async def create_payment(
     if order["payment_method"] == "cod":
         raise ValueError("COD orders do not require online payment")
 
+    # Advisory lock on (order_id, method) closes the race where two concurrent
+    # requests (double-tap / retry) both pass the "no active payment yet" check
+    # before either commits, which would otherwise create two payments for one order.
+    await session.execute(
+        text("SELECT pg_advisory_xact_lock(hashtext(:lock_key))"),
+        {"lock_key": f"payment_idempotency:{order['id']}:{method}"},
+    )
     existing = await session.execute(
         select(Payment).where(
             Payment.order_id == order["id"],
@@ -641,7 +652,28 @@ async def create_owner_subscription(
     owner_id: uuid.UUID,
     data: SubscriptionCreateRequest,
     publisher: EventPublisher | None,
-) -> OwnerSubscription:
+) -> tuple[OwnerSubscription, bool]:
+    """Start a subscription for ``owner_id``.
+
+    Idempotent per owner: a retried/double-submitted request (network timeout, double-tap)
+    must never create a second subscription. An owner can only have one live
+    (trial/active/past_due) subscription at a time, so we lock on ``owner_id`` and return
+    the existing one instead of minting a duplicate billing record.
+    """
+    await session.execute(
+        text("SELECT pg_advisory_xact_lock(hashtext(:lock_key))"),
+        {"lock_key": f"subscription_idempotency:{owner_id}"},
+    )
+    existing = await session.execute(
+        select(OwnerSubscription).where(
+            OwnerSubscription.owner_id == owner_id,
+            OwnerSubscription.status.in_(("trial", "active", "past_due")),
+        )
+    )
+    found = existing.scalar_one_or_none()
+    if found:
+        return found, False
+
     require_dev_payment_mocks("Subscription create")
     amount = SUBSCRIPTION_PLANS[data.plan_tier][data.billing_cycle]
     sub = OwnerSubscription(
@@ -671,7 +703,7 @@ async def create_owner_subscription(
         )
         await publisher.publish(stream_key("billing", "subscription"), event, session=session)
 
-    return sub
+    return sub, True
 
 
 async def activate_subscription(

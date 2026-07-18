@@ -1,5 +1,6 @@
 """Refund API — full gateway + partial direct transfer with evidence."""
 
+import asyncio
 import io
 import uuid
 
@@ -145,6 +146,52 @@ async def test_partial_requires_direct_and_evidence(client: AsyncClient, billing
         headers=headers,
     )
     assert pay.json()["status"] == "partially_refunded"
+
+
+@pytest.mark.asyncio
+async def test_concurrent_partial_refunds_never_exceed_payment_amount(
+    client: AsyncClient, billing_ctx
+):
+    """Two concurrent double-clicks on 'Refund' for overlapping amounts must not both
+    succeed — the advisory lock serializes them so the second sees the first's committed
+    refund and is rejected once the remaining balance is exhausted."""
+    _, _, order_id, _, token = billing_ctx
+    headers = {"Authorization": f"Bearer {token}"}
+    phone = "+919123456780"
+    _seed_customer_with_payout(phone)
+    _set_order_phone(order_id, phone)
+    payment_id = await _capture_payment(client, order_id, token)
+    pay = await client.get(f"/api/v1/billing/payments/{payment_id}", headers=headers)
+    payment_amount = pay.json()["amount"]
+
+    partial_amount = payment_amount * 0.75  # two of these together exceed 100%
+
+    async def _attempt():
+        return await client.post(
+            "/api/v1/billing/refunds",
+            json={
+                "order_id": str(order_id),
+                "kind": "partial",
+                "amount": partial_amount,
+                "reason": "double-click test",
+            },
+            headers=headers,
+        )
+
+    results = await asyncio.gather(_attempt(), _attempt())
+    statuses = sorted(r.status_code for r in results)
+    assert statuses == [201, 400], [r.text for r in results]
+
+    conn = psycopg2.connect(SYNC_DB_URL)
+    with conn.cursor() as cur:
+        cur.execute(
+            "SELECT COALESCE(SUM(amount), 0) FROM ckac_billing.refunds WHERE payment_id = %s::uuid "
+            "AND status IN ('requested', 'processing', 'completed')",
+            (payment_id,),
+        )
+        total_refunded = float(cur.fetchone()[0])
+    conn.close()
+    assert total_refunded <= payment_amount + 0.001
 
 
 @pytest.mark.asyncio

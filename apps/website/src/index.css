@@ -22,6 +22,21 @@
   --radius: 16px;
   --radius-lg: 24px;
   --nav-h: 88px;
+  /* Theme-aware surface veils used by dashboards/cards/inputs —
+     dark defaults here; overridden for light theme in brand-ux.css. */
+  --sidebar-bg: #0c0c12;
+  --topbar-bg: rgba(10, 10, 15, 0.92);
+  --veil-1: rgba(0, 0, 0, 0.15);
+  --veil-2: rgba(0, 0, 0, 0.2);
+  --veil-3: rgba(0, 0, 0, 0.25);
+  --veil-4: rgba(0, 0, 0, 0.3);
+  --veil-5: rgba(0, 0, 0, 0.35);
+  --hover-veil-1: rgba(255, 255, 255, 0.02);
+  --hover-veil-2: rgba(255, 255, 255, 0.04);
+  --hover-veil-3: rgba(255, 255, 255, 0.06);
+  --hover-veil-4: rgba(255, 255, 255, 0.08);
+  --hover-veil-5: rgba(255, 255, 255, 0.17);
+  --divider-soft: rgba(255, 255, 255, 0.06);
 }
 
 *,
@@ -310,15 +325,12 @@ html.theme-brand-light .brand-nav-mark__sub {
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
+  flex-shrink: 0;
   gap: 0.75rem;
   width: 100%;
   max-width: 26rem;
-  margin-inline: auto;
-  height: 100%;
-  min-height: 100%;
+  margin: auto;
   box-sizing: border-box;
-  overflow-y: auto;
   padding: clamp(1.5rem, 4vh, 2.5rem) clamp(1.25rem, 3vw, 2rem);
   text-align: center;
 }
@@ -1245,15 +1257,18 @@ html.theme-brand-light .brand-nav-mark__sub {
 .auth-page {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  min-height: 100vh;
+  height: 100vh;
+  height: 100dvh;
   position: relative;
+  overflow: hidden;
 }
 
 .admin-login.auth-page {
   display: grid;
   grid-template-columns: 1fr 1fr;
   padding: 0;
-  min-height: 100vh;
+  height: 100vh;
+  height: 100dvh;
   background: radial-gradient(circle at top, rgba(230, 81, 0, 0.08), transparent 42%), var(--dark);
 }
 
@@ -1270,9 +1285,14 @@ html.theme-brand-light .brand-nav-mark__sub {
 
 .auth-page__visual {
   position: relative;
-  overflow: hidden;
+  height: 100%;
+  overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior: contain;
   display: flex;
-  align-items: stretch;
+  align-items: center;
+  align-items: safe center;
+  justify-content: center;
 }
 
 .auth-page__img {
@@ -1307,11 +1327,16 @@ html.theme-brand-light .brand-nav-mark__sub {
 }
 
 .auth-page__form-wrap {
+  height: 100%;
   display: flex;
   align-items: center;
+  align-items: safe center;
   justify-content: center;
   padding: 2rem;
   background: var(--dark);
+  overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior: contain;
 }
 
 .auth-card {
@@ -2253,11 +2278,22 @@ form.auth-card > .btn,
   .auth-page,
   .admin-login.auth-page {
     grid-template-columns: 1fr;
+    height: auto;
+    min-height: 100vh;
+    min-height: 100dvh;
+    overflow: visible;
   }
 
   .auth-page__visual {
     min-height: 0;
     max-height: none;
+    height: auto;
+    overflow: visible;
+  }
+
+  .auth-page__form-wrap {
+    height: auto;
+    overflow: visible;
   }
 
   .contact__grid {
@@ -2672,7 +2708,7 @@ form.auth-card > .btn,
 .admin-app__ext-link {
   color: var(--teal-light); font-size: 0.85rem; white-space: nowrap;
   padding: 0.35rem 0.65rem; border-radius: 999px; border: 1px solid var(--surface-border);
-  background: rgba(0, 0, 0, 0.2); transition: border-color 0.2s, color 0.2s;
+  background: var(--veil-2); transition: border-color 0.2s, color 0.2s;
 }
 .admin-app__ext-link:hover { border-color: rgba(0, 137, 123, 0.45); color: var(--text); }
 .admin-tabs { display: flex; gap: 0.5rem; padding: 1rem 1.5rem; flex-wrap: nowrap; border-bottom: 1px solid var(--surface-border); overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
@@ -2721,7 +2757,7 @@ form.auth-card > .btn,
 .admin-quick { display: flex; flex-direction: column; gap: 0.5rem; }
 .admin-quick__item {
   text-align: left; padding: 0.85rem 1rem; border-radius: 10px;
-  border: 1px solid var(--surface-border); background: rgba(0, 0, 0, 0.2);
+  border: 1px solid var(--surface-border); background: var(--veil-2);
   color: inherit; cursor: pointer; transition: border-color 0.2s;
 }
 .admin-quick__item:hover { border-color: rgba(0, 137, 123, 0.4); }
@@ -2796,7 +2832,7 @@ form.auth-card > .btn,
   padding: 0.55rem 0.75rem;
   border-radius: 8px;
   border: 1px solid var(--surface-border);
-  background: rgba(0, 0, 0, 0.25);
+  background: var(--veil-3);
   color: inherit;
 }
 .admin-split {
@@ -2809,7 +2845,7 @@ form.auth-card > .btn,
   padding: 1.25rem;
   border-radius: 12px;
   border: 1px solid var(--surface-border);
-  background: rgba(0, 0, 0, 0.22);
+  background: var(--veil-3);
 }
 .admin-detail h3 { margin: 0 0 0.35rem; font-family: var(--font-display); font-size: 1.1rem; }
 .admin-detail h4 { margin: 1rem 0 0.35rem; font-size: 0.85rem; color: var(--teal-light); }
@@ -2820,7 +2856,7 @@ form.auth-card > .btn,
   padding: 0.5rem 0.65rem;
   border-radius: 8px;
   border: 1px solid var(--surface-border);
-  background: rgba(0, 0, 0, 0.25);
+  background: var(--veil-3);
   color: inherit;
 }
 .admin-detail__actions { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 1rem; }
@@ -2834,7 +2870,7 @@ form.auth-card > .btn,
   padding: 0.9rem 1rem;
   border-radius: 10px;
   border: 1px solid var(--surface-border);
-  background: rgba(0, 0, 0, 0.2);
+  background: var(--veil-2);
   display: flex;
   flex-direction: column;
   gap: 0.35rem;
@@ -2842,7 +2878,7 @@ form.auth-card > .btn,
 .admin-journey-card strong { font-size: 0.95rem; }
 .admin-journey-card span { font-size: 0.75rem; color: var(--text-muted); }
 .admin-journey-card em { font-style: normal; font-size: 0.8rem; color: var(--orange-light); }
-.admin-stat { display: flex; flex-direction: column; gap: 0.25rem; padding: 0.85rem 1rem; border-radius: 10px; border: 1px solid var(--surface-border); background: rgba(0,0,0,0.2); }
+.admin-stat { display: flex; flex-direction: column; gap: 0.25rem; padding: 0.85rem 1rem; border-radius: 10px; border: 1px solid var(--surface-border); background: var(--veil-2); }
 .admin-stat strong { font-family: var(--font-display); font-size: 1.35rem; color: var(--orange-light); }
 .admin-stat span { font-size: 0.75rem; color: var(--text-muted); }
 @media (max-width: 960px) {
@@ -3192,7 +3228,7 @@ form.auth-card > .btn,
   align-items: flex-start;
   padding: 1rem 1.25rem;
   border-bottom: 1px solid var(--surface-border);
-  background: rgba(0, 0, 0, 0.25);
+  background: var(--veil-3);
 }
 
 .support-chat__head strong {
@@ -3261,7 +3297,7 @@ form.auth-card > .btn,
 
 .support-chat__msg--assistant {
   align-self: flex-start;
-  background: rgba(255, 255, 255, 0.06);
+  background: var(--hover-veil-3);
   border: 1px solid var(--surface-border);
 }
 
@@ -3295,7 +3331,7 @@ form.auth-card > .btn,
   padding: 0.6rem 0.85rem;
   border-radius: 999px;
   border: 1px solid var(--surface-border);
-  background: rgba(0, 0, 0, 0.3);
+  background: var(--veil-4);
   color: var(--text);
   font-family: var(--font-body);
   font-size: 0.85rem;
@@ -3340,7 +3376,7 @@ form.auth-card > .btn,
   padding: 0.45rem 0.6rem;
   border-radius: 8px;
   border: 1px solid var(--surface-border);
-  background: rgba(0, 0, 0, 0.3);
+  background: var(--veil-4);
   color: var(--text);
   font-family: var(--font-body);
   font-size: 0.8rem;
@@ -3396,7 +3432,7 @@ form.auth-card > .btn,
 .admin-tickets__desc {
   font-size: 0.9rem;
   padding: 0.75rem;
-  background: rgba(0, 0, 0, 0.2);
+  background: var(--veil-2);
   border-radius: 8px;
   margin-bottom: 1rem;
 }

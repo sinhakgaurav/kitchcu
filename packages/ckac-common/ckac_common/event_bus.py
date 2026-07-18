@@ -128,6 +128,10 @@ class EventPublisher:
         payload: dict,
         correlation_id: str | None = None,
     ) -> EventEnvelope:
+        if correlation_id is None:
+            from ckac_common.observability import get_correlation_id
+
+            correlation_id = get_correlation_id()
         return EventEnvelope(
             event_type=event_type,
             aggregate_type=aggregate_type,

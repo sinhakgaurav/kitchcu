@@ -58,12 +58,14 @@ export async function createSupportTicket(data: {
   customer_phone?: string;
   customer_email?: string;
   order_code?: string;
+  source?: "ai_chat" | "web_form";
   chat_history?: { role: "user" | "assistant"; content: string }[];
 }): Promise<SupportTicket> {
+  const { source = "ai_chat", ...rest } = data;
   const res = await fetch("/api/v1/support/tickets", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ ...data, source: "ai_chat" }),
+    body: JSON.stringify({ ...rest, source }),
   });
   const body = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(typeof body.detail === "string" ? body.detail : "Failed to create ticket");

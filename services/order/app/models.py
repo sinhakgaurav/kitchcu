@@ -64,6 +64,7 @@ class Order(Base):
     customer_latitude: Mapped[float | None] = mapped_column(Float, nullable=True)
     customer_longitude: Mapped[float | None] = mapped_column(Float, nullable=True)
     tracking_token: Mapped[str | None] = mapped_column(String(64), unique=True, nullable=True)
+    idempotency_key: Mapped[str | None] = mapped_column(String(128), nullable=True)
     total: Mapped[float] = mapped_column(Numeric(10, 2), nullable=False)
     estimated_prep_min: Mapped[int | None] = mapped_column(Integer)
     estimated_ready_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

@@ -35,9 +35,11 @@ export async function createCustomerOrder(
     customer_latitude?: number;
     customer_longitude?: number;
   },
+  idempotencyKey?: string,
 ): Promise<Order> {
   return checkoutFetch(`/api/v1/kitchens/${kitchenId}/orders/customer`, {
     method: "POST",
+    headers: idempotencyKey ? { "Idempotency-Key": idempotencyKey } : undefined,
     body: JSON.stringify(data),
   });
 }

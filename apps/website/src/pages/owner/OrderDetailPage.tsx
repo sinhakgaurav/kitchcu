@@ -380,8 +380,15 @@ export function OrderDetailPage() {
           <ul className="owner-detail-items">
             {order.items.map((i) => (
               <li key={i.id}>
-                <span>{i.quantity}× {i.dish_name}</span>
-                <span>{inr(i.unit_price * i.quantity)}</span>
+                <div className="owner-detail-items__row">
+                  <span>{i.quantity}× {i.dish_name}</span>
+                  <span>{inr(i.unit_price * i.quantity)}</span>
+                </div>
+                {i.special_instructions && (
+                  <p className="owner-detail-items__note">
+                    <strong>Note:</strong> {i.special_instructions}
+                  </p>
+                )}
               </li>
             ))}
           </ul>

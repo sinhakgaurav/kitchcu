@@ -124,6 +124,63 @@ async def test_owner_cannot_use_customer_order_endpoint(client: AsyncClient, ord
 
 
 @pytest.mark.asyncio
+async def test_customer_order_idempotency_key_replay_returns_same_order(
+    client: AsyncClient, order_ctx
+):
+    """A retried checkout (network timeout / double-tap) with the same Idempotency-Key
+    must never create a second order or double-charge the customer."""
+    _, kitchen_id, dish_id, _, _ = order_ctx
+    customer_id = _seed_customer(phone="+919944455566")
+    token = _make_customer_token(customer_id)
+    payload = CUSTOMER_ORDER_PAYLOAD.copy()
+    payload["items"] = [{"dish_id": str(dish_id), "quantity": 3}]
+    headers = {"Authorization": f"Bearer {token}", "Idempotency-Key": "checkout-retry-key-001"}
+
+    first = await client.post(
+        f"/api/v1/kitchens/{kitchen_id}/orders/customer", json=payload, headers=headers
+    )
+    assert first.status_code == 201
+    order_id = first.json()["id"]
+
+    replay = await client.post(
+        f"/api/v1/kitchens/{kitchen_id}/orders/customer", json=payload, headers=headers
+    )
+    assert replay.status_code == 200
+    assert replay.json()["id"] == order_id
+
+    listing = await client.get(
+        "/api/v1/customers/me/orders", headers={"Authorization": f"Bearer {token}"}
+    )
+    assert listing.json()["total"] == 1
+
+
+@pytest.mark.asyncio
+async def test_customer_order_different_idempotency_key_creates_new_order(
+    client: AsyncClient, order_ctx
+):
+    _, kitchen_id, dish_id, _, _ = order_ctx
+    customer_id = _seed_customer(phone="+919944455577")
+    token = _make_customer_token(customer_id)
+    payload = CUSTOMER_ORDER_PAYLOAD.copy()
+    payload["items"] = [{"dish_id": str(dish_id), "quantity": 1}]
+    headers = {"Authorization": f"Bearer {token}"}
+
+    first = await client.post(
+        f"/api/v1/kitchens/{kitchen_id}/orders/customer",
+        json=payload,
+        headers={**headers, "Idempotency-Key": "checkout-key-A"},
+    )
+    second = await client.post(
+        f"/api/v1/kitchens/{kitchen_id}/orders/customer",
+        json=payload,
+        headers={**headers, "Idempotency-Key": "checkout-key-B"},
+    )
+    assert first.status_code == 201
+    assert second.status_code == 201
+    assert first.json()["id"] != second.json()["id"]
+
+
+@pytest.mark.asyncio
 async def test_customer_order_repeat(client: AsyncClient, order_ctx):
     _, kitchen_id, dish_id, _, _ = order_ctx
     customer_id = _seed_customer(phone="+919933344455")

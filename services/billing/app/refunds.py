@@ -234,6 +234,15 @@ async def create_refund(
     publisher: EventPublisher | None,
 ) -> Refund:
     payment = await _load_captured_payment_for_order(session, order["id"])
+
+    # Concurrent double-submits (owner double-clicks "Refund") must not both read the same
+    # `remaining` balance before either commits — serialize per-payment so the second request
+    # sees the first request's pending/created refund row.
+    await session.execute(
+        text("SELECT pg_advisory_xact_lock(hashtext(:lock_key))"),
+        {"lock_key": f"refund_idempotency:{payment.id}"},
+    )
+
     remaining = float(payment.amount) - await _refunded_total(session, payment.id)
     if remaining <= 0:
         raise ValueError("Payment is already fully refunded or refunds pending cover the amount")

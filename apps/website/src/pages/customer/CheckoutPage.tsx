@@ -23,7 +23,7 @@ import {
   type KitchenCartGroup,
 } from "../../shared/customerCart";
 import { APP_STORAGE_PREFIX } from "../../shared/brand";
-import { fetchDeliveryQuote, type DeliveryQuote } from "../../shared/api";
+import { denyDeliveryFee, fetchDeliveryQuote, type DeliveryQuote } from "../../shared/api";
 
 type DeliveryType = "pickup" | "delivery";
 type PaymentMethod = "cod" | "online" | "upi";
@@ -75,6 +75,21 @@ export function CheckoutPage() {
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("cod");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [deniedFeeKitchens, setDeniedFeeKitchens] = useState<Record<string, boolean>>({});
+
+  const denyFee = async (kitchenId: string) => {
+    const quote = quotes[kitchenId];
+    if (!quote?.quote_id) return;
+    try {
+      await denyDeliveryFee(quote.quote_id, {
+        subtotal: kitchenCartSubtotal(cart!.kitchens.find((k) => k.kitchenId === kitchenId)!),
+      });
+      setDeniedFeeKitchens((current) => ({ ...current, [kitchenId]: true }));
+    } catch {
+      // Fire-and-forget UX — even if the alert fails to send, don't block checkout flow.
+      setDeniedFeeKitchens((current) => ({ ...current, [kitchenId]: true }));
+    }
+  };
 
   useEffect(() => {
     setCart(getCart());
@@ -201,6 +216,7 @@ export function CheckoutPage() {
           ),
           payment_method: paymentMethod,
         },
+        checkoutKey(cart),
       );
 
       if (paymentMethod === "online") {
@@ -317,17 +333,43 @@ export function CheckoutPage() {
                       </p>
                     )}
                     {quote.fee > 0 && (
-                      <label style={{ display: "block", marginTop: "0.5rem" }}>
-                        <input
-                          type="checkbox"
-                          checked={feeAccepted[kitchen.kitchenId] ?? false}
-                          onChange={(event) => setFeeAccepted((current) => ({
-                            ...current,
-                            [kitchen.kitchenId]: event.target.checked,
-                          }))}
-                        />
-                        {" "}I accept the ₹{Math.round(quote.fee)} delivery fee
-                      </label>
+                      <>
+                        <label style={{ display: "block", marginTop: "0.5rem" }}>
+                          <input
+                            type="checkbox"
+                            checked={feeAccepted[kitchen.kitchenId] ?? false}
+                            onChange={(event) => setFeeAccepted((current) => ({
+                              ...current,
+                              [kitchen.kitchenId]: event.target.checked,
+                            }))}
+                          />
+                          {" "}I accept the ₹{Math.round(quote.fee)} delivery fee
+                        </label>
+                        {!feeAccepted[kitchen.kitchenId] && (
+                          deniedFeeKitchens[kitchen.kitchenId] ? (
+                            <p style={{ marginTop: "0.35rem", color: "var(--teal-dark, #0f766e)" }}>
+                              Kitchen notified — they may call you to offer free delivery or pickup.
+                            </p>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => denyFee(kitchen.kitchenId)}
+                              style={{
+                                marginTop: "0.35rem",
+                                background: "none",
+                                border: "none",
+                                padding: 0,
+                                color: "var(--orange, #d9622b)",
+                                textDecoration: "underline",
+                                cursor: "pointer",
+                                font: "inherit",
+                              }}
+                            >
+                              Can&apos;t pay this fee? Notify the kitchen instead
+                            </button>
+                          )
+                        )}
+                      </>
                     )}
                   </>
                 )}

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from contextvars import ContextVar
 from uuid import uuid4
 
 from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
@@ -11,6 +12,18 @@ from starlette.responses import Response
 CORRELATION_ID_HEADER = "X-Correlation-ID"
 REQUEST_ID_HEADER = "X-Request-ID"
 MAX_CORRELATION_ID_LEN = 128
+
+# Set by `CorrelationMiddleware` for the duration of the request/task. Lets
+# `EventPublisher.build()` stamp the inbound request's correlation ID onto every event it
+# emits during that request without every domain/schema function needing to thread a
+# `correlation_id` parameter through — closes the "can trace HTTP hops but not the event
+# chain they trigger" observability gap.
+_correlation_id_ctx: ContextVar[str | None] = ContextVar("ckac_correlation_id", default=None)
+
+
+def get_correlation_id() -> str | None:
+    """Current request's correlation ID, if set by `CorrelationMiddleware`."""
+    return _correlation_id_ctx.get()
 
 
 def resolve_correlation_id(request: Request) -> str:
@@ -40,6 +53,10 @@ class CorrelationMiddleware(BaseHTTPMiddleware):
     ) -> Response:
         correlation_id = resolve_correlation_id(request)
         request.state.correlation_id = correlation_id
-        response = await call_next(request)
+        token = _correlation_id_ctx.set(correlation_id)
+        try:
+            response = await call_next(request)
+        finally:
+            _correlation_id_ctx.reset(token)
         response.headers[CORRELATION_ID_HEADER] = correlation_id
         return response

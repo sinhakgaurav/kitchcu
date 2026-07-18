@@ -12,6 +12,13 @@ DEFAULT_CATEGORY_SLUGS = [
     ("Non Veg", "non_veg"),
     ("Vegan", "vegan"),
     ("Eggetarian", "eggetarian"),
+    ("Beverages", "beverages"),
+    ("Hot Drinks", "hot_drinks"),
+    ("Cold Drinks", "cold_drinks"),
+    ("Snacks", "snacks"),
+    ("Desserts", "desserts"),
+    ("Combos", "combos"),
+    ("Seasonal Special", "seasonal_special"),
 ]
 
 DEFAULT_CUISINES = [

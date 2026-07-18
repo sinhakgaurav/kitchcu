@@ -1,10 +1,11 @@
 /**
  * Platform theme management — apply once per app entry (main.tsx).
  *
- * - Marketing (portal, customer): light brand surface
- * - Ops (kitchen PWA after login, admin): dark dashboard shell
- * - Kitchen marketing landing shares the kitchen app; ops routes use
- *   owner-app / dashboard-shell without flipping the marketing theme.
+ * All four apps (portal, customer, kitchen, admin) run the light brand
+ * surface — a single professional, eye-catchy light theme across
+ * marketing pages, auth, and ops dashboards. "ops-dark" is kept as a
+ * dormant option in case a future user preference (e.g. an in-app dark
+ * mode toggle) needs it, but no app entry point applies it today.
  */
 export type AppTheme = "brand-light" | "ops-dark";
 

@@ -13,6 +13,13 @@ from ckac_common.internal_auth import resolve_internal_api_key
 settings = get_settings()
 
 
+def _mask_phone(phone: str) -> str:
+    """Redact a phone number for logs/events — keep enough to correlate, not to identify."""
+    if len(phone) < 6:
+        return "***"
+    return f"{phone[:4]}***{phone[-2:]}"
+
+
 async def lookup_kitchen_id(session: AsyncSession, phone_number_id: str) -> uuid.UUID | None:
     result = await session.execute(
         text(
@@ -42,7 +49,7 @@ async def process_inbound_message(
         producer="notification-service",
         payload={
             "kitchen_id": str(kitchen_id),
-            "from_phone": msg.from_phone,
+            "from_phone_masked": _mask_phone(msg.from_phone),
             "text": msg.text,
             "phone_number_id": msg.phone_number_id,
         },
