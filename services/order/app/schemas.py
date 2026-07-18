@@ -103,6 +103,13 @@ class ManualOrderCreateRequest(BaseModel):
     customer_longitude: float | None = Field(
         default=None, ge=-180, le=180, description="Delivery destination longitude, used to compute the delivery fee and distance server-side."
     )
+    delivery_mode: Literal["self", "platform"] = Field(
+        default="self",
+        description=(
+            "'self' — kitchen courier using radius fee rules. "
+            "'platform' — Porter/platform courier quote with the same kitchen/customer cost-share rules."
+        ),
+    )
 
 
 class CustomerOrderCreateRequest(BaseModel):
@@ -141,6 +148,10 @@ class CustomerOrderCreateRequest(BaseModel):
     customer_longitude: float | None = Field(
         default=None, ge=-180, le=180, description="Delivery destination longitude, used to compute the delivery fee server-side."
     )
+    delivery_mode: Literal["self", "platform"] = Field(
+        default="self",
+        description="'self' or 'platform' (Porter) — must match the delivery quote mode used at checkout.",
+    )
 
 
 class MasterOrderGroupInput(BaseModel):
@@ -166,6 +177,10 @@ class MasterOrderGroupInput(BaseModel):
     )
     customer_latitude: float | None = Field(default=None, ge=-90, le=90, description="Delivery destination latitude for this sub-order.")
     customer_longitude: float | None = Field(default=None, ge=-180, le=180, description="Delivery destination longitude for this sub-order.")
+    delivery_mode: Literal["self", "platform"] = Field(
+        default="self",
+        description="'self' or 'platform' (Porter) for this kitchen's sub-order.",
+    )
 
 
 class MasterOrderCreateRequest(BaseModel):
@@ -255,13 +270,19 @@ class OrderResponse(BaseModel):
         default=None, description="Whether the customer acknowledged a non-zero delivery fee before checkout."
     )
     delivery_mode: str | None = Field(
-        default=None, description="'self' or 'platform' once owner chooses fulfillment."
+        default=None, description="'self' or 'platform' (Porter) chosen at checkout or by owner."
     )
     delivery_payer: str | None = Field(
-        default=None, description="'owner' (in-range) or 'customer' (out-of-range)."
+        default=None, description="'owner' | 'customer' | 'shared' per kitchen cost-share rules."
     )
     owner_delivery_cost: float = Field(
-        default=0, description="Platform courier cost paid by kitchen when delivery_payer is owner."
+        default=0, description="Logistics cost borne by the kitchen (INR)."
+    )
+    courier_partner: str | None = Field(
+        default=None, description="Courier partner when mode is platform (e.g. porter)."
+    )
+    courier_job_id: str | None = Field(
+        default=None, description="External courier job id after Porter booking on accept."
     )
     customer_latitude: float | None = Field(default=None)
     customer_longitude: float | None = Field(default=None)
@@ -539,19 +560,28 @@ async def _quote_delivery_fee(
     delivery_fee_accepted: bool | None,
     customer_latitude: float | None,
     customer_longitude: float | None,
-) -> tuple[float, float | None, bool | None, str | None, bool]:
-    """Return customer_fee, distance, accepted, payer, in_range.
+    delivery_mode: str = "self",
+) -> tuple[float, float | None, bool | None, str | None, bool, float, str]:
+    """Return customer_fee, distance, accepted, payer, in_range, owner_fee, mode.
 
-    In range → customer fee 0 (owner pays logistics). Out of range → customer pays.
+    Rules (CEO/CPO):
+      In range → kitchen bears 100% (customer fee 0).
+      Beyond max + min order met → kitchen bears delivery_subsidy_percent%; else customer 100%.
+    Mode ``platform`` uses Porter/mock partner gross; ``self`` uses kitchen radius fees.
     """
+    from app.cost_share import split_delivery_cost
+
+    mode = delivery_mode if delivery_mode in ("self", "platform") else "self"
+
     if delivery_type != "delivery":
-        return 0.0, None, None, None, True
+        return 0.0, None, None, None, True, 0.0, mode
 
     if customer_latitude is None or customer_longitude is None:
         if delivery_fee > 0 and delivery_fee_accepted is not True:
             raise ValueError("delivery_fee_accepted must be true when location is unknown")
         payer = "customer" if delivery_fee > 0 else "owner"
-        return delivery_fee, distance_km, delivery_fee_accepted, payer, True
+        owner_fee = 0.0 if payer == "customer" else float(delivery_fee)
+        return delivery_fee, distance_km, delivery_fee_accepted, payer, True, owner_fee, mode
 
     row = (
         await session.execute(
@@ -563,6 +593,9 @@ async def _quote_delivery_fee(
                     COALESCE(delivery_fee_per_km, 10) AS delivery_fee_per_km,
                     COALESCE(delivery_fee_flat_beyond, 0) AS delivery_fee_flat_beyond,
                     min_order_for_free_delivery,
+                    COALESCE(delivery_subsidy_percent, 50) AS delivery_subsidy_percent,
+                    ST_Y(location::geometry) AS kitchen_lat,
+                    ST_X(location::geometry) AS kitchen_lng,
                     ST_Distance(
                         location,
                         ST_SetSRID(ST_MakePoint(:lng, :lat), 4326)::geography
@@ -579,50 +612,79 @@ async def _quote_delivery_fee(
         raise ValueError("Kitchen not found or inactive")
 
     import math
+    import os
 
     dist = round(float(row["distance_km"]), 2)
     free_km = float(row["free_delivery_radius_km"])
     max_km = float(row["max_delivery_radius_km"])
     in_range = dist <= max_km
+    min_order = (
+        float(row["min_order_for_free_delivery"])
+        if row["min_order_for_free_delivery"] is not None
+        else None
+    )
+    subsidy_pct = float(row["delivery_subsidy_percent"] or 50)
 
-    if in_range:
+    if mode == "platform":
+        base = float(os.getenv("DELIVERY_PARTNER_BASE_FEE", "25"))
+        per_km = float(os.getenv("DELIVERY_PARTNER_PER_KM", "12"))
+        gross = round(base + math.ceil(max(0.0, dist)) * per_km, 2)
+        if (os.getenv("DELIVERY_PARTNER") or "").strip().lower() == "porter":
+            try:
+                from app.porter_client import quote_porter_fee
+
+                porter_fee = await quote_porter_fee(
+                    pickup_lat=float(row["kitchen_lat"]),
+                    pickup_lng=float(row["kitchen_lng"]),
+                    drop_lat=float(customer_latitude),
+                    drop_lng=float(customer_longitude),
+                    distance_km=dist,
+                )
+                if porter_fee is not None:
+                    gross = float(porter_fee)
+            except Exception:
+                pass
+    else:
+        if in_range:
+            gross = 0.0
+        else:
+            chargeable_km = max(1, math.ceil(max(0.0, dist - free_km)))
+            gross = round(
+                float(row["delivery_fee_flat_beyond"])
+                + chargeable_km * float(row["delivery_fee_per_km"]),
+                2,
+            )
+
+    share = split_delivery_cost(
+        gross_fee=gross,
+        in_range=in_range,
+        subtotal=subtotal,
+        min_order_for_subsidy=min_order,
+        subsidy_percent=subsidy_pct,
+    )
+    # Self in-range: no third-party invoice — owner_fee stays 0 on the order.
+    if mode == "self" and in_range:
         quoted = 0.0
+        owner_fee = 0.0
         payer = "owner"
     else:
-        chargeable_km = max(1, math.ceil(max(0.0, dist - free_km)))
-        gross = round(
-            float(row["delivery_fee_flat_beyond"])
-            + chargeable_km * float(row["delivery_fee_per_km"]),
-            2,
-        )
-        min_free = row["min_order_for_free_delivery"]
-        # Match delivery-service cost share (default 50% kitchen subsidy when min order met).
-        subsidy_row = (
-            await session.execute(
-                text(
-                    "SELECT COALESCE(delivery_subsidy_percent, 50) "
-                    "FROM ckac_identity.kitchens WHERE id = :kid LIMIT 1"
-                ),
-                {"kid": kitchen_id},
-            )
-        ).scalar_one_or_none()
-        subsidy_pct = float(subsidy_row if subsidy_row is not None else 50)
-        if min_free is not None and subtotal >= float(min_free) and gross > 0 and subsidy_pct > 0:
-            owner_share = round(gross * min(100.0, subsidy_pct) / 100.0, 2)
-            quoted = round(gross - owner_share, 2)
-            payer = "shared" if quoted > 0 and owner_share > 0 else ("owner" if quoted <= 0 else "customer")
-            if quoted <= 0:
-                quoted = 0.0
-                payer = "owner"
-        else:
-            quoted = gross
-            payer = "customer"
+        quoted = float(share["customer_fee"])
+        owner_fee = float(share["owner_fee"])
+        payer = str(share["payer"])
 
     if round(delivery_fee, 2) != quoted:
         raise ValueError(f"Delivery fee mismatch: expected {quoted:.2f}")
     if quoted > 0 and delivery_fee_accepted is not True:
         raise ValueError("Customer must accept delivery fee before placing order")
-    return quoted, dist, True if quoted > 0 else delivery_fee_accepted, payer, in_range
+    return (
+        quoted,
+        dist,
+        True if quoted > 0 else delivery_fee_accepted,
+        payer,
+        in_range,
+        owner_fee,
+        mode,
+    )
 
 
 def _new_tracking_token() -> str:
@@ -678,7 +740,16 @@ async def create_manual_order(
             max_projected = max(max_projected, prep_min)
         subtotal += price * item.quantity
 
-    delivery_fee, distance_km, fee_accepted, delivery_payer, _in_range = await _quote_delivery_fee(
+    delivery_mode = getattr(data, "delivery_mode", None) or "self"
+    (
+        delivery_fee,
+        distance_km,
+        fee_accepted,
+        delivery_payer,
+        _in_range,
+        owner_delivery_cost,
+        delivery_mode,
+    ) = await _quote_delivery_fee(
         session,
         kitchen_id,
         delivery_type=data.delivery_type,
@@ -688,6 +759,7 @@ async def create_manual_order(
         delivery_fee_accepted=data.delivery_fee_accepted,
         customer_latitude=data.customer_latitude,
         customer_longitude=data.customer_longitude,
+        delivery_mode=delivery_mode,
     )
     total = subtotal + delivery_fee
     eta_minutes = max_projected or max_prep
@@ -708,8 +780,10 @@ async def create_manual_order(
         delivery_fee=delivery_fee,
         distance_km=distance_km,
         delivery_fee_accepted=fee_accepted,
+        delivery_mode=delivery_mode if data.delivery_type == "delivery" else None,
         delivery_payer=delivery_payer if data.delivery_type == "delivery" else None,
-        owner_delivery_cost=0,
+        owner_delivery_cost=owner_delivery_cost if data.delivery_type == "delivery" else 0,
+        courier_partner="porter" if delivery_mode == "platform" else None,
         customer_latitude=data.customer_latitude,
         customer_longitude=data.customer_longitude,
         tracking_token=tracking_token,
@@ -800,6 +874,7 @@ async def create_customer_order(
         delivery_fee_accepted=data.delivery_fee_accepted,
         customer_latitude=data.customer_latitude,
         customer_longitude=data.customer_longitude,
+        delivery_mode=data.delivery_mode,
     )
     return await create_manual_order(
         session,
@@ -880,6 +955,7 @@ async def create_master_order(
             delivery_fee_accepted=group.delivery_fee_accepted,
             customer_latitude=group.customer_latitude,
             customer_longitude=group.customer_longitude,
+            delivery_mode=group.delivery_mode,
         )
         order, _created = await create_manual_order(
             session,
@@ -1066,6 +1142,8 @@ async def order_to_response(session: AsyncSession, order: Order) -> OrderRespons
         delivery_mode=getattr(order, "delivery_mode", None),
         delivery_payer=getattr(order, "delivery_payer", None),
         owner_delivery_cost=float(getattr(order, "owner_delivery_cost", 0) or 0),
+        courier_partner=getattr(order, "courier_partner", None),
+        courier_job_id=getattr(order, "courier_job_id", None),
         customer_latitude=getattr(order, "customer_latitude", None),
         customer_longitude=getattr(order, "customer_longitude", None),
         tracking_token=order.tracking_token,

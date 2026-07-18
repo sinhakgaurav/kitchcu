@@ -310,6 +310,10 @@ class KitchenResponse(BaseModel):
     delivery_fee_per_km: float = Field(..., description="Delivery fee per km beyond the free radius.")
     delivery_fee_flat_beyond: float = Field(..., description="Flat delivery fee add-on beyond the free radius.")
     min_order_for_free_delivery: float | None = Field(default=None, description="Order subtotal (INR) for automatic free delivery.")
+    delivery_subsidy_percent: float = Field(
+        default=50.0,
+        description="When beyond max radius and min order met, % of logistics cost the kitchen bears.",
+    )
     tracking_notify_interval_min: int = Field(..., description="Minutes between delivery tracking notifications.")
     address_line: str | None = Field(default=None, description="Kitchen street address (owner-only).")
     pincode: str | None = Field(default=None, description="Kitchen postal PIN code.")
@@ -538,6 +542,7 @@ async def kitchen_to_response(session: AsyncSession, kitchen: Kitchen) -> Kitche
             if kitchen.min_order_for_free_delivery is not None
             else None
         ),
+        delivery_subsidy_percent=float(getattr(kitchen, "delivery_subsidy_percent", 50) or 50),
         tracking_notify_interval_min=int(kitchen.tracking_notify_interval_min),
         address_line=kitchen.address_line,
         pincode=kitchen.pincode,

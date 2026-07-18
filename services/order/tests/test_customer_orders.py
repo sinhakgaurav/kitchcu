@@ -181,6 +181,83 @@ async def test_customer_order_different_idempotency_key_creates_new_order(
 
 
 @pytest.mark.asyncio
+async def test_customer_order_platform_mode_beyond_range_shared_subsidy(
+    client: AsyncClient, order_ctx
+):
+    """Checkout Porter/platform fee must persist with kitchen cost-share rules."""
+    import math
+
+    _, kitchen_id, dish_id, _, _ = order_ctx
+    conn = psycopg2.connect(SYNC_DB_URL)
+    conn.autocommit = True
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            UPDATE ckac_identity.kitchens
+            SET max_delivery_radius_km = 5,
+                min_order_for_free_delivery = 300,
+                delivery_subsidy_percent = 50
+            WHERE id = %s::uuid
+            """,
+            (str(kitchen_id),),
+        )
+    conn.close()
+
+    # ~18+ km from kitchen pin (18.5362, 73.8958) — beyond 5 km max.
+    far_lat, far_lng = 18.70, 74.10
+    # Distance via PostGIS would be authoritative; approximate for fee formula after place.
+    # Order service recomputes distance — we only need a fee that matches server quote.
+    # First place with a probe to learn expected fee, or compute with same formula after
+    # fetching distance from a failed mismatch. Use delivery quote path via formula with
+    # known env defaults after measuring distance in SQL.
+    conn = psycopg2.connect(SYNC_DB_URL)
+    conn.autocommit = True
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            SELECT ST_Distance(
+                location,
+                ST_SetSRID(ST_MakePoint(%s, %s), 4326)::geography
+            ) / 1000.0
+            FROM ckac_identity.kitchens WHERE id = %s::uuid
+            """,
+            (far_lng, far_lat, str(kitchen_id)),
+        )
+        dist = float(cur.fetchone()[0])
+    conn.close()
+    assert dist > 5
+    platform_gross = round(25 + math.ceil(dist) * 12, 2)
+    customer_fee = round(platform_gross * 0.5, 2)
+    owner_fee = round(platform_gross - customer_fee, 2)
+
+    customer_id = _seed_customer(phone="+919922233344")
+    token = _make_customer_token(customer_id)
+    # qty 2 → subtotal 398 ≥ 300 min order
+    payload = {
+        "items": [{"dish_id": str(dish_id), "quantity": 2}],
+        "delivery_type": "delivery",
+        "delivery_mode": "platform",
+        "payment_method": "cod",
+        "delivery_fee": customer_fee,
+        "delivery_fee_accepted": True,
+        "customer_latitude": far_lat,
+        "customer_longitude": far_lng,
+    }
+    response = await client.post(
+        f"/api/v1/kitchens/{kitchen_id}/orders/customer",
+        json=payload,
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert response.status_code == 201, response.text
+    data = response.json()
+    assert data["delivery_mode"] == "platform"
+    assert data["delivery_payer"] == "shared"
+    assert data["delivery_fee"] == customer_fee
+    assert data["owner_delivery_cost"] == owner_fee
+    assert data["courier_partner"] == "porter"
+
+
+@pytest.mark.asyncio
 async def test_customer_order_repeat(client: AsyncClient, order_ctx):
     _, kitchen_id, dish_id, _, _ = order_ctx
     customer_id = _seed_customer(phone="+919933344455")

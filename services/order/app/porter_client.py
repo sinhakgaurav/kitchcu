@@ -1,4 +1,4 @@
-"""Porter booking helper for order delivery_mode=platform."""
+"""Porter quote + booking helpers for order delivery_mode=platform."""
 
 from __future__ import annotations
 
@@ -10,6 +10,63 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 logger = logging.getLogger(__name__)
+
+
+async def quote_porter_fee(
+    *,
+    pickup_lat: float,
+    pickup_lng: float,
+    drop_lat: float,
+    drop_lng: float,
+    distance_km: float,
+) -> float | None:
+    """Best-effort Porter quote; returns fee INR or None (caller uses mock formula)."""
+    api_key = (os.getenv("PORTER_API_KEY") or "").strip()
+    if not api_key:
+        return None
+    import httpx
+
+    base = (os.getenv("PORTER_BASE_URL") or "https://api.porter.in").rstrip("/")
+    path = os.getenv("PORTER_QUOTE_PATH") or "/v1/get_quote"
+    url = f"{base}{path if path.startswith('/') else '/' + path}"
+    payload = {
+        "pickup_details": {"lat": float(pickup_lat), "lng": float(pickup_lng)},
+        "drop_details": {"lat": float(drop_lat), "lng": float(drop_lng)},
+        "customer": {
+            "name": "kitchCU",
+            "mobile": {"number": "9999999999", "country_code": "+91"},
+        },
+    }
+    try:
+        async with httpx.AsyncClient(timeout=8.0) as client:
+            res = await client.post(
+                url,
+                json=payload,
+                headers={
+                    "Authorization": f"Bearer {api_key}",
+                    "X-API-KEY": api_key,
+                    "Content-Type": "application/json",
+                },
+            )
+            res.raise_for_status()
+            body = res.json()
+            if not isinstance(body, dict):
+                return None
+            for key in ("fare", "amount", "total_fare", "delivery_charge", "price"):
+                val = body.get(key)
+                if isinstance(val, (int, float)):
+                    return round(float(val), 2)
+            vehicles = body.get("vehicles") or body.get("vehicle_fare_list") or []
+            if isinstance(vehicles, list) and vehicles and isinstance(vehicles[0], dict):
+                for key in ("fare", "amount", "total_fare", "price"):
+                    val = vehicles[0].get(key)
+                    if isinstance(val, (int, float)):
+                        return round(float(val), 2)
+            _ = distance_km  # reserved for future distance sanity checks
+            return None
+    except Exception as exc:
+        logger.warning("Porter quote failed: %s", exc)
+        return None
 
 
 async def quote_and_book_porter(session: AsyncSession, order) -> dict | None:

@@ -54,6 +54,10 @@ export type Kitchen = {
   status: string;
   free_delivery_radius_km: number;
   max_delivery_radius_km: number;
+  delivery_fee_per_km?: number;
+  delivery_fee_flat_beyond?: number;
+  min_order_for_free_delivery?: number | null;
+  delivery_subsidy_percent?: number;
   latitude: number;
   longitude: number;
   branded_page?: KitchenBrandedPage;
@@ -182,6 +186,8 @@ export type Order = {
   delivery_mode?: string | null;
   delivery_payer?: string | null;
   owner_delivery_cost?: number;
+  courier_partner?: string | null;
+  courier_job_id?: string | null;
   customer_latitude?: number | null;
   customer_longitude?: number | null;
   tracking_token?: string | null;
@@ -415,6 +421,23 @@ export async function updateKitchenBrandedPage(
   },
 ): Promise<Kitchen> {
   return apiFetch(`/api/v1/kitchens/${kitchenId}/branded-page`, {
+    method: "PATCH",
+    body: JSON.stringify(data),
+  });
+}
+
+export async function updateKitchenDeliverySettings(
+  kitchenId: string,
+  data: {
+    free_delivery_radius_km?: number;
+    max_delivery_radius_km?: number;
+    delivery_fee_per_km?: number;
+    delivery_fee_flat_beyond?: number;
+    min_order_for_free_delivery?: number | null;
+    delivery_subsidy_percent?: number;
+  },
+): Promise<Kitchen> {
+  return apiFetch(`/api/v1/kitchens/${kitchenId}/delivery-settings`, {
     method: "PATCH",
     body: JSON.stringify(data),
   });
@@ -1204,6 +1227,8 @@ export type TrackingInfo = {
   distance_km: number | null;
   delivery_fee: number;
   owner_delivery_cost?: number;
+  courier_partner?: string | null;
+  courier_job_id?: string | null;
   estimated_ready_at: string | null;
   tracking_notify_interval_min: number;
   updated_at: string | null;

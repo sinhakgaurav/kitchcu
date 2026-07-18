@@ -72,6 +72,7 @@ For **persona lived experience** see [PLATFORM-PERSONA-DEEP-DIVE.md](./PLATFORM-
 | P30 | **LiveKit embed + template fan-out + audit** | Customer/owner LiveKit player · notify `/template-blast` per phone · `admin_audit_events` + Admin Audit tab | ✅ | Identity `015`; `livekit-client` |
 | P31 | **Wallet debit + Meta outbound + billing audit** | Template send deducts messaging wallet · Graph WhatsApp send · billing PG/package/refund → identity audit | ✅ | Identity `016` WA access token slot |
 | P32 | **Porter + delivery cost share + camera fix** | In-range kitchen pays 100%; extended min-order → kitchen subsidy %; Porter quote/book; LiveKit camera preview | ✅ | Identity `017`; order `007` |
+| P32.1 | **Checkout→order Porter wire-up** | Customer sends `delivery_mode`; order validates platform fees + cost share; Porter books on accept; owner delivery settings UI | ✅ | — |
 
 ---
 

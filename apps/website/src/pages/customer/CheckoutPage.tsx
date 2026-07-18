@@ -63,6 +63,7 @@ function buildGroupPayload(
       quantity: line.quantity,
     })),
     delivery_type: deliveryType,
+    delivery_mode: isDelivery ? deliveryMode : undefined,
     delivery_fee: fee,
     distance_km: isDelivery ? quote?.distance_km : undefined,
     delivery_fee_accepted: isDelivery && fee > 0 ? feeAccepted : isDelivery ? true : undefined,

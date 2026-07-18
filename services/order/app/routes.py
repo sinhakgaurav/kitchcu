@@ -69,7 +69,7 @@ from ckac_common.openapi import (
     auth_errors,
 )
 
-from sqlalchemy import select
+from sqlalchemy import select, text
 
 from app.models import Order, OrderItem
 
@@ -661,6 +661,66 @@ async def order_status_update(
                     "Stock deduct failed after accept order_id=%s kitchen_id=%s",
                     order.id,
                     order.kitchen_id,
+                )
+        # Book Porter only after kitchen accepts (avoid paying for cancelled carts).
+        if (
+            order.delivery_type == "delivery"
+            and getattr(order, "delivery_mode", None) == "platform"
+            and not getattr(order, "courier_job_id", None)
+        ):
+            try:
+                from app.porter_client import quote_and_book_porter
+
+                booked = await quote_and_book_porter(session, order)
+                if booked:
+                    order.courier_partner = "porter"
+                    order.courier_job_id = booked.get("job_id")
+                    if booked.get("fee") is not None:
+                        # Keep customer fee locked at checkout; refresh owner logistics cost if Porter differs.
+                        from app.cost_share import split_delivery_cost
+
+                        kitchen_row = (
+                            await session.execute(
+                                text(
+                                    """
+                                    SELECT
+                                        max_delivery_radius_km,
+                                        min_order_for_free_delivery,
+                                        COALESCE(delivery_subsidy_percent, 50) AS delivery_subsidy_percent
+                                    FROM ckac_identity.kitchens WHERE id = :kid LIMIT 1
+                                    """
+                                ),
+                                {"kid": order.kitchen_id},
+                            )
+                        ).mappings().one_or_none()
+                        if kitchen_row and order.distance_km is not None:
+                            in_range = float(order.distance_km) <= float(
+                                kitchen_row["max_delivery_radius_km"]
+                            )
+                            min_order = (
+                                float(kitchen_row["min_order_for_free_delivery"])
+                                if kitchen_row["min_order_for_free_delivery"] is not None
+                                else None
+                            )
+                            share = split_delivery_cost(
+                                gross_fee=float(booked["fee"]),
+                                in_range=in_range,
+                                subtotal=float(order.subtotal or 0),
+                                min_order_for_subsidy=min_order,
+                                subsidy_percent=float(kitchen_row["delivery_subsidy_percent"] or 50),
+                            )
+                            # Never raise customer fee after accept; absorb delta on kitchen.
+                            order.owner_delivery_cost = max(
+                                float(share["owner_fee"]),
+                                float(booked["fee"]) - float(order.delivery_fee or 0),
+                            )
+                            order.delivery_payer = share["payer"]
+                    await session.commit()
+                    await session.refresh(order)
+            except Exception:
+                logging.getLogger("order.porter").exception(
+                    "Porter book failed after accept order_id=%s",
+                    order.id,
                 )
     return await order_to_response(session, order)
 

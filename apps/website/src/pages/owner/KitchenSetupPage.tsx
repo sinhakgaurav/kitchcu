@@ -4,7 +4,7 @@ import { KitchenLocationMap } from "../../components/owner/KitchenLocationMap";
 import { OwnerPageShell, OwnerPanel } from "../../components/owner/OwnerPageShell";
 import { useGeolocation } from "../../hooks/useGeolocation";
 import { formatKitchenAddress } from "../../lib/locationMaps";
-import { createKitchen } from "../../lib/api";
+import { createKitchen, updateKitchenDeliverySettings } from "../../lib/api";
 import { useKitchen } from "../../lib/kitchen";
 
 const PUNE_DEFAULT = { latitude: 18.5362, longitude: 73.8958 };
@@ -14,6 +14,7 @@ export function KitchenSetupPage() {
   const { reloadKitchens, kitchen } = useKitchen();
   const { coords, status: geoStatus, error: geoError, refresh: refreshGeo } = useGeolocation(PUNE_DEFAULT);
   const [error, setError] = useState("");
+  const [saveMsg, setSaveMsg] = useState("");
   const [busy, setBusy] = useState(false);
   const [draftLat, setDraftLat] = useState(String(PUNE_DEFAULT.latitude));
   const [draftLng, setDraftLng] = useState(String(PUNE_DEFAULT.longitude));
@@ -59,13 +60,39 @@ export function KitchenSetupPage() {
     }
   };
 
+  const handleDeliverySettings = async (e: FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (!kitchen) return;
+    const fd = new FormData(e.currentTarget);
+    setError("");
+    setSaveMsg("");
+    setBusy(true);
+    try {
+      const minRaw = String(fd.get("min_order_for_free_delivery") || "").trim();
+      await updateKitchenDeliverySettings(kitchen.id, {
+        free_delivery_radius_km: Number(fd.get("free_delivery_radius_km")),
+        max_delivery_radius_km: Number(fd.get("max_delivery_radius_km")),
+        delivery_fee_per_km: Number(fd.get("delivery_fee_per_km")),
+        delivery_fee_flat_beyond: Number(fd.get("delivery_fee_flat_beyond")),
+        min_order_for_free_delivery: minRaw === "" ? null : Number(minRaw),
+        delivery_subsidy_percent: Number(fd.get("delivery_subsidy_percent")),
+      });
+      await reloadKitchens();
+      setSaveMsg("Delivery rules saved — checkout will show Self vs Porter with your cost share.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to save delivery settings");
+    } finally {
+      setBusy(false);
+    }
+  };
+
   return (
     <OwnerPageShell
       eyebrow="Settings"
       title={kitchen ? "Kitchen settings" : "Create your kitchen"}
       description={
         kitchen
-          ? "Profile, delivery radius, and map pin for customer discovery"
+          ? "Profile, delivery radius, and who pays when customers are beyond range"
           : "Set up your cloud kitchen to start taking orders"
       }
     >
@@ -84,10 +111,93 @@ export function KitchenSetupPage() {
                   pincode: kitchen.pincode,
                 }) || "—"}
               </p>
-              <p>
-                <strong>Delivery radius:</strong> {kitchen.free_delivery_radius_km}–{kitchen.max_delivery_radius_km} km
-              </p>
             </div>
+          </OwnerPanel>
+
+          <OwnerPanel
+            title="Delivery cost share"
+            description="In range: kitchen pays 100%. Beyond max radius: kitchen pays your subsidy % only if cart meets min order; otherwise customer pays full."
+          >
+            <form className="owner-form owner-form--wide" onSubmit={handleDeliverySettings}>
+              {error && <div className="auth-card__error">{error}</div>}
+              {saveMsg && <p className="owner-muted">{saveMsg}</p>}
+              <div className="form-row">
+                <label>
+                  Free radius (km)
+                  <input
+                    name="free_delivery_radius_km"
+                    type="number"
+                    step="0.1"
+                    min={0.1}
+                    required
+                    defaultValue={kitchen.free_delivery_radius_km}
+                  />
+                </label>
+                <label>
+                  Max radius (km)
+                  <input
+                    name="max_delivery_radius_km"
+                    type="number"
+                    step="0.1"
+                    min={0.1}
+                    required
+                    defaultValue={kitchen.max_delivery_radius_km}
+                  />
+                </label>
+              </div>
+              <div className="form-row">
+                <label>
+                  Self fee per km (₹)
+                  <input
+                    name="delivery_fee_per_km"
+                    type="number"
+                    step="1"
+                    min={0}
+                    required
+                    defaultValue={kitchen.delivery_fee_per_km ?? 10}
+                  />
+                </label>
+                <label>
+                  Flat fee beyond free (₹)
+                  <input
+                    name="delivery_fee_flat_beyond"
+                    type="number"
+                    step="1"
+                    min={0}
+                    required
+                    defaultValue={kitchen.delivery_fee_flat_beyond ?? 0}
+                  />
+                </label>
+              </div>
+              <div className="form-row">
+                <label>
+                  Min order for kitchen subsidy (₹)
+                  <input
+                    name="min_order_for_free_delivery"
+                    type="number"
+                    step="1"
+                    min={0}
+                    placeholder="e.g. 349 — leave empty for none"
+                    defaultValue={kitchen.min_order_for_free_delivery ?? ""}
+                  />
+                </label>
+                <label>
+                  Kitchen subsidy beyond range (%)
+                  <input
+                    name="delivery_subsidy_percent"
+                    type="number"
+                    step="1"
+                    min={0}
+                    max={100}
+                    required
+                    defaultValue={kitchen.delivery_subsidy_percent ?? 50}
+                  />
+                </label>
+              </div>
+              <button type="submit" className="btn btn--primary" disabled={busy}>
+                {busy ? "Saving…" : "Save delivery rules"}
+              </button>
+            </form>
           </OwnerPanel>
 
           <OwnerPanel

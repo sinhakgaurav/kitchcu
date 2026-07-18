@@ -51,3 +51,44 @@ async def test_quote_out_of_range_extended_customer_pays(client: AsyncClient, de
     assert modes["platform"]["payer"] == "customer"
     assert modes["platform"]["customer_fee"] == data["platform_fee"]
     assert modes["self"]["customer_fee"] == data["kitchen_self_fee"]
+
+
+@pytest.mark.asyncio
+async def test_quote_out_of_range_min_order_kitchen_subsidy(client: AsyncClient, delivery_ctx):
+    import psycopg2
+    from tests.conftest import SYNC_DB_URL
+
+    conn = psycopg2.connect(SYNC_DB_URL)
+    conn.autocommit = True
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            UPDATE ckac_identity.kitchens
+            SET min_order_for_free_delivery = 300,
+                delivery_subsidy_percent = 50
+            WHERE id = %s::uuid
+            """,
+            (str(delivery_ctx["kitchen_id"]),),
+        )
+    conn.close()
+
+    response = await client.post(
+        "/api/v1/delivery/quote",
+        json={
+            "kitchen_id": str(delivery_ctx["kitchen_id"]),
+            "latitude": delivery_ctx["far_lat"],
+            "longitude": delivery_ctx["far_lng"],
+            "subtotal": 400,
+        },
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert data["in_range"] is False
+    modes = {m["mode"]: m for m in data["modes"]}
+    assert modes["platform"]["payer"] == "shared"
+    # platform_fee on the quote is the gross courier quote before cost-share.
+    assert modes["platform"]["owner_fee"] == round(float(data["platform_fee"]) * 0.5, 2)
+    assert modes["platform"]["customer_fee"] == round(
+        float(data["platform_fee"]) - modes["platform"]["owner_fee"], 2
+    )
+    assert modes["self"]["payer"] == "shared"

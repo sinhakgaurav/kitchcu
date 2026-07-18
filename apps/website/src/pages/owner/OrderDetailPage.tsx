@@ -282,16 +282,20 @@ export function OrderDetailPage() {
               <p>
                 {order.distance_km != null ? `${order.distance_km.toFixed(1)} km · ` : ""}
                 {order.delivery_payer === "customer"
-                  ? "Out of kitchen range — logistics paid by customer"
-                  : "In range — logistics paid by kitchen (customer fee ₹0)"}
+                  ? "Beyond range — customer pays full logistics"
+                  : order.delivery_payer === "shared"
+                    ? "Beyond range — kitchen subsidy + customer share"
+                    : "In range — kitchen pays logistics (customer fee ₹0)"}
               </p>
             </div>
           </header>
           {fulfillError && <p className="auth-card__error">{fulfillError}</p>}
           <p className="report-hint">
             Mode: <strong>{order.delivery_mode ?? "not chosen"}</strong>
+            {order.courier_partner ? ` · ${order.courier_partner}` : ""}
+            {order.courier_job_id ? ` · job ${order.courier_job_id}` : ""}
             {order.owner_delivery_cost
-              ? ` · kitchen courier cost ${inr(order.owner_delivery_cost)}`
+              ? ` · kitchen cost ${inr(order.owner_delivery_cost)}`
               : ""}
             {order.delivery_fee > 0 ? ` · customer fee ${inr(order.delivery_fee)}` : ""}
           </p>

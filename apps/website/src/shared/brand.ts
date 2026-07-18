@@ -9,15 +9,27 @@ export const APP_TAGLINE = "A complete kitchen care unit";
 export const APP_POSITIONING =
   "India's first — and the world's third — platform with this feature stack";
 export const APP_POSITIONING_SHORT = "India's 1st · World's 3rd feature stack";
+/** Vite client env and/or Node process env (config/PWA load runs in Node where import.meta.env may be undefined). */
+function viteEnv(): Record<string, string | undefined> {
+  const meta =
+    typeof import.meta !== "undefined"
+      ? (import.meta as ImportMeta & { env?: Record<string, string | undefined> }).env
+      : undefined;
+  if (meta && typeof meta === "object") return meta;
+  if (typeof process !== "undefined" && process.env) return process.env as Record<string, string | undefined>;
+  return {};
+}
+
 /** Registrable domain — production subdomains hang off this. */
 function resolveAppDomain(): string {
-  const fromEnv = (import.meta.env.VITE_APP_DOMAIN as string | undefined)?.trim();
+  const env = viteEnv();
+  const fromEnv = env.VITE_APP_DOMAIN?.trim();
   if (fromEnv) {
     return fromEnv.replace(/^https?:\/\//i, "").replace(/\/$/, "");
   }
   // Infer from baked app URLs (GCP builds set VITE_ADMIN_APP_URL=https://admin.kitchcu.com)
   for (const key of ["VITE_ADMIN_APP_URL", "VITE_KITCHEN_APP_URL", "VITE_CUSTOMER_APP_URL"] as const) {
-    const raw = (import.meta.env[key] as string | undefined)?.trim();
+    const raw = env[key]?.trim();
     if (!raw || raw.includes("localhost")) continue;
     try {
       const host = new URL(raw).hostname.toLowerCase();

@@ -11,6 +11,10 @@
 Default subsidy: **50%**. Configurable per kitchen via `PATCH /kitchens/{id}/delivery-settings`.
 
 Checkout shows **two modes** (self vs Porter/platform) with clear customer vs kitchen ₹ split.
+Customer PWA sends `delivery_mode` on order create; fee is re-validated server-side.
+Porter is **booked on kitchen accept** (not at cart place) so cancelled carts do not create jobs.
+
+Owner configures radius + `min_order_for_free_delivery` + `delivery_subsidy_percent` on Kitchen settings.
 
 ## Porter integration (CTO)
 

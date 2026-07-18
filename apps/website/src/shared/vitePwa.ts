@@ -1,6 +1,8 @@
 import type { PluginOption } from "vite";
 import { VitePWA } from "vite-plugin-pwa";
-import { BRAND_COLORS } from "./brand";
+
+/** Inline brand hex so Vite config load does not import brand.ts (which resolves domains via env). */
+const PWA_THEME = { orange: "#FF6B1A", navy: "#0B1B32" } as const;
 
 export function kitchcuPwaPlugin(appName: string, shortName: string): PluginOption {
   return VitePWA({
@@ -9,8 +11,8 @@ export function kitchcuPwaPlugin(appName: string, shortName: string): PluginOpti
     manifest: {
       name: appName,
       short_name: shortName,
-      theme_color: BRAND_COLORS.orange,
-      background_color: BRAND_COLORS.navy,
+      theme_color: PWA_THEME.orange,
+      background_color: PWA_THEME.navy,
       display: "standalone",
       start_url: "/",
       icons: [
