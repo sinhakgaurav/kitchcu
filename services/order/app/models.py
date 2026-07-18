@@ -71,7 +71,12 @@ class Order(Base):
     idempotency_key: Mapped[str | None] = mapped_column(String(128), nullable=True)
     total: Mapped[float] = mapped_column(Numeric(10, 2), nullable=False)
     estimated_prep_min: Mapped[int | None] = mapped_column(Integer)
+    estimated_delivery_min: Mapped[int | None] = mapped_column(Integer)
     estimated_ready_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    estimated_delivery_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    porter_auto_book_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), index=True)
+    porter_auto_book_attempts: Mapped[int] = mapped_column(Integer, default=0)
+    porter_auto_book_last_attempt_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     cancel_reason: Mapped[str | None] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(UTC)

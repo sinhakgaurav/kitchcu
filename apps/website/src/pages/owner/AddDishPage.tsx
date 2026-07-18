@@ -16,6 +16,9 @@ export function AddDishPage() {
   const [heroUrl, setHeroUrl] = useState("");
   const [descriptionHtml, setDescriptionHtml] = useState("");
   const [ingredientsHtml, setIngredientsHtml] = useState("");
+  const [isFeatured, setIsFeatured] = useState(false);
+  const [isChefsSpecial, setIsChefsSpecial] = useState(false);
+  const [isUniqueRecipe, setIsUniqueRecipe] = useState(false);
 
   useEffect(() => {
     if (!kitchen) return;
@@ -59,6 +62,9 @@ export function AddDishPage() {
         category_id: String(fd.get("category_id")),
         description: descriptionHtml.trim() || undefined,
         ingredients_description: ingredientsHtml.trim() || undefined,
+        is_featured: isFeatured,
+        is_chefs_special: isChefsSpecial,
+        is_unique_recipe: isUniqueRecipe,
         media: {
           url: heroUrl,
           is_hero: true,
@@ -165,6 +171,37 @@ export function AddDishPage() {
           onChange={setHeroUrl}
           requireLiveCapture
         />
+
+        <fieldset className="dish-highlight-fieldset">
+          <legend>Menu highlights</legend>
+          <p className="auth-card__hint">
+            Customers see these as Featured, Chef&apos;s special, and Unique recipe sections.
+          </p>
+          <label className="dish-highlight-check">
+            <input
+              type="checkbox"
+              checked={isFeatured}
+              onChange={(e) => setIsFeatured(e.target.checked)}
+            />
+            Featured
+          </label>
+          <label className="dish-highlight-check">
+            <input
+              type="checkbox"
+              checked={isChefsSpecial}
+              onChange={(e) => setIsChefsSpecial(e.target.checked)}
+            />
+            Chef&apos;s special
+          </label>
+          <label className="dish-highlight-check">
+            <input
+              type="checkbox"
+              checked={isUniqueRecipe}
+              onChange={(e) => setIsUniqueRecipe(e.target.checked)}
+            />
+            Unique recipe
+          </label>
+        </fieldset>
 
         <p className="auth-card__hint">
           Menu hierarchy: cuisine → veg/non-veg → dish. Hero images must be live-capture.

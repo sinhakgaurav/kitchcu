@@ -110,6 +110,7 @@ def _payload(
                 "delivery_type": "delivery",
                 "delivery_fee": 40,
                 "delivery_fee_accepted": True,
+                "delivery_fee_payment": "pay_on_delivery",
             },
         ],
     }

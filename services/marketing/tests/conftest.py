@@ -56,6 +56,22 @@ def _truncate_all() -> None:
         cur.execute(
             """
             SELECT 1 FROM information_schema.tables
+            WHERE table_schema = 'ckac_marketing' AND table_name = 'customer_subscriptions'
+            """
+        )
+        if cur.fetchone():
+            cur.execute("TRUNCATE TABLE ckac_marketing.customer_subscriptions CASCADE")
+        cur.execute(
+            """
+            SELECT 1 FROM information_schema.tables
+            WHERE table_schema = 'ckac_marketing' AND table_name = 'subscription_plans'
+            """
+        )
+        if cur.fetchone():
+            cur.execute("TRUNCATE TABLE ckac_marketing.subscription_plans CASCADE")
+        cur.execute(
+            """
+            SELECT 1 FROM information_schema.tables
             WHERE table_schema = 'ckac_marketing' AND table_name = 'message_templates'
             """
         )
@@ -83,6 +99,7 @@ async def _flush_marketing_streams() -> None:
             "ckac:marketing:coupon",
             "ckac:marketing:promotion",
             "ckac:marketing:crm",
+            "ckac:marketing:subscription",
         )
     finally:
         await client.aclose()

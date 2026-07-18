@@ -1,3 +1,5 @@
+import asyncio
+import logging
 from contextlib import asynccontextmanager
 
 import redis.asyncio as redis
@@ -6,7 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.routes import router
 from ckac_common.config import get_settings
-from ckac_common.database import check_db_connection
+from ckac_common.database import SessionLocal, check_db_connection
 from ckac_common.event_bus import EventPublisher
 from ckac_common.events_context import set_event_publisher
 from ckac_common.health import live_response, ready_response
@@ -15,15 +17,43 @@ from ckac_common.observability import CorrelationMiddleware
 settings = get_settings()
 redis_client: redis.Redis | None = None
 event_publisher = EventPublisher(None)
+_porter_tick_task: asyncio.Task | None = None
+logger = logging.getLogger("order.lifespan")
+
+
+async def _porter_auto_book_loop() -> None:
+    """In-process tick so Porter auto-book retries without an external cron."""
+    from app.porter_auto_book import process_porter_auto_book_tick
+
+    while True:
+        try:
+            await asyncio.sleep(60)
+            async with SessionLocal() as session:
+                result = await process_porter_auto_book_tick(session, event_publisher)
+                await session.commit()
+                if result.get("processed"):
+                    logger.info("porter_auto_book tick %s", result)
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            logger.exception("porter_auto_book background tick failed")
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    global redis_client, event_publisher
+    global redis_client, event_publisher, _porter_tick_task
     redis_client = redis.from_url(settings.redis_url, decode_responses=True)
     event_publisher = EventPublisher(redis_client)
     set_event_publisher(event_publisher)
+    _porter_tick_task = asyncio.create_task(_porter_auto_book_loop())
     yield
+    if _porter_tick_task:
+        _porter_tick_task.cancel()
+        try:
+            await _porter_tick_task
+        except asyncio.CancelledError:
+            pass
+        _porter_tick_task = None
     set_event_publisher(None)
     if redis_client:
         await redis_client.aclose()

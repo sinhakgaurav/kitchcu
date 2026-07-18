@@ -38,7 +38,10 @@ Agreement = quote shown + `delivery_fee_accepted` + (for shared) prepaid capture
 | `porter` | Porter Partner quote API (`PORTER_API_KEY`, `PORTER_BASE_URL`) when feature `courier_porter_dunzo` is on |
 | `http` | Generic POST `DELIVERY_PARTNER_QUOTE_URL` |
 
-Order booking: owner `POST .../delivery-mode` with `mode=platform` → `order.porter_client` books Porter and stores `courier_partner` / `courier_job_id`.
+Order booking (P35): on accept with `delivery_mode=platform`:
+- Kitchen `porter_auto_book_enabled` + module `courier_porter_auto_book` → schedule book at accept+delay (default 15m), retry ~2m until booked; pickup time ≈ `estimated_ready_at`.
+- Otherwise → book immediately via `order.porter_client` (legacy).
+- Stores `courier_partner` / `courier_job_id`. Customer ETA = max(prep) + max(delivery).
 
 ## Order fields
 

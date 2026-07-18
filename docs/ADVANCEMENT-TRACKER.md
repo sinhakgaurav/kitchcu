@@ -90,6 +90,8 @@ For **architecture + end-to-end flows** see [PLATFORM-ARCHITECTURE-FLOWS.md](./P
 | P32.1 | **Checkout→order Porter wire-up** | Customer sends `delivery_mode`; order validates platform fees + cost share; Porter books on accept; owner delivery settings UI | ✅ | — |
 | P33 | **Prod OTP WhatsApp + Porter webhooks** | Identity OTP → Redis + notify WhatsApp; `POST /webhooks/porter` → `courier_status`; kitchen staff design pack | ✅ | Order `008`; design `docs/design/KITCHEN-STAFF-RBAC-DESIGN.md` |
 | P34 | **Delivery fee collection rules** | Shared → prepaid only; customer-only → pay-first or pay-on-delivery; Porter gated on prepaid capture | ✅ | Order `009` |
+| P35 | **Porter auto-book + prep+delivery ETA** | Customer ETA = prep + delivery; auto-book Porter after accept delay (default 15m) + retry; owner toggle; admin Delivery tab + module/feature | ✅ | Order `010`; identity `018`; billing `009`; design `docs/design/PORTER-AUTO-BOOK-ETA-DESIGN.md` |
+| P36 | **Tiffin / monthly subscriptions (F34/F35)** | Owner plans; customer request; accept/deny/activate/deactivate; Reports + Intelligence KPIs; admin Tiffin tab + `tiffin_plans` feature/module | ✅ | Marketing `003`; billing `010`; identity `019`; design `docs/design/TIFFIN-MONTHLY-SUBSCRIPTION-DESIGN.md` |
 
 ---
 

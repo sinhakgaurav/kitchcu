@@ -58,6 +58,8 @@ export type Kitchen = {
   delivery_fee_flat_beyond?: number;
   min_order_for_free_delivery?: number | null;
   delivery_subsidy_percent?: number;
+  porter_auto_book_enabled?: boolean;
+  porter_auto_book_delay_min?: number;
   latitude: number;
   longitude: number;
   branded_page?: KitchenBrandedPage;
@@ -136,7 +138,17 @@ export type Dish = {
   ingredients_description: string | null;
   quality_measures: string | null;
   is_active: boolean;
+  is_featured?: boolean;
+  is_chefs_special?: boolean;
+  is_unique_recipe?: boolean;
+  created_at?: string | null;
   media: DishMedia[];
+};
+
+export type MenuHighlightSections = {
+  featured: Dish[];
+  chefs_special: Dish[];
+  unique_recipe: Dish[];
 };
 
 export type DietMenuGroup = {
@@ -155,6 +167,7 @@ export type Menu = {
   grouped: CuisineMenuGroup[];
   cuisines: Cuisine[];
   diet_categories: Category[];
+  highlight_sections?: MenuHighlightSections;
 };
 
 export type OrderItem = {
@@ -437,6 +450,8 @@ export async function updateKitchenDeliverySettings(
     delivery_fee_flat_beyond?: number;
     min_order_for_free_delivery?: number | null;
     delivery_subsidy_percent?: number;
+    porter_auto_book_enabled?: boolean;
+    porter_auto_book_delay_min?: number;
   },
 ): Promise<Kitchen> {
   return apiFetch(`/api/v1/kitchens/${kitchenId}/delivery-settings`, {
@@ -503,8 +518,17 @@ export async function fetchCuisines(kitchenId: string): Promise<Cuisine[]> {
   return apiFetch(`/api/v1/kitchens/${kitchenId}/cuisines`);
 }
 
-export async function fetchMenu(kitchenId: string): Promise<Menu> {
-  return apiFetch(`/api/v1/kitchens/${kitchenId}/menu`);
+export async function fetchMenu(
+  kitchenId: string,
+  opts?: { highlight?: string; diet?: string; q?: string; sort?: string },
+): Promise<Menu> {
+  const q = new URLSearchParams();
+  if (opts?.highlight) q.set("highlight", opts.highlight);
+  if (opts?.diet) q.set("diet", opts.diet);
+  if (opts?.q) q.set("q", opts.q);
+  if (opts?.sort) q.set("sort", opts.sort);
+  const qs = q.toString();
+  return apiFetch(`/api/v1/kitchens/${kitchenId}/menu${qs ? `?${qs}` : ""}`);
 }
 
 export async function createDish(
@@ -519,6 +543,9 @@ export async function createDish(
     category_id: string;
     description?: string;
     ingredients_description?: string;
+    is_featured?: boolean;
+    is_chefs_special?: boolean;
+    is_unique_recipe?: boolean;
     media: { url: string; is_hero: boolean; is_live_capture: boolean; captured_at?: string };
   },
 ): Promise<Dish> {
@@ -538,6 +565,9 @@ export async function updateDish(
     delivery_time_min?: number | null;
     max_time_min?: number;
     is_active?: boolean;
+    is_featured?: boolean;
+    is_chefs_special?: boolean;
+    is_unique_recipe?: boolean;
     description?: string;
   },
 ): Promise<Dish> {
@@ -928,6 +958,159 @@ export async function deactivateCoupon(kitchenId: string, couponId: string): Pro
   });
 }
 
+export type SubscriptionPlan = {
+  id: string;
+  kitchen_id: string;
+  name: string;
+  description: string | null;
+  plan_type: string;
+  dishes_config: {
+    dish_ids?: string[];
+    weekdays?: number[];
+    meals_per_day?: number;
+    notes?: string | null;
+  };
+  price_monthly: number;
+  billing_cycle: string;
+  delivery_included: boolean;
+  max_subscribers: number | null;
+  is_active: boolean;
+  active_subscriber_count: number;
+  pending_count: number;
+  created_at: string;
+};
+
+export type CustomerKitchenSubscription = {
+  id: string;
+  kitchen_id: string;
+  plan_id: string;
+  plan_name: string | null;
+  plan_type: string | null;
+  price_monthly: number | null;
+  customer_id: string;
+  customer_phone: string;
+  customer_name: string | null;
+  status: string;
+  billing_status: string;
+  owner_note: string | null;
+  starts_on: string | null;
+  created_at: string;
+  decided_at: string | null;
+};
+
+export type SubscriptionSummary = {
+  kitchen_id: string;
+  plans_total: number;
+  plans_active: number;
+  pending: number;
+  active: number;
+  paused: number;
+  denied: number;
+  cancelled: number;
+  mrr_estimate: number;
+};
+
+export async function fetchSubscriptionPlans(
+  kitchenId: string,
+  activeOnly = false,
+): Promise<{ plans: SubscriptionPlan[]; total: number }> {
+  const q = activeOnly ? "?active_only=true" : "";
+  return apiFetch(`/api/v1/kitchens/${kitchenId}/subscription-plans${q}`);
+}
+
+export async function fetchPublicSubscriptionPlans(
+  kitchenId: string,
+): Promise<{ plans: SubscriptionPlan[]; total: number }> {
+  return apiFetch(`/api/v1/kitchens/${kitchenId}/subscription-plans/public`);
+}
+
+export async function createSubscriptionPlan(
+  kitchenId: string,
+  data: {
+    name: string;
+    description?: string;
+    plan_type: string;
+    price_monthly: number;
+    dishes_config?: SubscriptionPlan["dishes_config"];
+    delivery_included?: boolean;
+    max_subscribers?: number | null;
+  },
+): Promise<SubscriptionPlan> {
+  return apiFetch(`/api/v1/kitchens/${kitchenId}/subscription-plans`, {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+}
+
+export async function updateSubscriptionPlan(
+  kitchenId: string,
+  planId: string,
+  data: Partial<{
+    name: string;
+    description: string | null;
+    plan_type: string;
+    price_monthly: number;
+    dishes_config: SubscriptionPlan["dishes_config"];
+    delivery_included: boolean;
+    max_subscribers: number | null;
+    is_active: boolean;
+  }>,
+): Promise<SubscriptionPlan> {
+  return apiFetch(`/api/v1/kitchens/${kitchenId}/subscription-plans/${planId}`, {
+    method: "PATCH",
+    body: JSON.stringify(data),
+  });
+}
+
+export async function fetchKitchenSubscriptions(
+  kitchenId: string,
+  status?: string,
+): Promise<{ subscriptions: CustomerKitchenSubscription[]; total: number }> {
+  const q = status ? `?status=${encodeURIComponent(status)}` : "";
+  return apiFetch(`/api/v1/kitchens/${kitchenId}/subscriptions${q}`);
+}
+
+export async function fetchSubscriptionSummary(kitchenId: string): Promise<SubscriptionSummary> {
+  return apiFetch(`/api/v1/kitchens/${kitchenId}/subscriptions/summary`);
+}
+
+export async function decideKitchenSubscription(
+  kitchenId: string,
+  subId: string,
+  action: "accept" | "deny" | "activate" | "deactivate",
+  data: { owner_note?: string; starts_on?: string } = {},
+): Promise<CustomerKitchenSubscription> {
+  return apiFetch(`/api/v1/kitchens/${kitchenId}/subscriptions/${subId}/${action}`, {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+}
+
+export async function requestKitchenSubscription(
+  kitchenId: string,
+  planId: string,
+  data: { customer_name?: string; note?: string } = {},
+): Promise<CustomerKitchenSubscription> {
+  return apiFetch(`/api/v1/kitchens/${kitchenId}/subscription-plans/${planId}/subscribe`, {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+}
+
+export async function fetchMySubscriptions(): Promise<{
+  subscriptions: CustomerKitchenSubscription[];
+  total: number;
+}> {
+  return apiFetch("/api/v1/customers/me/subscriptions");
+}
+
+export async function cancelMySubscription(subId: string): Promise<CustomerKitchenSubscription> {
+  return apiFetch(`/api/v1/customers/me/subscriptions/${subId}/cancel`, {
+    method: "POST",
+    body: JSON.stringify({}),
+  });
+}
+
 export async function fetchPromotions(
   kitchenId: string,
 ): Promise<{ promotions: Promotion[]; total: number }> {
@@ -1232,7 +1415,10 @@ export type TrackingInfo = {
   courier_partner?: string | null;
   courier_job_id?: string | null;
   courier_status?: string | null;
+  estimated_prep_min?: number | null;
+  estimated_delivery_min?: number | null;
   estimated_ready_at: string | null;
+  estimated_delivery_at?: string | null;
   tracking_notify_interval_min: number;
   updated_at: string | null;
   kitchen_latitude?: number | null;

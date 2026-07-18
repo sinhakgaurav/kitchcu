@@ -18,6 +18,8 @@ import {
   clearCart,
   getCart,
   kitchenCartSubtotal,
+  projectKitchenDeliveryMin,
+  projectKitchenPrepMin,
   projectKitchenReadyMin,
   updateLineQuantity,
   type CustomerCart,
@@ -367,8 +369,15 @@ export function CheckoutPage() {
           <section key={kitchen.kitchenId} className="glass customer-checkout__cart">
             <h2>{kitchen.kitchenName} · {kitchen.kitchenCode}</h2>
             <p className="customer-checkout__eta">
-              Projected ready within ~{projectKitchenReadyMin(kitchen, dtype === "delivery")} min
-              {" "}(longest dish max time — quality-first, not a speed race)
+              {dtype === "delivery" ? (
+                <>
+                  Delivery in ~{projectKitchenReadyMin(kitchen, true)} min
+                  {" "}(prep {projectKitchenPrepMin(kitchen)} + travel {projectKitchenDeliveryMin(kitchen)}
+                  {" "}— quality-first)
+                </>
+              ) : (
+                <>Ready for pickup in ~{projectKitchenReadyMin(kitchen, false)} min (prep)</>
+              )}
             </p>
             <ul className="owner-detail-items">
               {kitchen.lines.map((line) => (

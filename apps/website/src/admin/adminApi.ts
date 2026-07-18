@@ -295,6 +295,8 @@ export type AdminKitchenDetail = AdminKitchen & {
   pincode: string | null;
   whatsapp_phone_id: string | null;
   whatsapp_display_phone: string | null;
+  porter_auto_book_enabled?: boolean;
+  porter_auto_book_delay_min?: number;
   platform_secrets_note: string;
 };
 
@@ -396,6 +398,19 @@ export async function updateAdminKitchenModuleFlag(
   return adminFetch<{ module_key: string; enabled: boolean; updated_at: string }>(
     `/api/v1/admin/kitchens/${kitchenId}/module-flags/${moduleKey}`,
     { method: "PATCH", body: JSON.stringify({ enabled }) },
+  );
+}
+
+export async function updateAdminKitchenDeliverySettings(
+  kitchenId: string,
+  data: {
+    porter_auto_book_enabled?: boolean;
+    porter_auto_book_delay_min?: number;
+  },
+) {
+  return adminFetch<AdminKitchenDetail>(
+    `/api/v1/admin/kitchens/${kitchenId}/delivery-settings`,
+    { method: "PATCH", body: JSON.stringify(data) },
   );
 }
 
@@ -595,6 +610,22 @@ export async function assignAdminKitchenPackage(
     method: "PUT",
     body: JSON.stringify(data),
   });
+}
+
+export type AdminTiffinSummary = {
+  kitchen_id: string;
+  plans_total: number;
+  plans_active: number;
+  pending: number;
+  active: number;
+  paused: number;
+  denied: number;
+  cancelled: number;
+  mrr_estimate: number;
+};
+
+export async function fetchAdminKitchenTiffinSummary(kitchenId: string) {
+  return adminFetch<AdminTiffinSummary>(`/api/v1/admin/kitchens/${kitchenId}/tiffin-summary`);
 }
 
 export async function fetchAdminKitchenTemplates(kitchenId: string) {

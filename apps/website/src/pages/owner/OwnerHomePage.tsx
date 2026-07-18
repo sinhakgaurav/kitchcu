@@ -59,6 +59,7 @@ const QUICK_ACTIONS = [
   { to: "/dashboard/reports", title: "Growth reports", desc: "Revenue & retention", accent: "teal" },
   { to: "/dashboard/stream", title: "Live stream", desc: "Go live to customers", accent: "orange" },
   { to: "/dashboard/coupons", title: "Coupons", desc: "Run promotions", accent: "teal" },
+  { to: "/dashboard/tiffin", title: "Tiffin plans", desc: "Monthly thali subscribers", accent: "orange" },
 ] as const;
 
 export function OwnerHomePage() {

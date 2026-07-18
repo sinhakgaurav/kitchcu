@@ -1,5 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
+import { ListingToolbar } from "../../components/ListingToolbar";
 import { OwnerEmpty, OwnerPageShell, OwnerPanel } from "../../components/owner/OwnerPageShell";
 import {
   fetchCuratedRecipes,
@@ -9,6 +10,7 @@ import {
   type DishTrial,
 } from "../../lib/api";
 import { useKitchen } from "../../lib/kitchen";
+import { filterAndSortByName } from "../../shared/listingControls";
 
 const CATEGORIES = [
   { value: "", label: "All" },
@@ -25,6 +27,8 @@ export function LearningPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [search, setSearch] = useState("");
+  const [sort, setSort] = useState<"name_asc" | "name_desc" | "newest">("name_asc");
 
   const load = async () => {
     if (!kitchen) return;
@@ -64,6 +68,16 @@ export function LearningPage() {
     }
   };
 
+  const visibleRecipes = useMemo(() => {
+    const named = recipes.map((r) => ({ ...r, name: r.title }));
+    return filterAndSortByName(named, { q: search, sort });
+  }, [recipes, search, sort]);
+
+  const visibleTrials = useMemo(() => {
+    const named = trials.map((t) => ({ ...t, name: t.dish_name }));
+    return filterAndSortByName(named, { q: search, sort });
+  }, [trials, search, sort]);
+
   if (!kitchen) return null;
 
   return (
@@ -74,12 +88,29 @@ export function LearningPage() {
     >
       {error && <p className="form-error">{error}</p>}
 
+      <ListingToolbar
+        search={search}
+        onSearchChange={setSearch}
+        searchPlaceholder="Search recipes & trials…"
+        sort={sort}
+        onSortChange={(v) => setSort(v as "name_asc" | "name_desc" | "newest")}
+        sortOptions={[
+          { value: "name_asc", label: "Name A–Z" },
+          { value: "name_desc", label: "Name Z–A" },
+          { value: "newest", label: "Newest" },
+        ]}
+        filterChips={CATEGORIES.filter((c) => c.value).map((c) => ({ id: c.value, label: c.label }))}
+        activeFilter={category}
+        onFilterChange={setCategory}
+        resultCount={visibleRecipes.length}
+      />
+
       <OwnerPanel title="Your trials" description="Dishes you're testing before adding to menu">
-        {trials.length === 0 ? (
+        {visibleTrials.length === 0 ? (
           <OwnerEmpty message='No trials yet — pick a recipe below and tap "I learned this dish".' />
         ) : (
           <ul className="owner-detail-items">
-            {trials.map((t) => (
+            {visibleTrials.map((t) => (
               <li key={t.id}>
                 <Link to={`/dashboard/learning/trials/${t.id}`}>
                   {t.dish_name} — <span className="status-badge">{t.status}</span>
@@ -94,27 +125,14 @@ export function LearningPage() {
       <OwnerPanel
         title="Curated recipes"
         description="Learn from the community and test with your regulars"
-        action={
-          <select
-            className="owner-input"
-            value={category}
-            onChange={(e) => setCategory(e.target.value)}
-          >
-            {CATEGORIES.map((c) => (
-              <option key={c.value || "all"} value={c.value}>
-                {c.label}
-              </option>
-            ))}
-          </select>
-        }
       >
         {loading ? (
           <div className="app-loading">Loading recipes…</div>
-        ) : recipes.length === 0 ? (
-          <OwnerEmpty message="No recipes in this category yet." />
+        ) : visibleRecipes.length === 0 ? (
+          <OwnerEmpty message="No recipes match these filters." />
         ) : (
           <div className="owner-menu-grid">
-            {recipes.map((r) => (
+            {visibleRecipes.map((r) => (
               <article key={r.id} className="dash-card owner-dish-card">
                 <img src={r.image_url} alt={r.title} loading="lazy" />
                 <div>

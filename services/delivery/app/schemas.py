@@ -98,7 +98,10 @@ class TrackingResponse(BaseModel):
     distance_km: float | None = None
     delivery_fee: float
     owner_delivery_cost: float = 0
+    estimated_prep_min: int | None = None
+    estimated_delivery_min: int | None = None
     estimated_ready_at: datetime | None = None
+    estimated_delivery_at: datetime | None = None
     tracking_notify_interval_min: int
     updated_at: datetime | None = None
     kitchen_latitude: float | None = None
@@ -106,6 +109,8 @@ class TrackingResponse(BaseModel):
     customer_latitude: float | None = None
     customer_longitude: float | None = None
     map_directions_url: str | None = None
+    courier_partner: str | None = None
+    courier_status: str | None = None
 
 
 def _gross_self_fee(
@@ -389,11 +394,16 @@ async def track_by_token(session: AsyncSession, token: str) -> TrackingResponse:
                     o.delivery_type,
                     o.distance_km,
                     o.delivery_fee,
+                    o.estimated_prep_min,
+                    o.estimated_delivery_min,
                     o.estimated_ready_at,
+                    o.estimated_delivery_at,
                     o.updated_at,
                     o.tracking_token,
                     o.customer_latitude,
                     o.customer_longitude,
+                    o.courier_partner,
+                    o.courier_status,
                     COALESCE(o.delivery_mode, NULL) AS delivery_mode,
                     COALESCE(o.delivery_payer, NULL) AS delivery_payer,
                     COALESCE(o.owner_delivery_cost, 0) AS owner_delivery_cost,
@@ -437,7 +447,12 @@ async def track_by_token(session: AsyncSession, token: str) -> TrackingResponse:
         distance_km=float(row["distance_km"]) if row["distance_km"] is not None else None,
         delivery_fee=float(row["delivery_fee"]),
         owner_delivery_cost=float(row["owner_delivery_cost"] or 0),
+        estimated_prep_min=int(row["estimated_prep_min"]) if row["estimated_prep_min"] is not None else None,
+        estimated_delivery_min=(
+            int(row["estimated_delivery_min"]) if row["estimated_delivery_min"] is not None else None
+        ),
         estimated_ready_at=row["estimated_ready_at"],
+        estimated_delivery_at=row["estimated_delivery_at"],
         tracking_notify_interval_min=int(row["tracking_notify_interval_min"]),
         updated_at=row["updated_at"],
         kitchen_latitude=k_lat,
@@ -445,4 +460,6 @@ async def track_by_token(session: AsyncSession, token: str) -> TrackingResponse:
         customer_latitude=c_lat,
         customer_longitude=c_lng,
         map_directions_url=map_url,
+        courier_partner=row["courier_partner"],
+        courier_status=row["courier_status"],
     )

@@ -23,9 +23,11 @@ from app.models import (
 )
 from app.routes import get_publisher
 from app.schemas import (
+    KitchenDeliverySettingsUpdate,
     KitchenWhatsAppIntegrationResponse,
     KitchenWhatsAppIntegrationUpdate,
     kitchen_whatsapp_to_response,
+    update_kitchen_delivery_settings,
     update_kitchen_whatsapp_integration,
 )
 from ckac_common.secret_box import decrypt_secret, encrypt_secret, mask_secret
@@ -276,6 +278,14 @@ class AdminKitchenDetail(AdminKitchenRow):
     pincode: str | None = Field(default=None, description="PIN code.")
     whatsapp_phone_id: str | None = Field(default=None, description="Meta phone_number_id, if linked.")
     whatsapp_display_phone: str | None = Field(default=None, description="E.164 display number, if set.")
+    porter_auto_book_enabled: bool = Field(
+        default=True,
+        description="When true (and module entitled), Porter is auto-booked after accept delay.",
+    )
+    porter_auto_book_delay_min: int = Field(
+        default=15,
+        description="Minutes after accept before first Porter auto-book attempt.",
+    )
     platform_secrets_note: str = Field(
         default=(
             "Meta App Secret / Verify Token and platform Razorpay (SaaS) live under Super Admin → API Keys. "
@@ -656,6 +666,71 @@ async def admin_kitchen_detail(
         pincode=kitchen.pincode,
         whatsapp_phone_id=wa.whatsapp_phone_id,
         whatsapp_display_phone=wa.whatsapp_display_phone,
+        porter_auto_book_enabled=bool(getattr(kitchen, "porter_auto_book_enabled", True)),
+        porter_auto_book_delay_min=int(getattr(kitchen, "porter_auto_book_delay_min", 15) or 15),
+    )
+
+
+@router.patch(
+    "/kitchens/{kitchen_id}/delivery-settings",
+    response_model=AdminKitchenDetail,
+    summary="Update kitchen delivery / Porter auto-book settings (super admin)",
+    responses=auth_errors(include_404=True),
+    tags=["Admin"],
+)
+async def admin_kitchen_delivery_settings(
+    kitchen_id: uuid.UUID,
+    body: KitchenDeliverySettingsUpdate,
+    admin: Annotated[PlatformAdmin, Depends(get_current_admin)],
+    session: Annotated[AsyncSession, Depends(get_db)],
+) -> AdminKitchenDetail:
+    from app.admin_audit import record_admin_audit
+    from app.rbac import assert_admin_permission
+
+    await assert_admin_permission(session, role=admin.role, permission="kitchens:write")
+    result = await session.execute(
+        select(Kitchen, Owner)
+        .join(Owner, Owner.id == Kitchen.owner_id)
+        .where(Kitchen.id == kitchen_id)
+    )
+    row = result.first()
+    if not row:
+        raise HTTPException(status_code=404, detail="Kitchen not found")
+    kitchen, owner = row
+    try:
+        kitchen = await update_kitchen_delivery_settings(session, kitchen, body)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    await record_admin_audit(
+        session,
+        actor=admin,
+        action="kitchen.delivery_settings.update",
+        resource_type="kitchen",
+        resource_id=str(kitchen_id),
+        kitchen_id=kitchen_id,
+        summary=f"{kitchen.code} delivery settings updated",
+        after={
+            "porter_auto_book_enabled": bool(getattr(kitchen, "porter_auto_book_enabled", True)),
+            "porter_auto_book_delay_min": int(getattr(kitchen, "porter_auto_book_delay_min", 15) or 15),
+        },
+    )
+    await session.commit()
+    await session.refresh(kitchen)
+
+    wa = kitchen_whatsapp_to_response(kitchen)
+    gateway_ids = await _payment_gateway_kitchen_ids(session, [kitchen.id])
+    base = _admin_kitchen_row(kitchen, owner, payment_gateway_configured=kitchen.id in gateway_ids)
+    return AdminKitchenDetail(
+        **base.model_dump(),
+        owner_id=owner.id,
+        address_line=kitchen.address_line,
+        state=kitchen.state,
+        pincode=kitchen.pincode,
+        whatsapp_phone_id=wa.whatsapp_phone_id,
+        whatsapp_display_phone=wa.whatsapp_display_phone,
+        porter_auto_book_enabled=bool(getattr(kitchen, "porter_auto_book_enabled", True)),
+        porter_auto_book_delay_min=int(getattr(kitchen, "porter_auto_book_delay_min", 15) or 15),
     )
 
 

@@ -76,6 +76,9 @@ class Dish(Base):
     ingredients_description: Mapped[str | None] = mapped_column(Text)
     quality_measures: Mapped[str | None] = mapped_column(Text)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    is_featured: Mapped[bool] = mapped_column(Boolean, default=False)
+    is_chefs_special: Mapped[bool] = mapped_column(Boolean, default=False)
+    is_unique_recipe: Mapped[bool] = mapped_column(Boolean, default=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(UTC)
     )

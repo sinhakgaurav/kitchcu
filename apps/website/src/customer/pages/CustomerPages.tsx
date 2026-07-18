@@ -9,6 +9,7 @@ import { normalizePhone } from "../../shared/api";
 import { fetchKitchenByCode } from "../../shared/publicApi";
 import { CUSTOMER_HOST, KITCHEN_HOST } from "../../shared/brand";
 import { CustomerSocialLogin } from "../../components/CustomerSocialLogin";
+import { PolicyAgreement } from "../../components/PolicyAgreement";
 import { isCustomerSignedIn, useCustomerAuth } from "../../shared/customerAuth";
 import { saveKitchenToSession } from "../../shared/customerSession";
 import { kitchenUrl } from "../../shared/urls";
@@ -33,10 +34,17 @@ export function CustomerLoginPage() {
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [busyPhone, setBusyPhone] = useState<string | null>(null);
+  const [policiesAgreed, setPoliciesAgreed] = useState(false);
 
   if (isCustomerSignedIn(session) && getCustomerToken()) {
     return <Navigate to={nextPath.startsWith("/") ? nextPath : "/"} replace />;
   }
+
+  const requirePolicyAgreement = () => {
+    if (policiesAgreed) return true;
+    setError("Please agree to the Terms, Privacy, and Refund Policies to continue.");
+    return false;
+  };
 
   const afterAuth = async (kitchenCode: string) => {
     if (kitchenCode.trim()) {
@@ -50,6 +58,7 @@ export function CustomerLoginPage() {
 
   const handleRequestOtp = async (e: FormEvent) => {
     e.preventDefault();
+    if (!requirePolicyAgreement()) return;
     setError("");
     setBusy(true);
     try {
@@ -64,6 +73,7 @@ export function CustomerLoginPage() {
 
   const handleVerify = async (e: FormEvent) => {
     e.preventDefault();
+    if (!requirePolicyAgreement()) return;
     setError("");
     setBusy(true);
     try {
@@ -202,7 +212,16 @@ export function CustomerLoginPage() {
                 />
               </label>
             )}
-            <button type="submit" className="btn btn--primary btn--lg" disabled={busy}>
+            <PolicyAgreement
+              audience="customer"
+              checked={policiesAgreed}
+              onChange={setPoliciesAgreed}
+            />
+            <button
+              type="submit"
+              className="btn btn--primary btn--lg"
+              disabled={busy || !policiesAgreed}
+            >
               {busy ? "Please wait…" : otpSent ? "Verify & sign in" : "Send WhatsApp OTP"}
             </button>
             {otpSent ? (
@@ -221,6 +240,7 @@ export function CustomerLoginPage() {
           </form>
 
           <CustomerSocialLogin
+            policiesAgreed={policiesAgreed}
             onAuth={(result) => {
               applyAuthResult(result);
             }}

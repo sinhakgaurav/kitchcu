@@ -9,7 +9,9 @@ import {
   fetchAdminKitchens,
   fetchAdminKitchenPackage,
   fetchAdminKitchenTemplates,
+  fetchAdminKitchenTiffinSummary,
   fetchAdminKitchenWhatsApp,
+  updateAdminKitchenDeliverySettings,
   fetchAdminMe,
   fetchAdminOrders,
   fetchAdminOwners,
@@ -36,6 +38,7 @@ import {
   type AdminPackage,
   type AdminMe,
   type AdminTicket,
+  type AdminTiffinSummary,
   type PlatformStats,
 } from "./adminApi";
 import {
@@ -750,8 +753,19 @@ function AdminKitchens() {
   const [allPackages, setAllPackages] = useState<AdminPackage[]>([]);
   const [templates, setTemplates] = useState<{ id: string; channel: string; name: string; is_active: boolean; body: string }[]>([]);
   const [panelTab, setPanelTab] = useState<
-    "profile" | "whatsapp" | "payments" | "package" | "marketing" | "modules" | "streaming"
+    | "profile"
+    | "whatsapp"
+    | "payments"
+    | "package"
+    | "marketing"
+    | "modules"
+    | "streaming"
+    | "delivery"
+    | "tiffin"
   >("profile");
+  const [porterAutoBook, setPorterAutoBook] = useState(true);
+  const [porterDelayMin, setPorterDelayMin] = useState(15);
+  const [tiffinSummary, setTiffinSummary] = useState<AdminTiffinSummary | null>(null);
   const [error, setError] = useState("");
   const [ok, setOk] = useState("");
   const [busy, setBusy] = useState(false);
@@ -780,7 +794,7 @@ function AdminKitchens() {
     setOk("");
     setPanelTab("profile");
     try {
-      const [d, w, p, m, pkg, pkgs, tmpl] = await Promise.all([
+      const [d, w, p, m, pkg, pkgs, tmpl, tf] = await Promise.all([
         fetchAdminKitchen(id),
         fetchAdminKitchenWhatsApp(id),
         fetchAdminKitchenPaymentGateway(id),
@@ -788,15 +802,19 @@ function AdminKitchens() {
         fetchAdminKitchenPackage(id).catch(() => null),
         fetchAdminPackages("owner").catch(() => [] as AdminPackage[]),
         fetchAdminKitchenTemplates(id).catch(() => []),
+        fetchAdminKitchenTiffinSummary(id).catch(() => null),
       ]);
       setDetail(d);
       setWa(w);
       setKitchenPkg(pkg);
       setAllPackages(pkgs);
       setTemplates(tmpl);
+      setTiffinSummary(tf);
       setAssignPackageId(pkg?.package?.id ?? pkgs[0]?.id ?? "");
       setPgw(p);
       setModules(m);
+      setPorterAutoBook(d.porter_auto_book_enabled !== false);
+      setPorterDelayMin(d.porter_auto_book_delay_min ?? 15);
       setPhoneId(w.whatsapp_phone_id ?? "");
       setDisplayPhone(w.whatsapp_display_phone ?? "");
       setKeyId(p.key_id ?? "");
@@ -1015,7 +1033,7 @@ function AdminKitchens() {
 
             <div className="admin-kitchen-panel__tabs">
               {(
-                ["profile", "whatsapp", "payments", "package", "marketing", "modules", "streaming"] as const
+                ["profile", "whatsapp", "payments", "package", "marketing", "modules", "streaming", "delivery", "tiffin"] as const
               ).map((t) => (
                 <button
                   key={t}
@@ -1247,6 +1265,96 @@ function AdminKitchens() {
                   </li>
                 ))}
               </ul>
+            )}
+
+            {panelTab === "tiffin" && (
+              <div className="admin-kitchen-panel__body">
+                <p className="report-hint">
+                  Customer monthly thali/tiffin plans. Entitlement: Packages →{" "}
+                  <code>tiffin_plans</code> · Modules → <code>tiffin_plans</code>.
+                </p>
+                {tiffinSummary ? (
+                  <dl className="admin-kv">
+                    <div><dt>Plans</dt><dd>{tiffinSummary.plans_active} active / {tiffinSummary.plans_total}</dd></div>
+                    <div><dt>Pending</dt><dd>{tiffinSummary.pending}</dd></div>
+                    <div><dt>Active subs</dt><dd>{tiffinSummary.active}</dd></div>
+                    <div><dt>Paused</dt><dd>{tiffinSummary.paused}</dd></div>
+                    <div><dt>MRR estimate</dt><dd>₹{Math.round(tiffinSummary.mrr_estimate).toLocaleString("en-IN")}</dd></div>
+                  </dl>
+                ) : (
+                  <p className="admin-panel__empty">No tiffin summary (module off or empty).</p>
+                )}
+                <button
+                  type="button"
+                  className="btn btn--sm btn--ghost"
+                  disabled={busy || !selectedId}
+                  onClick={async () => {
+                    if (!selectedId) return;
+                    setBusy(true);
+                    try {
+                      setTiffinSummary(await fetchAdminKitchenTiffinSummary(selectedId));
+                    } catch (e) {
+                      setError(e instanceof Error ? e.message : "Refresh failed");
+                    } finally {
+                      setBusy(false);
+                    }
+                  }}
+                >
+                  Refresh
+                </button>
+              </div>
+            )}
+
+            {panelTab === "delivery" && detail && (
+              <div className="admin-kitchen-panel__body">
+                <p className="report-hint">
+                  Porter auto-book: after accept, wait delay then book for food-ready pickup; retries
+                  until booked. Also gate via Modules → <code>courier_porter_auto_book</code> and
+                  Packages → feature <code>courier_porter_auto_book</code>.
+                </p>
+                <label className="owner-check">
+                  <input
+                    type="checkbox"
+                    checked={porterAutoBook}
+                    onChange={(e) => setPorterAutoBook(e.target.checked)}
+                  />
+                  Auto-book Porter enabled
+                </label>
+                <label>
+                  Delay (minutes)
+                  <input
+                    type="number"
+                    min={1}
+                    max={120}
+                    value={porterDelayMin}
+                    onChange={(e) => setPorterDelayMin(Number(e.target.value) || 15)}
+                  />
+                </label>
+                <button
+                  type="button"
+                  className="btn btn--primary btn--sm"
+                  disabled={busy}
+                  onClick={async () => {
+                    if (!selectedId) return;
+                    setBusy(true);
+                    setError("");
+                    try {
+                      const next = await updateAdminKitchenDeliverySettings(selectedId, {
+                        porter_auto_book_enabled: porterAutoBook,
+                        porter_auto_book_delay_min: porterDelayMin,
+                      });
+                      setDetail(next);
+                      setOk("Delivery / Porter auto-book settings saved.");
+                    } catch (e) {
+                      setError(e instanceof Error ? e.message : "Save failed");
+                    } finally {
+                      setBusy(false);
+                    }
+                  }}
+                >
+                  Save delivery settings
+                </button>
+              </div>
             )}
           </section>
         )}

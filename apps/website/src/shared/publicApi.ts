@@ -19,8 +19,17 @@ async function publicFetch<T>(path: string, init?: RequestInit): Promise<T> {
   return body as T;
 }
 
-export async function fetchPublicMenu(kitchenId: string): Promise<Menu> {
-  return publicFetch(`/api/v1/kitchens/${kitchenId}/menu`);
+export async function fetchPublicMenu(
+  kitchenId: string,
+  opts?: { highlight?: string; diet?: string; q?: string; sort?: string },
+): Promise<Menu> {
+  const q = new URLSearchParams();
+  if (opts?.highlight) q.set("highlight", opts.highlight);
+  if (opts?.diet) q.set("diet", opts.diet);
+  if (opts?.q) q.set("q", opts.q);
+  if (opts?.sort) q.set("sort", opts.sort);
+  const qs = q.toString();
+  return publicFetch(`/api/v1/kitchens/${kitchenId}/menu${qs ? `?${qs}` : ""}`);
 }
 
 export async function fetchKitchenByCode(code: string): Promise<import("./api").KitchenPublic> {

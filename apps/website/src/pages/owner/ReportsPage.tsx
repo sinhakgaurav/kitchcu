@@ -5,11 +5,13 @@ import {
   fetchPeakHours,
   fetchRevenueSummary,
   fetchRevenueTimeseries,
+  fetchSubscriptionSummary,
   fetchTopDishes,
   type CustomerSegments,
   type PeakHours,
   type RevenueSummary,
   type RevenueTimeseries,
+  type SubscriptionSummary,
   type TopDishes,
 } from "../../lib/api";
 import { useKitchen } from "../../lib/kitchen";
@@ -54,6 +56,7 @@ export function ReportsPage() {
   const [dishes, setDishes] = useState<TopDishes | null>(null);
   const [peak, setPeak] = useState<PeakHours | null>(null);
   const [customers, setCustomers] = useState<CustomerSegments | null>(null);
+  const [tiffin, setTiffin] = useState<SubscriptionSummary | null>(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -70,13 +73,15 @@ export function ReportsPage() {
       fetchTopDishes(kitchen.id, days, 8),
       fetchPeakHours(kitchen.id, days),
       fetchCustomerSegments(kitchen.id, Math.max(days, 90), 8),
+      fetchSubscriptionSummary(kitchen.id).catch(() => null),
     ])
-      .then(([s, t, d, p, c]) => {
+      .then(([s, t, d, p, c, tf]) => {
         setSummary(s);
         setSeries(t);
         setDishes(d);
         setPeak(p);
         setCustomers(c);
+        setTiffin(tf);
       })
       .catch((err) => setError(err instanceof Error ? err.message : "Failed to load reports"))
       .finally(() => {
@@ -126,6 +131,7 @@ export function ReportsPage() {
             ))}
           </div>
           <Link to="/dashboard/crm" className="btn btn--ghost btn--sm">Open CRM →</Link>
+          <Link to="/dashboard/tiffin" className="btn btn--ghost btn--sm">Tiffin plans →</Link>
         </div>
       </section>
 
@@ -136,6 +142,24 @@ export function ReportsPage() {
       ) : summary ? (
         <div className={refreshing ? "od-reports__body od-reports__body--refreshing" : "od-reports__body"}>
           {refreshing && <p className="od-reports__refresh-hint">Updating {days}-day window…</p>}
+          {tiffin && (
+            <div className="od-board__kpi-grid od-reports__kpis" style={{ marginBottom: "1rem" }}>
+              <div className="od-kpi dash-card">
+                <div>
+                  <strong>{tiffin.active}</strong>
+                  <span>Active tiffin subs</span>
+                  <em>{tiffin.pending} pending requests</em>
+                </div>
+              </div>
+              <div className="od-kpi dash-card">
+                <div>
+                  <strong>{inr(tiffin.mrr_estimate)}</strong>
+                  <span>Tiffin MRR estimate</span>
+                  <em>{tiffin.plans_active} active plans</em>
+                </div>
+              </div>
+            </div>
+          )}
           <div className="od-board__kpi-grid od-reports__kpis">
             <div className="od-kpi dash-card">
               <span className="od-kpi__icon od-kpi__icon--revenue" aria-hidden="true" />

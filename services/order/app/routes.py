@@ -662,79 +662,26 @@ async def order_status_update(
                     order.id,
                     order.kitchen_id,
                 )
-        # Book Porter only after kitchen accepts (avoid paying for cancelled carts).
+        # Porter: schedule delayed auto-book when entitled; else book immediately on accept.
         if (
             order.delivery_type == "delivery"
             and getattr(order, "delivery_mode", None) == "platform"
             and not getattr(order, "courier_job_id", None)
         ):
             try:
-                from app.delivery_fee_payment import porter_requires_prepaid_capture
-                from app.payment_gate import order_has_captured_payment
-                from app.porter_client import quote_and_book_porter
+                from app.porter_auto_book import attempt_porter_book, schedule_porter_auto_book
 
-                if porter_requires_prepaid_capture(
-                    delivery_mode=order.delivery_mode,
-                    delivery_fee_payment=getattr(order, "delivery_fee_payment", None),
-                    delivery_payer=getattr(order, "delivery_payer", None),
-                    customer_fee=float(order.delivery_fee or 0),
-                ):
-                    if not await order_has_captured_payment(session, order.id):
-                        logging.getLogger("order.porter").warning(
-                            "Porter book deferred — prepaid delivery fee not captured order_id=%s",
-                            order.id,
-                        )
-                        return await order_to_response(session, order)
-
-                booked = await quote_and_book_porter(session, order)
-                if booked:
-                    order.courier_partner = "porter"
-                    order.courier_job_id = booked.get("job_id")
-                    if booked.get("fee") is not None:
-                        # Keep customer fee locked at checkout; refresh owner logistics cost if Porter differs.
-                        from app.cost_share import split_delivery_cost
-
-                        kitchen_row = (
-                            await session.execute(
-                                text(
-                                    """
-                                    SELECT
-                                        max_delivery_radius_km,
-                                        min_order_for_free_delivery,
-                                        COALESCE(delivery_subsidy_percent, 50) AS delivery_subsidy_percent
-                                    FROM ckac_identity.kitchens WHERE id = :kid LIMIT 1
-                                    """
-                                ),
-                                {"kid": order.kitchen_id},
-                            )
-                        ).mappings().one_or_none()
-                        if kitchen_row and order.distance_km is not None:
-                            in_range = float(order.distance_km) <= float(
-                                kitchen_row["max_delivery_radius_km"]
-                            )
-                            min_order = (
-                                float(kitchen_row["min_order_for_free_delivery"])
-                                if kitchen_row["min_order_for_free_delivery"] is not None
-                                else None
-                            )
-                            share = split_delivery_cost(
-                                gross_fee=float(booked["fee"]),
-                                in_range=in_range,
-                                subtotal=float(order.subtotal or 0),
-                                min_order_for_subsidy=min_order,
-                                subsidy_percent=float(kitchen_row["delivery_subsidy_percent"] or 50),
-                            )
-                            # Never raise customer fee after accept; absorb delta on kitchen.
-                            order.owner_delivery_cost = max(
-                                float(share["owner_fee"]),
-                                float(booked["fee"]) - float(order.delivery_fee or 0),
-                            )
-                            order.delivery_payer = share["payer"]
+                scheduled = await schedule_porter_auto_book(session, order, publisher)
+                if scheduled:
+                    await session.commit()
+                    await session.refresh(order)
+                else:
+                    await attempt_porter_book(session, order, publisher, reason="accept_immediate")
                     await session.commit()
                     await session.refresh(order)
             except Exception:
                 logging.getLogger("order.porter").exception(
-                    "Porter book failed after accept order_id=%s",
+                    "Porter book/schedule failed after accept order_id=%s",
                     order.id,
                 )
     return await order_to_response(session, order)
@@ -1016,6 +963,28 @@ async def whatsapp_intake(
     await session.commit()
     await session.refresh(draft)
     return _draft_to_response(draft)
+
+
+@router.post(
+    "/internal/orders/porter-auto-book/tick",
+    tags=["Internal"],
+    summary="[Internal] Process due Porter auto-book attempts",
+    description=(
+        "Internal (`X-Internal-Key`) — books Porter for platform-delivery orders whose "
+        "`porter_auto_book_at` is due. Retries at short intervals until booked or max attempts. "
+        "Also driven by the order-service background loop every ~60s."
+    ),
+)
+async def porter_auto_book_tick(
+    _: Annotated[None, Depends(verify_internal_key)],
+    session: Annotated[AsyncSession, Depends(get_db)],
+    publisher: Annotated[EventPublisher, Depends(get_publisher)],
+) -> dict:
+    from app.porter_auto_book import process_porter_auto_book_tick
+
+    result = await process_porter_auto_book_tick(session, publisher)
+    await session.commit()
+    return result
 
 
 @router.post(

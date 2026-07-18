@@ -1,9 +1,14 @@
-import { Link, useParams } from "react-router-dom";
-import { useEffect, useState } from "react";
+import { Link, useNavigate, useParams } from "react-router-dom";
+import { useEffect, useMemo, useState } from "react";
+import { ListingToolbar } from "../../components/ListingToolbar";
 import { useBrandedStorefront } from "../../customer/BrandedStorefront";
 import { RichHtml } from "../../components/RichTextEditor";
 import { sampleDishImages } from "../../data/content";
-import type { CuisineMenuGroup, Dish, Menu } from "../../shared/api";
+import type { CuisineMenuGroup, Dish, Menu, SubscriptionPlan } from "../../shared/api";
+import {
+  fetchPublicSubscriptionPlans,
+  requestKitchenSubscription,
+} from "../../shared/api";
 import { fetchKitchenRatingSummaries, type DishRatingSummary } from "../../shared/customerRatingsApi";
 import { fetchPublicMenu } from "../../shared/publicApi";
 import {
@@ -12,7 +17,14 @@ import {
   getCart,
   projectKitchenReadyMin,
 } from "../../shared/customerCart";
+import { getCustomerToken } from "../../shared/customerApi";
 import { getCustomerSession } from "../../shared/customerSession";
+import {
+  dishHighlightBadges,
+  filterAndSortDishes,
+  type DishHighlight,
+  type DishSort,
+} from "../../shared/listingControls";
 
 const DIET_LABELS: Record<string, string> = {
   veg: "Veg",
@@ -21,9 +33,16 @@ const DIET_LABELS: Record<string, string> = {
   eggetarian: "Eggetarian",
 };
 
+const SECTION_META: { key: DishHighlight; title: string; dishesKey: "featured" | "chefs_special" | "unique_recipe" }[] = [
+  { key: "featured", title: "Featured", dishesKey: "featured" },
+  { key: "chefs_special", title: "Chef's special", dishesKey: "chefs_special" },
+  { key: "unique_recipe", title: "Unique recipes", dishesKey: "unique_recipe" },
+];
+
 export function KitchenMenuPage() {
   const { kitchenId: kitchenIdParam } = useParams<{ kitchenId: string }>();
   const branded = useBrandedStorefront();
+  const navigate = useNavigate();
   const kitchenId = kitchenIdParam || branded?.kitchen.id;
   const [menu, setMenu] = useState<Menu | null>(null);
   const [kitchenName, setKitchenName] = useState(branded?.kitchen.name ?? "");
@@ -32,6 +51,13 @@ export function KitchenMenuPage() {
   const [cartLines, setCartLines] = useState(0);
   const [cartReadyMin, setCartReadyMin] = useState(0);
   const [ratingMap, setRatingMap] = useState<Record<string, DishRatingSummary>>({});
+  const [plans, setPlans] = useState<SubscriptionPlan[]>([]);
+  const [subMsg, setSubMsg] = useState("");
+  const [subBusy, setSubBusy] = useState(false);
+  const [search, setSearch] = useState("");
+  const [sort, setSort] = useState<DishSort>("name_asc");
+  const [highlights, setHighlights] = useState<DishHighlight[]>([]);
+  const [diet, setDiet] = useState("");
   const checkoutHref = branded ? `${branded.basePath}/checkout` : "/checkout";
 
   useEffect(() => {
@@ -55,6 +81,9 @@ export function KitchenMenuPage() {
       .catch((err) =>
         setError(err instanceof Error ? err.message : "Menu not available for this kitchen."),
       );
+    fetchPublicSubscriptionPlans(kitchenId)
+      .then((r) => setPlans(r.plans))
+      .catch(() => setPlans([]));
     fetchKitchenRatingSummaries(kitchenId)
       .then(({ summaries }) => {
         const map: Record<string, DishRatingSummary> = {};
@@ -73,7 +102,72 @@ export function KitchenMenuPage() {
     return () => window.removeEventListener("storage", refreshCart);
   }, [kitchenId, branded]);
 
-  const groups = menu?.grouped?.length ? menu.grouped : fallbackGroups(menu);
+  const dietChips = useMemo(() => {
+    if (!menu) return [];
+    return (menu.diet_categories || []).map((c) => ({
+      id: c.slug,
+      label: DIET_LABELS[c.slug] ?? c.name,
+    }));
+  }, [menu]);
+
+  const filteredDishes = useMemo(() => {
+    if (!menu) return [];
+    return filterAndSortDishes(menu.dishes, {
+      q: search,
+      sort,
+      highlights,
+      diet: diet || undefined,
+    });
+  }, [menu, search, sort, highlights, diet]);
+
+  const groups = useMemo(() => {
+    if (!menu) return [];
+    return rebuildGroups(menu, filteredDishes);
+  }, [menu, filteredDishes]);
+
+  const highlightSections = useMemo(() => {
+    if (!menu) return [];
+    return SECTION_META.map((meta) => {
+      if (highlights.length && !highlights.includes(meta.key)) {
+        return { ...meta, dishes: [] as Dish[] };
+      }
+      const bucket =
+        menu.highlight_sections?.[meta.dishesKey] ??
+        menu.dishes.filter((d) =>
+          meta.key === "featured"
+            ? d.is_featured
+            : meta.key === "chefs_special"
+              ? d.is_chefs_special
+              : d.is_unique_recipe,
+        );
+      return {
+        ...meta,
+        dishes: filterAndSortDishes(bucket, {
+          q: search,
+          sort,
+          diet: diet || undefined,
+        }),
+      };
+    }).filter((s) => s.dishes.length > 0);
+  }, [menu, search, diet, highlights, sort]);
+
+  const requestPlan = async (planId: string) => {
+    if (!kitchenId) return;
+    if (!getCustomerToken()) {
+      navigate("/login");
+      return;
+    }
+    setSubBusy(true);
+    setSubMsg("");
+    try {
+      await requestKitchenSubscription(kitchenId, planId);
+      setSubMsg("Request sent — kitchen will accept or deny shortly.");
+    } catch (err) {
+      setSubMsg(err instanceof Error ? err.message : "Could not request subscription");
+    } finally {
+      setSubBusy(false);
+    }
+  };
 
   const handleAdd = (dish: Dish) => {
     if (!kitchenId) return;
@@ -98,9 +192,65 @@ export function KitchenMenuPage() {
           <header className="customer-menu__head">
             {!branded && <h1>{kitchenName || "Kitchen Menu"}</h1>}
             <p>
-              {menu.dishes.length} dishes · Cuisine → diet → dish · Live-capture verified heroes
+              {menu.dishes.length} dishes · Featured · Chef&apos;s special · Unique recipes
             </p>
           </header>
+
+          <ListingToolbar
+            search={search}
+            onSearchChange={setSearch}
+            searchPlaceholder="Search this menu…"
+            sort={sort}
+            onSortChange={(v) => setSort(v as DishSort)}
+            highlights={highlights}
+            onHighlightsChange={setHighlights}
+            filterChips={dietChips}
+            activeFilter={diet}
+            onFilterChange={setDiet}
+            resultCount={filteredDishes.length}
+          />
+
+          {plans.length > 0 && (
+            <section className="glass customer-menu__cuisine">
+              <h2 className="customer-menu__cuisine-title">Monthly thali / tiffin</h2>
+              <p className="owner-muted">Request a plan — kitchen confirms before it starts.</p>
+              {subMsg && <p className="report-hint">{subMsg}</p>}
+              <ul className="owner-detail-items">
+                {plans.map((p) => (
+                  <li key={p.id}>
+                    <span>
+                      <strong>{p.name}</strong> · {p.plan_type} · ₹{Math.round(p.price_monthly)}/mo
+                      {p.description ? ` — ${p.description}` : ""}
+                    </span>
+                    <button
+                      type="button"
+                      className="btn btn--primary btn--sm"
+                      disabled={subBusy}
+                      onClick={() => requestPlan(p.id)}
+                    >
+                      Request subscribe
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
+
+          {highlightSections.map((section) => (
+            <section key={section.key} className="customer-menu__highlight glass">
+              <h2 className="customer-menu__cuisine-title">{section.title}</h2>
+              <div className="customer-menu__grid">
+                {section.dishes.map((d) => (
+                  <DishCard
+                    key={`${section.key}-${d.id}`}
+                    dish={d}
+                    summary={ratingMap[d.id]}
+                    onAdd={() => handleAdd(d)}
+                  />
+                ))}
+              </div>
+            </section>
+          ))}
 
           {groups.map((group) => (
             <section key={group.cuisine.id} className="customer-menu__cuisine">
@@ -125,6 +275,10 @@ export function KitchenMenuPage() {
             </section>
           ))}
 
+          {filteredDishes.length === 0 && (
+            <p className="owner-muted">No dishes match these filters.</p>
+          )}
+
           {cartLines > 0 && kitchenId && (
             <div className="customer-cart-bar glass">
               <span>
@@ -141,37 +295,36 @@ export function KitchenMenuPage() {
   );
 }
 
-function fallbackGroups(menu: Menu | null): CuisineMenuGroup[] {
-  if (!menu?.dishes.length) return [];
+function rebuildGroups(menu: Menu, dishes: Dish[]): CuisineMenuGroup[] {
+  if (!dishes.length) return [];
+  const cuisineById = new Map(menu.cuisines.map((c) => [c.id, c]));
+  const dietById = new Map(menu.diet_categories.map((c) => [c.id, c]));
   const byCuisine = new Map<string, CuisineMenuGroup>();
-  for (const dish of menu.dishes) {
+
+  for (const dish of dishes) {
     const cKey = dish.cuisine_id ?? "unknown";
     if (!byCuisine.has(cKey)) {
-      byCuisine.set(cKey, {
-        cuisine: {
-          id: dish.cuisine_id ?? cKey,
-          kitchen_id: dish.kitchen_id,
-          name: dish.cuisine_name ?? "Menu",
-          slug: dish.cuisine_slug ?? "menu",
-          sort_order: 0,
-        },
-        diets: [],
-      });
+      const cuisine = (dish.cuisine_id && cuisineById.get(dish.cuisine_id)) || {
+        id: cKey,
+        kitchen_id: dish.kitchen_id,
+        name: dish.cuisine_name ?? "Menu",
+        slug: dish.cuisine_slug ?? "menu",
+        sort_order: 0,
+      };
+      byCuisine.set(cKey, { cuisine, diets: [] });
     }
     const group = byCuisine.get(cKey)!;
     const dKey = dish.category_id ?? "unknown";
     let dietGroup = group.diets.find((d) => d.diet.id === dKey);
     if (!dietGroup) {
-      dietGroup = {
-        diet: {
-          id: dish.category_id ?? dKey,
-          kitchen_id: dish.kitchen_id,
-          name: dish.category_name ?? "Dishes",
-          slug: dish.category_slug ?? "veg",
-          sort_order: 0,
-        },
-        dishes: [],
+      const diet = (dish.category_id && dietById.get(dish.category_id)) || {
+        id: dKey,
+        kitchen_id: dish.kitchen_id,
+        name: dish.category_name ?? "Dishes",
+        slug: dish.category_slug ?? "veg",
+        sort_order: 0,
       };
+      dietGroup = { diet, dishes: [] };
       group.diets.push(dietGroup);
     }
     dietGroup.dishes.push(dish);
@@ -193,11 +346,21 @@ function DishCard({
   const fallback =
     placeholders[Math.abs(hashCode(dish.name)) % placeholders.length];
   const imageSrc = hero?.url || fallback;
+  const badges = dishHighlightBadges(dish);
   return (
     <article className="glass customer-dish">
       <img src={imageSrc} alt={dish.name} loading="lazy" className="customer-dish__img" />
       <div>
         <h4>{dish.name}</h4>
+        {badges.length > 0 && (
+          <div className="dish-badges">
+            {badges.map((b) => (
+              <span key={b.key} className={`dish-badge dish-badge--${b.key}`}>
+                {b.label}
+              </span>
+            ))}
+          </div>
+        )}
         <p className="customer-dish__price">₹{dish.price}</p>
         <p className="customer-dish__eta">
           Prep {dish.prep_time_min} min

@@ -62,3 +62,20 @@ async def load_customer_phone(customer_id: uuid.UUID, session: AsyncSession) -> 
         {"cid": customer_id},
     )
     return result.scalar_one_or_none()
+
+
+async def load_customer_profile(
+    customer_id: uuid.UUID, session: AsyncSession
+) -> tuple[str | None, str | None]:
+    """Return (phone, name) for an active customer."""
+    result = await session.execute(
+        text(
+            "SELECT phone, name FROM ckac_identity.customers "
+            "WHERE id = :cid AND status = 'active' LIMIT 1"
+        ),
+        {"cid": customer_id},
+    )
+    row = result.one_or_none()
+    if not row:
+        return None, None
+    return row[0], row[1]

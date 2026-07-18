@@ -69,8 +69,16 @@ async def quote_porter_fee(
         return None
 
 
-async def quote_and_book_porter(session: AsyncSession, order) -> dict | None:
-    """Book Porter when configured; returns {fee, job_id} or None."""
+async def quote_and_book_porter(
+    session: AsyncSession,
+    order,
+    *,
+    pickup_time=None,
+) -> dict | None:
+    """Book Porter when configured; returns {fee, job_id} or None.
+
+    ``pickup_time`` (datetime) is sent when present so the partner arrives near food-ready.
+    """
     if (os.getenv("DELIVERY_PARTNER") or "").strip().lower() != "porter":
         return None
     if not (os.getenv("PORTER_API_KEY") or "").strip():
@@ -128,6 +136,11 @@ async def quote_and_book_porter(session: AsyncSession, order) -> dict | None:
             }
         },
     }
+    if pickup_time is not None:
+        try:
+            payload["pickup_time"] = pickup_time.isoformat()
+        except Exception:
+            pass
     try:
         async with httpx.AsyncClient(timeout=15.0) as client:
             res = await client.post(

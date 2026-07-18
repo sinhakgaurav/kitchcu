@@ -1,12 +1,17 @@
 import { BrowserRouter, Route, Routes } from "react-router-dom";
-import { PortalHomePage } from "./PortalHomePage";
+import { LegalPage } from "./LegalPage";
 import { OpenApiPage } from "./OpenApiPage";
+import { PortalHomePage } from "./PortalHomePage";
 
 export default function PortalApp() {
   return (
     <BrowserRouter>
       <Routes>
         <Route path="/" element={<PortalHomePage />} />
+        <Route path="/terms" element={<LegalPage kind="terms" />} />
+        <Route path="/privacy" element={<LegalPage kind="privacy" />} />
+        <Route path="/refund-policy" element={<LegalPage kind="refund" />} />
+        <Route path="/platform-refund-policy" element={<LegalPage kind="platform-refund" />} />
         <Route path="/openapi" element={<OpenApiPage />} />
         <Route path="/api-docs" element={<OpenApiPage />} />
       </Routes>

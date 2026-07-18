@@ -3,6 +3,7 @@ import { Link, Navigate, useNavigate, useSearchParams } from "react-router-dom";
 import { AnimatedMesh } from "../components/AnimatedMesh";
 import { AuthLoginHighlights } from "../components/AuthLoginHighlights";
 import { BrandAuthArt, BrandLogo } from "../components/BrandLogo";
+import { PolicyAgreement } from "../components/PolicyAgreement";
 import { DEMO, DEMO_OWNERS, type DemoOwnerAccount } from "../shared/demo";
 import { registerOwner, requestOtp, verifyOtp } from "../shared/api";
 import { KITCHEN_HOST, CUSTOMER_HOST } from "../shared/brand";
@@ -26,11 +27,16 @@ export function LoginPage() {
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [busyPhone, setBusyPhone] = useState<string | null>(null);
+  const [policiesAgreed, setPoliciesAgreed] = useState(false);
 
   if (token) return <Navigate to={nextPath.startsWith("/") ? nextPath : "/dashboard"} replace />;
 
   const handleRegister = async (e: FormEvent) => {
     e.preventDefault();
+    if (!policiesAgreed) {
+      setError("Please agree to the Terms, Privacy, and Refund Policies to register.");
+      return;
+    }
     setError("");
     setBusy(true);
     try {
@@ -88,10 +94,13 @@ export function LoginPage() {
       await login(access_token);
       navigate(nextPath.startsWith("/") ? nextPath : "/dashboard");
     } catch (err) {
+      const msg = err instanceof Error ? err.message : "Demo login failed";
+      const backendDown =
+        /unavailable|timed out|Docker|Gateway not ready|Failed to fetch|NetworkError/i.test(msg);
       setError(
-        err instanceof Error
-          ? `${err.message} — run: python scripts/seed-dev-data.py`
-          : "Demo login failed — seed demo data first",
+        backendDown
+          ? `${msg} — on GCP: restart identity (+ stack) on the VM (see docs/DEPLOYMENT-GCP.md §11.7–11.8). Seed only after /health/ready shows identity:true.`
+          : `${msg} — seed demo data: python scripts/seed-bulk-data.py (GCP) or python scripts/seed-dev-data.py (local)`,
       );
       setOtpSent(true);
     } finally {
@@ -146,7 +155,7 @@ export function LoginPage() {
               ))}
             </ul>
             <p className="auth-card__demo-note">
-              Requires backend + <code>python scripts/seed-dev-data.py</code>
+              Requires healthy API (<code>identity:true</code>). Seed only after that.
             </p>
           </div>
 
@@ -191,7 +200,16 @@ export function LoginPage() {
                 Email (optional)
                 <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder={DEMO.email} />
               </label>
-              <button type="submit" className="btn btn--primary btn--lg" disabled={busy}>
+              <PolicyAgreement
+                audience="owner"
+                checked={policiesAgreed}
+                onChange={setPoliciesAgreed}
+              />
+              <button
+                type="submit"
+                className="btn btn--primary btn--lg"
+                disabled={busy || !policiesAgreed}
+              >
                 {busy ? "Creating..." : "Register & Send OTP"}
               </button>
             </form>

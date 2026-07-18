@@ -160,6 +160,8 @@ class Kitchen(Base):
     min_order_for_free_delivery: Mapped[float | None] = mapped_column(nullable=True)
     delivery_subsidy_percent: Mapped[float] = mapped_column(default=50.0)
     tracking_notify_interval_min: Mapped[int] = mapped_column(default=5)
+    porter_auto_book_enabled: Mapped[bool] = mapped_column(default=True)
+    porter_auto_book_delay_min: Mapped[int] = mapped_column(default=15)
     status: Mapped[str] = mapped_column(String(20), default="pending_verification")
     whatsapp_phone_id: Mapped[str | None] = mapped_column(String(100), nullable=True, index=True)
     settings: Mapped[dict] = mapped_column(JSONB, default=dict)

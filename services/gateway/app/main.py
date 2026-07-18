@@ -22,7 +22,14 @@ _openapi_cache: dict | None = None
 IDENTITY_PREFIXES = ("/api/v1/auth", "/api/v1/owners", "/api/v1/admin", "/api/v1/customers")
 CATALOG_PATH_MARKERS = ("/categories", "/menu", "/dishes", "/cuisines", "/ingredients", "/media")
 ORDER_PATH_MARKERS = ("/orders", "/analytics")
-MARKETING_PATH_MARKERS = ("/crm", "/coupons", "/promotions", "/templates")
+MARKETING_PATH_MARKERS = (
+    "/crm",
+    "/coupons",
+    "/promotions",
+    "/templates",
+    "/subscription-plans",
+    "/subscriptions",
+)
 GST_PATH_MARKERS = ("/gst",)
 RATINGS_PATH_MARKERS = ("/ratings", "/suggestions")
 GROWTH_PATH_MARKERS = ("/growth",)
@@ -46,6 +53,8 @@ def resolve_service_url(path: str) -> str | None:
         return settings.order_service_url
     if path.startswith("/api/v1/customers/me/tickets"):
         return settings.notification_service_url
+    if path.startswith("/api/v1/customers/me/subscriptions"):
+        return settings.marketing_service_url
     if path.startswith((
         "/api/v1/customers/me/orders",
         "/api/v1/customers/me/master-orders",
@@ -67,7 +76,9 @@ def resolve_service_url(path: str) -> str | None:
         or path.rstrip("/").endswith("/package")
     ):
         return settings.billing_service_url
-    if path.startswith("/api/v1/admin/kitchens/") and "/templates" in path:
+    if path.startswith("/api/v1/admin/kitchens/") and (
+        "/templates" in path or path.rstrip("/").endswith("/tiffin-summary")
+    ):
         return settings.marketing_service_url
     if any(path.startswith(p) for p in IDENTITY_PREFIXES):
         if path.startswith("/api/v1/admin/tickets"):

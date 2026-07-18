@@ -1,8 +1,14 @@
 import { Link, useNavigate } from "react-router-dom";
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
+import { ListingToolbar } from "../../components/ListingToolbar";
 import { OwnerPageShell, OwnerPanel } from "../../components/owner/OwnerPageShell";
 import { createManualOrder, fetchMenu, type Dish } from "../../lib/api";
 import { useKitchen } from "../../lib/kitchen";
+import {
+  filterAndSortDishes,
+  type DishHighlight,
+  type DishSort,
+} from "../../shared/listingControls";
 
 type Line = { dish_id: string; quantity: number };
 
@@ -13,11 +19,19 @@ export function NewOrderPage() {
   const [lines, setLines] = useState<Line[]>([]);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [search, setSearch] = useState("");
+  const [sort, setSort] = useState<DishSort>("name_asc");
+  const [highlights, setHighlights] = useState<DishHighlight[]>([]);
 
   useEffect(() => {
     if (!kitchen) return;
     fetchMenu(kitchen.id).then((m) => setDishes(m.dishes)).catch(() => {});
   }, [kitchen]);
+
+  const visibleDishes = useMemo(
+    () => filterAndSortDishes(dishes, { q: search, sort, highlights }),
+    [dishes, search, sort, highlights],
+  );
 
   if (!kitchen) return null;
 
@@ -75,14 +89,26 @@ export function NewOrderPage() {
           {dishes.length === 0 ? (
             <p className="owner-muted">No dishes yet. <Link to="/dashboard/menu/new">Add dishes</Link> first.</p>
           ) : (
-            <div className="owner-dish-pick">
-              {dishes.map((d) => (
-                <button key={d.id} type="button" onClick={() => addLine(d.id)}>
-                  <span>{d.name}</span>
-                  <span>₹{d.price}</span>
-                </button>
-              ))}
-            </div>
+            <>
+              <ListingToolbar
+                search={search}
+                onSearchChange={setSearch}
+                searchPlaceholder="Search dishes…"
+                sort={sort}
+                onSortChange={(v) => setSort(v as DishSort)}
+                highlights={highlights}
+                onHighlightsChange={setHighlights}
+                resultCount={visibleDishes.length}
+              />
+              <div className="owner-dish-pick">
+                {visibleDishes.map((d) => (
+                  <button key={d.id} type="button" onClick={() => addLine(d.id)}>
+                    <span>{d.name}</span>
+                    <span>₹{d.price}</span>
+                  </button>
+                ))}
+              </div>
+            </>
           )}
         </OwnerPanel>
 

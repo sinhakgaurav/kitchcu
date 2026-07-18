@@ -1,13 +1,13 @@
 import { images } from "../data/content";
-import { ADMIN_HOST, CUSTOMER_HOST, KITCHEN_HOST } from "../shared/brand";
-import { customerUrl, kitchenUrl, adminUrl } from "../shared/urls";
+import { CUSTOMER_HOST, KITCHEN_HOST } from "../shared/brand";
+import { customerUrl, kitchenUrl } from "../shared/urls";
 
 const tiles = [
   {
     id: "customer",
     host: CUSTOMER_HOST,
-    title: "Browse & order",
-    description: "Discover nearby cloud kitchens, live-capture menus, and customer sign-in.",
+    title: "Order home-made food",
+    description: "Nearby kitchens, live-capture menus, honest ETAs, and fair delivery fees.",
     href: () => customerUrl("/"),
     image: images.customers.src,
     accent: "teal" as const,
@@ -16,28 +16,18 @@ const tiles = [
   {
     id: "kitchen",
     host: KITCHEN_HOST,
-    title: "Owner portal",
-    description: "WhatsApp orders, menu management, dashboard, and kitchen operations.",
-    href: () => kitchenUrl("/"),
+    title: "Run your kitchen",
+    description: "WhatsApp orders, menu, tiffin plans, reports — zero food commission.",
+    href: () => kitchenUrl("/login"),
     image: images.owners.src,
     accent: "orange" as const,
-    cta: "Open kitchen app",
-  },
-  {
-    id: "admin",
-    host: ADMIN_HOST,
-    title: "Platform admin",
-    description: "Manage all owners, kitchens, orders, and platform status.",
-    href: () => adminUrl("/"),
-    image: images.analytics.src,
-    accent: "orange" as const,
-    cta: "Open admin panel",
+    cta: "Owner sign in",
   },
 ];
 
 export function AppTiles() {
   return (
-    <div className="app-tiles">
+    <div className="app-tiles app-tiles--duo">
       {tiles.map((tile) => (
         <a
           key={tile.id}

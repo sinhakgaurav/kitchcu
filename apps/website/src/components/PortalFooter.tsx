@@ -9,22 +9,29 @@ export function PortalFooter() {
         <div className="footer__brand">
           <BrandNavMark height={40} />
           <p>
-            Cloud Kitchen Analytics &amp; Control — India's first (and the world's third)
             Growth OS for home food businesses, tiffin services, and delivery-only kitchens.
             Zero food commission.
           </p>
         </div>
         <div className="footer__links">
-          <a href="#features">Features</a>
-          <a href="#pricing">Pricing</a>
-          <a href="#support">Support</a>
-          <a href="#contact">Contact</a>
-          <a href="/openapi">API / OpenAPI</a>
-          <a href={customerUrl("/")} target="_blank" rel="noopener noreferrer">Customer app</a>
-          <a href={kitchenUrl("/")} target="_blank" rel="noopener noreferrer">Kitchen app</a>
+          <a href="/#features">Features</a>
+          <a href="/#pricing">Pricing</a>
+          <a href="/#support">Support</a>
+          <a href="/#contact">Contact</a>
+          <a href="/terms">Terms</a>
+          <a href="/privacy">Privacy</a>
+          <a href="/refund-policy">Kitchen refunds</a>
+          <a href="/platform-refund-policy">Platform refunds</a>
+          <a href="/openapi">API</a>
+          <a href={customerUrl("/")} target="_blank" rel="noopener noreferrer">
+            Customer app
+          </a>
+          <a href={kitchenUrl("/")} target="_blank" rel="noopener noreferrer">
+            Kitchen app
+          </a>
         </div>
         <p className="footer__copy">
-          © {new Date().getFullYear()} {APP_NAME} · {SUPPORT_EMAIL} · Pune, India
+          © {new Date().getFullYear()} {APP_NAME} · {SUPPORT_EMAIL}
         </p>
       </div>
     </footer>

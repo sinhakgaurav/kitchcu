@@ -78,17 +78,27 @@ export function cartItemCount(cart: CustomerCart | null, kitchenId?: string): nu
     );
 }
 
-/** Quality-first ETA: max dish ceiling across the kitchen cart (not sum of prep times). */
+/** Max prep across lines (parallel kitchen work — not a sum). */
+export function projectKitchenPrepMin(kitchen: KitchenCart): number {
+  if (!kitchen.lines.length) return 0;
+  return Math.max(...kitchen.lines.map((line) => line.prepTimeMin || 0));
+}
+
+/** Max delivery travel across lines. */
+export function projectKitchenDeliveryMin(kitchen: KitchenCart): number {
+  if (!kitchen.lines.length) return 0;
+  return Math.max(...kitchen.lines.map((line) => line.deliveryTimeMin || 0));
+}
+
+/**
+ * Customer-facing doorstep ETA = max(prep) + max(delivery).
+ * Quality-first: parallel prep, honest travel — not a fake speed race.
+ */
 export function projectKitchenReadyMin(kitchen: KitchenCart, forDelivery = true): number {
   if (!kitchen.lines.length) return 0;
-  return Math.max(
-    ...kitchen.lines.map((line) => {
-      const prep = line.prepTimeMin || 0;
-      const delivery = line.deliveryTimeMin || 0;
-      const maxTime = line.maxTimeMin || prep + delivery;
-      return forDelivery ? maxTime : prep;
-    }),
-  );
+  const prep = projectKitchenPrepMin(kitchen);
+  if (!forDelivery) return prep;
+  return prep + projectKitchenDeliveryMin(kitchen);
 }
 
 export function projectCartReadyMin(cart: CustomerCart | null, forDelivery = true): number {

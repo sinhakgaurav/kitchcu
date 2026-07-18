@@ -9,7 +9,34 @@ from app.deps import (
     get_current_owner_id,
     get_optional_customer_id,
     load_customer_phone,
+    load_customer_profile,
     verify_kitchen_owner,
+)
+from app.models import CustomerSubscription
+from app.subscriptions import (
+    MODULE_KEY as TIFFIN_MODULE,
+    CustomerSubscriptionResponse,
+    SubscribeRequest,
+    SubscriptionDecisionRequest,
+    SubscriptionPlanCreate,
+    SubscriptionPlanListResponse,
+    SubscriptionPlanResponse,
+    SubscriptionPlanUpdate,
+    SubscriptionSummaryResponse,
+    CustomerSubscriptionListResponse,
+    cancel_subscription,
+    create_plan,
+    decide_subscription,
+    get_plan_for_kitchen,
+    get_subscription_for_kitchen,
+    list_customer_subscriptions,
+    list_kitchen_subscriptions,
+    list_plans,
+    plan_to_response,
+    request_subscribe,
+    subscription_summary,
+    subscription_to_response,
+    update_plan,
 )
 from app.schemas import (
     ActivePromotionListResponse,
@@ -60,6 +87,7 @@ TAG_CRM = "CRM"
 TAG_COUPONS = "Coupons"
 TAG_PROMOTIONS = "Promotions"
 TAG_TEMPLATES = "Templates"
+TAG_TIFFIN = "Tiffin subscriptions"
 
 
 def get_publisher() -> EventPublisher:
@@ -415,3 +443,311 @@ async def templates_send(
     result = await send_template(session, publisher, kitchen_id, template_id, body)
     await session.commit()
     return result
+
+
+# --- F34 / F35 Tiffin & monthly plans ---
+
+
+@router.post(
+    "/kitchens/{kitchen_id}/subscription-plans",
+    response_model=SubscriptionPlanResponse,
+    status_code=status.HTTP_201_CREATED,
+    tags=[TAG_TIFFIN],
+    summary="Create a monthly thali/tiffin plan (F35)",
+    responses={**auth_errors(include_403=True), 400: RESP_400},
+)
+async def owner_create_plan(
+    kitchen_id: uuid.UUID,
+    body: SubscriptionPlanCreate,
+    owner_id: Annotated[uuid.UUID, Depends(get_current_owner_id)],
+    session: Annotated[AsyncSession, Depends(get_db)],
+    publisher: Annotated[EventPublisher, Depends(get_publisher)],
+):
+    await verify_kitchen_owner(kitchen_id, owner_id, session)
+    await require_kitchen_module(session, kitchen_id, TIFFIN_MODULE)
+    try:
+        plan = await create_plan(session, kitchen_id, body, publisher)
+        await session.commit()
+        await session.refresh(plan)
+        return await plan_to_response(session, plan)
+    except ValueError as exc:
+        await session.rollback()
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.get(
+    "/kitchens/{kitchen_id}/subscription-plans",
+    response_model=SubscriptionPlanListResponse,
+    tags=[TAG_TIFFIN],
+    summary="List kitchen subscription plans (owner)",
+    responses=auth_errors(include_403=True),
+)
+async def owner_list_plans(
+    kitchen_id: uuid.UUID,
+    owner_id: Annotated[uuid.UUID, Depends(get_current_owner_id)],
+    session: Annotated[AsyncSession, Depends(get_db)],
+    active_only: bool = Query(default=False),
+) -> SubscriptionPlanListResponse:
+    await verify_kitchen_owner(kitchen_id, owner_id, session)
+    await require_kitchen_module(session, kitchen_id, TIFFIN_MODULE)
+    plans = await list_plans(session, kitchen_id, active_only=active_only)
+    items = [await plan_to_response(session, p) for p in plans]
+    return SubscriptionPlanListResponse(plans=items, total=len(items))
+
+
+@router.patch(
+    "/kitchens/{kitchen_id}/subscription-plans/{plan_id}",
+    response_model=SubscriptionPlanResponse,
+    tags=[TAG_TIFFIN],
+    summary="Update / activate / deactivate a plan",
+    responses={**auth_errors(include_403=True), 400: RESP_400, 404: RESP_404},
+)
+async def owner_update_plan(
+    kitchen_id: uuid.UUID,
+    plan_id: uuid.UUID,
+    body: SubscriptionPlanUpdate,
+    owner_id: Annotated[uuid.UUID, Depends(get_current_owner_id)],
+    session: Annotated[AsyncSession, Depends(get_db)],
+    publisher: Annotated[EventPublisher, Depends(get_publisher)],
+):
+    await verify_kitchen_owner(kitchen_id, owner_id, session)
+    await require_kitchen_module(session, kitchen_id, TIFFIN_MODULE)
+    try:
+        plan = await get_plan_for_kitchen(session, kitchen_id, plan_id)
+        plan = await update_plan(session, plan, body, publisher)
+        await session.commit()
+        await session.refresh(plan)
+        return await plan_to_response(session, plan)
+    except ValueError as exc:
+        await session.rollback()
+        raise HTTPException(status_code=404 if "not found" in str(exc).lower() else 400, detail=str(exc)) from exc
+
+
+@router.get(
+    "/kitchens/{kitchen_id}/subscription-plans/public",
+    response_model=SubscriptionPlanListResponse,
+    tags=[TAG_TIFFIN],
+    summary="Public active plans for a kitchen (customer)",
+)
+async def public_list_plans(
+    kitchen_id: uuid.UUID,
+    session: Annotated[AsyncSession, Depends(get_db)],
+) -> SubscriptionPlanListResponse:
+    plans = await list_plans(session, kitchen_id, active_only=True)
+    items = [await plan_to_response(session, p) for p in plans]
+    return SubscriptionPlanListResponse(plans=items, total=len(items))
+
+
+@router.post(
+    "/kitchens/{kitchen_id}/subscription-plans/{plan_id}/subscribe",
+    response_model=CustomerSubscriptionResponse,
+    status_code=status.HTTP_201_CREATED,
+    tags=[TAG_TIFFIN],
+    summary="Customer requests monthly subscription (F34)",
+    responses={**auth_errors(), 400: RESP_400, 404: RESP_404},
+)
+async def customer_subscribe(
+    kitchen_id: uuid.UUID,
+    plan_id: uuid.UUID,
+    body: SubscribeRequest,
+    customer_id: Annotated[uuid.UUID, Depends(get_current_customer_id)],
+    session: Annotated[AsyncSession, Depends(get_db)],
+    publisher: Annotated[EventPublisher, Depends(get_publisher)],
+):
+    await require_kitchen_module(session, kitchen_id, TIFFIN_MODULE)
+    phone, name = await load_customer_profile(customer_id, session)
+    if not phone:
+        raise HTTPException(status_code=400, detail="Customer profile incomplete")
+    try:
+        sub = await request_subscribe(
+            session,
+            kitchen_id,
+            plan_id,
+            customer_id=customer_id,
+            customer_phone=phone,
+            customer_name=name,
+            data=body,
+            publisher=publisher,
+        )
+        await session.commit()
+        await session.refresh(sub)
+        return await subscription_to_response(session, sub)
+    except ValueError as exc:
+        await session.rollback()
+        code = 404 if "not found" in str(exc).lower() else 400
+        raise HTTPException(status_code=code, detail=str(exc)) from exc
+
+
+@router.get(
+    "/kitchens/{kitchen_id}/subscriptions",
+    response_model=CustomerSubscriptionListResponse,
+    tags=[TAG_TIFFIN],
+    summary="List enrollments for kitchen (owner)",
+    responses=auth_errors(include_403=True),
+)
+async def owner_list_subscriptions(
+    kitchen_id: uuid.UUID,
+    owner_id: Annotated[uuid.UUID, Depends(get_current_owner_id)],
+    session: Annotated[AsyncSession, Depends(get_db)],
+    status_filter: str | None = Query(default=None, alias="status"),
+    limit: int = Query(default=100, ge=1, le=200),
+) -> CustomerSubscriptionListResponse:
+    await verify_kitchen_owner(kitchen_id, owner_id, session)
+    await require_kitchen_module(session, kitchen_id, TIFFIN_MODULE)
+    rows = await list_kitchen_subscriptions(
+        session, kitchen_id, status=status_filter, limit=limit
+    )
+    items = [await subscription_to_response(session, s) for s in rows]
+    return CustomerSubscriptionListResponse(subscriptions=items, total=len(items))
+
+
+@router.get(
+    "/kitchens/{kitchen_id}/subscriptions/summary",
+    response_model=SubscriptionSummaryResponse,
+    tags=[TAG_TIFFIN],
+    summary="Subscription KPIs for reports / intelligence",
+    responses=auth_errors(include_403=True),
+)
+async def owner_subscription_summary(
+    kitchen_id: uuid.UUID,
+    owner_id: Annotated[uuid.UUID, Depends(get_current_owner_id)],
+    session: Annotated[AsyncSession, Depends(get_db)],
+) -> SubscriptionSummaryResponse:
+    await verify_kitchen_owner(kitchen_id, owner_id, session)
+    await require_kitchen_module(session, kitchen_id, TIFFIN_MODULE)
+    return await subscription_summary(session, kitchen_id)
+
+
+async def _owner_decide(
+    kitchen_id: uuid.UUID,
+    sub_id: uuid.UUID,
+    action: str,
+    body: SubscriptionDecisionRequest,
+    owner_id: uuid.UUID,
+    session: AsyncSession,
+    publisher: EventPublisher,
+):
+    await verify_kitchen_owner(kitchen_id, owner_id, session)
+    await require_kitchen_module(session, kitchen_id, TIFFIN_MODULE)
+    try:
+        sub = await get_subscription_for_kitchen(session, kitchen_id, sub_id)
+        sub = await decide_subscription(
+            session, sub, action=action, owner_id=owner_id, data=body, publisher=publisher
+        )
+        await session.commit()
+        await session.refresh(sub)
+        return await subscription_to_response(session, sub)
+    except ValueError as exc:
+        await session.rollback()
+        code = 404 if "not found" in str(exc).lower() else 400
+        raise HTTPException(status_code=code, detail=str(exc)) from exc
+
+
+@router.post(
+    "/kitchens/{kitchen_id}/subscriptions/{sub_id}/accept",
+    response_model=CustomerSubscriptionResponse,
+    tags=[TAG_TIFFIN],
+    summary="Accept a pending subscription request",
+)
+async def owner_accept_sub(
+    kitchen_id: uuid.UUID,
+    sub_id: uuid.UUID,
+    body: SubscriptionDecisionRequest,
+    owner_id: Annotated[uuid.UUID, Depends(get_current_owner_id)],
+    session: Annotated[AsyncSession, Depends(get_db)],
+    publisher: Annotated[EventPublisher, Depends(get_publisher)],
+):
+    return await _owner_decide(kitchen_id, sub_id, "accept", body, owner_id, session, publisher)
+
+
+@router.post(
+    "/kitchens/{kitchen_id}/subscriptions/{sub_id}/deny",
+    response_model=CustomerSubscriptionResponse,
+    tags=[TAG_TIFFIN],
+    summary="Deny a pending subscription request",
+)
+async def owner_deny_sub(
+    kitchen_id: uuid.UUID,
+    sub_id: uuid.UUID,
+    body: SubscriptionDecisionRequest,
+    owner_id: Annotated[uuid.UUID, Depends(get_current_owner_id)],
+    session: Annotated[AsyncSession, Depends(get_db)],
+    publisher: Annotated[EventPublisher, Depends(get_publisher)],
+):
+    return await _owner_decide(kitchen_id, sub_id, "deny", body, owner_id, session, publisher)
+
+
+@router.post(
+    "/kitchens/{kitchen_id}/subscriptions/{sub_id}/activate",
+    response_model=CustomerSubscriptionResponse,
+    tags=[TAG_TIFFIN],
+    summary="Re-activate a paused subscription",
+)
+async def owner_activate_sub(
+    kitchen_id: uuid.UUID,
+    sub_id: uuid.UUID,
+    body: SubscriptionDecisionRequest,
+    owner_id: Annotated[uuid.UUID, Depends(get_current_owner_id)],
+    session: Annotated[AsyncSession, Depends(get_db)],
+    publisher: Annotated[EventPublisher, Depends(get_publisher)],
+):
+    return await _owner_decide(kitchen_id, sub_id, "activate", body, owner_id, session, publisher)
+
+
+@router.post(
+    "/kitchens/{kitchen_id}/subscriptions/{sub_id}/deactivate",
+    response_model=CustomerSubscriptionResponse,
+    tags=[TAG_TIFFIN],
+    summary="Pause an active subscription",
+)
+async def owner_deactivate_sub(
+    kitchen_id: uuid.UUID,
+    sub_id: uuid.UUID,
+    body: SubscriptionDecisionRequest,
+    owner_id: Annotated[uuid.UUID, Depends(get_current_owner_id)],
+    session: Annotated[AsyncSession, Depends(get_db)],
+    publisher: Annotated[EventPublisher, Depends(get_publisher)],
+):
+    return await _owner_decide(kitchen_id, sub_id, "deactivate", body, owner_id, session, publisher)
+
+
+@router.get(
+    "/customers/me/subscriptions",
+    response_model=CustomerSubscriptionListResponse,
+    tags=[TAG_TIFFIN],
+    summary="List my kitchen subscriptions",
+    responses=auth_errors(),
+)
+async def customer_list_subs(
+    customer_id: Annotated[uuid.UUID, Depends(get_current_customer_id)],
+    session: Annotated[AsyncSession, Depends(get_db)],
+) -> CustomerSubscriptionListResponse:
+    rows = await list_customer_subscriptions(session, customer_id)
+    items = [await subscription_to_response(session, s) for s in rows]
+    return CustomerSubscriptionListResponse(subscriptions=items, total=len(items))
+
+
+@router.post(
+    "/customers/me/subscriptions/{sub_id}/cancel",
+    response_model=CustomerSubscriptionResponse,
+    tags=[TAG_TIFFIN],
+    summary="Customer cancels their subscription",
+    responses={**auth_errors(), 400: RESP_400, 404: RESP_404},
+)
+async def customer_cancel_sub(
+    sub_id: uuid.UUID,
+    customer_id: Annotated[uuid.UUID, Depends(get_current_customer_id)],
+    session: Annotated[AsyncSession, Depends(get_db)],
+    publisher: Annotated[EventPublisher, Depends(get_publisher)],
+):
+    sub = await session.get(CustomerSubscription, sub_id)
+    if not sub:
+        raise HTTPException(status_code=404, detail="Subscription not found")
+    try:
+        sub = await cancel_subscription(session, sub, customer_id=customer_id, publisher=publisher)
+        await session.commit()
+        await session.refresh(sub)
+        return await subscription_to_response(session, sub)
+    except ValueError as exc:
+        await session.rollback()
+        raise HTTPException(status_code=400, detail=str(exc)) from exc

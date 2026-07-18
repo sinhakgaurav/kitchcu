@@ -141,6 +141,9 @@ class DishCreateRequest(BaseModel):
         default=None, description="Free-text hygiene/quality notes shown to build customer trust."
     )
     is_active: bool = Field(default=True, description="Whether the dish is visible on the live menu.")
+    is_featured: bool = Field(default=False, description="Show in Featured section / filter.")
+    is_chefs_special: bool = Field(default=False, description="Show in Chef's special section / filter.")
+    is_unique_recipe: bool = Field(default=False, description="Show in Unique recipe section / filter.")
     media: DishMediaInput = Field(..., description="Hero image — see truth-in-media requirement above.")
 
     @model_validator(mode="after")
@@ -189,20 +192,108 @@ class DishResponse(BaseModel):
     ingredients_description: str | None = Field(default=None, description="Free-text ingredient list.")
     quality_measures: str | None = Field(default=None, description="Free-text hygiene/quality notes.")
     is_active: bool = Field(..., description="Whether the dish is visible on the live menu.")
+    is_featured: bool = Field(default=False, description="Featured merchandising flag.")
+    is_chefs_special: bool = Field(default=False, description="Chef's special merchandising flag.")
+    is_unique_recipe: bool = Field(default=False, description="Unique recipe merchandising flag.")
+    created_at: datetime | None = Field(default=None, description="Dish creation timestamp.")
     media: list[DishMediaResponse] = Field(default_factory=list, description="Hero + gallery photos.")
 
     model_config = {"from_attributes": True}
+
+
+class MenuHighlightSections(BaseModel):
+    """Customer-facing merchandising buckets for the kitchen menu."""
+
+    featured: list[DishResponse] = Field(default_factory=list)
+    chefs_special: list[DishResponse] = Field(default_factory=list)
+    unique_recipe: list[DishResponse] = Field(default_factory=list)
 
 
 class MenuResponse(BaseModel):
     """The full active menu for a kitchen — flat list plus cuisine/diet grouping for the menu UI."""
 
     kitchen_id: uuid.UUID = Field(..., description="Kitchen this menu belongs to.")
-    dishes: list[DishResponse] = Field(..., description="All active dishes, flat list.")
+    dishes: list[DishResponse] = Field(..., description="Active dishes (optionally filtered/sorted).")
     grouped: list[CuisineMenuGroup] = Field(default_factory=list, description="Dishes grouped by cuisine → diet.")
     cuisines: list[CuisineResponse] = Field(default_factory=list, description="Cuisines with at least one dish.")
     diet_categories: list[CategoryResponse] = Field(
         default_factory=list, description="Diet categories available for this kitchen."
+    )
+    highlight_sections: MenuHighlightSections = Field(
+        default_factory=MenuHighlightSections,
+        description="Featured / chef's special / unique recipe sections for the filtered dish set.",
+    )
+
+
+MENU_SORT_OPTIONS = frozenset(
+    {"name_asc", "name_desc", "price_asc", "price_desc", "prep_asc", "newest"}
+)
+HIGHLIGHT_FILTERS = frozenset({"featured", "chefs_special", "unique_recipe"})
+
+
+def apply_menu_list_options(
+    dishes: list[DishResponse],
+    *,
+    highlight: str | None = None,
+    diet: str | None = None,
+    q: str | None = None,
+    sort: str | None = None,
+) -> list[DishResponse]:
+    """Filter + sort dish list in-process (after menu cache load)."""
+    out = list(dishes)
+    if highlight:
+        flags = {p.strip() for p in highlight.split(",") if p.strip()}
+        unknown = flags - HIGHLIGHT_FILTERS
+        if unknown:
+            raise ValueError(f"Invalid highlight filter: {', '.join(sorted(unknown))}")
+
+        def _match(d: DishResponse) -> bool:
+            return (
+                ("featured" in flags and d.is_featured)
+                or ("chefs_special" in flags and d.is_chefs_special)
+                or ("unique_recipe" in flags and d.is_unique_recipe)
+            )
+
+        out = [d for d in out if _match(d)]
+    if diet:
+        slug = diet.strip().lower()
+        out = [d for d in out if (d.category_slug or "").lower() == slug]
+    if q:
+        needle = q.strip().lower()
+        if needle:
+            out = [
+                d
+                for d in out
+                if needle in d.name.lower()
+                or needle in (d.description or "").lower()
+                or needle in (d.cuisine_name or "").lower()
+            ]
+    sort_key = (sort or "name_asc").strip().lower()
+    if sort_key not in MENU_SORT_OPTIONS:
+        raise ValueError(f"Invalid sort: {sort}")
+    if sort_key == "name_asc":
+        out.sort(key=lambda d: d.name.lower())
+    elif sort_key == "name_desc":
+        out.sort(key=lambda d: d.name.lower(), reverse=True)
+    elif sort_key == "price_asc":
+        out.sort(key=lambda d: (d.price, d.name.lower()))
+    elif sort_key == "price_desc":
+        out.sort(key=lambda d: (d.price, d.name.lower()), reverse=True)
+    elif sort_key == "prep_asc":
+        out.sort(key=lambda d: (d.prep_time_min, d.name.lower()))
+    elif sort_key == "newest":
+        out.sort(
+            key=lambda d: (d.created_at or datetime.min.replace(tzinfo=UTC), d.name.lower()),
+            reverse=True,
+        )
+    return out
+
+
+def build_highlight_sections(dishes: list[DishResponse]) -> MenuHighlightSections:
+    return MenuHighlightSections(
+        featured=[d for d in dishes if d.is_featured],
+        chefs_special=[d for d in dishes if d.is_chefs_special],
+        unique_recipe=[d for d in dishes if d.is_unique_recipe],
     )
 
 
@@ -293,6 +384,9 @@ async def create_dish(
         ingredients_description=data.ingredients_description,
         quality_measures=data.quality_measures,
         is_active=data.is_active,
+        is_featured=data.is_featured,
+        is_chefs_special=data.is_chefs_special,
+        is_unique_recipe=data.is_unique_recipe,
     )
     session.add(dish)
     await session.flush()
@@ -313,7 +407,14 @@ async def create_dish(
             aggregate_type="dish",
             aggregate_id=str(dish.id),
             producer="catalog-service",
-            payload={"kitchen_id": str(kitchen_id), "dish_id": str(dish.id), "name": dish.name},
+            payload={
+                "kitchen_id": str(kitchen_id),
+                "dish_id": str(dish.id),
+                "name": dish.name,
+                "is_featured": dish.is_featured,
+                "is_chefs_special": dish.is_chefs_special,
+                "is_unique_recipe": dish.is_unique_recipe,
+            },
         )
         await publisher.publish(stream_key("catalog", "dish"), event, session=session)
 
@@ -326,6 +427,9 @@ class DishUpdateRequest(BaseModel):
     name: str | None = Field(default=None, min_length=2, max_length=255, description="New dish name.")
     price: float | None = Field(default=None, gt=0, description="New price in INR.")
     is_active: bool | None = Field(default=None, description="Toggle menu visibility.")
+    is_featured: bool | None = Field(default=None, description="Toggle Featured flag.")
+    is_chefs_special: bool | None = Field(default=None, description="Toggle Chef's special flag.")
+    is_unique_recipe: bool | None = Field(default=None, description="Toggle Unique recipe flag.")
     prep_time_min: int | None = Field(default=None, gt=0, description="New preparation time in minutes.")
     delivery_time_min: int | None = Field(default=None, ge=0, description="New delivery time in minutes.")
     max_time_min: int | None = Field(default=None, gt=0, description="New max readiness minutes for customers.")
@@ -429,6 +533,10 @@ async def dish_with_media(session: AsyncSession, dish: Dish) -> DishResponse:
         ingredients_description=dish.ingredients_description,
         quality_measures=dish.quality_measures,
         is_active=dish.is_active,
+        is_featured=bool(dish.is_featured),
+        is_chefs_special=bool(dish.is_chefs_special),
+        is_unique_recipe=bool(dish.is_unique_recipe),
+        created_at=dish.created_at,
         media=[DishMediaResponse.model_validate(m) for m in media],
     )
 

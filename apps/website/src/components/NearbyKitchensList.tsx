@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState, type CSSProperties, type RefObject } from "react";
 import { useNavigate } from "react-router-dom";
+import { ListingToolbar } from "./ListingToolbar";
 import { kitchenCardImage } from "../data/content";
 import { DEMO } from "../shared/demo";
 import type { KitchenNearby, LiveKitchenSummary } from "../shared/api";
@@ -12,6 +13,7 @@ import { useInView } from "../hooks/useParallax";
 
 type SortOrder = "asc" | "desc";
 type DietFilter = "" | "veg" | "non_veg" | "vegan";
+type ListSort = "distance_asc" | "distance_desc" | "name_asc" | "name_desc";
 
 export function NearbyKitchensList() {
   const navigate = useNavigate();
@@ -23,6 +25,8 @@ export function NearbyKitchensList() {
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState("");
   const [sort, setSort] = useState<SortOrder>("asc");
+  const [listSort, setListSort] = useState<ListSort>("distance_asc");
+  const [search, setSearch] = useState("");
   const [maxKm, setMaxKm] = useState(25);
   const [diet, setDiet] = useState<DietFilter>("");
   const [liveCaptureOnly, setLiveCaptureOnly] = useState(false);
@@ -79,6 +83,31 @@ export function NearbyKitchensList() {
 
   const useDemoLocation = () => {
     setCoords(DEMO.defaultLocation);
+  };
+
+  const displayed = useMemo(() => {
+    let list = [...kitchens];
+    if (search.trim()) {
+      const n = search.trim().toLowerCase();
+      list = list.filter(
+        (k) =>
+          k.name.toLowerCase().includes(n) ||
+          (k.city || "").toLowerCase().includes(n) ||
+          (k.code || "").toLowerCase().includes(n),
+      );
+    }
+    if (listSort === "name_asc") list.sort((a, b) => a.name.localeCompare(b.name));
+    else if (listSort === "name_desc") list.sort((a, b) => b.name.localeCompare(a.name));
+    else if (listSort === "distance_desc") list.sort((a, b) => b.distance_km - a.distance_km);
+    else list.sort((a, b) => a.distance_km - b.distance_km);
+    return list;
+  }, [kitchens, search, listSort]);
+
+  const onListSortChange = (v: string) => {
+    const next = v as ListSort;
+    setListSort(next);
+    if (next === "distance_asc") setSort("asc");
+    if (next === "distance_desc") setSort("desc");
   };
 
   return (
@@ -158,6 +187,21 @@ export function NearbyKitchensList() {
 
         {fetchError && <div className="auth-card__error">{fetchError}</div>}
 
+        <ListingToolbar
+          search={search}
+          onSearchChange={setSearch}
+          searchPlaceholder="Search kitchens by name or city…"
+          sort={listSort}
+          onSortChange={onListSortChange}
+          sortOptions={[
+            { value: "distance_asc", label: "Distance ↑" },
+            { value: "distance_desc", label: "Distance ↓" },
+            { value: "name_asc", label: "Name A–Z" },
+            { value: "name_desc", label: "Name Z–A" },
+          ]}
+          resultCount={displayed.length}
+        />
+
         {loading ? (
           <p className="app-loading nearby-kitchens__loading">Finding kitchens near you…</p>
         ) : kitchens.length === 0 ? (
@@ -167,9 +211,13 @@ export function NearbyKitchensList() {
               Run <code>python scripts/seed-dev-data.py</code> or widen the search radius.
             </p>
           </div>
+        ) : displayed.length === 0 ? (
+          <div className="glass nearby-kitchens__empty">
+            <p>No kitchens match “{search}”.</p>
+          </div>
         ) : (
           <ul className={`nearby-kitchens__list reveal-stagger ${visible ? "reveal--visible" : ""}`}>
-            {kitchens.map((k, i) => {
+            {displayed.map((k, i) => {
               const live = liveByKitchen[k.id];
               return (
               <li key={k.id} style={{ "--i": i } as CSSProperties}>

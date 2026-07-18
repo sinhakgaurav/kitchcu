@@ -237,9 +237,10 @@ async def test_customer_order_platform_mode_beyond_range_shared_subsidy(
         "items": [{"dish_id": str(dish_id), "quantity": 2}],
         "delivery_type": "delivery",
         "delivery_mode": "platform",
-        "payment_method": "cod",
+        "payment_method": "upi",
         "delivery_fee": customer_fee,
         "delivery_fee_accepted": True,
+        "delivery_fee_payment": "prepaid",
         "customer_latitude": far_lat,
         "customer_longitude": far_lng,
     }

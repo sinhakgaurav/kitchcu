@@ -26,6 +26,7 @@ const NAV_SECTIONS: { label: string; items: NavItem[] }[] = [
       { to: "/dashboard/growth", label: "Intelligence" },
       { to: "/dashboard/crm", label: "CRM" },
       { to: "/dashboard/coupons", label: "Coupons" },
+      { to: "/dashboard/tiffin", label: "Tiffin plans", module: "tiffin_plans" },
       { to: "/dashboard/templates", label: "Templates", module: "marketing_broadcast" },
       { to: "/dashboard/stream", label: "Live stream", module: "streaming" },
     ],

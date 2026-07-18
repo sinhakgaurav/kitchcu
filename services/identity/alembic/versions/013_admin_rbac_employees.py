@@ -6,7 +6,7 @@ import sqlalchemy as sa
 from alembic import op
 
 revision: str = "013"
-down_revision: Union[str, None] = "012"
+down_revision: Union[str, None] = "012_whatsapp_phone_unique"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 

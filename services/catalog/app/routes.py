@@ -1,7 +1,7 @@
 import uuid
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.deps import get_current_owner_id, verify_kitchen_owner
@@ -12,6 +12,8 @@ from app.schemas import (
     DishResponse,
     DishUpdateRequest,
     MenuResponse,
+    apply_menu_list_options,
+    build_highlight_sections,
     build_menu_grouped,
     create_dish,
     dish_with_media,
@@ -118,13 +120,25 @@ async def diet_categories_public(
     summary="Get the active menu",
     description=(
         "Public — the kitchen's active menu: flat dish list plus cuisine → diet grouping for the menu UI. "
-        "Cached in Redis for 5 minutes (`menu:{kitchen_id}`); invalidated on dish create/update."
+        "Cached in Redis for 5 minutes (`menu:{kitchen_id}`); invalidated on dish create/update. "
+        "Optional `highlight` (featured|chefs_special|unique_recipe), `diet`, `q`, and `sort` "
+        "are applied after cache load."
     ),
-    responses={422: RESP_422},
+    responses={400: RESP_400, 422: RESP_422},
 )
 async def menu_get(
     kitchen_id: uuid.UUID,
     session: Annotated[AsyncSession, Depends(get_db)],
+    highlight: Annotated[
+        str | None,
+        Query(description="Comma-separated: featured, chefs_special, unique_recipe"),
+    ] = None,
+    diet: Annotated[str | None, Query(description="Diet category slug filter")] = None,
+    q: Annotated[str | None, Query(description="Search name/description/cuisine")] = None,
+    sort: Annotated[
+        str | None,
+        Query(description="name_asc|name_desc|price_asc|price_desc|prep_asc|newest"),
+    ] = None,
 ) -> MenuResponse:
     from app.deps import require_kitchen_exists
     from app.main import redis_client
@@ -133,22 +147,45 @@ async def menu_get(
 
     cached = await get_cached_menu(redis_client, kitchen_id)
     if cached:
-        return MenuResponse(**cached)
+        base = MenuResponse(**cached)
+    else:
+        dishes = await get_menu(session, kitchen_id)
+        enriched = [await dish_with_media(session, d) for d in dishes]
+        cuisines = await list_cuisines(session, kitchen_id)
+        categories = await list_categories(session, kitchen_id)
+        grouped = build_menu_grouped(cuisines, categories, enriched)
+        base = MenuResponse(
+            kitchen_id=kitchen_id,
+            dishes=enriched,
+            grouped=grouped,
+            cuisines=[CuisineResponse.model_validate(c) for c in cuisines],
+            diet_categories=[CategoryResponse.model_validate(c) for c in categories],
+            highlight_sections=build_highlight_sections(enriched),
+        )
+        await set_cached_menu(redis_client, kitchen_id, base.model_dump(mode="json"))
 
-    dishes = await get_menu(session, kitchen_id)
-    enriched = [await dish_with_media(session, d) for d in dishes]
-    cuisines = await list_cuisines(session, kitchen_id)
-    categories = await list_categories(session, kitchen_id)
-    grouped = build_menu_grouped(cuisines, categories, enriched)
-    response = MenuResponse(
-        kitchen_id=kitchen_id,
-        dishes=enriched,
-        grouped=grouped,
-        cuisines=[CuisineResponse.model_validate(c) for c in cuisines],
-        diet_categories=[CategoryResponse.model_validate(c) for c in categories],
+    has_options = any([highlight, diet, q, sort])
+    if not has_options:
+        base.highlight_sections = build_highlight_sections(base.dishes)
+        return base
+
+    try:
+        filtered = apply_menu_list_options(
+            base.dishes, highlight=highlight, diet=diet, q=q, sort=sort or "name_asc"
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+
+    cuisine_models = await list_cuisines(session, kitchen_id)
+    category_models = await list_categories(session, kitchen_id)
+    return MenuResponse(
+        kitchen_id=base.kitchen_id,
+        dishes=filtered,
+        grouped=build_menu_grouped(cuisine_models, category_models, filtered),
+        cuisines=base.cuisines,
+        diet_categories=base.diet_categories,
+        highlight_sections=build_highlight_sections(filtered),
     )
-    await set_cached_menu(redis_client, kitchen_id, response.model_dump(mode="json"))
-    return response
 
 
 @router.post(

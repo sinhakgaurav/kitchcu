@@ -53,8 +53,17 @@ export const KITCHEN_APP_URL =
 export const ADMIN_APP_URL =
   import.meta.env.VITE_ADMIN_APP_URL ?? "http://localhost:13003";
 
+export const PORTAL_APP_URL =
+  import.meta.env.VITE_PORTAL_APP_URL ?? "http://localhost:13000";
+
 export function adminUrl(path = "/"): string {
   const base = resolveAppUrl(ADMIN_APP_URL, "admin" as keyof typeof DEV_PORTS);
+  return path.startsWith("/") ? `${base}${path}` : `${base}/${path}`;
+}
+
+/** Marketing site / legal pages (apex domain or localhost:13000). */
+export function portalUrl(path = "/"): string {
+  const base = resolveAppUrl(PORTAL_APP_URL, "portal");
   return path.startsWith("/") ? `${base}${path}` : `${base}/${path}`;
 }
 

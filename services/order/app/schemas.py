@@ -315,8 +315,18 @@ class OrderResponse(BaseModel):
     )
     total: float = Field(..., description="Amount charged to the customer: `subtotal + delivery_fee`.", examples=[480.0])
     estimated_prep_min: int | None = Field(default=None, description="Max prep time across line items, in minutes.")
+    estimated_delivery_min: int | None = Field(
+        default=None, description="Max delivery travel time across line items, in minutes (delivery orders)."
+    )
     estimated_ready_at: datetime | None = Field(
-        default=None, description="Predicted ready time: order creation time + prep time (+ dish delivery time if `delivery_type` is 'delivery')."
+        default=None, description="Predicted food-ready time: accept/create time + max prep."
+    )
+    estimated_delivery_at: datetime | None = Field(
+        default=None,
+        description="Predicted doorstep time: ready + max delivery (prep + delivery). Null for pickup.",
+    )
+    porter_auto_book_at: datetime | None = Field(
+        default=None, description="When set, platform will attempt Porter booking at/after this time."
     )
     cancel_reason: str | None = Field(default=None, description="Reason supplied when the order was cancelled. `null` unless `status == 'cancelled'`.")
     created_at: datetime = Field(..., description="Order creation timestamp, UTC.")
@@ -764,20 +774,17 @@ async def create_manual_order(
 
     line_items: list[tuple[str, float, int, int, OrderItemInput]] = []
     max_prep = 0
-    max_projected = 0
+    max_delivery = 0
     subtotal = 0.0
 
     for item in data.items:
-        name, price, prep_min, delivery_min, max_time = await _load_dish(
+        name, price, prep_min, delivery_min, _max_time = await _load_dish(
             session, kitchen_id, item.dish_id
         )
         line_items.append((name, price, prep_min, delivery_min, item))
         max_prep = max(max_prep, prep_min)
-        # Quality-first: project cart/order ETA from each dish's owner max_time (not sum of preps).
         if data.delivery_type == "delivery":
-            max_projected = max(max_projected, max_time)
-        else:
-            max_projected = max(max_projected, prep_min)
+            max_delivery = max(max_delivery, delivery_min)
         subtotal += price * item.quantity
 
     delivery_mode = getattr(data, "delivery_mode", None) or "self"
@@ -811,8 +818,15 @@ async def create_manual_order(
         delivery_fee_payment=getattr(data, "delivery_fee_payment", None),
     )
     total = subtotal + delivery_fee
-    eta_minutes = max_projected or max_prep
-    estimated_ready_at = datetime.now(UTC) + timedelta(minutes=eta_minutes)
+    from app.porter_auto_book import compute_order_eta
+
+    created_at = datetime.now(UTC)
+    estimated_ready_at, estimated_delivery_at, delivery_stored = compute_order_eta(
+        from_time=created_at,
+        prep_min=max_prep,
+        delivery_min=max_delivery,
+        delivery_type=data.delivery_type,
+    )
     tracking_token = _new_tracking_token() if data.delivery_type == "delivery" else None
 
     order = Order(
@@ -840,7 +854,9 @@ async def create_manual_order(
         idempotency_key=idempotency_key,
         total=total,
         estimated_prep_min=max_prep,
+        estimated_delivery_min=delivery_stored if data.delivery_type == "delivery" else None,
         estimated_ready_at=estimated_ready_at,
+        estimated_delivery_at=estimated_delivery_at,
     )
     session.add(order)
     await session.flush()
@@ -1203,7 +1219,10 @@ async def order_to_response(session: AsyncSession, order: Order) -> OrderRespons
         tracking_token=order.tracking_token,
         total=float(order.total),
         estimated_prep_min=order.estimated_prep_min,
+        estimated_delivery_min=getattr(order, "estimated_delivery_min", None),
         estimated_ready_at=order.estimated_ready_at,
+        estimated_delivery_at=getattr(order, "estimated_delivery_at", None),
+        porter_auto_book_at=getattr(order, "porter_auto_book_at", None),
         cancel_reason=order.cancel_reason,
         created_at=order.created_at,
         items=[OrderItemResponse.model_validate(i) for i in items_result.scalars().all()],

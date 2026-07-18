@@ -4,12 +4,11 @@ import { APP_TAGLINE } from "../shared/brand";
 import { customerUrl, kitchenUrl } from "../shared/urls";
 
 const links = [
+  { href: "#apps", label: "Apps" },
   { href: "#features", label: "Features" },
   { href: "#pricing", label: "Pricing" },
   { href: "#support", label: "Support" },
   { href: "#contact", label: "Contact" },
-  { href: "#apps", label: "Apps" },
-  { href: "/openapi", label: "API" },
 ];
 
 export function PortalNavbar() {
@@ -26,7 +25,7 @@ export function PortalNavbar() {
   return (
     <header className={`nav ${scrolled ? "nav--scrolled" : ""}`}>
       <div className="nav__inner container">
-        <BrandNavMark href="#top" subtitle={APP_TAGLINE} height={48} />
+        <BrandNavMark href="/" subtitle={APP_TAGLINE} height={48} />
 
         <nav className={`nav__links ${open ? "nav__links--open" : ""}`}>
           {links.map((l) => {

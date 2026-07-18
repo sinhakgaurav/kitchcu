@@ -151,6 +151,17 @@ class KitchenDeliverySettingsUpdate(BaseModel):
     tracking_notify_interval_min: int | None = Field(
         default=None, ge=1, le=60, description="New tracking notification interval in minutes. Omit to leave unchanged.", examples=[10]
     )
+    porter_auto_book_enabled: bool | None = Field(
+        default=None,
+        description="When true (and module entitled), platform auto-books Porter after accept delay. Omit to leave unchanged.",
+    )
+    porter_auto_book_delay_min: int | None = Field(
+        default=None,
+        ge=1,
+        le=120,
+        description="Minutes after accept before first Porter auto-book attempt (default 15).",
+        examples=[15],
+    )
 
 
 class KitchenWhatsAppIntegrationResponse(BaseModel):
@@ -315,6 +326,15 @@ class KitchenResponse(BaseModel):
         description="When beyond max radius and min order met, % of logistics cost the kitchen bears.",
     )
     tracking_notify_interval_min: int = Field(..., description="Minutes between delivery tracking notifications.")
+    porter_auto_book_enabled: bool = Field(
+        default=True,
+        description="Auto-book Porter after accept delay when delivery_mode=platform and module entitled.",
+    )
+    porter_auto_book_delay_min: int = Field(
+        default=15,
+        description="Minutes after accept before first Porter auto-book attempt.",
+        examples=[15],
+    )
     address_line: str | None = Field(default=None, description="Kitchen street address (owner-only).")
     pincode: str | None = Field(default=None, description="Kitchen postal PIN code.")
     latitude: float = Field(..., description="Kitchen latitude (WGS84).", examples=[18.5204])
@@ -544,6 +564,8 @@ async def kitchen_to_response(session: AsyncSession, kitchen: Kitchen) -> Kitche
         ),
         delivery_subsidy_percent=float(getattr(kitchen, "delivery_subsidy_percent", 50) or 50),
         tracking_notify_interval_min=int(kitchen.tracking_notify_interval_min),
+        porter_auto_book_enabled=bool(getattr(kitchen, "porter_auto_book_enabled", True)),
+        porter_auto_book_delay_min=int(getattr(kitchen, "porter_auto_book_delay_min", 15) or 15),
         address_line=kitchen.address_line,
         pincode=kitchen.pincode,
         latitude=float(row.lat),
@@ -616,6 +638,10 @@ async def update_kitchen_delivery_settings(
         kitchen.delivery_subsidy_percent = data.delivery_subsidy_percent
     if data.tracking_notify_interval_min is not None:
         kitchen.tracking_notify_interval_min = data.tracking_notify_interval_min
+    if data.porter_auto_book_enabled is not None:
+        kitchen.porter_auto_book_enabled = data.porter_auto_book_enabled
+    if data.porter_auto_book_delay_min is not None:
+        kitchen.porter_auto_book_delay_min = data.porter_auto_book_delay_min
     if kitchen.free_delivery_radius_km > kitchen.max_delivery_radius_km:
         raise ValueError("free_delivery_radius_km cannot exceed max_delivery_radius_km")
     await session.flush()

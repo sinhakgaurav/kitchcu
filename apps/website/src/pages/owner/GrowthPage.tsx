@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { OwnerEmpty, OwnerPageShell, OwnerPanel } from "../../components/owner/OwnerPageShell";
+import { Link } from "react-router-dom";
 import {
   dismissGrowthSuggestion,
   fetchDishCombos,
@@ -7,6 +8,7 @@ import {
   fetchGrowthSuggestions,
   fetchMenu,
   fetchOrderPatterns,
+  fetchSubscriptionSummary,
   generateGrowthSuggestions,
   pushDailyMenu,
   saveGoldenRecipe,
@@ -14,6 +16,7 @@ import {
   type GoldenRecipePin,
   type GrowthSuggestion,
   type OrderPatternInsight,
+  type SubscriptionSummary,
 } from "../../lib/api";
 import { useKitchen } from "../../lib/kitchen";
 
@@ -35,23 +38,26 @@ export function GrowthPage() {
   const [savingId, setSavingId] = useState<string | null>(null);
   const [error, setError] = useState("");
   const [pushResult, setPushResult] = useState("");
+  const [tiffin, setTiffin] = useState<SubscriptionSummary | null>(null);
 
   const load = async () => {
     if (!kitchen) return;
     setLoading(true);
     setError("");
     try {
-      const [sug, comboRes, pat, menu, pins] = await Promise.all([
+      const [sug, comboRes, pat, menu, pins, tf] = await Promise.all([
         fetchGrowthSuggestions(kitchen.id),
         fetchDishCombos(kitchen.id),
         fetchOrderPatterns(kitchen.id),
         fetchMenu(kitchen.id),
         fetchGoldenRecipes(kitchen.id),
+        fetchSubscriptionSummary(kitchen.id).catch(() => null),
       ]);
       setSuggestions(sug.suggestions);
       setCombos(comboRes.combos);
       setPatterns(pat);
       setGoldenPins(pins.pins);
+      setTiffin(tf);
       const dishes = menu.dishes
         .filter((d) => d.is_active)
         .map((d) => ({ id: d.id, name: d.name }));
@@ -139,6 +145,7 @@ export function GrowthPage() {
 
   const goldenSuggestions = suggestions.filter(isGolden);
   const otherSuggestions = suggestions.filter((s) => !isGolden(s));
+  const inr = (n: number) => `₹${Math.round(n).toLocaleString("en-IN")}`;
 
   return (
     <OwnerPageShell
@@ -157,6 +164,21 @@ export function GrowthPage() {
         <div className="app-loading">Loading growth insights…</div>
       ) : (
         <>
+          {tiffin && (
+            <OwnerPanel
+              title="Tiffin & monthly plans"
+              description="Subscription pipeline — recurring kitchen revenue without food commission"
+            >
+              <p className="owner-muted">
+                {tiffin.active} active · {tiffin.pending} pending · {inr(tiffin.mrr_estimate)} MRR estimate
+                {" · "}
+                {tiffin.plans_active} live plans
+              </p>
+              <Link to="/dashboard/tiffin" className="btn btn--ghost btn--sm">
+                Manage tiffin →
+              </Link>
+            </OwnerPanel>
+          )}
           {(goldenSuggestions.length > 0 || goldenPins.length > 0) && (
             <OwnerPanel
               title="Golden performance days"

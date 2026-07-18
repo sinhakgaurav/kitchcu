@@ -1,5 +1,6 @@
 import { Link, useSearchParams } from "react-router-dom";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { ListingToolbar } from "../../components/ListingToolbar";
 import {
   confirmDraft,
   fetchDrafts,
@@ -43,6 +44,8 @@ export function OrdersPage() {
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState("");
+  const [sort, setSort] = useState<"newest" | "name_asc" | "name_desc">("newest");
 
   const load = useCallback(async () => {
     if (!kitchen) return;
@@ -73,7 +76,44 @@ export function OrdersPage() {
     [todayOrders],
   );
 
-  const shown = tab === "drafts" ? [] : tab === "all" ? orders : activeOrders;
+  const shown = useMemo(() => {
+    const base = tab === "drafts" ? [] : tab === "all" ? orders : activeOrders;
+    let list = [...base];
+    if (search.trim()) {
+      const n = search.trim().toLowerCase();
+      list = list.filter(
+        (o) =>
+          o.order_code.toLowerCase().includes(n) ||
+          (o.customer_name || "").toLowerCase().includes(n) ||
+          (o.customer_phone || "").includes(n) ||
+          o.items.some((i) => i.dish_name.toLowerCase().includes(n)),
+      );
+    }
+    list.sort((a, b) => {
+      if (sort === "name_asc") {
+        return (a.customer_name || a.order_code).localeCompare(b.customer_name || b.order_code);
+      }
+      if (sort === "name_desc") {
+        return (b.customer_name || b.order_code).localeCompare(a.customer_name || a.order_code);
+      }
+      return Date.parse(b.created_at) - Date.parse(a.created_at);
+    });
+    return list;
+  }, [tab, orders, activeOrders, search, sort]);
+
+  const shownDrafts = useMemo(() => {
+    let list = [...drafts];
+    if (search.trim()) {
+      const n = search.trim().toLowerCase();
+      list = list.filter(
+        (d) =>
+          d.raw_message.toLowerCase().includes(n) ||
+          d.parsed_items.some((p) => (p.dish_name ?? p.raw).toLowerCase().includes(n)),
+      );
+    }
+    list.sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at));
+    return list;
+  }, [drafts, search]);
 
   if (!kitchen) return null;
 
@@ -181,6 +221,20 @@ export function OrdersPage() {
         ))}
       </div>
 
+      <ListingToolbar
+        search={search}
+        onSearchChange={setSearch}
+        searchPlaceholder="Search orders, customer, dishes…"
+        sort={sort}
+        onSortChange={(v) => setSort(v as "newest" | "name_asc" | "name_desc")}
+        sortOptions={[
+          { value: "newest", label: "Newest" },
+          { value: "name_asc", label: "Customer A–Z" },
+          { value: "name_desc", label: "Customer Z–A" },
+        ]}
+        resultCount={tab === "drafts" ? shownDrafts.length : shown.length}
+      />
+
       <section className="dash-card od-panel od-orders__parse">
         <header className="od-panel__head">
           <div>
@@ -212,12 +266,12 @@ export function OrdersPage() {
         <OrdersSkeleton />
       ) : tab === "drafts" ? (
         <div className="od-orders__list">
-          {drafts.length === 0 && (
+          {shownDrafts.length === 0 && (
             <p className="od-panel__empty dash-card od-panel">
               No drafts yet — paste a WhatsApp message above or share your menu link with customers.
             </p>
           )}
-          {drafts.map((d) => (
+          {shownDrafts.map((d) => (
             <article key={d.id} className="dash-card od-order-draft">
               <div className="od-order-draft__head">
                 <span className="od-order-draft__source">{d.source}</span>

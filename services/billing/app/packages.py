@@ -183,7 +183,14 @@ async def upsert_package(
         ).scalar_one_or_none()
         if existing:
             raise HTTPException(status_code=400, detail="Package code already exists")
-        pkg = Package(code=code)
+        # Set NOT NULL columns before any flush (feature validation SELECTs can autoflush).
+        pkg = Package(
+            code=code,
+            name=body.name.strip(),
+            audience=body.audience,
+            description=body.description,
+            is_active=body.is_active,
+        )
         session.add(pkg)
 
     # Validate features

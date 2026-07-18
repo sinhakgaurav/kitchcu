@@ -2566,12 +2566,26 @@ form.auth-card > .btn,
   .app-tiles {
     grid-template-columns: repeat(3, 1fr);
   }
+
+  .app-tiles--duo {
+    grid-template-columns: repeat(2, 1fr);
+    max-width: 920px;
+    margin-inline: auto;
+  }
 }
 
 @media (min-width: 640px) and (max-width: 767px) {
   .app-tiles {
     grid-template-columns: repeat(2, 1fr);
   }
+}
+
+.app-tiles--duo .app-tile {
+  min-height: 360px;
+}
+
+.app-tiles--duo .app-tile__media {
+  height: 168px;
 }
 
 .app-tile {
@@ -3637,4 +3651,274 @@ form.auth-card > .btn,
 .customer-dash__pin-actions {
   display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; margin-bottom: 0.5rem;
   font-size: 0.85rem; color: var(--text-muted);
+}
+
+/* Legal pages (portal) */
+.portal-legal .legal-page {
+  padding: calc(var(--nav-h) + 2.5rem) 0 4rem;
+  min-height: 70vh;
+}
+
+.legal-page__inner {
+  max-width: 720px;
+}
+
+.legal-page__inner h1 {
+  font-family: var(--font-display);
+  font-size: clamp(1.85rem, 4vw, 2.6rem);
+  font-weight: 800;
+  margin: 0.35rem 0 0.75rem;
+  letter-spacing: -0.02em;
+}
+
+.legal-page__intro {
+  color: var(--text-muted);
+  font-size: 1.05rem;
+  line-height: 1.55;
+  margin-bottom: 0.5rem;
+}
+
+.legal-page__updated {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  margin-bottom: 2rem;
+  opacity: 0.85;
+}
+
+.legal-page__section {
+  margin-bottom: 1.75rem;
+  padding-bottom: 1.5rem;
+  border-bottom: 1px solid var(--surface-border);
+}
+
+.legal-page__section h2 {
+  font-family: var(--font-display);
+  font-size: 1.15rem;
+  font-weight: 700;
+  margin-bottom: 0.65rem;
+  color: var(--teal-light);
+}
+
+.legal-page__section p {
+  color: var(--text-muted);
+  line-height: 1.65;
+  margin-bottom: 0.65rem;
+  font-size: 0.95rem;
+}
+
+.legal-page__related {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem 1.25rem;
+  margin: 1.5rem 0 1rem;
+}
+
+.legal-page__related a {
+  color: var(--orange-light);
+  font-weight: 600;
+  font-size: 0.95rem;
+}
+
+.legal-page__contact {
+  color: var(--text-muted);
+  font-size: 0.9rem;
+  margin-bottom: 1.25rem;
+}
+
+.legal-page__contact a {
+  color: var(--teal-light);
+}
+
+/* Signup policy consent */
+.policy-agree {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.65rem;
+  margin: 1rem 0 1.15rem;
+  font-size: 0.85rem;
+  line-height: 1.45;
+  color: var(--text-muted);
+  cursor: pointer;
+  text-align: left;
+}
+
+.policy-agree input {
+  margin-top: 0.2rem;
+  width: 1.05rem;
+  height: 1.05rem;
+  flex-shrink: 0;
+  accent-color: var(--teal);
+}
+
+.policy-agree a {
+  color: var(--teal-light);
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.policy-agree a:hover {
+  color: var(--orange-light);
+}
+
+.portal-apps--duo .section__header {
+  max-width: 36rem;
+  margin-inline: auto;
+  text-align: center;
+}
+
+.portal-apps--duo .section__header p {
+  margin-inline: auto;
+}
+
+/* Listing filter / sort toolbar */
+.listing-toolbar {
+  display: grid;
+  gap: 0.75rem;
+  margin: 0 0 1.25rem;
+  padding: 0.85rem 1rem;
+  border: 1px solid var(--surface-border, rgba(255, 255, 255, 0.1));
+  border-radius: var(--radius-md, 12px);
+  background: var(--veil-2, rgba(0, 0, 0, 0.2));
+}
+
+.listing-toolbar__row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem 1rem;
+  align-items: center;
+}
+
+.listing-toolbar__search {
+  flex: 1 1 12rem;
+  min-width: 10rem;
+}
+
+.listing-toolbar__search input {
+  width: 100%;
+  padding: 0.5rem 0.75rem;
+  border-radius: 8px;
+  border: 1px solid var(--surface-border, rgba(255, 255, 255, 0.14));
+  background: var(--dark-2, #12141a);
+  color: inherit;
+}
+
+.listing-toolbar__sort {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+.listing-toolbar__sort select {
+  padding: 0.45rem 0.6rem;
+  border-radius: 8px;
+  border: 1px solid var(--surface-border, rgba(255, 255, 255, 0.14));
+  background: var(--dark-2, #12141a);
+  color: inherit;
+}
+
+.listing-toolbar__count {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  margin-left: auto;
+}
+
+.listing-toolbar__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
+.listing-chip {
+  border: 1px solid var(--surface-border, rgba(255, 255, 255, 0.16));
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  font-weight: 600;
+  padding: 0.3rem 0.7rem;
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.listing-chip--on {
+  border-color: rgba(0, 137, 123, 0.55);
+  color: var(--teal-light, #4db6ac);
+  background: rgba(0, 105, 92, 0.22);
+}
+
+.dish-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin: 0.35rem 0 0.5rem;
+}
+
+.dish-badge {
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  padding: 0.15rem 0.45rem;
+  border-radius: 6px;
+}
+
+.dish-badge--featured {
+  background: rgba(230, 81, 0, 0.2);
+  color: var(--orange-light, #ffb74d);
+}
+
+.dish-badge--chefs_special {
+  background: rgba(0, 105, 92, 0.25);
+  color: var(--teal-light, #4db6ac);
+}
+
+.dish-badge--unique_recipe {
+  background: rgba(123, 31, 162, 0.2);
+  color: #ce93d8;
+}
+
+.dish-highlight-fieldset {
+  border: 1px solid var(--surface-border, rgba(255, 255, 255, 0.12));
+  border-radius: 10px;
+  padding: 0.75rem 1rem 1rem;
+  margin: 0.75rem 0;
+}
+
+.dish-highlight-fieldset legend {
+  font-weight: 700;
+  padding: 0 0.35rem;
+}
+
+.dish-highlight-check {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0.35rem 0;
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+
+.owner-timing-form--highlights {
+  display: grid;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+}
+
+.customer-menu__highlight {
+  margin-bottom: 1.5rem;
+  padding: 1.25rem 1.35rem;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }

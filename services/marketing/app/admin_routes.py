@@ -12,6 +12,7 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
+from app.subscriptions import SubscriptionSummaryResponse, subscription_summary
 from app.templates import TemplateResponse, list_templates
 from ckac_common.config import get_settings
 from ckac_common.database import get_db
@@ -96,3 +97,26 @@ async def admin_kitchen_templates(
     if not exists:
         raise HTTPException(status_code=404, detail="Kitchen not found")
     return await list_templates(session, kitchen_id, channel=channel)
+
+
+@router.get(
+    "/kitchens/{kitchen_id}/tiffin-summary",
+    response_model=SubscriptionSummaryResponse,
+    summary="Kitchen tiffin / monthly subscription KPIs (super admin)",
+    responses={**auth_errors(), 404: RESP_404},
+)
+async def admin_kitchen_tiffin_summary(
+    kitchen_id: uuid.UUID,
+    admin: Annotated[AdminContext, Depends(get_current_admin)],
+    session: Annotated[AsyncSession, Depends(get_db)],
+) -> SubscriptionSummaryResponse:
+    await _assert_perm(session, admin.role, "kitchens:read")
+    exists = (
+        await session.execute(
+            text("SELECT 1 FROM ckac_identity.kitchens WHERE id = :kid LIMIT 1"),
+            {"kid": kitchen_id},
+        )
+    ).scalar_one_or_none()
+    if not exists:
+        raise HTTPException(status_code=404, detail="Kitchen not found")
+    return await subscription_summary(session, kitchen_id)

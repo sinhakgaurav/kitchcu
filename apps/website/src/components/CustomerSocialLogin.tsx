@@ -12,6 +12,8 @@ type Props = {
   onSuccess: () => void | Promise<void>;
   onAuth: (result: CustomerAuthResult) => void | Promise<void>;
   onError: (message: string) => void;
+  /** Required for new customer signup / social continue */
+  policiesAgreed?: boolean;
 };
 
 const PROVIDER_LABELS: Record<string, string> = {
@@ -30,7 +32,12 @@ const PROVIDER_CLASS: Record<string, string> = {
   whatsapp: "social-btn--whatsapp",
 };
 
-export function CustomerSocialLogin({ onSuccess, onAuth, onError }: Props) {
+export function CustomerSocialLogin({
+  onSuccess,
+  onAuth,
+  onError,
+  policiesAgreed = true,
+}: Props) {
   const [busy, setBusy] = useState<string | null>(null);
   const [whatsappPhone, setWhatsappPhone] = useState("");
   const [whatsappOtp, setWhatsappOtp] = useState("");
@@ -44,8 +51,15 @@ export function CustomerSocialLogin({ onSuccess, onAuth, onError }: Props) {
     { id: "whatsapp", label: "WhatsApp", method: "otp" },
   ];
 
+  const ensurePolicies = useCallback(() => {
+    if (policiesAgreed) return true;
+    onError("Please agree to the Terms, Privacy, and Refund Policies to continue.");
+    return false;
+  }, [policiesAgreed, onError]);
+
   const handleOAuth = useCallback(
     async (provider: string) => {
+      if (!ensurePolicies()) return;
       setBusy(provider);
       try {
         const result = await loginWithCustomerOAuthProvider(provider);
@@ -57,10 +71,11 @@ export function CustomerSocialLogin({ onSuccess, onAuth, onError }: Props) {
         setBusy(null);
       }
     },
-    [onSuccess, onAuth, onError],
+    [onSuccess, onAuth, onError, ensurePolicies],
   );
 
   const handleWhatsAppRequest = async () => {
+    if (!ensurePolicies()) return;
     setBusy("whatsapp");
     try {
       await requestCustomerWhatsAppOtp(normalizePhone(whatsappPhone));
@@ -73,6 +88,7 @@ export function CustomerSocialLogin({ onSuccess, onAuth, onError }: Props) {
   };
 
   const handleWhatsAppVerify = async () => {
+    if (!ensurePolicies()) return;
     setBusy("whatsapp");
     try {
       const result = await verifyCustomerWhatsAppOtp(normalizePhone(whatsappPhone), whatsappOtp);
@@ -95,7 +111,7 @@ export function CustomerSocialLogin({ onSuccess, onAuth, onError }: Props) {
               key={p.id}
               type="button"
               className={`social-btn ${PROVIDER_CLASS[p.id] ?? ""}`}
-              disabled={!!busy}
+              disabled={!!busy || !policiesAgreed}
               onClick={() => handleOAuth(p.id)}
             >
               {busy === p.id ? "Connecting…" : PROVIDER_LABELS[p.id]}
@@ -129,7 +145,7 @@ export function CustomerSocialLogin({ onSuccess, onAuth, onError }: Props) {
         <button
           type="button"
           className="btn btn--ghost btn--sm social-btn--whatsapp"
-          disabled={!!busy || !whatsappPhone.trim()}
+          disabled={!!busy || !whatsappPhone.trim() || !policiesAgreed}
           onClick={whatsappStep === "otp" ? handleWhatsAppVerify : handleWhatsAppRequest}
         >
           {busy === "whatsapp"

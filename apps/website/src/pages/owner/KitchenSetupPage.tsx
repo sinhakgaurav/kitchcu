@@ -76,9 +76,11 @@ export function KitchenSetupPage() {
         delivery_fee_flat_beyond: Number(fd.get("delivery_fee_flat_beyond")),
         min_order_for_free_delivery: minRaw === "" ? null : Number(minRaw),
         delivery_subsidy_percent: Number(fd.get("delivery_subsidy_percent")),
+        porter_auto_book_enabled: fd.get("porter_auto_book_enabled") === "on",
+        porter_auto_book_delay_min: Number(fd.get("porter_auto_book_delay_min") || 15),
       });
       await reloadKitchens();
-      setSaveMsg("Delivery rules saved — checkout will show Self vs Porter with your cost share.");
+      setSaveMsg("Delivery rules saved — cost share + Porter auto-book settings applied.");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to save delivery settings");
     } finally {
@@ -194,6 +196,31 @@ export function KitchenSetupPage() {
                   />
                 </label>
               </div>
+              <div className="form-row">
+                <label className="owner-check">
+                  <input
+                    name="porter_auto_book_enabled"
+                    type="checkbox"
+                    defaultChecked={kitchen.porter_auto_book_enabled !== false}
+                  />
+                  Auto-book Porter after accept (platform delivery)
+                </label>
+                <label>
+                  Auto-book delay (minutes)
+                  <input
+                    name="porter_auto_book_delay_min"
+                    type="number"
+                    min={1}
+                    max={120}
+                    required
+                    defaultValue={kitchen.porter_auto_book_delay_min ?? 15}
+                  />
+                </label>
+              </div>
+              <p className="owner-muted">
+                When enabled, the platform books Porter after the delay so the courier arrives near
+                food-ready time, and retries every few minutes until booked. Off = book immediately on accept.
+              </p>
               <button type="submit" className="btn btn--primary" disabled={busy}>
                 {busy ? "Saving…" : "Save delivery rules"}
               </button>

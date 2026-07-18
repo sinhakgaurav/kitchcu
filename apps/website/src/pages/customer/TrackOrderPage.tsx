@@ -104,10 +104,28 @@ export function TrackOrderPage() {
             </div>
           )}
 
+          {(info.estimated_prep_min != null || info.estimated_delivery_min != null) && (
+            <p className="report-hint">
+              Timing: prep {info.estimated_prep_min ?? "—"} min
+              {info.delivery_type === "delivery" && (
+                <> + delivery {info.estimated_delivery_min ?? "—"} min
+                  {info.estimated_prep_min != null && info.estimated_delivery_min != null && (
+                    <> = ~{info.estimated_prep_min + info.estimated_delivery_min} min total</>
+                  )}
+                </>
+              )}
+            </p>
+          )}
           {info.estimated_ready_at && (
             <p className="report-hint">
-              Estimated ready around{" "}
+              Food ready around{" "}
               {new Date(info.estimated_ready_at).toLocaleString("en-IN", { timeZone: "Asia/Kolkata" })}
+            </p>
+          )}
+          {info.estimated_delivery_at && info.delivery_type === "delivery" && (
+            <p className="report-hint">
+              Estimated delivery around{" "}
+              {new Date(info.estimated_delivery_at).toLocaleString("en-IN", { timeZone: "Asia/Kolkata" })}
             </p>
           )}
           <p className="report-hint">

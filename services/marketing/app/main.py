@@ -36,11 +36,10 @@ app = FastAPI(
     description=(
         "Owns kitchen-side growth tooling: **CRM** (F37) syncs a per-kitchen customer profile "
         "(spend, favorite dishes, order patterns, owner tags) from order history, **coupons** "
-        "(F36) with percent/fixed discounts validated at checkout, and **targeted promotions** "
-        "(F38) — special dish pricing scoped to a customer segment (all / repeat / VIP / "
-        "churn-risk / top spenders). Owner routes require kitchen ownership; coupon validation "
-        "requires a customer JWT; active-promotions lookup is public with optional "
-        "personalization when a customer token is supplied."
+        "(F36) with percent/fixed discounts validated at checkout, **targeted promotions** "
+        "(F38), and **tiffin / monthly plans** (F34/F35) — owner-defined thali/tiffin plans with "
+        "customer subscribe requests and accept/deny/activate/deactivate. Owner routes require "
+        "kitchen ownership + module entitlement; coupon validation requires a customer JWT."
     ),
     lifespan=lifespan,
 )

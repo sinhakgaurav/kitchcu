@@ -12,6 +12,8 @@ from ckac_common.platform_config import is_feature_enabled
 RISK_FEATURE_FLAGS: dict[str, str] = {
     "order_parser_llm": "order_parser_llm",
     "courier_porter_dunzo": "courier_porter_dunzo",
+    "courier_porter_auto_book": "courier_porter_auto_book",
+    "tiffin_plans": "tiffin_plans",
     "payments_stripe_multi_region": "payments_stripe_multi_region",
     "messaging_wallet_deduct": "messaging_wallet_deduct",
     "kitchen_module_overrides": "kitchen_module_overrides",
@@ -26,6 +28,8 @@ KITCHEN_MODULE_GLOBAL_FLAGS: dict[str, str | None] = {
     "marketing_broadcast": "messaging_wallet_deduct",
     "customer_checkout": "multi_kitchen_checkout",
     "streaming": "live_streaming",
+    "courier_porter_auto_book": "courier_porter_auto_book",
+    "tiffin_plans": "tiffin_plans",
 }
 
 KITCHEN_MODULE_KEYS: tuple[str, ...] = tuple(KITCHEN_MODULE_GLOBAL_FLAGS.keys())
