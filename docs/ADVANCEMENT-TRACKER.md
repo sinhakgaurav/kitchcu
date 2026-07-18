@@ -23,7 +23,8 @@
 For acceptance criteria of F01–F48 see [CKAC-COMPLETE-PLANNING-BENCHMARK.md](./CKAC-COMPLETE-PLANNING-BENCHMARK.md).  
 For code map see [CKAC-IMPLEMENTATION-GUIDE.md](./CKAC-IMPLEMENTATION-GUIDE.md).  
 For journeys see [CKAC-USERFLOWS.md](./CKAC-USERFLOWS.md).  
-For **CEO/CPO/CTO deep analysis** (achievements, gaps, flow/impl changes, Waves A–D) see [PLATFORM-STRATEGIC-ANALYSIS.md](./PLATFORM-STRATEGIC-ANALYSIS.md).
+For **CEO/CPO/CTO strategic waves** see [PLATFORM-STRATEGIC-ANALYSIS.md](./PLATFORM-STRATEGIC-ANALYSIS.md).  
+For **persona-level flow/architecture/implementation depth** see [PLATFORM-PERSONA-DEEP-DIVE.md](./PLATFORM-PERSONA-DEEP-DIVE.md).
 
 ---
 
