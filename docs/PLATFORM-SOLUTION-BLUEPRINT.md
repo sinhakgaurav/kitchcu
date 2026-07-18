@@ -186,7 +186,7 @@ Status tags: ✅ Done well · 🟡 Partial · 🔴 Gap / not built · 📋 Desig
 | **Solution** | Employees + roles (done) + **enforce permissions on all mutations** + **tab filtering** + **audit log** + kitchen workspace (done) + packages (done) + flags (done). |
 | **Implementation (CTO)** | Shared `RequirePerm`; `GET /admin/me` → permissions[]; `admin_audit_events`; UI filter `TABS`. |
 | **Achievements / done well** | ✅ Kitchen workspace (P28) · ✅ Packages (P25) · ✅ Employees (P27) · ✅ Shared `admin_rbac` enforced on identity/billing/tickets · ✅ `GET /admin/me` → permissions + allowed_tabs · ✅ UI tab filter + role badge · ✅ Overview `allSettled` |
-| **Gaps** | 🔴 No audit UI · 🟡 Single-VM ops risk |
+| **Gaps** | ✅ Audit tab + `admin_audit_events` · 🟡 Billing mutations not yet audited · 🟡 Single-VM ops risk |
 | **Architecture enhancements** | Audit write in same TX as mutation; correlation id on audit. |
 | **DB enhancements** | `ckac_identity.admin_audit_events(...)` + indexes; identity `014` expands customers/flags/refunds:read grants. |
 | **UX enhancements** | Kitchen health strip; audit timeline (next). |
