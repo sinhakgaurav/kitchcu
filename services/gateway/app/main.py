@@ -75,6 +75,8 @@ def resolve_service_url(path: str) -> str | None:
         return settings.identity_service_url
     if path.startswith("/api/v1/billing") or path.startswith("/api/v1/webhooks/razorpay"):
         return settings.billing_service_url
+    if path.startswith("/api/v1/webhooks/porter"):
+        return settings.order_service_url
     if path.startswith("/api/v1/community"):
         return settings.community_service_url
     if path.startswith("/api/v1/stream"):

@@ -43,6 +43,16 @@ PORTER_API_KEY=
 PORTER_BASE_URL=https://api.porter.in
 PORTER_QUOTE_PATH=/v1/get_quote
 PORTER_ORDER_PATH=/v1/orders
+PORTER_WEBHOOK_SECRET=   # optional; header X-Porter-Secret
 DELIVERY_PARTNER_BASE_FEE=25
 DELIVERY_PARTNER_PER_KM=12
 ```
+
+## Porter webhooks (P33)
+
+`POST /api/v1/webhooks/porter` → gateway → **order** service.
+
+- Matches `orders.courier_job_id`
+- Updates `courier_status` only (food lifecycle stays owner-driven)
+- Emits `order.courier_status.updated` on `ckac:orders:order`
+- Owner Order detail shows courier status next to job id

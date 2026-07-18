@@ -126,6 +126,23 @@ class NotificationDispatchResponse(BaseModel):
     status: str = Field(..., description="Dispatch status, e.g. 'sent'.")
 
 
+class OtpNotifyRequest(BaseModel):
+    """Internal: identity asks notification to deliver a login OTP over WhatsApp."""
+
+    phone: str = Field(..., min_length=8, max_length=20, description="E.164 or India mobile.")
+    code: str = Field(..., min_length=4, max_length=8, description="OTP digits (never logged).")
+    purpose: str = Field(
+        default="login",
+        description="'owner_login' | 'customer_login' | 'login'.",
+    )
+
+
+class OtpNotifyResponse(BaseModel):
+    ok: bool
+    simulated: bool = False
+    channel: str = "whatsapp"
+
+
 class TrackingTickResponse(BaseModel):
     """Result of one tracking-interval scheduler tick (F29) — invoked periodically by a scheduled job."""
 
@@ -628,3 +645,30 @@ async def process_tracking_interval_tick(
 
     await session.flush()
     return TrackingTickResponse(processed=len(due), sent=sent)
+
+
+async def notify_otp(
+    session: AsyncSession,
+    body: OtpNotifyRequest,
+) -> OtpNotifyResponse:
+    """Send login OTP via platform WhatsApp number (not kitchen-scoped)."""
+    from ckac_common.platform_config import get_platform_secret
+    from app.whatsapp_send import send_text_message
+
+    phone_number_id = await get_platform_secret(session, "whatsapp_otp_phone_number_id")
+    access_token = await get_platform_secret(session, "whatsapp_access_token")
+    purpose = (body.purpose or "login").replace("_", " ")
+    # Never include code in structured logs — only in WhatsApp body.
+    text = (
+        f"Your kitchCU {purpose} code is {body.code}. "
+        f"Valid for 10 minutes. Do not share this code."
+    )
+    meta = await send_text_message(
+        phone_number_id=phone_number_id or "",
+        to_phone=body.phone,
+        text=text,
+        access_token=access_token or "",
+    )
+    if not meta.ok:
+        raise ValueError(meta.error or "WhatsApp OTP send failed")
+    return OtpNotifyResponse(ok=True, simulated=meta.simulated, channel="whatsapp")

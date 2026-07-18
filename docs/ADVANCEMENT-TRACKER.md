@@ -88,6 +88,7 @@ For **architecture + end-to-end flows** see [PLATFORM-ARCHITECTURE-FLOWS.md](./P
 | P31 | **Wallet debit + Meta outbound + billing audit** | Template send deducts messaging wallet · Graph WhatsApp send · billing PG/package/refund → identity audit | ✅ | Identity `016` WA access token slot |
 | P32 | **Porter + delivery cost share + camera fix** | In-range kitchen pays 100%; extended min-order → kitchen subsidy %; Porter quote/book; LiveKit camera preview | ✅ | Identity `017`; order `007` |
 | P32.1 | **Checkout→order Porter wire-up** | Customer sends `delivery_mode`; order validates platform fees + cost share; Porter books on accept; owner delivery settings UI | ✅ | — |
+| P33 | **Prod OTP WhatsApp + Porter webhooks** | Identity OTP → Redis + notify WhatsApp; `POST /webhooks/porter` → `courier_status`; kitchen staff design pack | ✅ | Order `008`; design `docs/design/KITCHEN-STAFF-RBAC-DESIGN.md` |
 
 ---
 
@@ -128,8 +129,8 @@ Run `.\scripts\seed-all.ps1` (or GCP `run-seed=1`) after migrations.
 
 | Wave | Item | Doc |
 |------|------|-----|
-| **A (trust)** | ✅ RBAC+tabs+hard entitlements · ✅ audit (+ billing writes) · ⏳ live Razorpay / prod OTP | [PLATFORM-SOLUTION-BLUEPRINT.md](./PLATFORM-SOLUTION-BLUEPRINT.md) E3 |
-| **B (promises)** | ✅ Template send + fan-out + wallet · ✅ Meta outbound · ✅ Watch/LiveKit · ✅ Porter cost-share · ⏳ kitchen staff · ⏳ Porter webhooks | Solution Blueprint A2/B2 |
+| **A (trust)** | ✅ RBAC+tabs+hard entitlements · ✅ audit · ✅ prod OTP WhatsApp path · ⏳ live Razorpay Checkout | [PLATFORM-SOLUTION-BLUEPRINT.md](./PLATFORM-SOLUTION-BLUEPRINT.md) E3 |
+| **B (promises)** | ✅ Templates/Watch/Porter cost-share · ✅ Porter webhooks · ⏳ kitchen staff **build** (design pack ✅) | [KITCHEN-STAFF-RBAC-DESIGN.md](./design/KITCHEN-STAFF-RBAC-DESIGN.md) |
 | **C (design)** | E1–E2 Kitchen Quality Loop | [E1-E2-KITCHEN-QUALITY-LOOP-DESIGN.md](./E1-E2-KITCHEN-QUALITY-LOOP-DESIGN.md) |
 | **D (scale)** | Cloud Run architecture · OTel · load SLOs | [DEPLOYMENT-GCP.md](./DEPLOYMENT-GCP.md) §1–10 |
 
@@ -140,7 +141,7 @@ Run `.\scripts\seed-all.ps1` (or GCP `run-seed=1`) after migrations.
 - [x] Admin login uses `admin@kitchcu.com` on production hosts (UI + env sync)
 - [x] Seed covers integrations, branded page, dish showcase
 - [x] Advancement tracker maintained (P19–P32.1)
-- [x] Migrations ready: identity `013`–`017` (RBAC + audit + WA token + subsidy), order `007` (courier), billing `008`, marketing `002`
+- [x] Migrations ready: identity `013`–`017`, order `007`–`008` (courier + status), billing `008`, marketing `002`
 - [ ] Deploy: push `main` → GCP VM redeploy → smoke admin tabs + Packages + Templates send + Watch live + checkout Self/Porter modes
 - [ ] Confirm `ADMIN_PASSWORD` in GCE metadata matches what operators use
 - [ ] Smoke: support role sees Tickets only; finance sees Packages/Refunds; Starter kitchen hides Live stream nav

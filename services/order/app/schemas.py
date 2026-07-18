@@ -284,6 +284,10 @@ class OrderResponse(BaseModel):
     courier_job_id: str | None = Field(
         default=None, description="External courier job id after Porter booking on accept."
     )
+    courier_status: str | None = Field(
+        default=None,
+        description="Logistics status from Porter webhook (accepted|assigned|picked_up|in_transit|delivered|…). Separate from food lifecycle status.",
+    )
     customer_latitude: float | None = Field(default=None)
     customer_longitude: float | None = Field(default=None)
     tracking_token: str | None = Field(
@@ -1144,6 +1148,7 @@ async def order_to_response(session: AsyncSession, order: Order) -> OrderRespons
         owner_delivery_cost=float(getattr(order, "owner_delivery_cost", 0) or 0),
         courier_partner=getattr(order, "courier_partner", None),
         courier_job_id=getattr(order, "courier_job_id", None),
+        courier_status=getattr(order, "courier_status", None),
         customer_latitude=getattr(order, "customer_latitude", None),
         customer_longitude=getattr(order, "customer_longitude", None),
         tracking_token=order.tracking_token,

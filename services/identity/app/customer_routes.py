@@ -251,13 +251,27 @@ async def customer_whatsapp_request(body: CustomerPhoneRequest) -> dict[str, str
             "dev_hint": f"Use {code} in development",
         }
 
-    raise HTTPException(
-        status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-        detail=(
-            "OTP delivery not configured. Use APP_ENV=development with DEMO_OTP for local demos, "
-            "or configure WhatsApp outbound before staging/production login."
-        ),
+    from app.main import redis_client
+    from app.otp_delivery import (
+        CUSTOMER_OTP_PREFIX,
+        generate_otp_code,
+        send_otp_whatsapp,
+        store_otp_redis,
     )
+
+    code = generate_otp_code()
+    try:
+        await store_otp_redis(redis_client, prefix=CUSTOMER_OTP_PREFIX, phone=phone, code=code)
+        await send_otp_whatsapp(phone=phone, code=code, purpose="customer_login")
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=(
+                "OTP delivery unavailable. Configure WHATSAPP_ACCESS_TOKEN + "
+                "WHATSAPP_OTP_PHONE_NUMBER_ID (or Admin → API Keys) and ensure Redis is up."
+            ),
+        ) from exc
+    return {"message": "OTP sent via WhatsApp"}
 
 
 @router.post(
@@ -288,9 +302,13 @@ async def customer_whatsapp_verify(
         ok = verify_customer_otp(phone, body.otp)
     else:
         from app.main import redis_client
+        from app.otp_delivery import CUSTOMER_OTP_PREFIX
 
-        expected = await redis_client.get(f"otp:customer:{phone}") if redis_client else None
+        key = f"{CUSTOMER_OTP_PREFIX}{phone}"
+        expected = await redis_client.get(key) if redis_client else None
         ok = bool(expected) and expected == body.otp
+        if ok and redis_client:
+            await redis_client.delete(key)
     if not ok:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid OTP")
 

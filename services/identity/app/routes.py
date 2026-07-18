@@ -98,14 +98,27 @@ async def request_otp(body: OTPRequest) -> dict[str, str]:
         _DEV_OTP[phone] = otp
         return {"message": "OTP sent", "dev_hint": f"Use {otp} in development"}
 
-    # WhatsApp outbound is not wired — never claim "sent" without a delivery path.
-    raise HTTPException(
-        status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-        detail=(
-            "OTP delivery not configured. Use APP_ENV=development with DEMO_OTP for local demos, "
-            "or configure WhatsApp outbound before staging/production login."
-        ),
+    from app.main import redis_client
+    from app.otp_delivery import (
+        OWNER_OTP_PREFIX,
+        generate_otp_code,
+        send_otp_whatsapp,
+        store_otp_redis,
     )
+
+    code = generate_otp_code()
+    try:
+        await store_otp_redis(redis_client, prefix=OWNER_OTP_PREFIX, phone=phone, code=code)
+        await send_otp_whatsapp(phone=phone, code=code, purpose="owner_login")
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=(
+                "OTP delivery unavailable. Configure WHATSAPP_ACCESS_TOKEN + "
+                "WHATSAPP_OTP_PHONE_NUMBER_ID (or Admin → API Keys) and ensure Redis is up."
+            ),
+        ) from exc
+    return {"message": "OTP sent via WhatsApp"}
 
 
 @router.post(
@@ -130,8 +143,12 @@ async def verify_otp(
         expected = _DEV_OTP.get(phone)
     else:
         from app.main import redis_client
+        from app.otp_delivery import OWNER_OTP_PREFIX
 
-        expected = await redis_client.get(f"{_OWNER_OTP_PREFIX}{phone}") if redis_client else None
+        key = f"{OWNER_OTP_PREFIX}{phone}"
+        expected = await redis_client.get(key) if redis_client else None
+        if expected and expected == body.otp and redis_client:
+            await redis_client.delete(key)
     if not expected or expected != body.otp:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid OTP")
 

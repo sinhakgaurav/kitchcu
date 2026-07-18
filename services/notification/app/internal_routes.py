@@ -3,6 +3,8 @@ from typing import Annotated
 from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from fastapi import HTTPException, status
+
 from app.notification_domain import (
     DailyMenuBlastRequest,
     DeliveryFeeDeniedNotifyRequest,
@@ -10,6 +12,8 @@ from app.notification_domain import (
     NotificationDispatchResponse,
     OrderPlacedNotifyRequest,
     OrderStatusChangedNotifyRequest,
+    OtpNotifyRequest,
+    OtpNotifyResponse,
     TemplateBlastRequest,
     TemplateBlastResponse,
     TrialSampleBlastRequest,
@@ -19,6 +23,7 @@ from app.notification_domain import (
     notify_golden_performance_day,
     notify_order_placed,
     notify_order_status_changed,
+    notify_otp,
     notify_template_blast,
     notify_trial_sample_blast,
     process_tracking_interval_tick,
@@ -217,3 +222,27 @@ async def internal_tracking_interval_tick(
     result = await process_tracking_interval_tick(session, publisher)
     await session.commit()
     return result
+
+
+@router.post(
+    "/otp",
+    response_model=OtpNotifyResponse,
+    tags=[TAG_INTERNAL],
+    summary="[Internal] Deliver login OTP via WhatsApp",
+    description=(
+        "Internal (`X-Internal-Key`) — called by identity for owner/customer OTP login. "
+        "Uses platform `whatsapp_access_token` + `whatsapp_otp_phone_number_id` (env or API Keys)."
+    ),
+    responses={401: RESP_401},
+)
+async def internal_otp(
+    body: OtpNotifyRequest,
+    session: Annotated[AsyncSession, Depends(get_db)],
+) -> OtpNotifyResponse:
+    try:
+        return await notify_otp(session, body)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=str(exc),
+        ) from exc

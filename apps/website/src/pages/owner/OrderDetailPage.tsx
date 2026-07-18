@@ -294,6 +294,7 @@ export function OrderDetailPage() {
             Mode: <strong>{order.delivery_mode ?? "not chosen"}</strong>
             {order.courier_partner ? ` · ${order.courier_partner}` : ""}
             {order.courier_job_id ? ` · job ${order.courier_job_id}` : ""}
+            {order.courier_status ? ` · courier ${order.courier_status}` : ""}
             {order.owner_delivery_cost
               ? ` · kitchen cost ${inr(order.owner_delivery_cost)}`
               : ""}

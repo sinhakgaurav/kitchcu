@@ -1,7 +1,7 @@
 import uuid
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Header, HTTPException, Query, Response, status
+from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app import analytics
@@ -1001,3 +1001,34 @@ async def whatsapp_intake(
     await session.commit()
     await session.refresh(draft)
     return _draft_to_response(draft)
+
+
+@router.post(
+    "/webhooks/porter",
+    tags=["Webhooks"],
+    summary="Porter courier status webhook",
+    description=(
+        "Public partner webhook (gateway → order). Updates `courier_status` on the matched "
+        "order by `courier_job_id`. Does **not** auto-advance the food lifecycle — owner still "
+        "drives preparing → delivered. Optional `PORTER_WEBHOOK_SECRET` via "
+        "`X-Porter-Secret` / `X-Webhook-Secret`."
+    ),
+)
+async def porter_webhook(
+    body: dict,
+    session: Annotated[AsyncSession, Depends(get_db)],
+    publisher: Annotated[EventPublisher, Depends(get_publisher)],
+    request: Request,
+) -> dict:
+    from app.porter_webhook import apply_porter_webhook, verify_porter_webhook_secret
+
+    secret = request.headers.get("X-Porter-Secret") or request.headers.get("X-Webhook-Secret")
+    if not verify_porter_webhook_secret(secret):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid webhook secret")
+    try:
+        result = await apply_porter_webhook(session, body if isinstance(body, dict) else {}, publisher)
+        await session.commit()
+        return result
+    except ValueError as exc:
+        await session.rollback()
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc

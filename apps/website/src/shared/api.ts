@@ -188,6 +188,7 @@ export type Order = {
   owner_delivery_cost?: number;
   courier_partner?: string | null;
   courier_job_id?: string | null;
+  courier_status?: string | null;
   customer_latitude?: number | null;
   customer_longitude?: number | null;
   tracking_token?: string | null;
@@ -1229,6 +1230,7 @@ export type TrackingInfo = {
   owner_delivery_cost?: number;
   courier_partner?: string | null;
   courier_job_id?: string | null;
+  courier_status?: string | null;
   estimated_ready_at: string | null;
   tracking_notify_interval_min: number;
   updated_at: string | null;
