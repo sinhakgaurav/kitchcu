@@ -66,6 +66,20 @@ Copy this template for **every new module or feature** (fill all sections; skip 
 | Customer | | |
 | Admin | | |
 
+### 7.1 Super-admin integration gate (mandatory)
+
+Copy answers into the PR / tracker. Fail any row → wire admin in the **same** change (see `.cursor/rules/kitchcu-superadmin-integration.mdc`).
+
+| # | Question | Y/N | Delivery if yes |
+|---|----------|-----|-----------------|
+| 1 | Kitchen-scoped (ops, credentials, modules, marketing, streaming, billing UX)? | | Admin → Kitchens → workspace tab + admin API |
+| 2 | Entitlement / monetized (plan, package, module)? | | Packages mapper + kitchen Package tab; server enforce |
+| 3 | Ops/support need view or override? | | Admin API/UI + RBAC `resource:action` |
+| 4 | Kill-switch needed? | | Feature flag and/or kitchen module flag |
+| 5 | Credentials? | | Kitchen secrets on kitchen form; platform secrets under API Keys only |
+
+Deferral only with tracker note + reserved permission code.
+
 ---
 
 ## 8. Domain model & bounded context

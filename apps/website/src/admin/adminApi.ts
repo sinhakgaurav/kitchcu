@@ -443,3 +443,128 @@ export async function replyAdminTicket(id: string, message: string) {
     body: JSON.stringify({ message }),
   });
 }
+
+export type AdminEmployee = {
+  id: string;
+  email: string;
+  name: string;
+  role: string;
+  is_active: boolean;
+  created_at: string;
+  permissions: string[];
+};
+
+export async function fetchAdminEmployees() {
+  return adminFetch<AdminEmployee[]>("/api/v1/admin/employees");
+}
+
+export async function fetchAdminEmployeeRoles() {
+  return adminFetch<string[]>("/api/v1/admin/employees/roles");
+}
+
+export async function createAdminEmployee(data: {
+  email: string;
+  name: string;
+  password: string;
+  role: string;
+}) {
+  return adminFetch<AdminEmployee>("/api/v1/admin/employees", {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+}
+
+export async function updateAdminEmployee(
+  id: string,
+  data: { name?: string; role?: string; password?: string; is_active?: boolean },
+) {
+  return adminFetch<AdminEmployee>(`/api/v1/admin/employees/${id}`, {
+    method: "PATCH",
+    body: JSON.stringify(data),
+  });
+}
+
+export type AdminPackage = {
+  id: string;
+  code: string;
+  name: string;
+  audience: string;
+  description: string | null;
+  is_active: boolean;
+  feature_keys: string[];
+  plan_tiers: string[];
+};
+
+export type AdminFeature = {
+  key: string;
+  label: string;
+  description: string | null;
+  audience: string;
+  module_key: string | null;
+};
+
+export async function fetchAdminFeatures() {
+  return adminFetch<AdminFeature[]>("/api/v1/admin/features");
+}
+
+export async function fetchAdminPackages(audience?: string) {
+  const q = audience ? `?audience=${encodeURIComponent(audience)}` : "";
+  return adminFetch<AdminPackage[]>(`/api/v1/admin/packages${q}`);
+}
+
+export async function upsertAdminPackage(
+  data: {
+    code: string;
+    name: string;
+    audience: string;
+    description?: string | null;
+    is_active?: boolean;
+    feature_keys: string[];
+    plan_tiers: string[];
+  },
+  packageId?: string,
+) {
+  if (packageId) {
+    return adminFetch<AdminPackage>(`/api/v1/admin/packages/${packageId}`, {
+      method: "PUT",
+      body: JSON.stringify(data),
+    });
+  }
+  return adminFetch<AdminPackage>("/api/v1/admin/packages", {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+}
+
+export type AdminKitchenPackage = {
+  kitchen_id: string;
+  package: AdminPackage | null;
+  source: string;
+  owner_plan_tier: string | null;
+};
+
+export async function fetchAdminKitchenPackage(kitchenId: string) {
+  return adminFetch<AdminKitchenPackage>(`/api/v1/admin/kitchens/${kitchenId}/package`);
+}
+
+export async function assignAdminKitchenPackage(
+  kitchenId: string,
+  data: { package_id: string; notes?: string; sync_module_flags?: boolean },
+) {
+  return adminFetch<AdminKitchenPackage>(`/api/v1/admin/kitchens/${kitchenId}/package`, {
+    method: "PUT",
+    body: JSON.stringify(data),
+  });
+}
+
+export async function fetchAdminKitchenTemplates(kitchenId: string) {
+  return adminFetch<
+    {
+      id: string;
+      channel: string;
+      name: string;
+      is_active: boolean;
+      body: string;
+    }[]
+  >(`/api/v1/admin/kitchens/${kitchenId}/templates`);
+}

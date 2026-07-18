@@ -13,6 +13,20 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.admin_auth import AdminContext, get_current_admin
 from app.models import Payment, Refund
+from app.packages import (
+    FeatureResponse,
+    KitchenPackageAssignRequest,
+    KitchenPackageResponse,
+    PackageResponse,
+    PackageUpsertRequest,
+    PlanMapRequest,
+    assign_kitchen_package,
+    get_kitchen_package,
+    list_features,
+    list_packages,
+    map_plan,
+    upsert_package,
+)
 from app.payment_gateway import (
     PaymentGatewayResponse,
     PaymentGatewayUpsertRequest,
@@ -34,6 +48,29 @@ def get_publisher() -> EventPublisher:
     from app.main import event_publisher
 
     return event_publisher
+
+
+async def _assert_admin_perm(session: AsyncSession, admin: AdminContext, permission: str) -> None:
+    """Cross-schema RBAC check against identity role grants."""
+    try:
+        rows = (
+            await session.execute(
+                text(
+                    "SELECT permission_code FROM ckac_identity.admin_role_permissions WHERE role = :role"
+                ),
+                {"role": admin.role},
+            )
+        ).scalars().all()
+        grants = {str(r) for r in rows}
+    except Exception:
+        grants = {"*"} if admin.role == "superadmin" else set()
+    if not grants and admin.role == "superadmin":
+        grants = {"*"}
+    if "*" in grants or permission in grants:
+        return
+    if permission.endswith(":read") and permission[:-5] + ":write" in grants:
+        return
+    raise HTTPException(status_code=403, detail=f"Missing permission: {permission}")
 
 
 async def _kitchen_exists(session: AsyncSession, kitchen_id: uuid.UUID) -> bool:
@@ -109,6 +146,127 @@ async def admin_kitchen_payment_gateway_delete(
     if not await _kitchen_exists(session, kitchen_id):
         raise HTTPException(status_code=404, detail="Kitchen not found")
     result = await delete_kitchen_payment_gateway(session, publisher, kitchen_id)
+    await session.commit()
+    return result
+
+
+@router.get(
+    "/features",
+    response_model=list[FeatureResponse],
+    summary="List platform features for package mapper",
+    responses=auth_errors(),
+)
+async def admin_features_list(
+    admin: Annotated[AdminContext, Depends(get_current_admin)],
+    session: Annotated[AsyncSession, Depends(get_db)],
+) -> list[FeatureResponse]:
+    await _assert_admin_perm(session, admin, "packages:read")
+    return await list_features(session)
+
+
+@router.get(
+    "/packages",
+    response_model=list[PackageResponse],
+    summary="List packages",
+    responses=auth_errors(),
+)
+async def admin_packages_list(
+    admin: Annotated[AdminContext, Depends(get_current_admin)],
+    session: Annotated[AsyncSession, Depends(get_db)],
+    audience: Annotated[str | None, Query()] = None,
+) -> list[PackageResponse]:
+    await _assert_admin_perm(session, admin, "packages:read")
+    return await list_packages(session, audience=audience)
+
+
+@router.post(
+    "/packages",
+    response_model=PackageResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Create package",
+    responses={**auth_errors(), 400: RESP_400},
+)
+async def admin_packages_create(
+    body: PackageUpsertRequest,
+    admin: Annotated[AdminContext, Depends(get_current_admin)],
+    session: Annotated[AsyncSession, Depends(get_db)],
+    publisher: Annotated[EventPublisher, Depends(get_publisher)],
+) -> PackageResponse:
+    await _assert_admin_perm(session, admin, "packages:write")
+    result = await upsert_package(session, publisher, body)
+    await session.commit()
+    return result
+
+
+@router.put(
+    "/packages/{package_id}",
+    response_model=PackageResponse,
+    summary="Update package + feature/plan mapping",
+    responses={**auth_errors(), 400: RESP_400, 404: RESP_404},
+)
+async def admin_packages_update(
+    package_id: uuid.UUID,
+    body: PackageUpsertRequest,
+    admin: Annotated[AdminContext, Depends(get_current_admin)],
+    session: Annotated[AsyncSession, Depends(get_db)],
+    publisher: Annotated[EventPublisher, Depends(get_publisher)],
+) -> PackageResponse:
+    await _assert_admin_perm(session, admin, "packages:write")
+    result = await upsert_package(session, publisher, body, package_id=package_id)
+    await session.commit()
+    return result
+
+
+@router.put(
+    "/plan-packages",
+    response_model=PackageResponse,
+    summary="Map a subscription plan tier to a package",
+    responses={**auth_errors(), 404: RESP_404},
+)
+async def admin_plan_package_map(
+    body: PlanMapRequest,
+    admin: Annotated[AdminContext, Depends(get_current_admin)],
+    session: Annotated[AsyncSession, Depends(get_db)],
+    publisher: Annotated[EventPublisher, Depends(get_publisher)],
+) -> PackageResponse:
+    await _assert_admin_perm(session, admin, "packages:write")
+    result = await map_plan(session, publisher, body)
+    await session.commit()
+    return result
+
+
+@router.get(
+    "/kitchens/{kitchen_id}/package",
+    response_model=KitchenPackageResponse,
+    summary="Get kitchen package assignment (or plan default)",
+    responses={**auth_errors(), 404: RESP_404},
+)
+async def admin_kitchen_package_get(
+    kitchen_id: uuid.UUID,
+    admin: Annotated[AdminContext, Depends(get_current_admin)],
+    session: Annotated[AsyncSession, Depends(get_db)],
+) -> KitchenPackageResponse:
+    await _assert_admin_perm(session, admin, "packages:read")
+    if not await _kitchen_exists(session, kitchen_id):
+        raise HTTPException(status_code=404, detail="Kitchen not found")
+    return await get_kitchen_package(session, kitchen_id)
+
+
+@router.put(
+    "/kitchens/{kitchen_id}/package",
+    response_model=KitchenPackageResponse,
+    summary="Assign package to kitchen (optional module sync)",
+    responses={**auth_errors(), 400: RESP_400, 404: RESP_404},
+)
+async def admin_kitchen_package_assign(
+    kitchen_id: uuid.UUID,
+    body: KitchenPackageAssignRequest,
+    admin: Annotated[AdminContext, Depends(get_current_admin)],
+    session: Annotated[AsyncSession, Depends(get_db)],
+    publisher: Annotated[EventPublisher, Depends(get_publisher)],
+) -> KitchenPackageResponse:
+    await _assert_admin_perm(session, admin, "packages:write")
+    result = await assign_kitchen_package(session, publisher, kitchen_id, body)
     await session.commit()
     return result
 

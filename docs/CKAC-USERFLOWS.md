@@ -4,10 +4,10 @@
 
 | Field | Value |
 |-------|-------|
-| Version | **1.1** |
+| Version | **1.2** |
 | Date | July 2026 |
 | Audience | CPO, Product, Engineering, QA, Investors |
-| Status | Traces to code shipped through **S1–S18** (13 domain services + gateway + 4 PWAs) |
+| Status | Traces to code shipped through **S1–S18 + P19–P28** (packages, templates, employees RBAC, kitchen workspace) |
 | Companion PDF | [`docs/CKAC-USERFLOWS.pdf`](./CKAC-USERFLOWS.pdf) (generate with `scripts/generate_userflows_pdf.py`) |
 
 ---
@@ -477,24 +477,27 @@ flowchart LR
 
 ## 9. Flow 6 — Admin Login -> Overview -> Customers / Refunds / Control / Tickets
 
-**Goal:** Full super-admin control plane — platform health, customer/refund oversight, feature flags & journeys — never owner-scope menu/order mutation.
-**Persona:** Platform admin
-**Entry URL:** `admin.kitchcu.in` (13003)
+**Goal:** Full super-admin control plane — platform health, customer/refund oversight, packages & employees RBAC, feature flags & journeys, per-kitchen workspace — never owner-scope menu/order mutation.
+**Persona:** Platform admin (roles: superadmin / ops / support / finance)
+**Entry URL:** `admin.kitchcu.in` (13003) · prod `admin.kitchcu.com`
 **Screenshots:** [`07-admin-login.png`](./assets/ui/07-admin-login.png) · [`05-admin-overview.png`](./assets/ui/05-admin-overview.png) · [`08-admin-control.png`](./assets/ui/08-admin-control.png)
 
 ### Preconditions
 - Admin account: local `admin@kitchcu.dev` / `admin123456`; production `admin@kitchcu.com` + VM `ADMIN_PASSWORD` (see [ADVANCEMENT-TRACKER.md](./ADVANCEMENT-TRACKER.md)).
+- RBAC: mutations require permissions such as `employees:write`, `packages:write`, `kitchens:write` (superadmin = `*`).
 
 ### Step-by-step UI actions
 
-1. Admin opens login — left panel **AuthLoginHighlights** lists customers/refunds, flags & journeys, suspend, tickets/money, zero-commission oversight; signs in with email + password.
-2. Lands on **Overview** — attention tiles (open tickets/refunds, suspended kitchens, trial owners), platform health, charts, Quick actions into Control / Customers / Refunds.
-3. **Customers** — suspend accounts, reset passwords, view payout details (identity admin APIs).
-4. **Refunds** — escalate gateway vs direct refunds with evidence; money-stats from billing admin routes.
-5. **Control** — application data journeys grid; toggle feature flags (`refunds_gateway`, `refunds_direct`, journey keys); owner subscription overrides; recent payments.
-6. **Tickets** — support queue including AI-chat escalations; reply and resolve.
-7. **Kitchens / Owners** — activate/suspend kitchens; override SaaS tier when needed.
-8. **Kitchen workspace** — open a kitchen → Profile / WhatsApp / Payments / Modules tabs; set kitchen WhatsApp phone ID and kitchen Razorpay keys (platform Meta/Razorpay SaaS keys stay under **Control → API Keys**).
+1. Admin opens login — left panel **AuthLoginHighlights**; signs in with email + password.
+2. Lands on **Overview** — attention tiles, platform health, charts, Quick actions.
+3. **Customers** — suspend accounts, reset passwords, view payout details.
+4. **Refunds** — escalate gateway vs direct refunds with evidence; money-stats.
+5. **Packages** — list platform features; create/edit packages (feature keys + plan tiers); assign from kitchen workspace.
+6. **Employees** — create/update/deactivate platform staff; assign roles (superadmin/ops/support/finance).
+7. **Control** — journeys grid; feature flags; owner subscription overrides; **API Keys** (platform Meta/Razorpay SaaS secrets only).
+8. **Tickets** — support queue; reply and resolve.
+9. **Kitchens / Owners** — activate/suspend; override SaaS tier when needed.
+10. **Kitchen workspace** — Profile / WhatsApp / Payments / **Package** / **Marketing** / Modules / **Streaming**; kitchen WhatsApp phone ID + kitchen Razorpay keys (not platform secrets).
 
 ### API calls
 
@@ -502,18 +505,19 @@ flowchart LR
 |------|----------------|------|-------|
 | 1 | `POST /api/v1/admin/auth/login` | none | Bootstraps/syncs default admin from `ADMIN_EMAIL`/`ADMIN_PASSWORD`; returns JWT `type:"admin"` |
 | 2 | `GET /api/v1/admin/me` | admin | Profile |
-| 2 | `GET /api/v1/admin/stats` | admin | `PlatformStats` (incl. customers, refunds_open, payments_captured) |
+| 2 | `GET /api/v1/admin/stats` | admin | `PlatformStats` |
 | 3 | `GET /api/v1/admin/customers` (+ suspend/reset) | admin | Identity customer control |
-| 3 | `GET /api/v1/admin/owners` / `GET /api/v1/admin/kitchens` / `GET /api/v1/admin/orders` | admin | Platform-wide lists |
-| 3 | `PATCH /api/v1/admin/kitchens/{kitchen_id}/status` | admin | `KitchenStatusUpdate{status}` -> `AdminKitchenRow` |
-| 4 | `GET /api/v1/admin/refunds` / `payments` / `settlements` / `money-stats` | admin | Billing admin (gateway routes billing before identity catch-all) |
-| 5 | `GET/PATCH /api/v1/admin/feature-flags` · journeys | admin | Kill-switches + journey stats |
-| 8 | `GET/PUT /api/v1/admin/kitchens/{id}/whatsapp-integration` | admin | Kitchen WhatsApp phone id |
-| 8 | `GET/PUT/DELETE /api/v1/admin/kitchens/{id}/payment-gateway` | admin | Kitchen Razorpay (billing) |
-| 6 | `GET /api/v1/admin/tickets` | admin | `TicketListResponse` |
-| 6 | `GET /api/v1/admin/tickets/{ticket_id}` | admin | Detail + timeline |
-| 6 | `PATCH /api/v1/admin/tickets/{ticket_id}` | admin | `TicketUpdateRequest{status, priority, ...}` |
-| 6 | `POST /api/v1/admin/tickets/{ticket_id}/reply` | admin | `TicketReplyRequest{message}` -> `TicketResponse` |
+| 3 | `GET /api/v1/admin/owners` / `kitchens` / `orders` | admin | Platform-wide lists |
+| 3 | `PATCH /api/v1/admin/kitchens/{kitchen_id}/status` | admin | needs `kitchens:write` |
+| 4 | `GET /api/v1/admin/refunds` / `payments` / `money-stats` | admin | Billing admin |
+| 5 | `GET /api/v1/admin/features` · `GET/POST/PUT /api/v1/admin/packages` · `PUT /plan-packages` | admin | Package mapper (`packages:read/write`) |
+| 5 | `GET/PUT /api/v1/admin/kitchens/{id}/package` | admin | Kitchen package assignment |
+| 6 | `GET/POST /api/v1/admin/employees` · `PATCH .../employees/{id}` · `POST .../deactivate` · `GET .../roles` | admin | `employees:read/write` |
+| 7 | `GET/PATCH /api/v1/admin/feature-flags` · journeys · API keys | admin | Kill-switches + platform secrets |
+| 10 | `GET/PUT /api/v1/admin/kitchens/{id}/whatsapp-integration` | admin | Kitchen WhatsApp phone id |
+| 10 | `GET/PUT/DELETE /api/v1/admin/kitchens/{id}/payment-gateway` | admin | Kitchen Razorpay (billing) |
+| 10 | `GET /api/v1/admin/kitchens/{id}/templates` | admin | Marketing templates inventory |
+| 8 | `GET /api/v1/admin/tickets` (+ detail / reply) | admin | Notification support |
 
 ### Domain events published
 
@@ -691,26 +695,29 @@ flowchart LR
 ### Step-by-step UI actions
 
 1. Owner opens Stream settings, toggles "Allow live sharing" and Q&A on/off, saves.
-2. Owner taps **Go Live** when ready to show kitchen prep.
-3. Customers browsing nearby kitchens can toggle a "Live now" filter to see only currently-streaming kitchens.
-4. Interested customer opens the live kitchen's card, taps Watch — gets a viewer session.
-5. Owner taps **End Stream** when done; the kitchen drops out of the live filter immediately.
+2. Owner selects a **dish** (optional) and taps **Go Live** — session starts on **ingredients** showcase when a dish is featured.
+3. Owner advances phases: **Ingredients** → **Prep** (step order) → **Prepared**; customers see the live dish path.
+4. Customers browsing nearby kitchens can toggle a "Live now" filter.
+5. Interested customer opens the live kitchen's card, taps Watch — gets a viewer session.
+6. Owner taps **End Stream** when done; the kitchen drops out of the live filter immediately.
 
 ### API calls
 
 | Step | Method + Path | Auth | Notes |
 |------|----------------|------|-------|
-| 1 | `GET /api/v1/kitchens/{kitchen_id}/stream/settings` then `PATCH .../stream/settings` | owner | `StreamSettingsUpdate{live_sharing_enabled, qa_enabled}` -> `StreamSettingsResponse`; publishes `stream.settings_updated` |
-| 2 | `POST /api/v1/kitchens/{kitchen_id}/stream/go-live` | owner | `GoLiveRequest{title?}` -> `LiveSessionResponse{session_id, livekit_room, status:"live"}` |
+| 1 | `GET /api/v1/kitchens/{kitchen_id}/stream/settings` then `PATCH .../stream/settings` | owner | `StreamSettingsUpdate{live_sharing_enabled, qa_enabled}` |
+| 2 | `POST /api/v1/kitchens/{kitchen_id}/stream/go-live` | owner | `GoLiveRequest{title?, dish_id?, showcase_phase?}` → live session |
+| 3 | `PATCH /api/v1/kitchens/{kitchen_id}/stream/session` (or showcase update) | owner | `showcase_phase`: `ingredients` \| `prep` \| `prepared`; `active_prep_step_order` |
+| — | `GET /api/v1/kitchens/{kitchen_id}/stream/showcase` | owner/viewer | Dish ingredients + prep steps for overlay |
 | — | `GET /api/v1/kitchens/{kitchen_id}/stream/session` | owner | Current active session (null if none) |
-| 3 | `GET /api/v1/kitchens/public/nearby?live_only=true` | none | Identity discovery, filtered to streaming kitchens |
-| 3 (alt) | `GET /api/v1/stream/live-kitchens` | none | `LiveKitchenListResponse` — direct live roster |
-| 4 | `POST /api/v1/stream/sessions/{session_id}/viewer-token` | customer | -> `ViewerTokenResponse{livekit_token}` (LiveKit viewer join) |
-| 5 | `POST /api/v1/kitchens/{kitchen_id}/stream/end` | owner | -> `LiveSessionResponse{status:"ended"}` |
+| 4 | `GET /api/v1/kitchens/public/nearby?live_only=true` | none | Discovery filtered to streaming kitchens |
+| 4 (alt) | `GET /api/v1/stream/live-kitchens` | none | Live roster (includes showcase_phase when set) |
+| 5 | `POST /api/v1/stream/sessions/{session_id}/viewer-token` | customer | LiveKit viewer join |
+| 6 | `POST /api/v1/kitchens/{kitchen_id}/stream/end` | owner | Ends session |
 
 ### Domain events published
 
-`stream.settings_updated` -> `stream.started` -> `stream.ended` (all on `ckac:streaming:session`).
+`stream.settings_updated` → `stream.started` → `stream.showcase_updated` → `stream.ended` (all on `ckac:streaming:session`).
 
 ### Success screen / failure paths
 
@@ -805,10 +812,10 @@ Gateway-owned (not forwarded): `GET /`, `GET /health/live`, `GET /health/ready`,
 | Field | Value |
 |-------|-------|
 | Document | `CKAC-USERFLOWS.md` |
-| Version | 1.1 |
+| Version | 1.2 |
 | Date | July 2026 |
 | Author | KitchCu engineering (AI-assisted, human-reviewed) |
 | Traceability | Every route/event cited here was read directly from `services/*/app/routes.py`, `schemas.py`, and `main.py` in this repository as of July 2026 — not inferred from memory |
 | Companion | `docs/CKAC-USERFLOWS.pdf` — generate/refresh via `python scripts/generate_userflows_pdf.py` |
 | Change policy | Update this file whenever a route, event name, or status transition changes; regenerate the PDF in the same change |
-| Supersedes | v1.0; aligned with Complete Guide v3.2 (super-admin Control, login highlights, delivery payer) |
+| Supersedes | v1.1; aligned with Complete Guide v3.2.2 (P25–P28 packages, templates, employees RBAC, dish showcase) |

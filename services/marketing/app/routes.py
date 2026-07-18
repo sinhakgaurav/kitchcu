@@ -37,15 +37,27 @@ from app.schemas import (
     update_customer_tags,
     validate_coupon,
 )
+from app.templates import (
+    TemplateCreateRequest,
+    TemplateResponse,
+    TemplateUpdateRequest,
+    create_template,
+    delete_template,
+    list_templates,
+    update_template,
+)
 from ckac_common.database import get_db
 from ckac_common.event_bus import EventPublisher
 from ckac_common.openapi import RESP_400, RESP_404, auth_errors
+from ckac_common.platform_config import require_kitchen_module
 
 router = APIRouter()
 
 TAG_CRM = "CRM"
 TAG_COUPONS = "Coupons"
 TAG_PROMOTIONS = "Promotions"
+TAG_TEMPLATES = "Templates"
+TAG_TEMPLATES = "Templates"
 
 
 def get_publisher() -> EventPublisher:
@@ -292,3 +304,85 @@ async def promotions_active(
     if customer_id:
         phone = await load_customer_phone(customer_id, session)
     return await list_active_promotions(session, kitchen_id, phone)
+
+
+@router.get(
+    "/kitchens/{kitchen_id}/templates",
+    response_model=list[TemplateResponse],
+    tags=[TAG_TEMPLATES],
+    summary="List WhatsApp / email marketing templates",
+    responses=auth_errors(include_403=True),
+)
+async def templates_list(
+    kitchen_id: uuid.UUID,
+    owner_id: Annotated[uuid.UUID, Depends(get_current_owner_id)],
+    session: Annotated[AsyncSession, Depends(get_db)],
+    channel: str | None = Query(default=None, description="Filter: whatsapp | email"),
+) -> list[TemplateResponse]:
+    await verify_kitchen_owner(kitchen_id, owner_id, session)
+    await require_kitchen_module(session, kitchen_id, "marketing_broadcast")
+    return await list_templates(session, kitchen_id, channel=channel)
+
+
+@router.post(
+    "/kitchens/{kitchen_id}/templates",
+    response_model=TemplateResponse,
+    status_code=status.HTTP_201_CREATED,
+    tags=[TAG_TEMPLATES],
+    summary="Create WhatsApp or email marketing template",
+    responses={**auth_errors(include_403=True), 400: RESP_400},
+)
+async def templates_create(
+    kitchen_id: uuid.UUID,
+    body: TemplateCreateRequest,
+    owner_id: Annotated[uuid.UUID, Depends(get_current_owner_id)],
+    session: Annotated[AsyncSession, Depends(get_db)],
+    publisher: Annotated[EventPublisher, Depends(get_publisher)],
+) -> TemplateResponse:
+    await verify_kitchen_owner(kitchen_id, owner_id, session)
+    await require_kitchen_module(session, kitchen_id, "marketing_broadcast")
+    result = await create_template(session, publisher, kitchen_id, body)
+    await session.commit()
+    return result
+
+
+@router.patch(
+    "/kitchens/{kitchen_id}/templates/{template_id}",
+    response_model=TemplateResponse,
+    tags=[TAG_TEMPLATES],
+    summary="Update marketing template",
+    responses={**auth_errors(include_403=True), 400: RESP_400, 404: RESP_404},
+)
+async def templates_update(
+    kitchen_id: uuid.UUID,
+    template_id: uuid.UUID,
+    body: TemplateUpdateRequest,
+    owner_id: Annotated[uuid.UUID, Depends(get_current_owner_id)],
+    session: Annotated[AsyncSession, Depends(get_db)],
+    publisher: Annotated[EventPublisher, Depends(get_publisher)],
+) -> TemplateResponse:
+    await verify_kitchen_owner(kitchen_id, owner_id, session)
+    await require_kitchen_module(session, kitchen_id, "marketing_broadcast")
+    result = await update_template(session, publisher, kitchen_id, template_id, body)
+    await session.commit()
+    return result
+
+
+@router.delete(
+    "/kitchens/{kitchen_id}/templates/{template_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    tags=[TAG_TEMPLATES],
+    summary="Delete marketing template",
+    responses={**auth_errors(include_403=True), 404: RESP_404},
+)
+async def templates_delete(
+    kitchen_id: uuid.UUID,
+    template_id: uuid.UUID,
+    owner_id: Annotated[uuid.UUID, Depends(get_current_owner_id)],
+    session: Annotated[AsyncSession, Depends(get_db)],
+    publisher: Annotated[EventPublisher, Depends(get_publisher)],
+) -> None:
+    await verify_kitchen_owner(kitchen_id, owner_id, session)
+    await require_kitchen_module(session, kitchen_id, "marketing_broadcast")
+    await delete_template(session, publisher, kitchen_id, template_id)
+    await session.commit()

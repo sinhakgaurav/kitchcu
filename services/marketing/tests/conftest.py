@@ -53,6 +53,14 @@ def _truncate_all() -> None:
         cur.execute("TRUNCATE TABLE ckac_marketing.promotions CASCADE")
         cur.execute("TRUNCATE TABLE ckac_marketing.coupons CASCADE")
         cur.execute("TRUNCATE TABLE ckac_marketing.kitchen_customers CASCADE")
+        cur.execute(
+            """
+            SELECT 1 FROM information_schema.tables
+            WHERE table_schema = 'ckac_marketing' AND table_name = 'message_templates'
+            """
+        )
+        if cur.fetchone():
+            cur.execute("TRUNCATE TABLE ckac_marketing.message_templates CASCADE")
         cur.execute("TRUNCATE TABLE ckac_orders.order_items CASCADE")
         cur.execute("TRUNCATE TABLE ckac_orders.order_status_events CASCADE")
         cur.execute("TRUNCATE TABLE ckac_orders.orders CASCADE")

@@ -5,7 +5,7 @@
 | Field | Value |
 |-------|-------|
 | Version | **3.2** |
-| Status | Phase 1 **S1–S18** + post-S18 **P19–P24** (branded storefront, golden performance day, kitchen WhatsApp/Razorpay workspace, live dish showcase, admin password sync); GST + super-admin Control live; prod `*.kitchcu.com`; tracker [`ADVANCEMENT-TRACKER.md`](./ADVANCEMENT-TRACKER.md); **E1/E2** design pack only |
+| Status | Phase 1 **S1–S18** + post-S18 **P19–P28** (branded storefront, golden day, kitchen integrations, live dish showcase, package mapper, marketing templates, employees RBAC, super-admin kitchen workspace); GST + Control live; prod `*.kitchcu.com`; tracker [`ADVANCEMENT-TRACKER.md`](./ADVANCEMENT-TRACKER.md); **E1/E2** design pack only |
 | Audience | CEO, CPO, CTO, Product, Engineering, DBA, QA, Investors, AI coding agents |
 | Last updated | July 2026 |
 | Supersedes | `CKAC-COMPLETE-GUIDE.md` v3.1 (July 2026) |
@@ -468,10 +468,10 @@ Each module is a **bounded product + engineering context**: one row per module w
 |--|--|
 | **Definition** | Owner opt-in live kitchen-preparation sessions for customer trust. |
 | **Problem solved** | P12 (engagement without ad spend) and a stronger version of C1 — live video is a harder trust signal than even a live-captured photo. |
-| **Logic / how it works** | `kitchen_stream_settings` holds the owner's opt-in and go-live controls; `live_sessions` are LiveKit-backed WebRTC rooms with tenant-scoped access tokens; the customer app exposes a "live now" filter (F48) so diners can discover kitchens currently streaming prep. |
-| **Data / events** | Schema `ckac_streaming`: `kitchen_stream_settings`, `live_sessions`. Events on `ckac:streaming:session`. |
-| **Surfaces** | Kitchen PWA — **Stream** page · Customer PWA (live filter). |
-| **Status** | ✅ S18. |
+| **Logic / how it works** | `kitchen_stream_settings` holds the owner's opt-in and go-live controls; `live_sessions` are LiveKit-backed WebRTC rooms with tenant-scoped access tokens; sessions can feature a **dish** and advance showcase phases `ingredients → prep → prepared` (P22) so viewers see the real cook path; the customer app exposes a "live now" filter (F48). |
+| **Data / events** | Schema `ckac_streaming`: `kitchen_stream_settings`, `live_sessions` (+ dish/showcase fields). Events on `ckac:streaming:session` including `stream.showcase_updated`. |
+| **Surfaces** | Kitchen PWA — **Stream** page · Customer PWA (live filter) · Admin kitchen **Streaming** module kill-switch. |
+| **Status** | ✅ S18 + P22. |
 
 ---
 
@@ -481,10 +481,10 @@ Each module is a **bounded product + engineering context**: one row per module w
 |--|--|
 | **Definition** | Installable React surfaces for every persona — including super-admin control. |
 | **Problem solved** | Distribution without app-store gatekeeping or review delays; deep-linkable from WhatsApp; platform ops in one Admin shell. |
-| **Logic / how it works** | One Vite monorepo (`apps/website/`) builds four independent bundles (`portal`, `customer`, `kitchen`, `admin`) sharing components, brand tokens (`shared/brand.ts`), and API helpers, but each with its own `main.tsx` entry, manifest, and service worker where offline matters (customer, kitchen). **`OwnerPageShell`** unifies the kitchen dashboard. **`AuthLoginHighlights`** (left panel on Kitchen / Customer / Admin login) lists subdomain-specific value props (zero commission, ready-within, Maps, refunds, feature flags). Owner Home includes **`CommissionAdvantagePanel`** (0% food take vs typical 25–30% aggregator comparison). Customer **Dashboard** covers savings, health tips, refunds, and addresses. Admin tabs: Overview · Kitchens · Owners · Customers · Orders · Refunds · Tickets · **Control** (feature flags, application data journeys, subscription overrides, money snapshot). |
-| **Data / events** | Client-only; identity feature flags / journey stats + billing admin APIs power Admin Control. |
+| **Logic / how it works** | One Vite monorepo (`apps/website/`) builds four independent bundles (`portal`, `customer`, `kitchen`, `admin`) sharing components, brand tokens (`shared/brand.ts`), and API helpers, but each with its own `main.tsx` entry, manifest, and service worker where offline matters (customer, kitchen). **`OwnerPageShell`** unifies the kitchen dashboard (incl. Growth → **Templates** for WA/email). **`AuthLoginHighlights`** lists subdomain-specific value props. Owner Home includes **`CommissionAdvantagePanel`**. Customer **Dashboard** covers savings, health tips, refunds, and addresses. Admin tabs: Overview · Kitchens · Owners · Customers · Orders · Refunds · Tickets · **Packages** · **Employees** · **Control**. Kitchen workspace: Profile / WhatsApp / Payments / Package / Marketing / Modules / Streaming. |
+| **Data / events** | Client-only; identity RBAC + feature flags / journeys + billing packages/refunds power Admin. |
 | **Surfaces** | All four apps — see §18/§21. |
-| **Status** | ✅ Continuous polish; login highlights · customer dashboard · super-admin Control plane ✅. |
+| **Status** | ✅ Continuous polish; Packages · Employees · Templates · super-admin kitchen workspace ✅ (P25–P28). |
 
 ---
 
@@ -1060,6 +1060,10 @@ curl "http://localhost:18000/openapi.json?refresh=true"   # force refresh after 
 | Kitchen WhatsApp + Razorpay (owner + admin workspace) | P21 | ✅ |
 | Go-live per-dish showcase (ingredients → prep → prepared) | P22 | ✅ |
 | Admin password sync from `ADMIN_PASSWORD` env | P23 | ✅ |
+| Package mapper (features → packages → plans → kitchen) | P25 | ✅ |
+| Owner WhatsApp/email marketing templates | P26 | ✅ |
+| Platform employees CRUD + RBAC | P27 | ✅ |
+| Super-admin kitchen workspace (Package/Marketing/Streaming + Cursor gate) | P28 | ✅ |
 | **Purchases ledger + chef-standard lock (E1/E2)** | **S19 proposed** | **📋 Design only — not started** |
 
 ---
@@ -1244,17 +1248,20 @@ See [`DELIVERY-PAYER-MODE-DESIGN.md`](./DELIVERY-PAYER-MODE-DESIGN.md) for the c
 
 ## 17.10 Super Admin Control Plane
 
-**Context.** Platform ops need one place to see **customers, refunds, money, kill-switches, and journey health** without impersonating an owner JWT (admin tokens never call owner-mutation routes).
+**Context.** Platform ops need one place to see **customers, refunds, money, packages, staff RBAC, kill-switches, and journey health** without impersonating an owner JWT (admin tokens never call owner-mutation routes). Every new kitchen-scoped feature must pass the Cursor gate in `.cursor/rules/kitchcu-superadmin-integration.mdc`.
 
 | Area | Admin tab / API | Job |
 |------|-----------------|-----|
 | Health | Overview | Stat tiles, charts, quick actions (tickets, refunds, suspended kitchens, trials) |
 | People | Customers, Owners, Kitchens | Suspend, activate, subscription overrides |
+| Staff | **Employees** | CRUD/deactivate platform admins; roles `superadmin` / `ops` / `support` / `finance`; permissions `resource:action` |
+| Monetization | **Packages** | Map platform features → packages → plan tiers; assign package on kitchen workspace |
 | Money | Refunds + billing admin | Gateway vs direct refunds, payments, settlements, money-stats |
-| Governance | **Control** | Feature flags (`refunds_*`, journey flags), application data journeys grid, recent payments |
+| Governance | **Control** | Feature flags, application data journeys, subscription overrides, API Keys (platform secrets) |
 | Support | Tickets | Escalated AI-chat queues |
+| Kitchen workspace | Profile / WhatsApp / Payments / **Package** / **Marketing** / Modules / **Streaming** | Per-kitchen credentials, entitlements, template inventory, streaming modules |
 
-Gateway note: admin **billing** paths are registered **before** the identity admin catch-all so refunds/payments proxy correctly.
+Gateway note: admin **billing** paths (packages, refunds, payment-gateway) are registered **before** the identity admin catch-all so they proxy correctly.
 
 ---
 
@@ -1343,8 +1350,8 @@ Screenshots live at [`docs/assets/ui/`](./assets/ui/) (PNG for markdown; `*-pdf.
 | | |
 |--|--|
 | **Surface** | Admin PWA Overview |
-| **Anatomy** | Nav: Overview, Kitchens, Owners, **Customers**, Orders, **Refunds**, Tickets, **Control** → attention tiles (open tickets/refunds, suspended kitchens, trial owners) → platform health → charts (orders 14d, status mix, top kitchens, subscription tiers) → Quick actions. |
-| **UX intent** | Platform health at a glance; deep work lives in Customers / Refunds / Control. |
+| **Anatomy** | Nav: Overview, Kitchens, Owners, **Customers**, Orders, **Refunds**, Tickets, **Packages**, **Employees**, **Control** → attention tiles → platform health → charts → Quick actions. Kitchen detail opens workspace tabs (Profile / WhatsApp / Payments / Package / Marketing / Modules / Streaming). |
+| **UX intent** | Platform health at a glance; entitlements & staff under Packages / Employees; deep kitchen ops in workspace tabs. |
 | **Brand cues** | Dark ops (matches Kitchen). |
 | **Demo** | Stats reflect current seed/DB state. |
 
@@ -1581,6 +1588,7 @@ Full acceptance criteria for every feature: [`CKAC-COMPLETE-PLANNING-BENCHMARK.m
 
 | Version | Date | Changes |
 |---------|------|---------|
+| **3.2.2** | July 2026 | Post-S18 P25–P28: package mapper, owner WA/email templates, employees CRUD+RBAC, expanded kitchen workspace + always-on super-admin Cursor gate; docs/PDFs/tracker refresh. |
 | **3.2.1** | July 2026 | Post-S18 P19–P24: branded storefront, golden performance day, kitchen integrations admin workspace, live dish showcase, admin password env sync; prod admin `admin@kitchcu.com`; living [`ADVANCEMENT-TRACKER.md`](./ADVANCEMENT-TRACKER.md). |
 | **3.2** | July 2026 | Super-admin Control plane (Customers/Refunds/Control, feature flags, journeys); dish prep/delivery/`max_time` + customer ready-within; delivery payer modes (owner in-range / customer extended) + platform courier + Google Maps tracking; login `AuthLoginHighlights` + owner `CommissionAdvantagePanel` + customer dashboard; expanded UI Catalog (§18.1–18.8) with new screenshots; flows §17.9–17.10; PDF layout v3.2 (header clearance, caption-above-figure, no overlap). |
 | 3.1 | July 2026 | Documents the aggregated gateway OpenAPI contract (§15.5: `/openapi.json`, `/docs`, `/redoc`, portal `/openapi`/`/api-docs`, `docs/API.md`, `?refresh=true`, mandatory `summary`/`description`/`Field`/`responses` on every route via `ckac_common.openapi`); adds the unified form spacing system (§19.5: `owner-forms.css` field-stack tokens spanning auth + dashboards); links the new step-by-step [`CKAC-USERFLOWS.md`](./CKAC-USERFLOWS.md) pack from the TOC and Part IV; updates Appendix B/document index and changelog. |
@@ -1590,4 +1598,4 @@ Full acceptance criteria for every feature: [`CKAC-COMPLETE-PLANNING-BENCHMARK.m
 
 ---
 
-*KitchCu Complete Executive & Engineering Guide v3.2 — Confidential — July 2026*
+*KitchCu Complete Executive & Engineering Guide v3.2.2 — Confidential — July 2026*

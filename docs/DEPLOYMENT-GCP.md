@@ -331,15 +331,35 @@ gcloud compute ssh ckac-vm --zone=asia-south1-a --command="cd /opt/ckac && CKAC_
 
 **Demo logins after seed:** owner `9876543210` / OTP `123456`, customers `9123456789` etc. / OTP `123456`.
 
-### 11.8 Redeploy after a code change
+### 11.8 Redeploy after a code change (typical update path)
+
+**Prereq:** changes merged/pushed to `origin/main` (VM pulls hard-reset from GitHub).
 
 ```bash
-gcloud compute ssh ckac-vm --zone=asia-south1-a --command="sudo google_metadata_script_runner startup"
+# Project + zone (adjust if yours differ)
+gcloud config set project kitchcu
+
+# Pull main + rebuild images + migrate + restart stack (keeps volumes/DB)
+gcloud compute ssh ckac-vm --zone=asia-south1-a \
+  --command="sudo google_metadata_script_runner startup"
+
+# Follow logs until compose is healthy (10–25 min on e2-small)
+gcloud compute ssh ckac-vm --zone=asia-south1-a \
+  --command="sudo tail -f /var/log/ckac-startup.log"
+
+# Smoke
+curl -sS https://api.kitchcu.com/health/ready
+curl -sS -o /dev/null -w "%{http_code}\n" https://admin.kitchcu.com/
+curl -sS -o /dev/null -w "%{http_code}\n" https://kitchen.kitchcu.com/
 ```
 
 Re-runs `startup.sh`: `git reset --hard origin/main`, rewrites `.env` from the same
 metadata, then **batch-builds** images (avoids `context deadline exceeded` on e2-small)
-and `docker compose up -d`.
+and `docker compose up -d`. Alembic migrations run as part of the compose/startup path —
+new revisions (identity `013`, billing `008`, marketing `002`) apply automatically.
+
+**Post-deploy smoke for P25–P28:** Admin → Packages + Employees; open a kitchen → Package /
+Marketing / Streaming; Owner → Growth → Templates; Stream go-live with dish phases.
 
 ### 11.8b Fresh wipe on the same VM (keep static IP)
 

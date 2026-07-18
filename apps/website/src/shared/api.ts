@@ -1031,6 +1031,63 @@ export async function fetchOrderPatterns(kitchenId: string, days = 90): Promise<
   return apiFetch(`/api/v1/kitchens/${kitchenId}/growth/patterns?days=${days}`);
 }
 
+export type MarketingTemplate = {
+  id: string;
+  kitchen_id: string;
+  channel: string;
+  name: string;
+  subject: string | null;
+  body: string;
+  variables: string[];
+  is_active: boolean;
+  created_at: string;
+  updated_at: string | null;
+};
+
+export async function fetchMarketingTemplates(
+  kitchenId: string,
+  channel?: string,
+): Promise<MarketingTemplate[]> {
+  const q = channel ? `?channel=${encodeURIComponent(channel)}` : "";
+  return apiFetch(`/api/v1/kitchens/${kitchenId}/templates${q}`);
+}
+
+export async function createMarketingTemplate(
+  kitchenId: string,
+  data: {
+    channel: string;
+    name: string;
+    subject?: string | null;
+    body: string;
+    is_active?: boolean;
+  },
+): Promise<MarketingTemplate> {
+  return apiFetch(`/api/v1/kitchens/${kitchenId}/templates`, {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+}
+
+export async function updateMarketingTemplate(
+  kitchenId: string,
+  templateId: string,
+  data: { name?: string; subject?: string | null; body?: string; is_active?: boolean },
+): Promise<MarketingTemplate> {
+  return apiFetch(`/api/v1/kitchens/${kitchenId}/templates/${templateId}`, {
+    method: "PATCH",
+    body: JSON.stringify(data),
+  });
+}
+
+export async function deleteMarketingTemplate(
+  kitchenId: string,
+  templateId: string,
+): Promise<void> {
+  await apiFetch(`/api/v1/kitchens/${kitchenId}/templates/${templateId}`, {
+    method: "DELETE",
+  });
+}
+
 export async function pushDailyMenu(
   kitchenId: string,
   data: { dish_ids: string[]; message?: string },

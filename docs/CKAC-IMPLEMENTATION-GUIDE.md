@@ -5,10 +5,10 @@
 | Field | Value |
 |-------|-------|
 | Version | **2.0** |
-| Status | **S1–S18 shipped** + post-S18 P19–P24 (branded page, golden day, kitchen integrations, dish showcase, admin password sync); E1/E2 = design pack only |
+| Status | **S1–S18 shipped** + post-S18 **P19–P28** (packages, templates, employees RBAC, kitchen workspace); E1/E2 = design pack only |
 | Last updated | July 2026 |
 | Advancement | **[ADVANCEMENT-TRACKER.md](./ADVANCEMENT-TRACKER.md)** — sprint board + release gate |
-| Encyclopedia | **[CKAC-COMPLETE-GUIDE.md](./CKAC-COMPLETE-GUIDE.md) v3.2** — definitions, how/why, flows (§17.9–17.10), ER, **UI Catalog (8 surfaces)**, super-admin Control, delivery payer, dish timing, aggregated OpenAPI |
+| Encyclopedia | **[CKAC-COMPLETE-GUIDE.md](./CKAC-COMPLETE-GUIDE.md) v3.2.2** — packages/employees/templates + super-admin kitchen workspace; UI Catalog; OpenAPI |
 | Companion docs | [Planning Benchmark](./CKAC-COMPLETE-PLANNING-BENCHMARK.md) · [System Benchmark](./CKAC-SYSTEM-BENCHMARK.md) · [CPO Blueprint v4.2](./CKAC-CPO-PRODUCT-BLUEPRINT.md) · [CTO Architecture](./CKAC-ARCHITECTURE-CTO.md) · [Development Phases](./DEVELOPMENT-PHASES.md) · [User Flows](./CKAC-USERFLOWS.md) · [API.md](./API.md) · [AGENTS.md](../AGENTS.md) · [UI shots](./assets/ui/) |
 
 > For deep definitions, module logic, Mermaid flows, and annotated screenshots, prefer the Complete Guide. This file remains the **code ↔ feature map** (what's wired where).
@@ -79,7 +79,7 @@
 |---------|------|---------------|-----------------|
 | **Raj (Owner)** | Run kitchen, see orders | **kitchen.kitchcu.in** PWA (orders, menu, reports) | Full offline PWA (S5+) |
 | **Priya (Customer)** | Order trusted food | **customer.kitchcu.in** PWA (browse, nearby) | Checkout + accounts (Phase 2) |
-| **Platform admin** | Moderate, support tickets, refunds, flags | **admin.kitchcu.in** (Overview, Customers, Refunds, Control, tickets) | Super-admin Control plane ✅ |
+| **Platform admin** | Moderate, support, refunds, packages, staff RBAC | **admin.kitchcu.in** (Overview, Packages, Employees, Control, kitchen workspace) | Super-admin plane ✅ P25–P28 |
 
 **Maps to:** Planning Benchmark [§2.2 Personas](./CKAC-COMPLETE-PLANNING-BENCHMARK.md#22-personas-detailed) · System Benchmark [§2.2 Personas](./CKAC-SYSTEM-BENCHMARK.md#22-personas)
 
@@ -131,20 +131,20 @@ Legend: ✅ Done · 🟡 Partial · ⏳ Not started
 | F34–F41 | CRM, coupons, tiffin | ⏳ |
 | F44 | Split payment | ⏳ |
 
-### Phase 3 — Differentiation (not started)
+### Phase 3 — Differentiation
 
-F19–F24, F46–F48 — see [Planning Benchmark §11](./CKAC-COMPLETE-PLANNING-BENCHMARK.md#11-feature-index-all-45-features)
+F19–F24, F46–F48 — **shipped** in S15–S18 (see [ADVANCEMENT-TRACKER.md](./ADVANCEMENT-TRACKER.md)). Per-dish go-live showcase = **P22**.
 
-### Summary counts
+### Post-S18 platform ops (P19–P28)
 
-| | Count |
-|---|------|
-| Features fully done | **8** (F02, F03, F04, F05, F13, F14, F15, F30) |
-| Features partial | **4** (F01, F26, F45, F42/43 fields only) |
-| Phase 1 remaining | **4** (F07, F42, F43, F45 outbound) |
-| **Total spec** | **48** |
+| ID | Feature | Status | Code / notes |
+|----|---------|--------|--------------|
+| P25 | Package mapper | ✅ | `services/billing/app/packages.py` · Admin → Packages · `008_packages` |
+| P26 | WA/email templates | ✅ | `services/marketing/app/templates.py` · Owner Templates · `002_message_templates` |
+| P27 | Employees + RBAC | ✅ | `services/identity/app/rbac.py` · Admin → Employees · `013_admin_rbac_employees` |
+| P28 | Super-admin kitchen workspace gate | ✅ | Admin kitchen tabs + `.cursor/rules/kitchcu-superadmin-integration.mdc` |
 
-**Maps to:** Planning Benchmark [§11 Feature Index](./CKAC-COMPLETE-PLANNING-BENCHMARK.md#11-feature-index-all-45-features) · System Benchmark [§7 Feature Catalog](./CKAC-SYSTEM-BENCHMARK.md#7-feature-catalog--priority-matrix) · DEVELOPMENT-PHASES.md
+**Maps to:** Planning Benchmark [§11 Feature Index](./CKAC-COMPLETE-PLANNING-BENCHMARK.md#11-feature-index-all-45-features) · [ADVANCEMENT-TRACKER.md](./ADVANCEMENT-TRACKER.md) · DEVELOPMENT-PHASES.md
 
 ---
 

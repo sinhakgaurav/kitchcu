@@ -7,15 +7,19 @@ import {
   fetchAdminKitchenModuleFlags,
   fetchAdminKitchenPaymentGateway,
   fetchAdminKitchens,
+  fetchAdminKitchenPackage,
+  fetchAdminKitchenTemplates,
   fetchAdminKitchenWhatsApp,
   fetchAdminOrders,
   fetchAdminOwners,
+  fetchAdminPackages,
   fetchAdminStats,
   fetchAdminTicket,
   fetchAdminTickets,
   getAdminToken,
   replyAdminTicket,
   setAdminToken,
+  assignAdminKitchenPackage,
   updateAdminKitchenModuleFlag,
   updateAdminTicket,
   updateAdminOwnerSubscription,
@@ -25,12 +29,21 @@ import {
   type AdminKitchen,
   type AdminKitchenDetail,
   type AdminKitchenModuleFlags,
+  type AdminKitchenPackage,
   type AdminKitchenPaymentGateway,
   type AdminKitchenWhatsApp,
+  type AdminPackage,
   type AdminTicket,
   type PlatformStats,
 } from "./adminApi";
-import { AdminApiKeysPanel, AdminControlPlane, AdminCustomers, AdminRefunds } from "./AdminPanels";
+import {
+  AdminApiKeysPanel,
+  AdminControlPlane,
+  AdminCustomers,
+  AdminEmployeesPanel,
+  AdminPackagesPanel,
+  AdminRefunds,
+} from "./AdminPanels";
 import {
   buildOrderTimeline,
   buildStatusBreakdown,
@@ -53,6 +66,8 @@ type Tab =
   | "orders"
   | "refunds"
   | "tickets"
+  | "packages"
+  | "employees"
   | "api-keys"
   | "control";
 
@@ -64,6 +79,8 @@ const TABS: { id: Tab; label: string }[] = [
   { id: "orders", label: "Orders" },
   { id: "refunds", label: "Refunds" },
   { id: "tickets", label: "Tickets" },
+  { id: "packages", label: "Packages" },
+  { id: "employees", label: "Employees" },
   { id: "api-keys", label: "API Keys" },
   { id: "control", label: "Control" },
 ];
@@ -81,7 +98,7 @@ const TAB_META: Record<Tab, { title: string; desc: string }> = {
   },
   kitchens: {
     title: "Kitchens",
-    desc: "Kitchen workspace — status, WhatsApp phone ID, Razorpay keys, module flags",
+    desc: "Kitchen workspace — WhatsApp, payments, package, marketing, modules, streaming",
   },
   owners: { title: "Owners", desc: "Subscription tiers and kitchen counts — force plan changes" },
   customers: {
@@ -94,6 +111,14 @@ const TAB_META: Record<Tab, { title: string; desc: string }> = {
     desc: "Gateway and direct-transfer refunds — escalate, complete, or fail",
   },
   tickets: { title: "Support tickets", desc: "Customer and owner escalations from AI chat" },
+  packages: {
+    title: "Package mapper",
+    desc: "Features → packages → owner/customer plans — assign on kitchen workspace",
+  },
+  employees: {
+    title: "Employees",
+    desc: "kitchCU staff CRUD with RBAC roles (superadmin, ops, support, finance)",
+  },
   "api-keys": {
     title: "Platform API keys",
     desc: "Meta App Secret / Verify Token, platform Razorpay (SaaS), LiveKit, Maps, OAuth — not per-kitchen keys",
@@ -230,6 +255,8 @@ export default function AdminApp() {
           {tab === "orders" && <AdminOrders />}
           {tab === "refunds" && <AdminRefunds />}
           {tab === "tickets" && <AdminTickets />}
+          {tab === "packages" && <AdminPackagesPanel />}
+          {tab === "employees" && <AdminEmployeesPanel />}
           {tab === "api-keys" && <AdminApiKeysPanel />}
           {tab === "control" && <AdminControlPlane />}
         </div>
@@ -666,7 +693,12 @@ function AdminKitchens() {
   const [wa, setWa] = useState<AdminKitchenWhatsApp | null>(null);
   const [pgw, setPgw] = useState<AdminKitchenPaymentGateway | null>(null);
   const [modules, setModules] = useState<AdminKitchenModuleFlags | null>(null);
-  const [panelTab, setPanelTab] = useState<"profile" | "whatsapp" | "payments" | "modules">("profile");
+  const [kitchenPkg, setKitchenPkg] = useState<AdminKitchenPackage | null>(null);
+  const [allPackages, setAllPackages] = useState<AdminPackage[]>([]);
+  const [templates, setTemplates] = useState<{ id: string; channel: string; name: string; is_active: boolean; body: string }[]>([]);
+  const [panelTab, setPanelTab] = useState<
+    "profile" | "whatsapp" | "payments" | "package" | "marketing" | "modules" | "streaming"
+  >("profile");
   const [error, setError] = useState("");
   const [ok, setOk] = useState("");
   const [busy, setBusy] = useState(false);
@@ -677,6 +709,7 @@ function AdminKitchens() {
   const [webhookSecret, setWebhookSecret] = useState("");
   const [linkedAccountId, setLinkedAccountId] = useState("");
   const [pgwActive, setPgwActive] = useState(true);
+  const [assignPackageId, setAssignPackageId] = useState("");
 
   const reloadList = async () => {
     setRows(await fetchAdminKitchens());
@@ -694,14 +727,21 @@ function AdminKitchens() {
     setOk("");
     setPanelTab("profile");
     try {
-      const [d, w, p, m] = await Promise.all([
+      const [d, w, p, m, pkg, pkgs, tmpl] = await Promise.all([
         fetchAdminKitchen(id),
         fetchAdminKitchenWhatsApp(id),
         fetchAdminKitchenPaymentGateway(id),
         fetchAdminKitchenModuleFlags(id),
+        fetchAdminKitchenPackage(id).catch(() => null),
+        fetchAdminPackages("owner").catch(() => [] as AdminPackage[]),
+        fetchAdminKitchenTemplates(id).catch(() => []),
       ]);
       setDetail(d);
       setWa(w);
+      setKitchenPkg(pkg);
+      setAllPackages(pkgs);
+      setTemplates(tmpl);
+      setAssignPackageId(pkg?.package?.id ?? pkgs[0]?.id ?? "");
       setPgw(p);
       setModules(m);
       setPhoneId(w.whatsapp_phone_id ?? "");
@@ -921,14 +961,20 @@ function AdminKitchens() {
             </header>
 
             <div className="admin-kitchen-panel__tabs">
-              {(["profile", "whatsapp", "payments", "modules"] as const).map((t) => (
+              {(
+                ["profile", "whatsapp", "payments", "package", "marketing", "modules", "streaming"] as const
+              ).map((t) => (
                 <button
                   key={t}
                   type="button"
                   className={panelTab === t ? "active" : ""}
                   onClick={() => setPanelTab(t)}
                 >
-                  {t === "whatsapp" ? "WhatsApp" : t === "payments" ? "Payments" : t[0].toUpperCase() + t.slice(1)}
+                  {t === "whatsapp"
+                    ? "WhatsApp"
+                    : t === "payments"
+                      ? "Payments"
+                      : t[0].toUpperCase() + t.slice(1)}
                 </button>
               ))}
             </div>
@@ -1022,6 +1068,112 @@ function AdminKitchens() {
                   )}
                 </div>
               </form>
+            )}
+
+            {panelTab === "package" && (
+              <div className="admin-kitchen-panel__body owner-forms">
+                <p className="report-hint">
+                  Source: {kitchenPkg?.source ?? "none"}
+                  {kitchenPkg?.owner_plan_tier ? ` · owner plan ${kitchenPkg.owner_plan_tier}` : ""}
+                </p>
+                {kitchenPkg?.package && (
+                  <p>
+                    Current: <strong>{kitchenPkg.package.name}</strong> ({kitchenPkg.package.code}) —{" "}
+                    {kitchenPkg.package.feature_keys.join(", ")}
+                  </p>
+                )}
+                <label>
+                  Assign package
+                  <select value={assignPackageId} onChange={(e) => setAssignPackageId(e.target.value)}>
+                    {allPackages.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.name} ({p.code})
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <button
+                  type="button"
+                  className="btn btn--primary"
+                  disabled={busy || !assignPackageId}
+                  onClick={async () => {
+                    if (!selectedId || !assignPackageId) return;
+                    setBusy(true);
+                    try {
+                      const next = await assignAdminKitchenPackage(selectedId, {
+                        package_id: assignPackageId,
+                        sync_module_flags: true,
+                      });
+                      setKitchenPkg(next);
+                      setModules(await fetchAdminKitchenModuleFlags(selectedId));
+                      setOk("Package assigned and modules synced.");
+                    } catch (err) {
+                      setError(err instanceof Error ? err.message : "Package assign failed");
+                    } finally {
+                      setBusy(false);
+                    }
+                  }}
+                >
+                  Assign & sync modules
+                </button>
+              </div>
+            )}
+
+            {panelTab === "marketing" && (
+              <div className="admin-kitchen-panel__body">
+                <p className="report-hint">
+                  Owner WhatsApp/email templates for this kitchen ({templates.length}). Module: marketing_broadcast.
+                </p>
+                {templates.length === 0 ? (
+                  <p className="admin-panel__empty">No templates yet.</p>
+                ) : (
+                  <ul className="report-rank">
+                    {templates.map((t) => (
+                      <li key={t.id}>
+                        <div className="report-rank__row">
+                          <span>
+                            <strong>{t.name}</strong>
+                            <span className="report-rank__meta">
+                              {" "}
+                              · {t.channel}
+                              {!t.is_active ? " · inactive" : ""}
+                            </span>
+                          </span>
+                        </div>
+                        <p className="report-hint">{t.body.slice(0, 160)}</p>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            )}
+
+            {panelTab === "streaming" && modules && (
+              <div className="admin-kitchen-panel__body">
+                <p className="report-hint">
+                  Per-dish go-live (ingredients → prep → prepared) lives on the owner Stream page.
+                  Toggle streaming / livekit modules here for ops kill-switch.
+                </p>
+                <ul className="report-rank">
+                  {modules.modules
+                    .filter((m) => m.module_key === "streaming" || m.module_key === "livekit")
+                    .map((m) => (
+                      <li key={m.module_key}>
+                        <div className="report-rank__row">
+                          <span><strong>{m.module_key}</strong></span>
+                          <button
+                            type="button"
+                            className={`btn btn--sm ${m.enabled ? "btn--ghost" : "btn--primary"}`}
+                            disabled={busy}
+                            onClick={() => toggleModule(m.module_key, !m.enabled)}
+                          >
+                            {m.enabled ? "Disable" : "Enable"}
+                          </button>
+                        </div>
+                      </li>
+                    ))}
+                </ul>
+              </div>
             )}
 
             {panelTab === "modules" && modules && (

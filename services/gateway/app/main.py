@@ -22,7 +22,7 @@ _openapi_cache: dict | None = None
 IDENTITY_PREFIXES = ("/api/v1/auth", "/api/v1/owners", "/api/v1/admin", "/api/v1/customers")
 CATALOG_PATH_MARKERS = ("/categories", "/menu", "/dishes", "/cuisines", "/ingredients", "/media")
 ORDER_PATH_MARKERS = ("/orders", "/analytics")
-MARKETING_PATH_MARKERS = ("/crm", "/coupons", "/promotions")
+MARKETING_PATH_MARKERS = ("/crm", "/coupons", "/promotions", "/templates")
 GST_PATH_MARKERS = ("/gst",)
 RATINGS_PATH_MARKERS = ("/ratings", "/suggestions")
 GROWTH_PATH_MARKERS = ("/growth",)
@@ -56,13 +56,19 @@ def resolve_service_url(path: str) -> str | None:
         "/api/v1/admin/payments",
         "/api/v1/admin/settlements",
         "/api/v1/admin/money-stats",
+        "/api/v1/admin/packages",
+        "/api/v1/admin/features",
+        "/api/v1/admin/plan-packages",
     )):
         return settings.billing_service_url
-    # Kitchen Razorpay credentials travel with kitchen ops — billing owns the table.
-    if path.startswith("/api/v1/admin/kitchens/") and path.rstrip("/").endswith(
-        "/payment-gateway"
+    # Kitchen Razorpay / package assignment — billing owns the tables.
+    if path.startswith("/api/v1/admin/kitchens/") and (
+        path.rstrip("/").endswith("/payment-gateway")
+        or path.rstrip("/").endswith("/package")
     ):
         return settings.billing_service_url
+    if path.startswith("/api/v1/admin/kitchens/") and "/templates" in path:
+        return settings.marketing_service_url
     if any(path.startswith(p) for p in IDENTITY_PREFIXES):
         if path.startswith("/api/v1/admin/tickets"):
             return settings.notification_service_url

@@ -55,7 +55,7 @@
 | Identity service | `services/identity/` | Owners, kitchens, OTP, JWT |
 | **Catalog service** | `services/catalog/` | **Sprint 2** — categories, dishes, menu, EDD |
 | **Order service** | `services/order/` | **Sprint 3** — manual orders, lifecycle, history |
-| **Billing service** | `services/billing/` | **Sprint 6** — payments, UPI intents, owner subscriptions; **GST**; **refunds** — full (gateway or direct) / partial (direct UPI/bank + evidence) |
+| **Billing service** | `services/billing/` | **Sprint 6** — payments, UPI intents, owner subscriptions; **GST**; **refunds**; **P25** package mapper (features→packages→plans→kitchen) |
 | **Marketing service** | `services/marketing/` | **Sprint 10** — CRM (F37), coupons (F36), promotions (F38) |
 | **Ratings service** | `services/ratings/` | **Sprint 11** — home taste ratings (F16–F18) |
 | **Growth service** | `services/growth/` | **Sprint 12** — combos (F09), patterns (F10), suggestions (F11), daily menu push (F39) |
@@ -67,7 +67,7 @@
 | **Discovery + history** | `services/identity/`, `apps/website/` | **S7** — F32 nearby map/filters (diet, live-capture); F33 order history + repeat |
 | **Multi-kitchen checkout** | `services/order/`, `apps/website/` | **S8** — F06 grouped cart, master receipt, atomic sub-orders |
 | **Split payment** | `services/billing/` | **S9** — F44 aggregated payment + Route split settlements |
-| **Marketing / CRM** | `services/marketing/`, `apps/website/` | **S10** — F36 coupons, F37 CRM, F38 targeted promotions |
+| **Marketing / CRM** | `services/marketing/`, `apps/website/` | **S10** — F36 coupons, F37 CRM, F38 targeted promotions; **P26** WA/email message templates |
 | **Ratings** | `services/ratings/`, `apps/website/` | **S11** — F16–F18 home taste ratings, aggregates, A/V reviews |
 | **Growth intelligence** | `services/growth/`, `apps/website/` | **S12** — F09 combos, F10 patterns, F11 suggestions, F39 daily menu WhatsApp |
 | **Delivery** | `services/delivery/`, `apps/website/` | **S13** — F27–F31 radius/fees/distance, F29 tracking links |
@@ -79,9 +79,10 @@
 | **Growth golden day** | `services/growth/` | **P20** — ML comment sentiment + golden performance day pins |
 | **Branded storefront** | `services/identity/`, `apps/website/` | **P19** — kitchen `branded_page` + customer `/k/:code` |
 | **Kitchen integrations admin** | identity + billing admin APIs, admin PWA | **P21** — WhatsApp / Razorpay per kitchen (platform keys stay Admin API Keys) |
+| **Package mapper + employees RBAC** | billing packages · identity employees · admin PWA | **P25–P28** — Admin Packages/Employees; kitchen Package/Marketing/Streaming tabs; Cursor super-admin gate |
 | **Owner analytics** | `services/order/app/analytics.py` | F07–F08 revenue, top dishes, peak hours, customer segments |
 | Shared lib | `packages/ckac-common/` | Config, DB, auth, `EventPublisher`, cache, health, internal auth |
-| Event bus | Redis Streams | `ckac:catalog:dish`, `ckac:catalog:ingredient`, `ckac:orders:order`, `ckac:orders:draft`, `ckac:orders:master_order`, `ckac:billing:payment`, `ckac:billing:settlement`, `ckac:billing:subscription`, `ckac:billing:wallet`, `ckac:billing:gst`, `ckac:billing:refund`, `ckac:identity:kitchen`, `ckac:marketing:coupon`, `ckac:marketing:promotion`, `ckac:marketing:crm`, `ckac:ratings:rating`, `ckac:ratings:dish`, `ckac:growth:suggestion`, `ckac:growth:daily_menu`, `ckac:delivery:quote`, `ckac:delivery:tracking`, `ckac:learning:trial`, `ckac:community:recipe`, `ckac:community:reward`, `ckac:community:ranking`, `ckac:streaming:session`, `ckac:notify:whatsapp`, `ckac:notify:dispatch`, `ckac:notify:tracking` |
+| Event bus | Redis Streams | `ckac:catalog:dish`, `ckac:catalog:ingredient`, `ckac:orders:order`, `ckac:orders:draft`, `ckac:orders:master_order`, `ckac:billing:payment`, `ckac:billing:settlement`, `ckac:billing:subscription`, `ckac:billing:wallet`, `ckac:billing:gst`, `ckac:billing:refund`, `ckac:billing:package`, `ckac:identity:kitchen`, `ckac:marketing:coupon`, `ckac:marketing:promotion`, `ckac:marketing:crm`, `ckac:marketing:template`, `ckac:ratings:rating`, `ckac:ratings:dish`, `ckac:growth:suggestion`, `ckac:growth:daily_menu`, `ckac:delivery:quote`, `ckac:delivery:tracking`, `ckac:learning:trial`, `ckac:community:recipe`, `ckac:community:reward`, `ckac:community:ranking`, `ckac:streaming:session`, `ckac:notify:whatsapp`, `ckac:notify:dispatch`, `ckac:notify:tracking` |
 | PostgreSQL + PostGIS | `infra/postgres/init/` | Schema-per-domain |
 | Docker stack | `docker-compose.yml` | postgres, redis, minio, gateway, identity, catalog, order, billing, marketing, ratings, growth, delivery, learning, community, streaming, notification |
 | Tests | `services/*/tests/` | TDD — run `scripts/run-tests.ps1` |
@@ -452,4 +453,4 @@ Delivered order only → home_taste (1–5) + quality (1–5) → optional anony
 
 ---
 
-*Last updated: Phase 1 S1–S18 + P19–P24 (branded page, golden day, kitchen integrations, dish showcase, admin password sync). Tracker: `docs/ADVANCEMENT-TRACKER.md`. Prod: `*.kitchcu.com`. Next design: E1–E2 Quality Loop.*
+*Last updated: Phase 1 S1–S18 + P19–P28 (packages, marketing templates, employees RBAC, super-admin kitchen workspace). Tracker: `docs/ADVANCEMENT-TRACKER.md`. Prod: `*.kitchcu.com`. Next design: E1–E2 Quality Loop.*

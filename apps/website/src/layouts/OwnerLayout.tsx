@@ -23,6 +23,7 @@ const NAV_SECTIONS = [
       { to: "/dashboard/growth", label: "Intelligence" },
       { to: "/dashboard/crm", label: "CRM" },
       { to: "/dashboard/coupons", label: "Coupons" },
+      { to: "/dashboard/templates", label: "Templates" },
       { to: "/dashboard/stream", label: "Live stream" },
     ],
   },

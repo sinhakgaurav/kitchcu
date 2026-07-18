@@ -173,4 +173,4 @@ For architecture, event flows, and ER diagrams see:
 
 ---
 
-*CPO Product Blueprint v4.2 — aligned with Complete Guide v3.2 — July 2026*
+*CPO Product Blueprint v4.2 — aligned with Complete Guide v3.2.2 (P19–P28) — July 2026*

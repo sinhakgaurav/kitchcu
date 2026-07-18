@@ -1,0 +1,51 @@
+---
+description: Every feature must check super-admin integration — kitchen workspace, packages, RBAC, kill-switches
+alwaysApply: true
+---
+
+# KitchCu Super-Admin Integration Gate (Always)
+
+Before design or code for **any** product feature, run this gate. Fail any row → redesign or wire admin in the **same change**. “Owner PWA only” is not enough when ops/support/monetization touch the feature.
+
+## Mandatory checklist (copy into design pack / PR notes)
+
+| # | Question | If yes → required delivery |
+|---|----------|----------------------------|
+| 1 | **Kitchen-scoped?** Affects kitchen ops, credentials, modules, marketing, streaming, billing, or customer UX for a kitchen? | **Admin → Kitchens → kitchen workspace** tab/panel + admin API |
+| 2 | **Entitlement / monetized?** Unlocked by plan, package, or module? | **Packages** mapper (feature → package → plan) + kitchen **Package** tab; enforce server-side |
+| 3 | **Ops / support?** Employees need view, override, or troubleshoot? | Admin API + UI; **RBAC permission** (`resource:action`); `require_admin_permission` |
+| 4 | **Cross-tenant risk?** | Tenant filters; no unscoped lists; admin audit on sensitive writes |
+| 5 | **Kill-switch?** | Global `feature_flags` and/or kitchen `module_flags`; Control and/or Modules tab |
+| 6 | **Credentials?** | Kitchen secrets on kitchen form; **platform** secrets only under **API Keys** |
+
+Deferral allowed only with: tracker note in `docs/ADVANCEMENT-TRACKER.md` + permission code reserved + owner path still tenant-safe.
+
+## Default kitchen workspace tabs
+
+| Tab | Owns |
+|-----|------|
+| Profile | Status, address, branded summary |
+| WhatsApp | Kitchen `phone_number_id` (not Meta app secret) |
+| Payments | Kitchen Razorpay / Route (not SaaS Razorpay) |
+| Modules | Per-kitchen module flags |
+| Package | Assigned package + feature checklist |
+| Marketing | Template counts / broadcast module |
+| Streaming | Live session summary + streaming/livekit modules |
+
+## RBAC (employees)
+
+- Platform staff live under **Admin → Employees** (CRUD + deactivate).
+- Permission codes: `resource:action` (e.g. `kitchens:write`, `packages:write`, `employees:write`, `marketing:read`).
+- Role `superadmin` ⇒ `*`. Never ship new `/admin/*` mutations without a permission check once RBAC exists.
+- Billing/notification admin routes must validate the same permission model (JWT + DB grants).
+
+## Forbidden
+
+- Owner-only features that support will need with no admin surface
+- Plan entitlements only in the frontend
+- Platform Meta/Razorpay SaaS secrets on kitchen forms
+- Skipping this gate with “UI later” without tracker deferral
+
+## Agent behavior
+
+At the start of a feature task: state which gate rows apply and which admin tabs/APIs you will touch. If none apply, say so explicitly (e.g. pure internal refactor).

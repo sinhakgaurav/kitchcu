@@ -158,13 +158,18 @@ export const features = [
     image: { src: m("kitchen.jpg"), alt: "Live cooking showcase" },
   },
   {
+    title: "Marketing templates",
+    desc: "Create WhatsApp and email templates for daily menu and CRM — owned by your kitchen.",
+    image: { src: m("service.jpg"), alt: "Kitchen messaging" },
+  },
+  {
     title: "Order Lifecycle",
     desc: "Track every order from received to delivered with status updates.",
-    image: { src: m("service.jpg"), alt: "Kitchen service" },
+    image: { src: m("restaurant.jpg"), alt: "Kitchen service" },
   },
   {
     title: "Owner Dashboard",
-    desc: "Menus, orders, WhatsApp & payments, growth — one kitchen workspace.",
+    desc: "Menus, orders, WhatsApp & payments, templates, growth — one kitchen workspace.",
     image: { src: m("restaurant.jpg"), alt: "Commercial kitchen" },
   },
 ];

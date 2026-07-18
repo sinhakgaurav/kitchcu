@@ -61,6 +61,10 @@ For journeys see [CKAC-USERFLOWS.md](./CKAC-USERFLOWS.md).
 | P22 | **Go-live per-dish showcase** | Streaming dish_id + phases ingredients→prep→prepared · StreamPage · Nearby live filter | ✅ | Event `stream.showcase_updated` |
 | P23 | **Admin password sync from env** | Identity `ensure_default_admin` resyncs hash · admin UI prod defaults | ✅ | Fixes `admin.kitchcu.com` invalid credentials after metadata rotate |
 | P24 | **Release docs + tracker** | This file · Complete Guide / Userflows / Implementation Guide · portal features | ✅ | PDFs regenerable via `scripts/generate_*_pdf.py` |
+| P25 | **Package mapper (features→packages→plans)** | Billing `platform_features` / `packages` / `plan_packages` / `kitchen_packages` · Admin → Packages · kitchen Package tab | ✅ | Alembic billing `008`; assign syncs module flags optionally |
+| P26 | **Owner WA/email marketing templates** | Marketing `message_templates` · Owner Growth → Templates · Admin kitchen Marketing tab | ✅ | Alembic marketing `002`; module `marketing_broadcast` |
+| P27 | **Platform employees CRUD + RBAC** | Identity `admin_permissions` / role grants · Admin → Employees · `require_admin_permission` | ✅ | Alembic identity `013`; roles superadmin/ops/support/finance |
+| P28 | **Super-admin kitchen workspace expansion** | Kitchen tabs: Profile / WhatsApp / Payments / Package / Marketing / Modules / Streaming | ✅ | Cursor rule `kitchcu-superadmin-integration.mdc` (always-on gate) |
 
 ---
 
@@ -92,6 +96,7 @@ Run `.\scripts\seed-all.ps1` (or GCP `run-seed=1`) after migrations.
 | Branded storefront | `ensure_branded_page` | ✅ |
 | Streaming + dish showcase | `ensure_streaming(..., dish_id=)` | ✅ |
 | Growth suggestions (incl. golden day when data qualifies) | `ensure_growth_suggestions` | ✅ |
+| Platform features / seed packages | billing migration `008` seed | ✅ |
 | Learning trials / community | extras | ✅ |
 
 ---
@@ -108,8 +113,29 @@ Run `.\scripts\seed-all.ps1` (or GCP `run-seed=1`) after migrations.
 
 - [x] Admin login uses `admin@kitchcu.com` on production hosts (UI + env sync)
 - [x] Seed covers integrations, branded page, dish showcase
-- [x] Advancement tracker maintained
-- [ ] Deploy: push `main` → GCP build/redeploy → smoke `https://admin.kitchcu.com` + `https://api.kitchcu.com/health/ready`
+- [x] Advancement tracker maintained (P19–P28)
+- [x] Migrations ready: identity `013` (RBAC), billing `008` (packages), marketing `002` (templates)
+- [ ] Deploy: push `main` → GCP VM redeploy (§11.8) → smoke admin Packages/Employees + kitchen Package/Marketing tabs
 - [ ] Confirm `ADMIN_PASSWORD` in GCE metadata matches what operators use
+- [ ] Smoke: Owner → Templates; Admin → Packages assign; Stream per-dish phases
 
 *Update the checkboxes and Post-S18 table on every release cut.*
+
+### GCP update (single-VM — production path today)
+
+```bash
+# 1) After push to origin/main — pull + rebuild (keeps DB)
+gcloud compute ssh ckac-vm --zone=asia-south1-a --command="sudo google_metadata_script_runner startup"
+
+# 2) Watch build
+gcloud compute ssh ckac-vm --zone=asia-south1-a --command="sudo tail -f /var/log/ckac-startup.log"
+
+# 3) Smoke
+curl -sS https://api.kitchcu.com/health/ready
+# Login admin.kitchcu.com → Packages + Employees; open a kitchen → Package / Marketing / Streaming
+
+# Fresh wipe (DB reset + re-seed) — only when intentionally destroying demo data:
+# gcloud compute ssh ckac-vm --zone=asia-south1-a --command="cd /opt/ckac && sudo git fetch origin main && sudo git reset --hard origin/main && sudo bash infra/gcp-vm/reset-fresh.sh"
+```
+
+Full runbook: [DEPLOYMENT-GCP.md](./DEPLOYMENT-GCP.md) §11.

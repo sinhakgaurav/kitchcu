@@ -20,6 +20,7 @@ import { LearningPage } from "../pages/owner/LearningPage";
 import { TrialDetailPage } from "../pages/owner/TrialDetailPage";
 import { CrmPage } from "../pages/owner/CrmPage";
 import { CouponsPage } from "../pages/owner/CouponsPage";
+import { MarketingTemplatesPage } from "../pages/owner/MarketingTemplatesPage";
 import { SubscriptionPage } from "../pages/owner/SubscriptionPage";
 import { PaymentGatewayPage } from "../pages/owner/PaymentGatewayPage";
 import { WhatsAppIntegrationPage } from "../pages/owner/WhatsAppIntegrationPage";
@@ -59,6 +60,7 @@ export default function KitchenApp() {
             <Route path="stream" element={<StreamPage />} />
             <Route path="crm" element={<CrmPage />} />
             <Route path="coupons" element={<CouponsPage />} />
+            <Route path="templates" element={<MarketingTemplatesPage />} />
             <Route path="subscription" element={<SubscriptionPage />} />
             <Route path="whatsapp" element={<WhatsAppIntegrationPage />} />
             <Route path="payment-gateway" element={<PaymentGatewayPage />} />

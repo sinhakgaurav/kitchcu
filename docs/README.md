@@ -5,8 +5,8 @@
 | **[KITCHCU-ENGINEERING-STANDARDS.md](./KITCHCU-ENGINEERING-STANDARDS.md)** | **Engineering constitution — DDD, EDD, TDD, security, observability** | Engineering, AI agents |
 | **[templates/MODULE-DESIGN-PACK.md](./templates/MODULE-DESIGN-PACK.md)** | Pre-code design template (mandatory for new modules) | Engineering |
 | **[ADVANCEMENT-TRACKER.md](./ADVANCEMENT-TRACKER.md)** | **Living release board** — S1–S18 + post-S18 increments, credentials, seed checklist, kitchcu.com gate | CEO, CPO, CTO, Engineering, AI agents |
-| **[CKAC-COMPLETE-GUIDE.md](./CKAC-COMPLETE-GUIDE.md)** | **Master guide v3.2 — definitions/glossary, architecture why+how, 100k-session scale lens, TDD+EDD, modules (+ delivery payer, dish timing, super-admin Control), flows §17.9–17.10, UI Catalog (8 surfaces), brand/UX, OpenAPI** | CEO, CPO, CTO, DBA, QA, Investors, AI agents |
-| **[CKAC-COMPLETE-GUIDE.pdf](./CKAC-COMPLETE-GUIDE.pdf)** | Complete Executive Guide PDF v3.2 (portrait; UI Catalog figures; fixed header/caption layout) | CEO, CPO, CTO, Investors |
+| **[CKAC-COMPLETE-GUIDE.md](./CKAC-COMPLETE-GUIDE.md)** | **Master guide v3.2.2 — modules through P28 (packages, templates, employees RBAC, kitchen workspace), flows §17.9–17.10, UI Catalog, OpenAPI** | CEO, CPO, CTO, DBA, QA, Investors, AI agents |
+| **[CKAC-COMPLETE-GUIDE.pdf](./CKAC-COMPLETE-GUIDE.pdf)** | Complete Executive Guide PDF v3.2.2 (portrait; UI Catalog figures) | CEO, CPO, CTO, Investors |
 | **[CKAC-USERFLOWS.md](./CKAC-USERFLOWS.md)** | **Full user journey pack** — every persona, every screen, every API call, step-by-step | Product, Design, Engineering, QA |
 | **[CKAC-USERFLOWS.pdf](./CKAC-USERFLOWS.pdf)** | User journey pack PDF | Product, Design, Investors |
 | **[assets/ui/](./assets/ui/)** | **Reference UI screenshots** (8 surfaces: portal, customer home/login, kitchen login, owner dashboard, admin login/overview/Control) — Complete Guide §18 | Product, Design, Engineering |
@@ -45,7 +45,7 @@ python scripts/generate_pitch_pdf.py
 
 ## Quick Stats
 
-- **S1–S18 + P19–P24 shipped** — track progress in [ADVANCEMENT-TRACKER.md](./ADVANCEMENT-TRACKER.md); encyclopedia [Complete Guide v3.2](./CKAC-COMPLETE-GUIDE.md)
+- **S1–S18 + P19–P28 shipped** — track progress in [ADVANCEMENT-TRACKER.md](./ADVANCEMENT-TRACKER.md); encyclopedia [Complete Guide v3.2.2](./CKAC-COMPLETE-GUIDE.md)
 - **Prod:** `https://kitchcu.com` · `customer` / `kitchen` / `admin` / `api` / `media`.kitchcu.com
 - **Local apps:** Portal :13000 · customer.kitchcu.in :13001 · kitchen.kitchcu.in :13002 · admin.kitchcu.in :13003
 - **Stack:** React PWAs + Python FastAPI + PostgreSQL/PostGIS + Redis + Docker

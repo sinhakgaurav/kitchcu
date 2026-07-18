@@ -1,23 +1,33 @@
-import { useEffect, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import {
   clearAdminApiKey,
   clearAdminCustomerPassword,
+  createAdminEmployee,
   fetchAdminApiKeys,
   fetchAdminCustomer,
   fetchAdminCustomers,
+  fetchAdminEmployeeRoles,
+  fetchAdminEmployees,
   fetchAdminFeatureFlags,
+  fetchAdminFeatures,
   fetchAdminJourneys,
   fetchAdminMoneyStats,
   fetchAdminOwners,
+  fetchAdminPackages,
   fetchAdminPayments,
   fetchAdminRefunds,
   patchAdminRefund,
   updateAdminApiKey,
   updateAdminCustomerStatus,
+  updateAdminEmployee,
   updateAdminFeatureFlag,
   updateAdminOwnerSubscription,
+  upsertAdminPackage,
   type AdminCustomer,
   type AdminCustomerDetail,
+  type AdminEmployee,
+  type AdminFeature,
+  type AdminPackage,
   type AdminRefund,
   type FeatureFlag,
   type PlatformApiKey,
@@ -684,6 +694,331 @@ export function AdminControlPlane() {
           </tbody>
         </table>
       </section>
+    </div>
+  );
+}
+
+export function AdminEmployeesPanel() {
+  const [rows, setRows] = useState<AdminEmployee[]>([]);
+  const [roles, setRoles] = useState<string[]>([]);
+  const [error, setError] = useState("");
+  const [ok, setOk] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [busy, setBusy] = useState(false);
+  const [email, setEmail] = useState("");
+  const [name, setName] = useState("");
+  const [password, setPassword] = useState("");
+  const [role, setRole] = useState("support");
+
+  const load = async () => {
+    setLoading(true);
+    try {
+      const [emps, r] = await Promise.all([fetchAdminEmployees(), fetchAdminEmployeeRoles()]);
+      setRows(emps);
+      setRoles(r);
+      setError("");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to load employees");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    load();
+  }, []);
+
+  const onCreate = async (e: FormEvent) => {
+    e.preventDefault();
+    setBusy(true);
+    try {
+      await createAdminEmployee({ email, name, password, role });
+      setEmail("");
+      setName("");
+      setPassword("");
+      setOk("Employee created.");
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Create failed");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="admin-panel">
+      {error && <p className="auth-card__error">{error}</p>}
+      {ok && <p className="auth-card__success">{ok}</p>}
+      <section className="glass admin-detail" style={{ marginBottom: "1.25rem" }}>
+        <header className="admin-panel__head">
+          <div>
+            <h3>Add employee</h3>
+            <p style={{ margin: "0.35rem 0 0", color: "var(--text-muted)" }}>
+              RBAC roles: superadmin, ops, support, finance — permissions enforced on admin APIs.
+            </p>
+          </div>
+        </header>
+        <form className="owner-forms" onSubmit={onCreate}>
+          <label>
+            Name
+            <input value={name} onChange={(e) => setName(e.target.value)} required />
+          </label>
+          <label>
+            Email
+            <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
+          </label>
+          <label>
+            Password
+            <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required minLength={8} />
+          </label>
+          <label>
+            Role
+            <select value={role} onChange={(e) => setRole(e.target.value)}>
+              {roles.map((r) => (
+                <option key={r} value={r}>{r}</option>
+              ))}
+            </select>
+          </label>
+          <button type="submit" className="btn btn--primary" disabled={busy}>
+            {busy ? "Saving…" : "Create employee"}
+          </button>
+        </form>
+      </section>
+      <div className="dash-card admin-table-wrap">
+        {loading ? (
+          <p className="admin-panel__empty">Loading…</p>
+        ) : (
+          <table className="admin-table">
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>Email</th>
+                <th>Role</th>
+                <th>Status</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((emp) => (
+                <tr key={emp.id}>
+                  <td>{emp.name}</td>
+                  <td>{emp.email}</td>
+                  <td>
+                    <select
+                      value={emp.role}
+                      onChange={async (e) => {
+                        try {
+                          await updateAdminEmployee(emp.id, { role: e.target.value });
+                          await load();
+                        } catch (err) {
+                          setError(err instanceof Error ? err.message : "Role update failed");
+                        }
+                      }}
+                    >
+                      {roles.map((r) => (
+                        <option key={r} value={r}>{r}</option>
+                      ))}
+                    </select>
+                  </td>
+                  <td>{emp.is_active ? "active" : "inactive"}</td>
+                  <td>
+                    {emp.is_active && (
+                      <button
+                        type="button"
+                        className="btn btn--sm btn--ghost"
+                        onClick={async () => {
+                          try {
+                            await updateAdminEmployee(emp.id, { is_active: false });
+                            await load();
+                          } catch (err) {
+                            setError(err instanceof Error ? err.message : "Deactivate failed");
+                          }
+                        }}
+                      >
+                        Deactivate
+                      </button>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
+    </div>
+  );
+}
+
+export function AdminPackagesPanel() {
+  const [packages, setPackages] = useState<AdminPackage[]>([]);
+  const [features, setFeatures] = useState<AdminFeature[]>([]);
+  const [error, setError] = useState("");
+  const [ok, setOk] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [editing, setEditing] = useState<AdminPackage | null>(null);
+  const [code, setCode] = useState("");
+  const [name, setName] = useState("");
+  const [audience, setAudience] = useState("owner");
+  const [description, setDescription] = useState("");
+  const [selectedFeatures, setSelectedFeatures] = useState<string[]>([]);
+  const [planTiers, setPlanTiers] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  const load = async () => {
+    setLoading(true);
+    try {
+      const [p, f] = await Promise.all([fetchAdminPackages(), fetchAdminFeatures()]);
+      setPackages(p);
+      setFeatures(f);
+      setError("");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to load packages");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    load();
+  }, []);
+
+  const startEdit = (pkg: AdminPackage | null) => {
+    setEditing(pkg);
+    setCode(pkg?.code ?? "");
+    setName(pkg?.name ?? "");
+    setAudience(pkg?.audience ?? "owner");
+    setDescription(pkg?.description ?? "");
+    setSelectedFeatures(pkg?.feature_keys ?? []);
+    setPlanTiers((pkg?.plan_tiers ?? []).join(", "));
+  };
+
+  const onSave = async (e: FormEvent) => {
+    e.preventDefault();
+    setBusy(true);
+    setError("");
+    try {
+      await upsertAdminPackage(
+        {
+          code,
+          name,
+          audience,
+          description,
+          is_active: true,
+          feature_keys: selectedFeatures,
+          plan_tiers: planTiers
+            .split(",")
+            .map((t) => t.trim())
+            .filter(Boolean),
+        },
+        editing?.id,
+      );
+      setOk(editing ? "Package updated." : "Package created.");
+      startEdit(null);
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Save failed");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const toggleFeat = (key: string) => {
+    setSelectedFeatures((prev) =>
+      prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key],
+    );
+  };
+
+  return (
+    <div className="admin-panel">
+      {error && <p className="auth-card__error">{error}</p>}
+      {ok && <p className="auth-card__success">{ok}</p>}
+      <p className="report-hint" style={{ marginBottom: "1rem" }}>
+        Map platform features → packages → subscription plan tiers. Assign packages on kitchen workspace.
+      </p>
+      <div className="admin-split">
+        <div className="dash-card admin-table-wrap">
+          {loading ? (
+            <p className="admin-panel__empty">Loading…</p>
+          ) : (
+            <table className="admin-table">
+              <thead>
+                <tr>
+                  <th>Code</th>
+                  <th>Name</th>
+                  <th>Audience</th>
+                  <th>Features</th>
+                  <th>Plans</th>
+                  <th />
+                </tr>
+              </thead>
+              <tbody>
+                {packages.map((p) => (
+                  <tr key={p.id}>
+                    <td><code className="admin-code">{p.code}</code></td>
+                    <td>{p.name}</td>
+                    <td>{p.audience}</td>
+                    <td>{p.feature_keys.length}</td>
+                    <td>{p.plan_tiers.join(", ") || "—"}</td>
+                    <td>
+                      <button type="button" className="btn btn--sm btn--ghost" onClick={() => startEdit(p)}>
+                        Edit
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+          <button type="button" className="btn btn--primary btn--sm" style={{ margin: "1rem" }} onClick={() => startEdit(null)}>
+            New package
+          </button>
+        </div>
+        <section className="glass admin-detail">
+          <h3>{editing ? `Edit ${editing.code}` : "New package"}</h3>
+          <form className="owner-forms" onSubmit={onSave}>
+            <label>
+              Code
+              <input value={code} onChange={(e) => setCode(e.target.value)} required disabled={Boolean(editing)} />
+            </label>
+            <label>
+              Name
+              <input value={name} onChange={(e) => setName(e.target.value)} required />
+            </label>
+            <label>
+              Audience
+              <select value={audience} onChange={(e) => setAudience(e.target.value)}>
+                <option value="owner">Owner</option>
+                <option value="customer">Customer</option>
+                <option value="both">Both</option>
+              </select>
+            </label>
+            <label>
+              Description
+              <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={2} />
+            </label>
+            <label>
+              Plan tiers (comma-separated)
+              <input value={planTiers} onChange={(e) => setPlanTiers(e.target.value)} placeholder="starter, growth" />
+            </label>
+            <fieldset style={{ border: "1px solid var(--surface-border)", borderRadius: 8, padding: "0.75rem" }}>
+              <legend>Features</legend>
+              {features.map((f) => (
+                <label key={f.key} className="owner-forms__check">
+                  <input
+                    type="checkbox"
+                    checked={selectedFeatures.includes(f.key)}
+                    onChange={() => toggleFeat(f.key)}
+                  />
+                  {f.label} <span className="report-rank__meta">({f.key})</span>
+                </label>
+              ))}
+            </fieldset>
+            <button type="submit" className="btn btn--primary" disabled={busy}>
+              {busy ? "Saving…" : "Save package"}
+            </button>
+          </form>
+        </section>
+      </div>
     </div>
   );
 }

@@ -181,18 +181,18 @@ Gateway aggregation prefixes service name (e.g. `Identity: Auth`, `Order: Custom
 
 | Service | Example tags | Owns |
 |---------|--------------|------|
-| Identity | Auth, Owners, Kitchens, Discovery, Customer Auth, Admin | OTP/JWT, kitchens, nearby |
+| Identity | Auth, Owners, Kitchens, Discovery, Customer Auth, Admin, Employees | OTP/JWT, kitchens, nearby, admin RBAC |
 | Catalog | Menu, Dishes, Ingredients, Media | Live-capture menu, stock recipes |
 | Order | Owner Orders, Customer Checkout, Master Orders, Analytics, Bills | Lifecycle, PDFs |
-| Billing | Payments, Customer Payments, Settlements, Subscriptions, GST | Money + tax |
+| Billing | Payments, Settlements, Subscriptions, GST, Refunds, Packages | Money + tax + package mapper |
 | Delivery | Delivery | Quotes + public tracking |
-| Marketing | CRM, Coupons, Promotions | Owner CRM |
+| Marketing | CRM, Coupons, Promotions, Templates | Owner CRM + WA/email templates |
 | Ratings | Ratings, Suggestions | Verified home-taste |
 | Growth | Suggestions, Combos, Patterns, Daily Menu | Growth cards |
 | Notification | WhatsApp, Support Chat, Support Tickets | Webhooks + tickets |
 | Learning | Curated Recipes, Dish Trials | Skill portal |
 | Community | Community Recipes, Rewards, Chef Rankings | Rankings |
-| Streaming | Live Streaming | LiveKit opt-in |
+| Streaming | Live Streaming | LiveKit + per-dish showcase phases |
 
 ---
 

@@ -63,25 +63,6 @@ async def _payment_gateway_kitchen_ids(
     return {uuid.UUID(str(r)) for r in rows}
 
 
-def _admin_kitchen_row(
-    kitchen: Kitchen,
-    owner: Owner,
-    *,
-    payment_gateway_configured: bool = False,
-) -> AdminKitchenRow:
-    return AdminKitchenRow(
-        id=kitchen.id,
-        code=kitchen.code,
-        name=kitchen.name,
-        city=kitchen.city,
-        status=kitchen.status,
-        owner_name=owner.name,
-        owner_phone=owner.phone,
-        whatsapp_connected=bool(kitchen.whatsapp_phone_id),
-        payment_gateway_configured=payment_gateway_configured,
-    )
-
-
 def _mask_account(account: str | None) -> str | None:
     if not account:
         return None
@@ -292,6 +273,25 @@ class AdminKitchenDetail(AdminKitchenRow):
             "Meta App Secret / Verify Token and platform Razorpay (SaaS) live under Super Admin → API Keys. "
             "Kitchen WhatsApp phone ID and kitchen Razorpay keys travel with this kitchen."
         ),
+    )
+
+
+def _admin_kitchen_row(
+    kitchen: Kitchen,
+    owner: Owner,
+    *,
+    payment_gateway_configured: bool = False,
+) -> AdminKitchenRow:
+    return AdminKitchenRow(
+        id=kitchen.id,
+        code=kitchen.code,
+        name=kitchen.name,
+        city=kitchen.city,
+        status=kitchen.status,
+        owner_name=owner.name,
+        owner_phone=owner.phone,
+        whatsapp_connected=bool(kitchen.whatsapp_phone_id),
+        payment_gateway_configured=payment_gateway_configured,
     )
 
 
@@ -635,7 +635,9 @@ async def admin_kitchen_whatsapp_put(
     session: Annotated[AsyncSession, Depends(get_db)],
     publisher: Annotated[EventPublisher, Depends(get_publisher)],
 ) -> KitchenWhatsAppIntegrationResponse:
-    _ = admin
+    from app.rbac import assert_admin_permission
+
+    await assert_admin_permission(session, role=admin.role, permission="kitchens:write")
     kitchen = await session.get(Kitchen, kitchen_id)
     if not kitchen:
         raise HTTPException(status_code=404, detail="Kitchen not found")
@@ -673,7 +675,9 @@ async def admin_kitchen_status(
     admin: Annotated[PlatformAdmin, Depends(get_current_admin)],
     session: Annotated[AsyncSession, Depends(get_db)],
 ) -> AdminKitchenRow:
-    _ = admin
+    from app.rbac import assert_admin_permission
+
+    await assert_admin_permission(session, role=admin.role, permission="kitchens:write")
     result = await session.execute(
         select(Kitchen, Owner)
         .join(Owner, Owner.id == Kitchen.owner_id)
@@ -1189,3 +1193,197 @@ async def admin_journeys(
         },
     ]
     return JourneyMap(stages=stages)
+
+
+# --- Platform employees (CRUD) + RBAC -----------------------------------------
+
+class AdminEmployeeRow(BaseModel):
+    id: uuid.UUID
+    email: EmailStr
+    name: str
+    role: str
+    is_active: bool
+    created_at: datetime
+    permissions: list[str] = Field(default_factory=list)
+
+
+class AdminEmployeeCreate(BaseModel):
+    email: EmailStr
+    name: str = Field(..., min_length=2, max_length=255)
+    password: str = Field(..., min_length=8, max_length=128)
+    role: str = Field(default="support", max_length=32)
+
+
+class AdminEmployeeUpdate(BaseModel):
+    name: str | None = Field(default=None, min_length=2, max_length=255)
+    role: str | None = Field(default=None, max_length=32)
+    password: str | None = Field(default=None, min_length=8, max_length=128)
+    is_active: bool | None = None
+
+
+async def _employee_to_row(session: AsyncSession, admin: PlatformAdmin) -> AdminEmployeeRow:
+    from app.rbac import load_permissions_for_role
+
+    perms = sorted(await load_permissions_for_role(session, admin.role))
+    return AdminEmployeeRow(
+        id=admin.id,
+        email=admin.email,
+        name=admin.name,
+        role=admin.role,
+        is_active=bool(admin.is_active),
+        created_at=admin.created_at,
+        permissions=perms,
+    )
+
+
+async def _count_active_superadmins(session: AsyncSession) -> int:
+    return int(
+        (
+            await session.execute(
+                select(func.count())
+                .select_from(PlatformAdmin)
+                .where(
+                    PlatformAdmin.role == "superadmin",
+                    PlatformAdmin.is_active.is_(True),
+                )
+            )
+        ).scalar_one()
+    )
+
+
+@router.get(
+    "/employees",
+    response_model=list[AdminEmployeeRow],
+    summary="List platform employees",
+    responses=auth_errors(),
+    tags=["Admin Employees"],
+)
+async def admin_employees_list(
+    admin: Annotated[PlatformAdmin, Depends(get_current_admin)],
+    session: Annotated[AsyncSession, Depends(get_db)],
+) -> list[AdminEmployeeRow]:
+    from app.rbac import assert_admin_permission
+
+    await assert_admin_permission(session, role=admin.role, permission="employees:read")
+    rows = list(
+        (await session.execute(select(PlatformAdmin).order_by(PlatformAdmin.created_at.desc())))
+        .scalars()
+        .all()
+    )
+    return [await _employee_to_row(session, r) for r in rows]
+
+
+@router.get(
+    "/employees/roles",
+    response_model=list[str],
+    summary="List assignable employee roles",
+    responses=auth_errors(),
+    tags=["Admin Employees"],
+)
+async def admin_employees_roles(
+    admin: Annotated[PlatformAdmin, Depends(get_current_admin)],
+    session: Annotated[AsyncSession, Depends(get_db)],
+) -> list[str]:
+    from app.rbac import KNOWN_ROLES, assert_admin_permission
+
+    await assert_admin_permission(session, role=admin.role, permission="employees:read")
+    return list(KNOWN_ROLES)
+
+
+@router.post(
+    "/employees",
+    response_model=AdminEmployeeRow,
+    status_code=status.HTTP_201_CREATED,
+    summary="Create platform employee",
+    responses=auth_errors(),
+    tags=["Admin Employees"],
+)
+async def admin_employees_create(
+    body: AdminEmployeeCreate,
+    admin: Annotated[PlatformAdmin, Depends(get_current_admin)],
+    session: Annotated[AsyncSession, Depends(get_db)],
+) -> AdminEmployeeRow:
+    from app.rbac import KNOWN_ROLES, assert_admin_permission
+
+    await assert_admin_permission(session, role=admin.role, permission="employees:write")
+    if body.role not in KNOWN_ROLES:
+        raise HTTPException(status_code=400, detail=f"Unknown role. Use one of: {', '.join(KNOWN_ROLES)}")
+    email = body.email.lower().strip()
+    existing = (
+        await session.execute(select(PlatformAdmin).where(PlatformAdmin.email == email))
+    ).scalar_one_or_none()
+    if existing:
+        raise HTTPException(status_code=400, detail="Employee email already exists")
+    row = PlatformAdmin(
+        email=email,
+        name=body.name.strip(),
+        password_hash=hash_password(body.password),
+        role=body.role,
+        is_active=True,
+    )
+    session.add(row)
+    await session.commit()
+    await session.refresh(row)
+    return await _employee_to_row(session, row)
+
+
+@router.patch(
+    "/employees/{employee_id}",
+    response_model=AdminEmployeeRow,
+    summary="Update platform employee",
+    responses=auth_errors(include_404=True),
+    tags=["Admin Employees"],
+)
+async def admin_employees_update(
+    employee_id: uuid.UUID,
+    body: AdminEmployeeUpdate,
+    admin: Annotated[PlatformAdmin, Depends(get_current_admin)],
+    session: Annotated[AsyncSession, Depends(get_db)],
+) -> AdminEmployeeRow:
+    from app.rbac import KNOWN_ROLES, assert_admin_permission
+
+    await assert_admin_permission(session, role=admin.role, permission="employees:write")
+    row = await session.get(PlatformAdmin, employee_id)
+    if not row:
+        raise HTTPException(status_code=404, detail="Employee not found")
+    if body.role is not None:
+        if body.role not in KNOWN_ROLES:
+            raise HTTPException(status_code=400, detail=f"Unknown role. Use one of: {', '.join(KNOWN_ROLES)}")
+        if row.role == "superadmin" and body.role != "superadmin":
+            if await _count_active_superadmins(session) <= 1 and row.is_active:
+                raise HTTPException(status_code=400, detail="Cannot demote the last active superadmin")
+        row.role = body.role
+    if body.name is not None:
+        row.name = body.name.strip()
+    if body.password is not None:
+        row.password_hash = hash_password(body.password)
+    if body.is_active is not None:
+        if row.id == admin.id and body.is_active is False:
+            raise HTTPException(status_code=400, detail="Cannot deactivate your own account")
+        if row.role == "superadmin" and body.is_active is False:
+            if await _count_active_superadmins(session) <= 1:
+                raise HTTPException(status_code=400, detail="Cannot deactivate the last active superadmin")
+        row.is_active = body.is_active
+    await session.commit()
+    await session.refresh(row)
+    return await _employee_to_row(session, row)
+
+
+@router.post(
+    "/employees/{employee_id}/deactivate",
+    response_model=AdminEmployeeRow,
+    summary="Deactivate platform employee",
+    responses=auth_errors(include_404=True),
+    tags=["Admin Employees"],
+)
+async def admin_employees_deactivate(
+    employee_id: uuid.UUID,
+    admin: Annotated[PlatformAdmin, Depends(get_current_admin)],
+    session: Annotated[AsyncSession, Depends(get_db)],
+) -> AdminEmployeeRow:
+    return await admin_employees_update(
+        employee_id,
+        AdminEmployeeUpdate(is_active=False),
+        admin,
+        session,
+    )
