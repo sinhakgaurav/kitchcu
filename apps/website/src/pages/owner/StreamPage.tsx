@@ -1,5 +1,6 @@
 import { FormEvent, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
+import { LiveKitViewer } from "../../components/LiveKitViewer";
 import { OwnerPageShell, OwnerPanel } from "../../components/owner/OwnerPageShell";
 import {
   endKitchenStream,
@@ -259,9 +260,18 @@ export function StreamPage() {
                 </span>
               </p>
             )}
-            {session.publisher_token && (
-              <p className="stream-live__hint">Publisher token issued — connect your LiveKit client.</p>
-            )}
+            {session.publisher_token && session.livekit_url ? (
+              <div style={{ marginBottom: "1rem" }}>
+                <LiveKitViewer
+                  url={session.livekit_url}
+                  token={session.publisher_token}
+                  publish
+                />
+                <p className="stream-live__hint">Camera publishing to LiveKit — customers can Watch live.</p>
+              </div>
+            ) : session.publisher_token ? (
+              <p className="stream-live__hint">Publisher token issued — LiveKit URL not configured.</p>
+            ) : null}
 
             <div className="stream-dish-pick">
               <label>

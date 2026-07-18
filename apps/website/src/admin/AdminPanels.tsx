@@ -4,6 +4,7 @@ import {
   clearAdminCustomerPassword,
   createAdminEmployee,
   fetchAdminApiKeys,
+  fetchAdminAuditEvents,
   fetchAdminCustomer,
   fetchAdminCustomers,
   fetchAdminEmployeeRoles,
@@ -23,6 +24,7 @@ import {
   updateAdminFeatureFlag,
   updateAdminOwnerSubscription,
   upsertAdminPackage,
+  type AdminAuditEvent,
   type AdminCustomer,
   type AdminCustomerDetail,
   type AdminEmployee,
@@ -1019,6 +1021,57 @@ export function AdminPackagesPanel() {
           </form>
         </section>
       </div>
+    </div>
+  );
+}
+
+export function AdminAuditPanel() {
+  const [items, setItems] = useState<AdminAuditEvent[]>([]);
+  const [total, setTotal] = useState(0);
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    setLoading(true);
+    fetchAdminAuditEvents({ limit: 100 })
+      .then((res) => {
+        setItems(res.items);
+        setTotal(res.total);
+        setError("");
+      })
+      .catch((e) => setError(e instanceof Error ? e.message : "Failed to load audit"))
+      .finally(() => setLoading(false));
+  }, []);
+
+  if (loading) return <p className="app-loading">Loading audit…</p>;
+  if (error) return <p className="auth-card__error">{error}</p>;
+
+  return (
+    <div className="admin-panel">
+      <p className="report-hint">{total} events (newest first) — secrets never stored in payloads.</p>
+      {items.length === 0 ? (
+        <p className="owner-muted">No audit events yet — suspend a kitchen or toggle a flag to see entries.</p>
+      ) : (
+        <ul className="report-rank">
+          {items.map((ev) => (
+            <li key={ev.id}>
+              <div className="report-rank__row">
+                <span>
+                  <strong>{ev.action}</strong>
+                  <span className="report-rank__meta">
+                    {" "}
+                    · {ev.actor_email} ({ev.actor_role}) · {ev.resource_type}/{ev.resource_id}
+                  </span>
+                </span>
+                <span className="report-rank__meta">
+                  {new Date(ev.created_at).toLocaleString("en-IN")}
+                </span>
+              </div>
+              {ev.summary && <p className="report-hint">{ev.summary}</p>}
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   );
 }

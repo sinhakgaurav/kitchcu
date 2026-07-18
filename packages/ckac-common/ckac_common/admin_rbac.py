@@ -21,6 +21,7 @@ TAB_PERMISSIONS: dict[str, str] = {
     "employees": "employees:read",
     "api-keys": "api_keys:write",
     "control": "flags:read",
+    "audit": "audit:read",
 }
 
 

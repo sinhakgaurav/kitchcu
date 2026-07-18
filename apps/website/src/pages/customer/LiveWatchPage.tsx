@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
+import { LiveKitViewer } from "../../components/LiveKitViewer";
 import {
   fetchLiveShowcase,
   fetchViewerToken,
@@ -76,10 +77,12 @@ export function LiveWatchPage() {
         {showcase?.showcase_phase || tokenInfo ? showcase?.showcase_phase || "live" : "…"}
         {showcase?.dish_name ? ` · ${showcase.dish_name}` : ""}
         {tokenInfo?.livekit_url && tokenInfo.token ? (
-          <p className="report-hint" style={{ marginTop: "0.75rem" }}>
-            LiveKit room <code>{tokenInfo.room_name}</code> — connect with your viewer client using the
-            session token (embedded player ships next). URL: {tokenInfo.livekit_url}
-          </p>
+          <div style={{ marginTop: "0.75rem" }}>
+            <LiveKitViewer url={tokenInfo.livekit_url} token={tokenInfo.token} />
+            <p className="report-hint" style={{ marginTop: "0.5rem" }}>
+              Room <code>{tokenInfo.room_name}</code>
+            </p>
+          </div>
         ) : (
           <p className="report-hint" style={{ marginTop: "0.75rem" }}>
             Showcase mode — LiveKit media not configured; follow the dish phases below.

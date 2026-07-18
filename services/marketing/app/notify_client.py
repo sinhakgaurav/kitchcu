@@ -18,20 +18,22 @@ async def notify_template_blast(
     *,
     kitchen_id: uuid.UUID,
     message: str,
-    recipient_count: int,
+    recipient_phones: list[str],
+    template_name: str | None = None,
 ) -> None:
-    """Reuse daily-menu blast path — logs WhatsApp dispatch for recipient_count."""
+    """Fan-out WhatsApp template blast — one notify log per phone."""
     url = (
         f"{settings.notification_service_url.rstrip('/')}"
-        "/api/v1/internal/notifications/daily-menu-blast"
+        "/api/v1/internal/notifications/template-blast"
     )
     payload = {
         "kitchen_id": str(kitchen_id),
         "message": message,
-        "recipient_count": recipient_count,
+        "recipient_phones": recipient_phones[:200],
+        "template_name": template_name,
     }
     try:
-        async with httpx.AsyncClient(timeout=5.0) as client:
+        async with httpx.AsyncClient(timeout=30.0) as client:
             response = await client.post(
                 url,
                 json=payload,

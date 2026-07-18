@@ -450,6 +450,36 @@ async def admin_me(
 
 
 @router.get(
+    "/audit-events",
+    summary="List platform admin audit events",
+    description="Append-only audit trail for high-value admin mutations. Requires `audit:read`.",
+    responses=auth_errors(),
+    tags=["Admin"],
+)
+async def admin_audit_events_list(
+    admin: Annotated[PlatformAdmin, Depends(get_current_admin)],
+    session: Annotated[AsyncSession, Depends(get_db)],
+    limit: int = 50,
+    offset: int = 0,
+    actor_email: str | None = None,
+    resource_type: str | None = None,
+    kitchen_id: uuid.UUID | None = None,
+):
+    from app.admin_audit import list_admin_audit_events
+    from app.rbac import assert_admin_permission
+
+    await assert_admin_permission(session, role=admin.role, permission="audit:read")
+    return await list_admin_audit_events(
+        session,
+        limit=limit,
+        offset=offset,
+        actor_email=actor_email,
+        resource_type=resource_type,
+        kitchen_id=kitchen_id,
+    )
+
+
+@router.get(
     "/stats",
     response_model=PlatformStats,
     summary="Get platform-wide aggregate counters",
@@ -687,6 +717,18 @@ async def admin_kitchen_whatsapp_put(
         )
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    from app.admin_audit import record_admin_audit
+
+    await record_admin_audit(
+        session,
+        actor=admin,
+        action="kitchen.whatsapp.updated",
+        resource_type="kitchen",
+        resource_id=str(kitchen_id),
+        kitchen_id=kitchen_id,
+        summary=f"WhatsApp integration updated for {kitchen.code}",
+        after={"configured": bool(result.connected)},
+    )
     await session.commit()
     return result
 
@@ -723,7 +765,21 @@ async def admin_kitchen_status(
     if not row:
         raise HTTPException(status_code=404, detail="Kitchen not found")
     kitchen, owner = row
+    before_status = kitchen.status
     kitchen.status = body.status
+    from app.admin_audit import record_admin_audit
+
+    await record_admin_audit(
+        session,
+        actor=admin,
+        action="kitchen.status.updated",
+        resource_type="kitchen",
+        resource_id=str(kitchen_id),
+        kitchen_id=kitchen_id,
+        summary=f"Kitchen {kitchen.code} status {before_status} → {body.status}",
+        before={"status": before_status},
+        after={"status": body.status},
+    )
     await session.commit()
     gateway_ids = await _payment_gateway_kitchen_ids(session, [kitchen.id])
     return _admin_kitchen_row(
@@ -952,16 +1008,34 @@ async def admin_owner_subscription(
     from app.rbac import assert_admin_permission
 
     await assert_admin_permission(session, role=admin.role, permission="owners:write")
-    _ = admin
     owner = await session.get(Owner, owner_id)
     if not owner:
         raise HTTPException(status_code=404, detail="Owner not found")
     if body.subscription_tier is None and body.subscription_status is None:
         raise HTTPException(status_code=400, detail="Provide subscription_tier and/or subscription_status")
+    before = {
+        "subscription_tier": owner.subscription_tier,
+        "subscription_status": owner.subscription_status,
+    }
     if body.subscription_tier is not None:
         owner.subscription_tier = body.subscription_tier
     if body.subscription_status is not None:
         owner.subscription_status = body.subscription_status
+    from app.admin_audit import record_admin_audit
+
+    await record_admin_audit(
+        session,
+        actor=admin,
+        action="owner.subscription.updated",
+        resource_type="owner",
+        resource_id=str(owner_id),
+        summary=f"Owner subscription updated (**{str(owner.phone)[-4:]})",
+        before=before,
+        after={
+            "subscription_tier": owner.subscription_tier,
+            "subscription_status": owner.subscription_status,
+        },
+    )
     await session.flush()
     kc = (
         await session.execute(select(func.count()).select_from(Kitchen).where(Kitchen.owner_id == owner.id))
@@ -1000,12 +1074,24 @@ async def admin_feature_flag_update(
     from app.rbac import assert_admin_permission
 
     await assert_admin_permission(session, role=admin.role, permission="flags:write")
-    _ = admin
     flag = await session.get(FeatureFlag, key)
     if not flag:
         raise HTTPException(status_code=404, detail="Feature flag not found")
+    before_enabled = bool(flag.enabled)
     flag.enabled = body.enabled
     flag.updated_at = datetime.now(UTC)
+    from app.admin_audit import record_admin_audit
+
+    await record_admin_audit(
+        session,
+        actor=admin,
+        action="feature_flag.updated",
+        resource_type="feature_flag",
+        resource_id=key,
+        summary=f"Feature flag {key} → {'on' if body.enabled else 'off'}",
+        before={"enabled": before_enabled},
+        after={"enabled": body.enabled},
+    )
     await session.flush()
     return FeatureFlagRow.model_validate(flag)
 
@@ -1088,7 +1174,6 @@ async def admin_kitchen_module_flag_update(
     from app.rbac import assert_admin_permission
 
     await assert_admin_permission(session, role=admin.role, permission="kitchens:write")
-    _ = admin
     from app.models import KitchenModuleFlag
     from ckac_common.risk_config import KITCHEN_MODULE_KEYS
 
@@ -1098,12 +1183,26 @@ async def admin_kitchen_module_flag_update(
     if not kitchen:
         raise HTTPException(status_code=404, detail="Kitchen not found")
     row = await session.get(KitchenModuleFlag, (kitchen_id, module_key))
+    before_enabled = bool(row.enabled) if row is not None else None
     if row is None:
         row = KitchenModuleFlag(kitchen_id=kitchen_id, module_key=module_key, enabled=body.enabled)
         session.add(row)
     else:
         row.enabled = body.enabled
     row.updated_at = datetime.now(UTC)
+    from app.admin_audit import record_admin_audit
+
+    await record_admin_audit(
+        session,
+        actor=admin,
+        action="kitchen.module_flag.updated",
+        resource_type="kitchen_module",
+        resource_id=f"{kitchen_id}:{module_key}",
+        kitchen_id=kitchen_id,
+        summary=f"{kitchen.code} module {module_key} → {'on' if body.enabled else 'off'}",
+        before={"enabled": before_enabled},
+        after={"enabled": body.enabled, "module_key": module_key},
+    )
     await session.flush()
     return KitchenModuleFlagRow(
         module_key=row.module_key,
@@ -1150,6 +1249,17 @@ async def admin_api_key_upsert(
     row.value_enc = encrypt_secret(body.value.strip())
     row.updated_at = datetime.now(UTC)
     row.updated_by = admin.email
+    from app.admin_audit import record_admin_audit
+
+    await record_admin_audit(
+        session,
+        actor=admin,
+        action="platform_api_key.updated",
+        resource_type="api_key",
+        resource_id=key,
+        summary=f"API key slot {key} configured",
+        after={"key": key, "category": row.category, "configured": True},
+    )
     await session.flush()
     event = EventPublisher.build(
         event_type="platform_api_key.updated",
@@ -1178,6 +1288,17 @@ async def admin_api_key_clear(
     row.value_enc = None
     row.updated_at = datetime.now(UTC)
     row.updated_by = admin.email
+    from app.admin_audit import record_admin_audit
+
+    await record_admin_audit(
+        session,
+        actor=admin,
+        action="platform_api_key.cleared",
+        resource_type="api_key",
+        resource_id=key,
+        summary=f"API key slot {key} cleared",
+        after={"key": key, "category": row.category, "configured": False},
+    )
     await session.flush()
     event = EventPublisher.build(
         event_type="platform_api_key.cleared",
@@ -1400,6 +1521,18 @@ async def admin_employees_create(
         is_active=True,
     )
     session.add(row)
+    await session.flush()
+    from app.admin_audit import record_admin_audit
+
+    await record_admin_audit(
+        session,
+        actor=admin,
+        action="employee.created",
+        resource_type="employee",
+        resource_id=str(row.id),
+        summary=f"Created employee {email} as {body.role}",
+        after={"email": email, "role": body.role, "is_active": True},
+    )
     await session.commit()
     await session.refresh(row)
     return await _employee_to_row(session, row)
@@ -1442,6 +1575,22 @@ async def admin_employees_update(
             if await _count_active_superadmins(session) <= 1:
                 raise HTTPException(status_code=400, detail="Cannot deactivate the last active superadmin")
         row.is_active = body.is_active
+    from app.admin_audit import record_admin_audit
+
+    await record_admin_audit(
+        session,
+        actor=admin,
+        action="employee.updated",
+        resource_type="employee",
+        resource_id=str(employee_id),
+        summary=f"Updated employee {row.email}",
+        after={
+            "email": row.email,
+            "role": row.role,
+            "is_active": row.is_active,
+            "password_changed": body.password is not None,
+        },
+    )
     await session.commit()
     await session.refresh(row)
     return await _employee_to_row(session, row)

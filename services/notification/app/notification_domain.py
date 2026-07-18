@@ -72,6 +72,28 @@ class DailyMenuBlastRequest(BaseModel):
     recipient_count: int = Field(ge=0, description="Number of CRM-known recipients targeted (logged for audit).")
 
 
+class TemplateBlastRequest(BaseModel):
+    """Internal request from marketing to fan out a WhatsApp template blast per phone."""
+
+    kitchen_id: uuid.UUID = Field(..., description="Kitchen the blast is for.")
+    message: str = Field(..., description="Pre-rendered message text.")
+    recipient_phones: list[str] = Field(
+        default_factory=list,
+        max_length=200,
+        description="E.164 phones to notify (capped at 200).",
+    )
+    template_name: str | None = Field(default=None, description="Owner template name for audit payload.")
+
+
+class TemplateBlastResponse(BaseModel):
+    """Result of a per-recipient marketing template blast."""
+
+    sent: int = Field(..., description="Notification log rows created (one per phone).")
+    template_id: str = Field(default="marketing_template")
+    channel: str = Field(default="whatsapp")
+    status: str = Field(default="sent")
+
+
 class GoldenPerformanceDayNotifyRequest(BaseModel):
     """Internal request from growth when a dish has a standout order+rating+sentiment day."""
 
@@ -436,6 +458,54 @@ async def notify_daily_menu_blast(
         template_id="daily_menu_blast",
         channel=row.channel,
         status=row.status,
+    )
+
+
+def _mask_phone(phone: str) -> str:
+    digits = "".join(c for c in phone if c.isdigit())
+    if len(digits) < 4:
+        return "***"
+    return f"***{digits[-4:]}"
+
+
+async def notify_template_blast(
+    session: AsyncSession,
+    body: TemplateBlastRequest,
+    publisher: EventPublisher,
+) -> TemplateBlastResponse:
+    """One NotificationLog + notification.sent event per recipient phone."""
+    phones: list[str] = []
+    seen: set[str] = set()
+    for raw in body.recipient_phones:
+        p = (raw or "").strip()
+        if not p or p in seen:
+            continue
+        seen.add(p)
+        phones.append(p)
+        if len(phones) >= 200:
+            break
+
+    for phone in phones:
+        await _send_notification(
+            session,
+            publisher,
+            template_id="marketing_template",
+            body=body.message,
+            kitchen_id=body.kitchen_id,
+            order_id=None,
+            recipient_phone=phone,
+            payload={
+                "template_name": body.template_name,
+                "recipient_phone_masked": _mask_phone(phone),
+                "message_preview": body.message[:200],
+            },
+        )
+
+    return TemplateBlastResponse(
+        sent=len(phones),
+        template_id="marketing_template",
+        channel="whatsapp",
+        status="sent" if phones else "empty",
     )
 
 

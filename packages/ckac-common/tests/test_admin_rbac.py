@@ -34,3 +34,8 @@ def test_write_implies_read_for_tabs():
     assert role_has_permission({"packages:write"}, "packages:read")
     tabs = tabs_for_permissions({"packages:write"})
     assert "packages" in tabs
+
+
+def test_audit_tab_requires_audit_read():
+    assert "audit" in tabs_for_permissions({"audit:read"})
+    assert "audit" not in tabs_for_permissions({"tickets:write", "kitchens:read"})

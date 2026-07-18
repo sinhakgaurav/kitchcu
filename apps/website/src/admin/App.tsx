@@ -40,6 +40,7 @@ import {
 } from "./adminApi";
 import {
   AdminApiKeysPanel,
+  AdminAuditPanel,
   AdminControlPlane,
   AdminCustomers,
   AdminEmployeesPanel,
@@ -71,7 +72,8 @@ type Tab =
   | "packages"
   | "employees"
   | "api-keys"
-  | "control";
+  | "control"
+  | "audit";
 
 const TABS: { id: Tab; label: string }[] = [
   { id: "overview", label: "Overview" },
@@ -85,6 +87,7 @@ const TABS: { id: Tab; label: string }[] = [
   { id: "employees", label: "Employees" },
   { id: "api-keys", label: "API Keys" },
   { id: "control", label: "Control" },
+  { id: "audit", label: "Audit" },
 ];
 
 function chartDayLabel(isoDate: string): string {
@@ -128,6 +131,10 @@ const TAB_META: Record<Tab, { title: string; desc: string }> = {
   control: {
     title: "Control plane",
     desc: "Feature flags, data journeys, payments, and SaaS subscription overrides",
+  },
+  audit: {
+    title: "Audit log",
+    desc: "Who changed kitchens, flags, API keys, employees, and subscriptions",
   },
 };
 
@@ -304,6 +311,7 @@ export default function AdminApp() {
           {tab === "employees" && <AdminEmployeesPanel />}
           {tab === "api-keys" && <AdminApiKeysPanel />}
           {tab === "control" && <AdminControlPlane />}
+          {tab === "audit" && <AdminAuditPanel />}
         </div>
       </div>
     </div>

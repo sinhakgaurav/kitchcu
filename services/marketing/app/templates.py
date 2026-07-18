@@ -341,7 +341,8 @@ async def send_template(
         await notify_template_blast(
             kitchen_id=kitchen_id,
             message=preview,
-            recipient_count=len(recipients),
+            recipient_phones=recipients,
+            template_name=row.name,
         )
 
     return TemplateSendResponse(

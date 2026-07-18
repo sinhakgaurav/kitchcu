@@ -209,6 +209,56 @@ async def test_daily_menu_blast(client: AsyncClient):
 
 
 @pytest.mark.asyncio
+async def test_template_blast_fans_out_per_phone(client: AsyncClient):
+    kitchen_id = _seed_kitchen()
+    from app.main import redis_client
+
+    if redis_client:
+        await redis_client.delete("ckac:notify:dispatch")
+
+    phones = ["+919876543210", "+919876543211", "+919876543210"]  # duplicate ignored
+
+    response = await client.post(
+        "/api/v1/internal/notifications/template-blast",
+        json={
+            "kitchen_id": str(kitchen_id),
+            "message": "Hi from Spice Box — today's specials!",
+            "recipient_phones": phones,
+            "template_name": "Daily specials",
+        },
+        headers={"X-Internal-Key": INTERNAL_KEY},
+    )
+    assert response.status_code == 200, response.text
+    data = response.json()
+    assert data["sent"] == 2
+    assert data["template_id"] == "marketing_template"
+
+    conn = psycopg2.connect(SYNC_DB_URL)
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            SELECT COUNT(*) FROM ckac_notifications.notification_log
+            WHERE kitchen_id = %s::uuid AND template_id = 'marketing_template'
+              AND recipient_phone IS NOT NULL
+            """,
+            (str(kitchen_id),),
+        )
+        count = cur.fetchone()[0]
+    conn.close()
+    assert count == 2
+
+    if redis_client:
+        messages = await redis_client.xread({"ckac:notify:dispatch": "0-0"}, count=20)
+        assert messages
+        event_types = []
+        for _stream, entries in messages:
+            for _id, fields in entries:
+                payload = json.loads(fields["data"])
+                event_types.append(payload["event_type"])
+        assert event_types.count("notification.sent") >= 2
+
+
+@pytest.mark.asyncio
 async def test_trial_sample_blast(client: AsyncClient):
     kitchen_id = _seed_kitchen()
     trial_id = uuid.uuid4()

@@ -390,13 +390,13 @@ Status tags: ✅ Done well · 🟡 Partial · 🔴 Gap / not built · 📋 Desig
 | Discover → menu | Customer | A | Ranking |
 | Checkout → pay | Customer | B+ | Live PG + retry |
 | Track → rate | Customer | A− | Prompt timing |
-| Watch live | Customer | B | LiveKit embed player |
+| Watch live | Customer | A− | Prod LiveKit config |
 | Owner day-1 | Owner | A− | Checklist |
 | Order lifecycle | Owner | A | Staff roles |
-| Templates send | Owner | B+ | Per-recipient fan-out |
-| Stream cook | Owner | B | LiveKit embed |
+| Templates send | Owner | A− | Meta outbound + wallet debit |
+| Stream cook | Owner | A− | Prod LiveKit + camera UX polish |
 | Package plan | Finance | A− | Owner plan matrix page |
-| Admin hire safely | Superadmin | B+ | Audit log |
+| Admin hire safely | Superadmin | A− | Billing audit + exports |
 | Support tickets | Support | A− | SLA/assignee |
 | Kitchen staff | Cook | F | Not built |
 
@@ -422,11 +422,11 @@ Status tags: ✅ Done well · 🟡 Partial · 🔴 Gap / not built · 📋 Desig
 
 | # | Solution | Primary lens | Wave | Status |
 |---|----------|--------------|------|--------|
-| 1 | Enforce admin RBAC + tab filter (+ audit next) | CEO trust / hire | A | ✅ RBAC+tabs · ⏳ audit |
+| 1 | Enforce admin RBAC + tab filter + audit | CEO trust / hire | A | ✅ |
 | 2 | Hard package entitlements + owner nav | CEO monetization | A | ✅ |
 | 3 | Live Razorpay + prod OTP posture | CEO / CTO | A | ⏳ |
-| 4 | Template send pipeline | CPO honesty | B | ✅ Preview/Send · ⏳ fan-out |
-| 5 | Customer Watch (+ LiveKit embed) | CPO honesty | B | ✅ Watch page · ⏳ embed |
+| 4 | Template send pipeline | CPO honesty | B | ✅ Preview/Send + per-phone fan-out |
+| 5 | Customer Watch + LiveKit embed | CPO honesty | B | ✅ |
 | 6 | Kitchen staff design→build | CEO TAM | B/C | ⏳ |
 | 7 | E1–E2 quality/profit | CPO OS | C | ⏳ |
 | 8 | Cloud Run scale path | CTO 100k | D | ⏳ |
@@ -452,9 +452,10 @@ Status tags: ✅ Done well · 🟡 Partial · 🔴 Gap / not built · 📋 Desig
 |---------|------|---------|
 | **1.0** | 2026-07-18 | Full solution blueprint: every major journey with CEO/CPO/CTO triad, achievements, gaps, arch/DB/UX enhancements; admin multilevel + package planner |
 | **1.1** | 2026-07-18 | Wave A/B gap-fill: admin RBAC enforced + tab filter; hard entitlements + owner nav; template send; customer Watch live |
+| **1.2** | 2026-07-18 | P30: LiveKit embed (watch+publish), template per-phone fan-out, admin audit events + Audit tab |
 
 **Update policy:** Closing a 🔴 gap updates the matching section score + E1/E3 in the same PR as code. Regenerate Complete Guide PDF only when encyclopedia status tables change materially.
 
 ---
 
-*KitchCu Platform Solution Blueprint v1.1 — Confidential — July 2026*
+*KitchCu Platform Solution Blueprint v1.2 — Confidential — July 2026*

@@ -60,6 +60,33 @@ export async function fetchAdminMe(): Promise<AdminMe> {
   return adminFetch("/api/v1/admin/me");
 }
 
+export type AdminAuditEvent = {
+  id: string;
+  actor_admin_id: string | null;
+  actor_email: string;
+  actor_role: string;
+  action: string;
+  resource_type: string;
+  resource_id: string;
+  kitchen_id: string | null;
+  summary: string;
+  before: Record<string, unknown> | null;
+  after: Record<string, unknown> | null;
+  correlation_id: string | null;
+  created_at: string;
+};
+
+export async function fetchAdminAuditEvents(params?: {
+  limit?: number;
+  resource_type?: string;
+}): Promise<{ total: number; items: AdminAuditEvent[] }> {
+  const q = new URLSearchParams();
+  if (params?.limit) q.set("limit", String(params.limit));
+  if (params?.resource_type) q.set("resource_type", params.resource_type);
+  const suffix = q.toString() ? `?${q}` : "";
+  return adminFetch(`/api/v1/admin/audit-events${suffix}`);
+}
+
 export async function fetchAdminStats(): Promise<PlatformStats> {
   return adminFetch("/api/v1/admin/stats");
 }

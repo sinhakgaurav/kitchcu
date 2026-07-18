@@ -10,6 +10,8 @@ from app.notification_domain import (
     NotificationDispatchResponse,
     OrderPlacedNotifyRequest,
     OrderStatusChangedNotifyRequest,
+    TemplateBlastRequest,
+    TemplateBlastResponse,
     TrialSampleBlastRequest,
     TrackingTickResponse,
     notify_daily_menu_blast,
@@ -17,6 +19,7 @@ from app.notification_domain import (
     notify_golden_performance_day,
     notify_order_placed,
     notify_order_status_changed,
+    notify_template_blast,
     notify_trial_sample_blast,
     process_tracking_interval_tick,
 )
@@ -123,6 +126,28 @@ async def internal_daily_menu_blast(
     publisher: Annotated[EventPublisher, Depends(get_publisher)],
 ) -> NotificationDispatchResponse:
     result = await notify_daily_menu_blast(session, body, publisher)
+    await session.commit()
+    return result
+
+
+@router.post(
+    "/template-blast",
+    response_model=TemplateBlastResponse,
+    tags=[TAG_INTERNAL],
+    summary="[Internal] Fan-out a marketing WhatsApp template blast",
+    description=(
+        "Internal service-to-service (`X-Internal-Key`) — called by marketing "
+        "`POST .../templates/{id}/send`. Creates one notification log + `notification.sent` "
+        "per recipient phone (max 200)."
+    ),
+    responses={401: RESP_401},
+)
+async def internal_template_blast(
+    body: TemplateBlastRequest,
+    session: Annotated[AsyncSession, Depends(get_db)],
+    publisher: Annotated[EventPublisher, Depends(get_publisher)],
+) -> TemplateBlastResponse:
+    result = await notify_template_blast(session, body, publisher)
     await session.commit()
     return result
 

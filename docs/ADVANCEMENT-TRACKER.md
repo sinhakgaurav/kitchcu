@@ -69,6 +69,7 @@ For **persona lived experience** see [PLATFORM-PERSONA-DEEP-DIVE.md](./PLATFORM-
 | P27 | **Platform employees CRUD + RBAC** | Identity `admin_permissions` / role grants · Admin → Employees · `require_admin_permission` | ✅ | Alembic identity `013`; roles superadmin/ops/support/finance |
 | P28 | **Super-admin kitchen workspace expansion** | Kitchen tabs: Profile / WhatsApp / Payments / Package / Marketing / Modules / Streaming | ✅ | Cursor rule `kitchcu-superadmin-integration.mdc` (always-on gate) |
 | P29 | **Wave A/B capability close** | Admin RBAC enforce + `/me` tabs · hard entitlements + owner nav · template send · customer Watch live | ✅ | Identity `014`; `ckac_common.admin_rbac`; billing entitlements API |
+| P30 | **LiveKit embed + template fan-out + audit** | Customer/owner LiveKit player · notify `/template-blast` per phone · `admin_audit_events` + Admin Audit tab | ✅ | Identity `015`; `livekit-client` |
 
 ---
 
@@ -109,8 +110,8 @@ Run `.\scripts\seed-all.ps1` (or GCP `run-seed=1`) after migrations.
 
 | Wave | Item | Doc |
 |------|------|-----|
-| **A (trust)** | ✅ RBAC+tabs+hard entitlements · ⏳ audit log · ⏳ live Razorpay / prod OTP | [PLATFORM-SOLUTION-BLUEPRINT.md](./PLATFORM-SOLUTION-BLUEPRINT.md) E3 |
-| **B (promises)** | ✅ Template send · ✅ Watch page · ⏳ LiveKit embed · ⏳ kitchen staff design | Solution Blueprint B3/A4 |
+| **A (trust)** | ✅ RBAC+tabs+hard entitlements · ✅ audit log · ⏳ live Razorpay / prod OTP | [PLATFORM-SOLUTION-BLUEPRINT.md](./PLATFORM-SOLUTION-BLUEPRINT.md) E3 |
+| **B (promises)** | ✅ Template send + fan-out · ✅ Watch + LiveKit embed · ⏳ kitchen staff design | Solution Blueprint B3/A4 |
 | **C (design)** | E1–E2 Kitchen Quality Loop | [E1-E2-KITCHEN-QUALITY-LOOP-DESIGN.md](./E1-E2-KITCHEN-QUALITY-LOOP-DESIGN.md) |
 | **D (scale)** | Cloud Run architecture · OTel · load SLOs | [DEPLOYMENT-GCP.md](./DEPLOYMENT-GCP.md) §1–10 |
 
@@ -121,7 +122,7 @@ Run `.\scripts\seed-all.ps1` (or GCP `run-seed=1`) after migrations.
 - [x] Admin login uses `admin@kitchcu.com` on production hosts (UI + env sync)
 - [x] Seed covers integrations, branded page, dish showcase
 - [x] Advancement tracker maintained (P19–P28)
-- [x] Migrations ready: identity `013`+`014` (RBAC), billing `008` (packages), marketing `002` (templates)
+- [x] Migrations ready: identity `013`–`015` (RBAC + audit), billing `008` (packages), marketing `002` (templates)
 - [ ] Deploy: push `main` → GCP VM redeploy → smoke admin role tabs + Packages assign + Owner Templates Preview/Send + customer Watch live
 - [ ] Confirm `ADMIN_PASSWORD` in GCE metadata matches what operators use
 - [ ] Smoke: support role sees Tickets only; finance sees Packages/Refunds; Starter kitchen hides Live stream nav
