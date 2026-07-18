@@ -4,15 +4,16 @@
 
 | Companion | Job |
 |-----------|-----|
+| [`PLATFORM-ARCHITECTURE-FLOWS.md`](./PLATFORM-ARCHITECTURE-FLOWS.md) | **Current topology, persona flows, events, scorecard** |
 | [`PLATFORM-SOLUTION-BLUEPRINT.md`](./PLATFORM-SOLUTION-BLUEPRINT.md) | **Expectations → problem → solution → CTO impl → arch/DB/UX** per journey |
 | [`PLATFORM-STRATEGIC-ANALYSIS.md`](./PLATFORM-STRATEGIC-ANALYSIS.md) | Competitive + Waves A–D |
 | [`CKAC-USERFLOWS.md`](./CKAC-USERFLOWS.md) | Step APIs |
 
 | Field | Value |
 |-------|-------|
-| Version | **1.0** |
-| Date | 2026-07-18 |
-| Baseline | S1–S18 + P19–P28 |
+| Version | **1.1** |
+| Date | 2026-07-19 |
+| Baseline | S1–S18 + P19–P32.1 |
 | Code roots | `apps/website/` · `services/*/` · `packages/ckac-common/` |
 
 **How to read**
@@ -57,8 +58,8 @@
                     ✗ Kitchen staff (manager/cook) — NOT BUILT
 ```
 
-\* Permission **seeded** but often **not enforced** on the route — see §10.1.  
-**UI reality:** Admin SPA shows **every tab to every role**. Tab hiding by permission does not exist (`admin/App.tsx` `TABS`).
+\* Permissions **enforced** via `ckac_common.admin_rbac` + `/admin/me` tab filter (P29). Audit log on admin + billing writes (P30–P31).  
+**Still open:** kitchen staff JWT (manager/cook) — see §7.
 
 ---
 
@@ -86,31 +87,33 @@
 Discover (nearby | code | /k/:code | live_only filter)
   → Auth (OTP/OAuth)
   → Menu (live-capture, diet, prep/delivery times)
-  → Cart (local) → Delivery quote (accept fee)
+  → Cart (local) → Delivery quote (Self vs Porter + ₹ split)
+  → Choose delivery_mode → accept fee if customer share > 0
   → Place order (Idempotency-Key) → Pay (COD / online / UPI intent)
   → Confirm → Track (/t/:token) → Rate (home_taste + quality)
-  → Dashboard (savings, addresses, refunds, complaints)
+  → Optional Watch (/live/:sessionId) · Dashboard
 ```
 
 **What feels good (as a customer)**
 
 1. **I can see the food is real** — live-capture heroes and diet filters reduce bait-and-switch anxiety vs aggregator stock photos.  
 2. **Branded kitchen page** — `/k/{code}` feels like *their* kitchen, not a marketplace tab (`BrandedStorefront.tsx`).  
-3. **Delivery fee is explained before pay** — quote accept is honest; payer modes (owner in-range / customer extended) are product-real.  
+3. **Delivery fee is explained before pay** — Self vs Porter/platform modes show kitchen vs my ₹ share (in-range = ₹0 to me).  
 4. **Multi-kitchen checkout exists** — rare; master receipt PDF is a real win when I order from two places.  
 5. **Home-taste rating** — language matches how I judge home food, not only “stars for packaging.”  
 6. **Track link** — token page + Maps direction is usable without installing another app.  
-7. **Dashboard depth** — savings / health / refunds / addresses show the product thinks beyond one order.
+7. **I can watch live** — Nearby live → `/live/:sessionId` LiveKit viewer (P30).  
+8. **Dashboard depth** — savings / health / refunds / addresses show the product thinks beyond one order.
 
 **What frustrates me**
 
-1. **“Live now” but I can’t watch** — filter exists; `fetchViewerToken` exists in `shared/api.ts`; **no Watch page** in customer routes. I feel lied to.  
-2. **Cart dies when I switch phones** — cart is local storage, not server-persisted.  
-3. **Payment failure is scary** — order may sit `received` / pending; I don’t get a clear “retry pay” story.  
-4. **English only** — Hindi promised in charter; not in UI.  
-5. **Deep-link reload** — bookmark `/dashboard/...` can bounce depending on nginx history fallback.  
-6. **No offline** — weak for flaky mobile networks.  
-7. **I don’t know why a kitchen can’t go live / take online pay** — no entitlement empty states (“this kitchen hasn’t enabled online pay”).
+1. **Cart dies when I switch phones** — cart is local storage, not server-persisted.  
+2. **Payment failure is scary** — order may sit `received` / pending; weak “retry pay” story; mock PG risk in demo.  
+3. **English only** — Hindi promised in charter; not in UI.  
+4. **Deep-link reload** — bookmark `/dashboard/...` can bounce depending on nginx history fallback.  
+5. **No offline** — weak for flaky mobile networks.  
+6. **Entitlement empty states** — why a kitchen can’t go live / take online pay still thin.  
+7. **Porter status after book** — job id exists; live courier webhook sync not customer-visible yet.
 
 ### 1.3 Flow achievements vs gaps (customer)
 
@@ -119,11 +122,11 @@ Discover (nearby | code | /k/:code | live_only filter)
 | Discover | Nearby + filters + branded entry | Weak personalization / ranking | Rank by distance + taste + live; save favourites |
 | Auth | OTP + OAuth | Dev OTP in demo; Hindi copy | Prod OTP; i18n |
 | Menu | Live-capture + timing | Media CDN latency unknown | CDN + skeleton; signed URLs |
-| Checkout | Idempotent place + fee accept | Address UX; coupon clarity | Default last address; clearer coupon errors |
+| Checkout | Idempotent place + modes + cost-share | Address UX; coupon clarity | Default last address; clearer coupon errors |
 | Pay | Domain complete | Mock Razorpay risk; retry UX | Live PG; “Complete payment” CTA |
 | Track | Token + Maps | Push reliability depends on WA | In-app push later; WA status copy |
 | Rate | Verified purchase | Prompt timing | Soft prompt 30–120 min after delivered |
-| Live | Discovery badge | **No player** | `/live/:sessionId` + LiveKit viewer |
+| Live | Watch + LiveKit embed | Prod LiveKit credentials | Harden env + viewer count |
 | Multi-kitchen | Atomic master order | Settlement opacity (OK) | Keep opacity; improve confirm UX |
 
 ### 1.4 Data I never see (correct vs wrong)
@@ -179,9 +182,9 @@ Register → OTP → Create kitchen → Setup / branded publish
 **Flow achievement**
 
 ```
-Orders inbox → Drafts confirm → Accept (stock deduct)
+Orders inbox → Drafts confirm → Accept (stock deduct + Porter book if platform)
   → preparing → ready → out_for_delivery → delivered
-  → Delivery fulfillment (self vs platform)
+  → Delivery fulfillment (self vs platform) · cost-share visible
   → Refunds with evidence when needed
   → Ingredients stock warnings
 ```
@@ -189,7 +192,8 @@ Orders inbox → Drafts confirm → Accept (stock deduct)
 **What’s good**
 
 - Lifecycle is clear and audited (`order_status_events`).  
-- Accept → stock deduct is real ops (F19).  
+- Accept → stock deduct is real ops (F19); accept → Porter book when customer chose platform (P32.1).  
+- Delivery settings: radius, min order, subsidy % — I control who pays beyond range.  
 - Order detail refunds with gateway/direct + evidence match Indian reality.  
 - Analytics (revenue, peak hours, segments) answer “what sold today.”
 
@@ -455,8 +459,8 @@ Customer checkout
 | Owner | Refunds + GST | Settlement UX thin; mocks | Settlement list; prod PG |
 | Finance | Packages strong | Refunds ungated | RBAC + exports |
 | Support | Sees refunds UI | Shouldn’t write | Hide + deny |
-| Superadmin | Full visibility | No audit | Audit log |
-| Platform | Subscription SaaS model | Entitlement soft | Hard modules |
+| Superadmin | Full visibility + audit | Exports thin | CSV / GST rollup |
+| Platform | Subscription SaaS + hard entitlements | Live PG / prod OTP | Wave A close |
 
 **Idempotency:** Customer checkout sends `Idempotency-Key` — keep sacred; extend consistency to pay capture retries in UI.
 
@@ -486,8 +490,8 @@ Customer checkout
 | Outbox flush in-request | Adds latency under load | Async dispatcher workers |
 | Admin unscoped lists | OK for ops | Pagination + search indexes mandatory |
 | Cross-schema reads from many services | Coupling | Internal BFF or projection tables for admin health |
-| Soft module defaults | Entitlement lie | Default-deny for paid modules |
-| Rate limit | Present on gateway | Per-route + per-tenant + OTP-specific |
+| Soft module defaults (pre-P29) | Hard entitlements when package assigned | Keep default-deny for paid modules |
+| Rate limit | Present on gateway (OTP) | Per-route + per-tenant broaden |
 | Observability | Health endpoints | OTel traces + RED metrics + money SLOs |
 | RLS | “when enabled” | Prove RLS on tenant tables in prod |
 
@@ -501,7 +505,7 @@ Actor → Gateway → Service route → Domain
   → UI poll/refetch
 ```
 
-**Missing events = incomplete feature.** Templates CRUD emits template events; **send does not exist** so no blast events. Stream showcase emits; **customer watch path unused**.
+**Missing events = incomplete feature.** Templates send + fan-out emit dispatch paths (P30–P31). Stream showcase + customer watch path shipped (P30). Porter book is best-effort on accept — webhook status sync still open.
 
 ### 9.4 Gateway notes (`services/gateway/app/main.py`)
 
@@ -513,91 +517,49 @@ Actor → Gateway → Service route → Domain
 
 ## 10. Implementation deep dive
 
-### 10.1 Admin RBAC — seed vs enforce
+### 10.1 Admin RBAC — shipped (P29–P31)
 
-**Seeded roles** (`013_admin_rbac_employees.py`): `superadmin`, `ops`, `support`, `finance`  
-**Helper:** `services/identity/app/rbac.py` · billing duplicate `_assert_admin_perm`
+**Roles:** `superadmin`, `ops`, `support`, `finance` (`013`+)  
+**Shared:** `packages/ckac-common/ckac_common/admin_rbac.py`  
+**UI:** `GET /admin/me` → permission-filtered tabs · Admin Audit tab (`015`)  
+**Billing writes** → identity `POST /internal/admin-audit` (P31)
 
-| Permission | Checked on | NOT checked (examples) |
-|------------|------------|------------------------|
-| `employees:*` | Employee CRUD | — |
-| `kitchens:write` | WA put, kitchen status | Module flags, customers, PG |
-| `packages:*` | Package/feature/plan/kitchen package | — |
-| `marketing:read` | Admin kitchen templates list | — |
-| `refunds:write` | — | All refund/payment/settlement admin routes |
-| `tickets:write` | — | Ticket list/patch/reply |
-| `api_keys:write` | — | API key mutations |
-| `owners:write` | — | Force subscription |
-| `streaming:read` | — | No assert found |
+| Area | Status |
+|------|--------|
+| Employees / packages / kitchens / tickets / refunds / API keys | ✅ Enforced |
+| Tab filter by role | ✅ |
+| Audit trail breadth | 🟡 Expand to remaining admin mutations |
+| Matrix tests role × route | 🟡 Keep growing |
 
-**Implementation change required**
+### 10.2 Packages & modules — hard entitlements (P29)
 
-1. Shared `ckac_common.admin_rbac.assert_permission(session, role, code)` used by identity/billing/notification.  
-2. Decorator / Depends factory `RequirePerm("refunds:write")`.  
-3. Admin UI: `GET /admin/me` returns `permissions[]`; filter `TABS`.  
-4. Tests: each role × forbidden route → 403 (matrix test).  
+When a kitchen has an assigned package, module access is **hard-gated**; owner nav uses `GET /billing/kitchens/{id}/entitlements`.
 
-### 10.2 Packages & modules — soft gating mechanics
+**Still soft / feature-flagged for non-package kitchens:** progressive complexity + global risk flags (`courier_porter_dunzo`, etc.).
 
-```
-is_kitchen_module_enabled():
-  if global feature off → False
-  if kitchen_module_overrides feature OFF → True   # ← soft world
-  else look up kitchen_module_flags row
-  if row missing → default True                    # ← soft world
-```
+**Remaining polish:** richer customer empty states when stream/pay blocked; owner plan matrix page.
 
-**File:** `packages/ckac-common/ckac_common/platform_config.py`
+### 10.3 Templates — shipped path (P26 / P29–P31)
 
-**Hard checks today (examples)**
+| Exists | Notes |
+|--------|-------|
+| CRUD + Preview/Send | Owner Growth → Templates |
+| Per-phone fan-out | `/template-blast` |
+| Messaging wallet debit | 402 if insufficient |
+| Meta Cloud outbound | Graph send client + identity access-token slot |
 
-- `marketing_broadcast` → templates + daily-menu push  
-- `live_streaming` feature → go-live / viewer-token  
-- `multi_kitchen_checkout` feature → master orders  
+**Open:** CRM segment audience picker polish; delivery receipts analytics.
 
-**Not package-keyed:** most catalog/order/growth APIs.
+### 10.4 Streaming — shipped path (P22 / P30 / P32)
 
-**Implementation change required**
+| Exists | Notes |
+|--------|-------|
+| Go-live + dish showcase phases | Owner Stream |
+| LiveKit publish + viewer | `livekit-client` |
+| Customer `/live/:sessionId` | Nearby Watch CTA |
+| Camera preview fix | Re-issue publisher token on showcase |
 
-1. On kitchen package assign: always sync module flags from feature→module map when `sync_module_flags=true` (default true).  
-2. Strategy decision (product):  
-   - **A)** Turn `kitchen_module_overrides` ON globally for paid envs, or  
-   - **B)** Change default to deny when kitchen has an assigned package.  
-3. Owner nav + API must share same entitlement resolver.  
-4. Customer empty states when module/feature blocks stream/pay.  
-
-### 10.3 Templates — implementation hole
-
-| Exists | Missing |
-|--------|---------|
-| Model `message_templates` | `send` endpoint |
-| CRUD routes + events | Audience resolution (CRM segment) |
-| Variable extract | Wallet debit + notify dispatch |
-| Admin list | Admin edit (optional) |
-| Owner UI create/list | Preview with sample CRM row |
-
-**Proposed contract**
-
-```
-POST /api/v1/kitchens/{id}/templates/{template_id}/send
-{
-  "audience": "crm_segment" | "phones",
-  "segment": "vip" | "churn" | ...,
-  "phones": ["+91..."],   // capped
-  "dry_run": false
-}
-→ { "queued": N, "wallet_debited": ..., "dispatch_id": ... }
-Events: template.send_requested → notify.dispatch → template.send_completed
-```
-
-### 10.4 Streaming — implementation hole
-
-| Exists | Missing |
-|--------|---------|
-| Go-live + dish + phases | In-browser LiveKit publisher |
-| Viewer-token API | Customer `/live/:sessionId` page calling token |
-| Live kitchens list | Watch CTA on nearby cards |
-| Admin streaming modules | Permission-gated streaming:read usage |
+**Open:** Prod LiveKit credentials; viewer count proof.
 
 ### 10.5 WhatsApp — split of duties (good architecture)
 
@@ -605,9 +567,21 @@ Events: template.send_requested → notify.dispatch → template.send_completed
 |-------------|-------|-------|
 | Meta App Secret / Verify Token | Platform | Admin → API Keys |
 | Kitchen `phone_number_id` | Kitchen | Owner WA page + Admin kitchen WA tab |
-| Outbound templates / blasts | Kitchen + wallet | Incomplete send path |
+| Outbound templates / blasts | Kitchen + wallet | ✅ Send path (P31) |
 
 This split is **correct** — keep it. Don’t put App Secret on kitchen forms.
+
+### 10.6 Delivery / Porter — shipped path (P32 / P32.1)
+
+| Exists | Notes |
+|--------|-------|
+| Cost-share rules | In-range kitchen 100%; beyond + min order → subsidy % |
+| Quote modes | Self \| platform (Porter/mock) |
+| Checkout `delivery_mode` | Server fee re-validate |
+| Porter book on accept | Avoids jobs for cancelled carts |
+| Owner delivery settings UI | Radius, min order, subsidy % |
+
+**Open:** Porter webhooks / live courier status; production `PORTER_API_KEY` + flag.
 
 ---
 
@@ -616,78 +590,59 @@ This split is **correct** — keep it. Don’t put App Secret on kitchen forms.
 | Journey | Persona | Achievement | Score |
 |---------|---------|-------------|-------|
 | Discover → menu | Customer | Nearby, filters, branded | A |
-| Checkout → pay | Customer | Idempotent + multi-kitchen | B+ |
+| Checkout → pay + delivery modes | Customer | Idempotent + cost-share + Porter mode | A− |
 | Track → rate | Customer | Token + home_taste | A− |
-| Watch live | Customer | — | F |
+| Watch live | Customer | LiveKit Watch page | A− |
 | Owner onboard | Owner | OTP → kitchen → dish | A− |
-| Order lifecycle | Owner | Full state machine | A |
-| Refunds | Owner/Finance | Evidence paths | B |
+| Order lifecycle + Porter | Owner | Full SM + book on accept | A |
+| Refunds | Owner/Finance | Evidence paths + RBAC | B+ |
 | CRM / coupons | Owner | Full CRUD | A− |
-| Templates send | Owner | — | F |
-| Stream cook phases | Owner | ingredients→prepared | B |
-| Stream watch proof | Owner/Customer | — | D |
-| Package sell | Finance/Superadmin | Mapper | B+ |
-| Entitlement enforce | All | Soft | D |
-| Admin hire safely | Superadmin | Employees UI | C− (RBAC hole) |
-| Support tickets | Support | Queue exists | B− (over-privileged) |
+| Templates send | Owner | Send + wallet + Meta | A− |
+| Stream cook + watch | Owner/Customer | LiveKit publish/view | A− |
+| Package sell | Finance/Superadmin | Mapper + hard entitlements | A− |
+| Entitlement enforce | All | Hard when packaged | A− |
+| Admin hire safely | Superadmin | RBAC + tabs + audit | A− |
+| Support tickets | Support | Permission-gated | B+ |
 | Kitchen staff | Cook/Manager | — | F (missing) |
 | Quality/profit loop | Owner | E1–E2 design only | — |
+
+Canonical scorecard also in [`PLATFORM-ARCHITECTURE-FLOWS.md`](./PLATFORM-ARCHITECTURE-FLOWS.md) §7.
 
 ---
 
 ## 12. How to improve — backlog by persona (actionable)
 
 ### Customer
-1. Ship Watch Live page + CTA on live kitchens.  
+1. ~~Watch Live~~ ✅ · harden prod LiveKit.  
 2. Server-side cart optional sync for logged-in users.  
-3. Payment pending recovery screen.  
+3. Payment pending recovery + live Razorpay.  
 4. Hindi strings for auth/checkout/track.  
 5. Favourites + better ranking.  
+6. Porter tracking UX after book (webhooks).  
 
 ### Owner
 1. Day-1 checklist wizard.  
-2. Template send pipeline.  
-3. Embedded LiveKit publish.  
-4. Package-aware nav.  
-5. Design pack: kitchen staff RBAC.  
-6. Inbox urgency UX.  
+2. ~~Template send / LiveKit / package nav~~ ✅ — polish Meta receipts.  
+3. Design pack: kitchen staff RBAC.  
+4. Inbox urgency UX.  
+5. Porter webhook status on order detail.  
 
 ### Superadmin
-1. Permission-filtered tabs.  
-2. Audit log.  
-3. Kitchen health strip.  
-4. Enforce RBAC everywhere.  
+1. ~~Permission-filtered tabs + audit~~ ✅ — broaden audit coverage.  
+2. Kitchen health strip.  
 
-### Ops
-1. Enforce owners/kitchens/PG/modules permissions.  
-2. Onboarding checklist in kitchen workspace.  
-3. Hide money secrets tabs.  
-
-### Support
-1. Enforce tickets permission.  
-2. Narrow UI.  
-3. Assignee + SLA.  
-
-### Finance
-1. Enforce refunds/billing permissions.  
-2. Settlements + GST rollups + CSV.  
+### Ops / Support / Finance
+1. Assignee + SLA on tickets.  
+2. Settlements + GST rollups + CSV exports.  
 
 ### Platform (CTO)
-1. Hard entitlements strategy.  
-2. Live Razorpay + prod OTP.  
-3. Leave single-VM (Wave D).  
-4. OTel + money SLOs.  
-5. Shared admin RBAC package.  
+1. Live Razorpay + prod OTP.  
+2. Porter webhooks.  
+3. Leave single-VM (Wave D) · OTel + money SLOs.  
 
-### Product (CPO)
-1. Stop marketing send/live-watch until shipped.  
-2. Align portal Features copy with scorecard.  
-3. Approve kitchen staff design before E1 if multi-user kitchens are sales-critical.  
-
-### CEO
-1. Hire ops/support **only after** Wave A RBAC.  
-2. Price packages against hard modules, not slideware.  
-3. Measure: time-to-first-order, rating attach, blast→order (post-send), live→order (post-watch).  
+### Product (CPO) / CEO
+1. Kitchen staff design before E1 if multi-user kitchens are sales-critical.  
+2. Measure: time-to-first-order, rating attach, blast→order, live→order, delivery subsidy attach rate.  
 
 ---
 
@@ -696,11 +651,13 @@ This split is **correct** — keep it. Don’t put App Secret on kitchen forms.
 | Version | Date | Changes |
 |---------|------|---------|
 | **1.0** | 2026-07-18 | First full persona/flow/architecture/implementation deep dive |
+| **1.1** | 2026-07-19 | Refresh post P29–P32.1: RBAC/audit/Watch/templates/Porter; scorecard + §10 |
 
-**Update policy:** When a persona-blocking gap closes, update that persona’s scorecard + §12 item in the same PR as the code. Keep [`PLATFORM-STRATEGIC-ANALYSIS.md`](./PLATFORM-STRATEGIC-ANALYSIS.md) Waves in sync.
+**Update policy:** When a persona-blocking gap closes, update that persona’s scorecard + §12 item in the same PR as the code. Keep Waves in sync. Architecture snapshot: [`PLATFORM-ARCHITECTURE-FLOWS.md`](./PLATFORM-ARCHITECTURE-FLOWS.md).
 
 **Related**
 
+- Architecture flows: [`PLATFORM-ARCHITECTURE-FLOWS.md`](./PLATFORM-ARCHITECTURE-FLOWS.md)  
 - Strategic waves: [`PLATFORM-STRATEGIC-ANALYSIS.md`](./PLATFORM-STRATEGIC-ANALYSIS.md)  
 - Step APIs: [`CKAC-USERFLOWS.md`](./CKAC-USERFLOWS.md)  
 - Tracker: [`ADVANCEMENT-TRACKER.md`](./ADVANCEMENT-TRACKER.md)  
@@ -708,4 +665,4 @@ This split is **correct** — keep it. Don’t put App Secret on kitchen forms.
 
 ---
 
-*KitchCu Persona Deep Dive v1.0 — Confidential — July 2026*
+*KitchCu Persona Deep Dive v1.1 — Confidential — July 2026*

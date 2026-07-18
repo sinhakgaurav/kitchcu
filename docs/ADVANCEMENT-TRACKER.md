@@ -7,7 +7,8 @@
 | Baseline | Phase 1 **S1–S18** complete (gateway + 13 domain services + 4 PWAs + GST) |
 | Production | `*.kitchcu.com` (GCP VM + Caddy) |
 | Local demo | `*.kitchcu.in` / `admin@kitchcu.dev` |
-| Last updated | 2026-07-18 |
+| Last updated | 2026-07-19 |
+| Architecture flows | [PLATFORM-ARCHITECTURE-FLOWS.md](./PLATFORM-ARCHITECTURE-FLOWS.md) |
 
 ---
 
@@ -25,7 +26,21 @@ For code map see [CKAC-IMPLEMENTATION-GUIDE.md](./CKAC-IMPLEMENTATION-GUIDE.md).
 For journeys see [CKAC-USERFLOWS.md](./CKAC-USERFLOWS.md).  
 For **solution blueprint** (expectations → CEO/CPO solution → CTO impl → arch/DB per journey) see [PLATFORM-SOLUTION-BLUEPRINT.md](./PLATFORM-SOLUTION-BLUEPRINT.md).  
 For **strategic waves** see [PLATFORM-STRATEGIC-ANALYSIS.md](./PLATFORM-STRATEGIC-ANALYSIS.md).  
-For **persona lived experience** see [PLATFORM-PERSONA-DEEP-DIVE.md](./PLATFORM-PERSONA-DEEP-DIVE.md).
+For **persona lived experience** see [PLATFORM-PERSONA-DEEP-DIVE.md](./PLATFORM-PERSONA-DEEP-DIVE.md).  
+For **architecture + end-to-end flows** see [PLATFORM-ARCHITECTURE-FLOWS.md](./PLATFORM-ARCHITECTURE-FLOWS.md).
+
+---
+
+## Platform snapshot (2026-07-19)
+
+| Layer | State |
+|-------|-------|
+| Edge | Gateway `:18000` — CORS, correlation ID, OTP rate limits |
+| Domains | 13 services (identity→streaming) — schema-per-domain + outbox EDD |
+| PWAs | portal / customer / kitchen / admin under `apps/website/` |
+| Delivery | Cost-share + Self/Porter modes; book on accept (P32/P32.1) |
+| Trust | Admin RBAC + audit · hard package entitlements · LiveKit Watch |
+| Open | Kitchen staff · live Razorpay / prod OTP · Porter webhooks · Wave C/D |
 
 ---
 
@@ -114,7 +129,7 @@ Run `.\scripts\seed-all.ps1` (or GCP `run-seed=1`) after migrations.
 | Wave | Item | Doc |
 |------|------|-----|
 | **A (trust)** | ✅ RBAC+tabs+hard entitlements · ✅ audit (+ billing writes) · ⏳ live Razorpay / prod OTP | [PLATFORM-SOLUTION-BLUEPRINT.md](./PLATFORM-SOLUTION-BLUEPRINT.md) E3 |
-| **B (promises)** | ✅ Template send + fan-out + wallet · ✅ Meta outbound client · ✅ Watch/LiveKit · ⏳ kitchen staff | Solution Blueprint B3/A4 |
+| **B (promises)** | ✅ Template send + fan-out + wallet · ✅ Meta outbound · ✅ Watch/LiveKit · ✅ Porter cost-share · ⏳ kitchen staff · ⏳ Porter webhooks | Solution Blueprint A2/B2 |
 | **C (design)** | E1–E2 Kitchen Quality Loop | [E1-E2-KITCHEN-QUALITY-LOOP-DESIGN.md](./E1-E2-KITCHEN-QUALITY-LOOP-DESIGN.md) |
 | **D (scale)** | Cloud Run architecture · OTel · load SLOs | [DEPLOYMENT-GCP.md](./DEPLOYMENT-GCP.md) §1–10 |
 
@@ -124,11 +139,12 @@ Run `.\scripts\seed-all.ps1` (or GCP `run-seed=1`) after migrations.
 
 - [x] Admin login uses `admin@kitchcu.com` on production hosts (UI + env sync)
 - [x] Seed covers integrations, branded page, dish showcase
-- [x] Advancement tracker maintained (P19–P28)
-- [x] Migrations ready: identity `013`–`016` (RBAC + audit + WA token), billing `008` (packages), marketing `002` (templates)
-- [ ] Deploy: push `main` → GCP VM redeploy → smoke admin role tabs + Packages assign + Owner Templates Preview/Send + customer Watch live
+- [x] Advancement tracker maintained (P19–P32.1)
+- [x] Migrations ready: identity `013`–`017` (RBAC + audit + WA token + subsidy), order `007` (courier), billing `008`, marketing `002`
+- [ ] Deploy: push `main` → GCP VM redeploy → smoke admin tabs + Packages + Templates send + Watch live + checkout Self/Porter modes
 - [ ] Confirm `ADMIN_PASSWORD` in GCE metadata matches what operators use
 - [ ] Smoke: support role sees Tickets only; finance sees Packages/Refunds; Starter kitchen hides Live stream nav
+- [ ] Smoke: owner delivery settings + beyond-range quote shows subsidy split
 
 *Update the checkboxes and Post-S18 table on every release cut.*
 

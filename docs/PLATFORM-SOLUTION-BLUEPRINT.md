@@ -5,9 +5,10 @@
 
 | Field | Value |
 |-------|-------|
-| Version | **1.0** |
-| Date | 2026-07-18 |
-| Baseline | S1–S18 + P19–P28 |
+| Version | **1.4** |
+| Date | 2026-07-19 |
+| Baseline | S1–S18 + P19–P32.1 |
+| Architecture flows | [`PLATFORM-ARCHITECTURE-FLOWS.md`](./PLATFORM-ARCHITECTURE-FLOWS.md) |
 | Persona lived experience | [`PLATFORM-PERSONA-DEEP-DIVE.md`](./PLATFORM-PERSONA-DEEP-DIVE.md) |
 | Strategic waves | [`PLATFORM-STRATEGIC-ANALYSIS.md`](./PLATFORM-STRATEGIC-ANALYSIS.md) |
 | Step APIs | [`CKAC-USERFLOWS.md`](./CKAC-USERFLOWS.md) |
@@ -49,20 +50,20 @@ Status tags: ✅ Done well · 🟡 Partial · 🔴 Gap / not built · 📋 Desig
 
 ---
 
-## A2. Auth → cart → checkout → pay
+## A2. Auth → cart → checkout → pay (+ delivery cost-share)
 
 | | |
 |--|--|
-| **Expectations** | Login once; cart survives; fee explained before pay; pay or COD; clear failure recovery; one receipt for multi-kitchen. |
-| **Problem (CEO)** | Abandoned checkout kills unit economics; fake fees destroy trust. |
+| **Expectations** | Login once; cart survives; fee explained before pay; choose Self vs Porter; know who pays when beyond kitchen range; pay or COD; one receipt for multi-kitchen. |
+| **Problem (CEO)** | Abandoned checkout kills unit economics; fake fees destroy trust; kitchens need a growth lever (absorb delivery in-range / subsidize large carts beyond). |
 | **Problem (CPO)** | Delivery payer modes and multi-kitchen are differentiators — must feel simple, not engineer. |
-| **Solution** | OTP/OAuth; local cart → quote accept → idempotent place order → billing create/capture/UPI/COD; master-order for multi-kitchen + PDF. |
-| **Implementation (CTO)** | Order `POST .../orders/customer` + `Idempotency-Key`; delivery quote; billing customer/master pay; feature `multi_kitchen_checkout`; gateway path markers. |
-| **Achievements / done well** | ✅ Idempotent place · ✅ Fee accept UX · ✅ Multi-kitchen master receipt (S8/S9 model) · ✅ COD + online domain |
-| **Gaps** | 🔴 Cart not server-persisted · 🟡 Razorpay mock/prod risk · 🔴 Weak pay-retry screen · 🟡 Coupon error clarity |
-| **Architecture enhancements** | Optional `cart_snapshots` service or order-draft for logged-in carts; payment state machine UI bound to billing events; never cache payments. |
-| **DB enhancements** | `ckac_orders.customer_carts` / `cart_lines` (kitchen_id, dish_id, qty, updated_at) keyed by customer_id; index `(customer_id, updated_at DESC)`; payment idempotency keys unique. |
-| **UX enhancements** | Default last address; “Complete payment” for pending; multi-kitchen confirm one screen. |
+| **Solution** | OTP/OAuth; local cart → quote with modes (self \| platform) + cost-share → accept fee → idempotent place with `delivery_mode` → billing; Porter books on kitchen accept; master-order for multi-kitchen + PDF. |
+| **Implementation (CTO)** | Delivery `POST /quote` + `split_delivery_cost`; order create validates mode/fee; `porter_client` on accept; identity delivery-settings (radius, min_order, subsidy %); billing pay; `multi_kitchen_checkout`. Design: [DELIVERY-PAYER-MODE-DESIGN.md](./DELIVERY-PAYER-MODE-DESIGN.md). |
+| **Achievements / done well** | ✅ Idempotent place · ✅ Fee accept UX · ✅ Self vs Porter modes + ₹ split (P32/P32.1) · ✅ Multi-kitchen master receipt · ✅ COD + online domain · ✅ Owner delivery settings UI |
+| **Gaps** | 🔴 Cart not server-persisted · 🟡 Razorpay mock/prod risk · 🔴 Weak pay-retry screen · 🟡 Porter webhooks / live courier status · 🟡 Coupon error clarity |
+| **Architecture enhancements** | Optional server cart; payment state machine UI; Porter webhook → order courier status projection; never cache payments. |
+| **DB enhancements** | `customer_carts` optional; payment idempotency unique; courier_job_id indexed for webhook upsert. |
+| **UX enhancements** | Default last address; “Complete payment” for pending; clear in-range ₹0 / shared subsidy copy (shipped at checkout). |
 
 ---
 
@@ -130,8 +131,8 @@ Status tags: ✅ Done well · 🟡 Partial · 🔴 Gap / not built · 📋 Desig
 | **Problem (CPO)** | Inbox must be glove-friendly; staff roles are table-stakes for real kitchens. |
 | **Solution** | Strong lifecycle (done) + urgency UX + **kitchen staff RBAC** (design → build) + stock warnings (done) + refunds evidence (done). |
 | **Implementation (CTO)** | Order state machine + stock deduct on accept; refunds billing; **new** `kitchen_members` + staff JWT. |
-| **Achievements / done well** | ✅ Full lifecycle · ✅ Stock deduct/warnings (F19) · ✅ Refunds with evidence · ✅ Analytics |
-| **Gaps** | 🔴 Kitchen staff roles · 🟡 Inbox urgency · 🔴 Profit without E1 purchases |
+| **Achievements / done well** | ✅ Full lifecycle · ✅ Stock deduct/warnings (F19) · ✅ Porter book on accept (P32.1) · ✅ Refunds with evidence · ✅ Analytics |
+| **Gaps** | 🔴 Kitchen staff roles · 🟡 Inbox urgency · 🟡 Porter webhooks · 🔴 Profit without E1 purchases |
 | **Architecture enhancements** | Staff JWT `type:staff` scoped to one kitchen; permissions subset; events unchanged. |
 | **DB enhancements** | `ckac_identity.kitchen_members(id, kitchen_id, phone, role, is_active)` + unique (kitchen_id, phone); RLS by kitchen_id. |
 | **UX enhancements** | Beep on `received`; big status chips; cook mode UI. |
@@ -388,12 +389,12 @@ Status tags: ✅ Done well · 🟡 Partial · 🔴 Gap / not built · 📋 Desig
 | Journey | Persona | Score | Blocker to A |
 |---------|---------|-------|--------------|
 | Discover → menu | Customer | A | Ranking |
-| Checkout → pay | Customer | B+ | Live PG + retry |
+| Checkout → pay + delivery modes | Customer | A− | Live PG + retry + Porter webhooks |
 | Track → rate | Customer | A− | Prompt timing |
 | Watch live | Customer | A− | Prod LiveKit config |
 | Owner day-1 | Owner | A− | Checklist |
-| Order lifecycle | Owner | A | Staff roles |
-| Templates send | Owner | A− | Meta outbound + wallet debit |
+| Order lifecycle + Porter | Owner | A | Staff roles |
+| Templates send | Owner | A− | Segment picker polish |
 | Stream cook | Owner | A− | Prod LiveKit + camera UX polish |
 | Package plan | Finance | A− | Owner plan matrix page |
 | Admin hire safely | Superadmin | A− | Billing audit + exports |
@@ -428,6 +429,7 @@ Status tags: ✅ Done well · 🟡 Partial · 🔴 Gap / not built · 📋 Desig
 | 4 | Template send pipeline | CPO honesty | B | ✅ send + fan-out + wallet + Meta client |
 | 5 | Customer Watch + LiveKit embed | CPO honesty | B | ✅ |
 | 6 | Kitchen staff design→build | CEO TAM | B/C | ⏳ |
+| 6b | Porter webhooks / courier status | CPO honesty | B | ⏳ |
 | 7 | E1–E2 quality/profit | CPO OS | C | ⏳ |
 | 8 | Cloud Run scale path | CTO 100k | D | ⏳ |
 
@@ -438,10 +440,12 @@ Status tags: ✅ Done well · 🟡 Partial · 🔴 Gap / not built · 📋 Desig
 | Doc | Job |
 |-----|-----|
 | **This file** | Expectations → problem → solution → implementation → arch/DB/UX per journey |
+| [`PLATFORM-ARCHITECTURE-FLOWS.md`](./PLATFORM-ARCHITECTURE-FLOWS.md) | Topology, mermaid flows, scorecard snapshot |
 | [`PLATFORM-PERSONA-DEEP-DIVE.md`](./PLATFORM-PERSONA-DEEP-DIVE.md) | Lived voice + friction detail |
 | [`PLATFORM-STRATEGIC-ANALYSIS.md`](./PLATFORM-STRATEGIC-ANALYSIS.md) | Competitive + Waves A–D |
 | [`CKAC-USERFLOWS.md`](./CKAC-USERFLOWS.md) | Step-by-step API calls |
 | [`ADVANCEMENT-TRACKER.md`](./ADVANCEMENT-TRACKER.md) | Ship status board |
+| [`CKAC-ARCHITECTURE-CTO.md`](./CKAC-ARCHITECTURE-CTO.md) | Service registry + request flows |
 | [`CKAC-COMPLETE-GUIDE.md`](./CKAC-COMPLETE-GUIDE.md) | Encyclopedia |
 
 ---
@@ -454,9 +458,10 @@ Status tags: ✅ Done well · 🟡 Partial · 🔴 Gap / not built · 📋 Desig
 | **1.1** | 2026-07-18 | Wave A/B gap-fill: admin RBAC enforced + tab filter; hard entitlements + owner nav; template send; customer Watch live |
 | **1.2** | 2026-07-18 | P30: LiveKit embed (watch+publish), template per-phone fan-out, admin audit events + Audit tab |
 | **1.3** | 2026-07-18 | P31: messaging wallet debit on template send; Meta Cloud outbound client; billing→identity audit |
+| **1.4** | 2026-07-19 | P32/P32.1 Porter + delivery cost-share in A2; scoreboard; architecture flows companion |
 
 **Update policy:** Closing a 🔴 gap updates the matching section score + E1/E3 in the same PR as code. Regenerate Complete Guide PDF only when encyclopedia status tables change materially.
 
 ---
 
-*KitchCu Platform Solution Blueprint v1.3 — Confidential — July 2026*
+*KitchCu Platform Solution Blueprint v1.4 — Confidential — July 2026*

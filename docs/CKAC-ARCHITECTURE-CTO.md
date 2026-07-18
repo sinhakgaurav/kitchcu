@@ -4,10 +4,11 @@
 
 | Field | Value |
 |-------|-------|
-| Version | **1.1** |
+| Version | **2.0** |
+| Date | 2026-07-19 |
 | Audience | CTO, Engineering Managers, Tech Leads, CPO (product ↔ code traceability) |
-| Status | S1–S18 shipped; deep how/why + ER + flows in Complete Guide v3.2 |
-| Companion | [Complete Guide v3.2](./CKAC-COMPLETE-GUIDE.md) · [Implementation Guide](./CKAC-IMPLEMENTATION-GUIDE.md) · [System Benchmark](./CKAC-SYSTEM-BENCHMARK.md) · [CPO Blueprint v4.2](./CKAC-CPO-PRODUCT-BLUEPRINT.md) · [User Flows](./CKAC-USERFLOWS.md) · [API.md](./API.md) · [AGENTS.md](../AGENTS.md) · [UI Catalog](./assets/ui/) |
+| Status | **S1–S18 + P19–P32.1 shipped** (gateway + 13 domain services + 4 PWAs) |
+| Companion | [Architecture Flows](./PLATFORM-ARCHITECTURE-FLOWS.md) · [Complete Guide](./CKAC-COMPLETE-GUIDE.md) · [Implementation Guide](./CKAC-IMPLEMENTATION-GUIDE.md) · [Advancement Tracker](./ADVANCEMENT-TRACKER.md) · [AGENTS.md](../AGENTS.md) |
 
 ---
 
@@ -15,17 +16,18 @@
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────┐
-│  EXPERIENCE LAYER (S5–S18)                                              │
-│  Portal · Owner PWA · Customer PWA · Admin PWA · WhatsApp webhook       │
+│  EXPERIENCE LAYER                                                       │
+│  Portal · Customer PWA · Kitchen PWA · Admin PWA · WhatsApp webhook     │
+│  apps/website/  (:13000–13003)                                          │
 └───────────────────────────────────┬─────────────────────────────────────┘
                                     │ HTTPS / JWT
 ┌───────────────────────────────────▼─────────────────────────────────────┐
-│  EDGE LAYER — API Gateway (services/gateway)                            │
-│  Path routing · CORS · correlation ID · future rate limits              │
+│  EDGE LAYER — API Gateway (services/gateway :18000)                     │
+│  Path routing · CORS · X-Correlation-ID · OTP rate limits · OpenAPI     │
 └───────────────────────────────────┬─────────────────────────────────────┘
                                     │
 ┌───────────────────────────────────▼─────────────────────────────────────┐
-│  APPLICATION LAYER — Bounded-context microservices (13 domains)         │
+│  APPLICATION LAYER — 13 bounded-context microservices                   │
 │  identity · catalog · order · billing · marketing · ratings · growth    │
 │  delivery · learning · community · streaming · notification             │
 │  Pattern: routes (thin) → schemas (domain) → models (persistence)       │
@@ -35,8 +37,8 @@
 │  DOMAIN DATA LAYER           │   │  INTEGRATION LAYER                  │
 │  PostgreSQL 16 + PostGIS     │   │  Redis Streams (events)             │
 │  Schema-per-service          │   │  Redis cache (menu TTL 300s)        │
-│  ckac_identity, catalog,     │   │  Internal HTTP (X-Internal-Key)     │
-│  orders, billing, …events    │   │  Outbox (ckac_events.outbox)        │
+│  ckac_identity … streaming   │   │  Internal HTTP (X-Internal-Key)     │
+│  + ckac_events (outbox)      │   │  Outbox (ckac_events.outbox)        │
 └──────────────────────────────┘   └─────────────────────────────────────┘
                 │
 ┌───────────────▼──────────────┐
@@ -45,93 +47,105 @@
 └──────────────────────────────┘
 ```
 
-> For the full "why microservices / gateway / outbox / tenant scoping / 100k sessions" narrative, see Complete Guide **§9–§11**.
+Full narrative: Complete Guide §9–§11 · flow snapshot: [PLATFORM-ARCHITECTURE-FLOWS.md](./PLATFORM-ARCHITECTURE-FLOWS.md).
 
 ### 1.1 Engineering standards (enforced in code)
 
 | Standard | Location | Rule |
 |----------|----------|------|
 | Service template | `services/<name>/app/` | `main.py`, `routes.py`, `schemas.py`, `models.py` |
-| Shared library | `packages/ckac-common/` | Config, DB, auth, events, cache, health, internal auth |
-| Health probes | `ckac_common.health` | `GET /health/live`, `GET /health/ready` with `service` field |
-| EDD writes | `EventPublisher.publish(..., session=session)` | Outbox row + Redis XADD in same transaction |
-| Cross-service auth | `ckac_common.internal_auth` | `X-Internal-Key` for service-to-service |
-| Menu cache | `ckac_common.cache` | Read-through on GET menu; invalidate on dish create/update |
+| Shared library | `packages/ckac-common/` | Config, DB, auth, events, cache, health, admin_rbac, internal auth |
+| Health probes | `ckac_common.health` | `GET /health/live`, `GET /health/ready` |
+| EDD writes | `EventPublisher.publish(..., session=session)` | Outbox + Redis in same transaction |
+| Cross-service auth | `ckac_common.internal_auth` | `X-Internal-Key` |
+| Menu cache | `ckac_common.cache` | Tenant keys `menu:{kitchen_id}`; invalidate on dish events |
 | No cross-schema writes | Each Alembic | Read-only SELECT across schemas for ownership/menu |
 
 ---
 
 ## 2. Service Registry & Ownership
 
-| Service | Port | Schema / state | Writes | Reads (cross-schema) |
-|---------|------|----------------|--------|----------------------|
+| Service | Port | Schema | Writes | Cross-schema reads |
+|---------|------|--------|--------|--------------------|
 | **gateway** | 18000 | — | — | Proxies only |
-| **identity** | 18001 | `ckac_identity` | owners, kitchens | — |
-| **catalog** | 18002 | `ckac_catalog` | categories, dishes, media | `ckac_identity.kitchens` (ownership) |
-| **order** | 18003 | `ckac_orders` | orders, drafts, status events | identity + catalog dishes |
-| **notification** | 18005 | — | — | `ckac_identity.kitchens` (whatsapp_phone_id) |
+| **identity** | 18001 | `ckac_identity` | owners, customers, kitchens, admin RBAC/audit, delivery-settings, branded_page | — |
+| **catalog** | 18002 | `ckac_catalog` | categories, dishes, media, ingredients | kitchens (ownership) |
+| **order** | 18003 | `ckac_orders` | orders, drafts, master orders, status events, analytics | identity + catalog |
+| **billing** | 18004 | `ckac_billing` | payments, subscriptions, GST, refunds, packages, wallet | identity (kitchen) |
+| **notification** | 18005 | `ckac_support` | tickets, WA handlers, dispatch | kitchens (whatsapp_phone_id) |
+| **marketing** | 18006 | `ckac_marketing` | CRM, coupons, promos, templates | — |
+| **ratings** | 18007 | `ckac_ratings` | ratings, aggregates | orders (verified purchase) |
+| **growth** | 18008 | `ckac_growth` | suggestions, daily menu, golden day | order/catalog projections |
+| **delivery** | 18009 | `ckac_delivery` | quotes, tracking views | kitchens (radius / subsidy) |
+| **learning** | 18010 | `ckac_learning` | trials, invites | — |
+| **community** | 18011 | `ckac_community` | recipes, rewards, rankings | — |
+| **streaming** | 18012 | `ckac_streaming` | live sessions, showcase | — |
 
-**Shared:** `ckac_events` (outbox), Redis (streams + cache), MinIO (media URLs).
-
----
-
-## 3. Event Catalog (EDD)
-
-All write paths pass `session` to `EventPublisher.publish()` so `ckac_events.outbox` records the event before Redis publish.
-
-| Event | Producer | Stream | CPO capability |
-|-------|----------|--------|----------------|
-| `kitchen.created` | identity | `ckac:identity:kitchen` | F26 onboarding |
-| `dish.created` | catalog | `ckac:catalog:dish` | F13 menu trust |
-| `dish.updated` | catalog | `ckac:catalog:dish` | F13/F15 menu ops |
-| `order.placed` | order | `ckac:orders:order` | F03 intake |
-| `order.status.changed` | order | `ckac:orders:order` | F04 lifecycle |
-| `order.draft.created` | order | `ckac:orders:draft` | F01/F02 WhatsApp parser |
-| `whatsapp.message.received` | notification | `ckac:notify:whatsapp` | F01 unified inbox |
-
-**Relay worker** (outbox → Kafka at scale) is Phase 4 — table and write path exist today.
+**Shared:** `ckac_events` (outbox/DLQ) · Redis · MinIO · `packages/ckac-common/`.
 
 ---
 
-## 4. CPO Product → Code Map
+## 3. Event Catalog (EDD) — summary
 
-Maps [CPO Blueprint §2–3](./CKAC-CPO-PRODUCT-BLUEPRINT.md) pain points and modules to implemented code.
+Format: `ckac:{domain}:{aggregate}` via `stream_key()`.
+
+| Domain streams | Examples |
+|----------------|----------|
+| identity | `kitchen.created` |
+| catalog | `dish.*`, `ingredient.*` |
+| orders | `order.placed`, `order.status.changed`, `order.delivery_mode.set`, drafts, master_order |
+| billing | payment, settlement, subscription, wallet, gst, refund, package |
+| marketing | coupon, promotion, crm, template |
+| delivery | `delivery.fee_quoted`, tracking |
+| notify | whatsapp, dispatch, tracking |
+| streaming / growth / ratings / learning / community | session, suggestion, rating, trial, recipe… |
+
+**Relay worker** (outbox → Kafka) remains Phase 4 — table + write path exist today.
+
+Full stream list: [AGENTS.md](../AGENTS.md) · [PLATFORM-ARCHITECTURE-FLOWS.md](./PLATFORM-ARCHITECTURE-FLOWS.md) §2.
+
+---
+
+## 4. CPO Product → Code Map (current)
 
 ### 4.1 Owner pain → implementation
 
 | CPO pain | Module | Feature IDs | Code / API | Status |
 |----------|--------|-------------|------------|--------|
-| P1 WhatsApp chaos | Order + Notification | F01, F02 | `notification/handlers.py`, `order/parser.py`, drafts API | Partial |
-| P2 Aggregator commission | Billing | F42–F44 | — | Sprint 6 |
-| P3 No profit visibility | Analytics | F07–F12 | — | Sprint 6+ |
-| P4 Stock photo deception | Catalog | F13 | `DishMediaInput` live-capture validator | Done |
-| P5 Taste inconsistency | Catalog | F30 | `quality_measures`, `ingredients_description` fields | Partial |
-| P6 No owner CRM | Marketing | F34–F40 | — | Phase 2 |
-| P7 Promotion guesswork | Growth | F11 | — | Phase 2 |
-| P8 Multi-channel chaos | Order | F03–F05 | Single lifecycle + `source` field | Partial |
+| P1 WhatsApp chaos | Order + Notification | F01–F02 | handlers, drafts, template blast | ✅ Partial→strong |
+| P2 Aggregator commission | Billing | F42–F44 | subscriptions, packages, no food commission | ✅ |
+| P3 No profit visibility | Order analytics + Growth | F07–F12 | analytics routes + suggestions | ✅ |
+| P4 Stock photo deception | Catalog | F13 | live-capture validator | ✅ |
+| P5 Taste inconsistency | Catalog + Ratings | F16–F18, F30 | quality fields + home_taste | ✅ |
+| P6 No owner CRM | Marketing | F36–F38 | CRM / coupons / promos | ✅ |
+| P7 Promotion guesswork | Growth | F09–F11, F39 | combos, patterns, daily menu | ✅ |
+| P8 Multi-channel chaos | Order | F03–F05 | lifecycle + `source` | ✅ |
 
 ### 4.2 Customer pain → implementation
 
 | CPO pain | Feature | Code | Status |
 |----------|---------|------|--------|
-| C1 Untrustworthy photos | F13 | Catalog media rules | Done |
-| C2 Opaque delivery fees | F27–F31 | Kitchen radius fields on identity | Fields only |
-| C3 No tracking | F04 | Order status events + future notify | Partial |
-| C4 Generic ratings | F16–F18 | — | Phase 2 |
-| C5 Single-kitchen cart | F33 | — | Phase 2 |
-| C6 No tiffin | F39 | — | Phase 2 |
+| C1 Untrustworthy photos | F13 | Catalog media rules | ✅ |
+| C2 Opaque delivery fees | F27–F31 + P32 | Quote modes + cost-share + Porter | ✅ |
+| C3 No tracking | F04, F29 | Track token + notify intervals | ✅ |
+| C4 Generic ratings | F16–F18 | Ratings service | ✅ |
+| C5 Single-kitchen cart | F06, F33 | Master order + history/repeat | ✅ |
+| C6 No tiffin / daily menu | F39 | Growth daily menu push | ✅ |
 
 ### 4.3 Module → repository path
 
-| CPO module | Sprint | Path | Product promise |
-|------------|--------|------|-----------------|
-| Identity | S1 ✅ | `services/identity/` | Owner registers, kitchen goes live |
-| Catalog | S2 ✅ | `services/catalog/` | Honest menu with live photos |
-| Order | S3 ✅ | `services/order/` | Every order has a bill code and lifecycle |
-| Notification | S4 ✅ | `services/notification/` | WhatsApp in → draft out |
-| Gateway | S1 ✅ | `services/gateway/` | One API for all clients |
-| Billing | S6 ⏳ | `services/billing/` (planned) | Subscription, not commission |
-| Owner PWA | S5 ⏳ | `apps/owner-pwa/` (planned) | Single pane of glass |
+| CPO module | Sprint | Path | Status |
+|------------|--------|------|--------|
+| Identity | S1 | `services/identity/` | ✅ |
+| Catalog | S2 | `services/catalog/` | ✅ |
+| Order | S3 | `services/order/` | ✅ |
+| Notification | S4 | `services/notification/` | ✅ |
+| Gateway | S1 | `services/gateway/` | ✅ |
+| Billing | S6 | `services/billing/` | ✅ |
+| Delivery | S13 + P32 | `services/delivery/` + order Porter | ✅ |
+| Marketing / Ratings / Growth | S10–S12 | respective services | ✅ |
+| Streaming | S18 + P30 | `services/streaming/` + LiveKit UI | ✅ |
+| PWAs | S5+ | `apps/website/` (not `owner-pwa/`) | ✅ |
 
 ---
 
@@ -148,7 +162,7 @@ Meta webhook → gateway /webhooks/whatsapp
   → owner confirms draft → order.placed
 ```
 
-### 5.2 Menu read (P4 + performance)
+### 5.2 Menu read (cache)
 
 ```
 GET /kitchens/{id}/menu
@@ -157,13 +171,32 @@ GET /kitchens/{id}/menu
   → dish create/update invalidates cache + dish.* event
 ```
 
-### 5.3 Kitchen onboarding (F26)
+### 5.3 Checkout + Porter cost-share (P32.1)
+
+```
+Customer checkout
+  → POST /delivery/quote (subtotal, lat/lng)
+      → distance vs max_delivery_radius_km
+      → modes: self | platform (Porter/mock gross)
+      → split_delivery_cost → customer_fee / owner_fee / payer
+  → POST .../orders/customer { delivery_mode, delivery_fee, Idempotency-Key }
+      → order re-validates fee + stores mode / payer / owner_delivery_cost
+  → billing pay (COD | online | UPI)
+  → owner PATCH status → accepted
+      → stock deduct (catalog internal)
+      → if delivery_mode=platform → porter_client.quote_and_book_porter
+      → courier_job_id stored
+  → track GET /delivery/track/{token} + WA notify
+```
+
+### 5.4 Kitchen onboarding (F26)
 
 ```
 POST /owners/register → OTP → POST /kitchens
   → identity: PostGIS location, code CKPNQ001
   → kitchen.created event
-  → catalog seeds default categories on first access
+  → PATCH delivery-settings (radius, min_order, subsidy %)
+  → branded_page publish → /k/{code}
 ```
 
 ---
@@ -174,11 +207,11 @@ POST /owners/register → OTP → POST /kitchens
 - [ ] Health uses `ckac_common.health`
 - [ ] All mutating routes pass `session` to `publish()`
 - [ ] Alembic owns exactly one `ckac_*` schema
-- [ ] Tests: schemas + routes + events (`test_events.py`)
-- [ ] Gateway route registered in `services/gateway/app/main.py`
-- [ ] Documented in `CKAC-IMPLEMENTATION-GUIDE.md` §7 API Reference
+- [ ] Tests: schemas + routes + events
+- [ ] Gateway route registered
+- [ ] Documented in Implementation Guide / Architecture Flows
 
-**Current compliance:** identity, catalog, order, notification meet checklist after architecture alignment pass (July 2026).
+**Current compliance:** All 13 domain services + gateway on Phase 1 template. Expand event-matrix tests for new money/Porter paths continuously.
 
 ---
 
@@ -186,9 +219,20 @@ POST /owners/register → OTP → POST /kitchens
 
 | Priority | Item | Why |
 |----------|------|-----|
-| S5 | Owner PWA | Closes P1/P8 for daily ops UX |
-| S6 | Billing service | Closes P2/P3 subscription story |
-| Phase 2 | Delivery fee engine | C2 — use PostGIS fields already on kitchens |
-| Phase 4 | Outbox relay worker | At-least-once without Redis-only coupling |
+| Wave A | Live Razorpay + prod OTP | Money trust |
+| Wave B | Kitchen staff RBAC | Multi-human kitchens |
+| Wave B | Porter webhooks | Courier status honesty |
+| Wave C | E1–E2 Quality Loop | Profit OS |
+| Wave D | Cloud Run + OTel + SLOs | 100k sessions |
+| Phase 4 | Outbox → Kafka relay | Bus scale |
 
-See [DEVELOPMENT-PHASES.md](./DEVELOPMENT-PHASES.md) for sprint detail.
+See [DEVELOPMENT-PHASES.md](./DEVELOPMENT-PHASES.md) · [ADVANCEMENT-TRACKER.md](./ADVANCEMENT-TRACKER.md) · [PLATFORM-ARCHITECTURE-FLOWS.md](./PLATFORM-ARCHITECTURE-FLOWS.md).
+
+---
+
+## Document control
+
+| Version | Date | Changes |
+|---------|------|---------|
+| 1.1 | 2026-07 | Early Phase 1 registry (incomplete) |
+| **2.0** | 2026-07-19 | Full 13-service registry; CPO map current; Porter checkout flow; PWA path `apps/website/` |

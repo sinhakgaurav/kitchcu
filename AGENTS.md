@@ -15,6 +15,7 @@
 | **`docs/templates/MODULE-DESIGN-PACK.md`** | **Required pre-code design template (10-step gate)** |
 | **`packages/ai-context/`** | **WhatsApp + support AI training/context pack** (options-first, FAQ answer_ids, order/menu extract, tickets) — branch `feature/whatsapp-ai-model-training` |
 | `docs/ADVANCEMENT-TRACKER.md` | **Living release board** — S1–S18 + post-S18 increments, credentials, seed checklist |
+| `docs/PLATFORM-ARCHITECTURE-FLOWS.md` | **Architecture + flow report** — topology, persona mermaid flows, events, scorecard (current state) |
 | `docs/PLATFORM-SOLUTION-BLUEPRINT.md` | **Solution blueprint** — expectations → CEO/CPO solution → CTO impl → arch/DB/UX per journey & admin controls |
 | `docs/PLATFORM-STRATEGIC-ANALYSIS.md` | **Strategic analysis** — competitive, gaps, Waves A–D |
 | `docs/PLATFORM-PERSONA-DEEP-DIVE.md` | **Persona deep dive** — lived experience, scorecards, RBAC reality |
