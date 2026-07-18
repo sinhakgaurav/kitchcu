@@ -148,7 +148,7 @@ Status tags: ✅ Done well · 🟡 Partial · 🔴 Gap / not built · 📋 Desig
 | **Solution** | Templates CRUD (done) + **send pipeline** + CRM segments + wallet; Stream phases (done) + **in-app publish/watch**; golden day (done). |
 | **Implementation (CTO)** | `POST .../templates/{id}/send` → marketing → notify → billing wallet; LiveKit embed; package module `marketing_broadcast` / `streaming` hard-gated. |
 | **Achievements / done well** | ✅ CRM/coupons/promos · ✅ Template CRUD (P26) · ✅ **Send** Preview/Send + `message_template.send_requested` · ✅ Stream phases · ✅ Customer Watch · ✅ Package-gated Growth nav |
-| **Gaps** | 🟡 LiveKit embed (owner publish + customer player) · 🟡 Per-recipient fan-out + wallet debit · 🟡 Send receipt history table |
+| **Gaps** | 🟡 Meta outbound delivery + wallet debit · 🟡 Send receipt history table · ✅ LiveKit embed · ✅ Per-phone fan-out |
 | **Architecture enhancements** | Notify consumer per phone; wallet debit idempotent; send job table. |
 | **DB enhancements** | `message_template_sends(...)` for history; indexes `(kitchen_id, created_at DESC)`. |
 | **UX enhancements** | Confirm cost → receipt; embed player when LiveKit configured. |
