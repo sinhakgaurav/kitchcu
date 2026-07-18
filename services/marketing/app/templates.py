@@ -209,3 +209,146 @@ async def delete_template(
         payload={"kitchen_id": str(kitchen_id)},
     )
     await publisher.publish(stream_key("marketing", "template"), event, session=session)
+
+
+class TemplateSendRequest(BaseModel):
+    audience: str = Field(default="all", description="all | vip | repeat | churn_risk | phones")
+    phones: list[str] = Field(default_factory=list, max_length=50)
+    dry_run: bool = False
+    sample_vars: dict[str, str] = Field(default_factory=dict)
+
+
+class TemplateSendResponse(BaseModel):
+    template_id: uuid.UUID
+    channel: str
+    queued: int
+    dry_run: bool
+    preview: str
+    recipient_phones: list[str]
+
+
+def _render_template(body: str, variables: dict[str, str]) -> str:
+    out = body
+    for key, val in variables.items():
+        out = out.replace("{{ " + key + " }}", val)
+        out = out.replace("{{" + key + "}}", val)
+    return out
+
+
+async def _resolve_audience_phones(
+    session: AsyncSession,
+    kitchen_id: uuid.UUID,
+    audience: str,
+    phones: list[str],
+) -> list[str]:
+    aud = audience.strip().lower()
+    if aud == "phones":
+        cleaned: list[str] = []
+        for p in phones:
+            p = p.strip()
+            if p and p not in cleaned:
+                cleaned.append(p)
+        return cleaned[:50]
+
+    from app.models import KitchenCustomer
+
+    customers = list(
+        (
+            await session.execute(select(KitchenCustomer).where(KitchenCustomer.kitchen_id == kitchen_id))
+        )
+        .scalars()
+        .all()
+    )
+    result: list[str] = []
+    for cust in customers:
+        phone = str(cust.customer_phone)
+        tags = [str(t).lower() for t in (cust.tags or [])]
+        if aud == "all":
+            result.append(phone)
+        elif aud in tags or aud.replace("_", "-") in tags:
+            result.append(phone)
+        elif aud == "vip" and float(cust.total_spend or 0) >= 2000:
+            result.append(phone)
+        elif aud == "repeat" and int(cust.order_count or 0) >= 2:
+            result.append(phone)
+        elif aud == "churn_risk" and "churn" in " ".join(tags):
+            result.append(phone)
+    seen: set[str] = set()
+    out: list[str] = []
+    for p in result:
+        if p not in seen:
+            seen.add(p)
+            out.append(p)
+    return out[:200]
+
+
+async def send_template(
+    session: AsyncSession,
+    publisher: EventPublisher,
+    kitchen_id: uuid.UUID,
+    template_id: uuid.UUID,
+    body: TemplateSendRequest,
+) -> TemplateSendResponse:
+    row = (
+        await session.execute(
+            select(MessageTemplate).where(
+                MessageTemplate.id == template_id,
+                MessageTemplate.kitchen_id == kitchen_id,
+            )
+        )
+    ).scalar_one_or_none()
+    if not row:
+        raise HTTPException(status_code=404, detail="Template not found")
+    if not row.is_active:
+        raise HTTPException(status_code=400, detail="Template is inactive")
+
+    recipients = await _resolve_audience_phones(
+        session, kitchen_id, body.audience, body.phones
+    )
+    if not recipients and not body.dry_run:
+        raise HTTPException(status_code=400, detail="No recipients matched this audience")
+
+    defaults = {
+        "customer_name": "Guest",
+        "dish_name": "today's special",
+        "kitchen_name": "our kitchen",
+        "order_code": "",
+    }
+    defaults.update({k: str(v) for k, v in body.sample_vars.items()})
+    preview = _render_template(row.body, defaults)
+    if row.channel == "email" and row.subject:
+        preview = f"Subject: {_render_template(row.subject, defaults)}\n\n{preview}"
+
+    event = EventPublisher.build(
+        event_type="message_template.send_requested",
+        aggregate_type="message_template",
+        aggregate_id=str(row.id),
+        producer="marketing-service",
+        payload={
+            "kitchen_id": str(kitchen_id),
+            "channel": row.channel,
+            "audience": body.audience,
+            "queued": len(recipients),
+            "dry_run": body.dry_run,
+            "preview": preview[:500],
+        },
+    )
+    await publisher.publish(stream_key("marketing", "template"), event, session=session)
+
+    if not body.dry_run and row.channel == "whatsapp" and recipients:
+        from app.notify_client import notify_template_blast
+
+        await notify_template_blast(
+            kitchen_id=kitchen_id,
+            message=preview,
+            recipient_count=len(recipients),
+        )
+
+    return TemplateSendResponse(
+        template_id=row.id,
+        channel=row.channel,
+        queued=len(recipients),
+        dry_run=body.dry_run,
+        preview=preview,
+        recipient_phones=recipients[:20],
+    )

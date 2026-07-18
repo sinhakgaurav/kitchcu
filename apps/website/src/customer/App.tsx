@@ -18,6 +18,7 @@ import { RateOrderPage } from "../pages/customer/RateOrderPage";
 import { TrackOrderPage } from "../pages/customer/TrackOrderPage";
 import { CustomerAccountPage } from "../pages/customer/CustomerAccountPage";
 import { CustomerDashboardPage } from "../pages/customer/CustomerDashboardPage";
+import { LiveWatchPage } from "../pages/customer/LiveWatchPage";
 import { BrandedMenuRedirect, BrandedStorefrontLayout } from "./BrandedStorefront";
 
 function CustomerShell({ children }: { children: React.ReactNode }) {
@@ -135,6 +136,14 @@ export default function CustomerApp() {
             element={
               <CustomerShell>
                 <TrackOrderPage />
+              </CustomerShell>
+            }
+          />
+          <Route
+            path="/live/:sessionId"
+            element={
+              <CustomerShell>
+                <LiveWatchPage />
               </CustomerShell>
             }
           />

@@ -157,6 +157,26 @@ def feature_http_status(exc: BaseException) -> int | None:
     return None
 
 
+async def kitchen_has_assigned_package(session: AsyncSession, kitchen_id) -> bool:
+    """True when billing has an explicit kitchen_packages row (hard entitlement mode)."""
+    try:
+        row = (
+            await session.execute(
+                text(
+                    """
+                    SELECT 1 FROM ckac_billing.kitchen_packages
+                    WHERE kitchen_id = CAST(:kid AS uuid)
+                    LIMIT 1
+                    """
+                ),
+                {"kid": str(kitchen_id)},
+            )
+        ).scalar_one_or_none()
+        return row is not None
+    except Exception:
+        return False
+
+
 async def is_kitchen_module_enabled(
     session: AsyncSession,
     kitchen_id,
@@ -164,7 +184,11 @@ async def is_kitchen_module_enabled(
     *,
     default: bool = True,
 ) -> bool:
-    """Global flag + optional per-kitchen override (when ``kitchen_module_overrides`` is on)."""
+    """Global flag + per-kitchen module flags.
+
+    Hard entitlement: when the kitchen has an assigned package (or
+    ``kitchen_module_overrides`` is on), missing flag rows default to **disabled**.
+    """
     from ckac_common.risk_config import KITCHEN_MODULE_GLOBAL_FLAGS, KITCHEN_MODULE_KEYS
 
     if module_key not in KITCHEN_MODULE_KEYS:
@@ -174,7 +198,9 @@ async def is_kitchen_module_enabled(
     if global_flag and not await is_feature_enabled(session, global_flag, default=True):
         return False
 
-    if not await is_feature_enabled(session, "kitchen_module_overrides", default=False):
+    overrides_on = await is_feature_enabled(session, "kitchen_module_overrides", default=False)
+    packaged = await kitchen_has_assigned_package(session, kitchen_id)
+    if not overrides_on and not packaged:
         return True
 
     result = await session.execute(
@@ -189,7 +215,8 @@ async def is_kitchen_module_enabled(
     )
     row = result.scalar_one_or_none()
     if row is None:
-        return default
+        # Packaged kitchens: default-deny unknown modules
+        return False if packaged else default
     return bool(row)
 
 

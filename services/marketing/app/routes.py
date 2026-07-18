@@ -40,10 +40,13 @@ from app.schemas import (
 from app.templates import (
     TemplateCreateRequest,
     TemplateResponse,
+    TemplateSendRequest,
+    TemplateSendResponse,
     TemplateUpdateRequest,
     create_template,
     delete_template,
     list_templates,
+    send_template,
     update_template,
 )
 from ckac_common.database import get_db
@@ -56,7 +59,6 @@ router = APIRouter()
 TAG_CRM = "CRM"
 TAG_COUPONS = "Coupons"
 TAG_PROMOTIONS = "Promotions"
-TAG_TEMPLATES = "Templates"
 TAG_TEMPLATES = "Templates"
 
 
@@ -386,3 +388,30 @@ async def templates_delete(
     await require_kitchen_module(session, kitchen_id, "marketing_broadcast")
     await delete_template(session, publisher, kitchen_id, template_id)
     await session.commit()
+
+
+@router.post(
+    "/kitchens/{kitchen_id}/templates/{template_id}/send",
+    response_model=TemplateSendResponse,
+    tags=[TAG_TEMPLATES],
+    summary="Send a marketing template to a CRM audience",
+    description=(
+        "Resolves CRM phones by audience (all/vip/repeat/churn_risk/phones), renders variables, "
+        "publishes `message_template.send_requested`, and for WhatsApp queues notify dispatch. "
+        "Use dry_run=true to preview without dispatch."
+    ),
+    responses={**auth_errors(include_403=True), 400: RESP_400, 404: RESP_404},
+)
+async def templates_send(
+    kitchen_id: uuid.UUID,
+    template_id: uuid.UUID,
+    body: TemplateSendRequest,
+    owner_id: Annotated[uuid.UUID, Depends(get_current_owner_id)],
+    session: Annotated[AsyncSession, Depends(get_db)],
+    publisher: Annotated[EventPublisher, Depends(get_publisher)],
+) -> TemplateSendResponse:
+    await verify_kitchen_owner(kitchen_id, owner_id, session)
+    await require_kitchen_module(session, kitchen_id, "marketing_broadcast")
+    result = await send_template(session, publisher, kitchen_id, template_id, body)
+    await session.commit()
+    return result

@@ -47,6 +47,19 @@ export async function adminLogin(email: string, password: string) {
   });
 }
 
+export type AdminMe = {
+  id: string;
+  email: string;
+  name: string;
+  role: string;
+  permissions: string[];
+  allowed_tabs: string[];
+};
+
+export async function fetchAdminMe(): Promise<AdminMe> {
+  return adminFetch("/api/v1/admin/me");
+}
+
 export async function fetchAdminStats(): Promise<PlatformStats> {
   return adminFetch("/api/v1/admin/stats");
 }

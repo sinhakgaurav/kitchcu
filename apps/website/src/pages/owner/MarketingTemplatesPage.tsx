@@ -4,6 +4,7 @@ import {
   createMarketingTemplate,
   deleteMarketingTemplate,
   fetchMarketingTemplates,
+  sendMarketingTemplate,
   updateMarketingTemplate,
   type MarketingTemplate,
 } from "../../lib/api";
@@ -22,6 +23,8 @@ export function MarketingTemplatesPage() {
   const [body, setBody] = useState(
     "Hi {{customer_name}} — today's specials from {{kitchen_name}}: {{menu_line}}. Order on kitchCU!",
   );
+  const [audience, setAudience] = useState("all");
+  const [sendPreview, setSendPreview] = useState("");
 
   const load = async () => {
     if (!kitchen) return;
@@ -87,6 +90,30 @@ export function MarketingTemplatesPage() {
     }
   };
 
+  const onSend = async (t: MarketingTemplate, dryRun: boolean) => {
+    if (!kitchen) return;
+    setBusy(true);
+    setError("");
+    setOk("");
+    try {
+      const res = await sendMarketingTemplate(kitchen.id, t.id, {
+        audience,
+        dry_run: dryRun,
+        sample_vars: { kitchen_name: kitchen.name, menu_line: "chef specials" },
+      });
+      setSendPreview(res.preview);
+      setOk(
+        dryRun
+          ? `Preview ready — ${res.queued} recipients would be queued.`
+          : `Queued ${res.queued} ${res.channel} recipients.`,
+      );
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Send failed");
+    } finally {
+      setBusy(false);
+    }
+  };
+
   if (!kitchen) return null;
 
   return (
@@ -133,6 +160,23 @@ export function MarketingTemplatesPage() {
         </form>
       </OwnerPanel>
 
+      <OwnerPanel title="Send to CRM" description="Audience for Preview / Send actions below">
+        <label className="owner-forms">
+          Audience
+          <select value={audience} onChange={(e) => setAudience(e.target.value)}>
+            <option value="all">All CRM customers</option>
+            <option value="vip">VIP (spend ≥ ₹2000 or vip tag)</option>
+            <option value="repeat">Repeat (2+ orders)</option>
+            <option value="churn_risk">Churn risk tag</option>
+          </select>
+        </label>
+        {sendPreview && (
+          <pre className="report-hint" style={{ whiteSpace: "pre-wrap", marginTop: "0.75rem" }}>
+            {sendPreview}
+          </pre>
+        )}
+      </OwnerPanel>
+
       <OwnerPanel title="Your templates" description={`${rows.length} saved`}>
         {loading ? (
           <p className="app-loading">Loading…</p>
@@ -153,6 +197,24 @@ export function MarketingTemplatesPage() {
                     </span>
                   </span>
                   <div className="golden-day-card__actions">
+                    <button
+                      type="button"
+                      className="btn btn--ghost btn--sm"
+                      disabled={busy || !t.is_active}
+                      onClick={() => onSend(t, true)}
+                    >
+                      Preview
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn--primary btn--sm"
+                      disabled={busy || !t.is_active}
+                      onClick={() => {
+                        if (window.confirm(`Send “${t.name}” to ${audience}?`)) onSend(t, false);
+                      }}
+                    >
+                      Send
+                    </button>
                     <button type="button" className="btn btn--ghost btn--sm" onClick={() => onToggle(t)}>
                       {t.is_active ? "Disable" : "Enable"}
                     </button>

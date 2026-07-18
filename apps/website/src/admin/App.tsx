@@ -10,6 +10,7 @@ import {
   fetchAdminKitchenPackage,
   fetchAdminKitchenTemplates,
   fetchAdminKitchenWhatsApp,
+  fetchAdminMe,
   fetchAdminOrders,
   fetchAdminOwners,
   fetchAdminPackages,
@@ -33,6 +34,7 @@ import {
   type AdminKitchenPaymentGateway,
   type AdminKitchenWhatsApp,
   type AdminPackage,
+  type AdminMe,
   type AdminTicket,
   type PlatformStats,
 } from "./adminApi";
@@ -148,6 +150,7 @@ const STAT_CARDS: {
 export default function AdminApp() {
   const [token, setToken] = useState(getAdminToken());
   const [tab, setTab] = useState<Tab>("overview");
+  const [me, setMe] = useState<AdminMe | null>(null);
   const [stats, setStats] = useState<PlatformStats | null>(null);
   const [allOrders, setAllOrders] = useState<Awaited<ReturnType<typeof fetchAdminOrders>>>([]);
   const [owners, setOwners] = useState<Awaited<ReturnType<typeof fetchAdminOwners>>>([]);
@@ -157,26 +160,62 @@ export default function AdminApp() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
 
+  const visibleTabs =
+    me?.allowed_tabs?.length
+      ? TABS.filter((t) => me.allowed_tabs.includes(t.id))
+      : me
+        ? TABS
+        : [];
+
   useEffect(() => {
     if (!token) return;
+    let cancelled = false;
     setLoading(true);
-    Promise.all([
-      fetchAdminStats(),
-      fetchAdminOrders(500),
-      fetchAdminOwners(),
-      fetchAdminKitchens(),
-      fetchAdminTickets({ status: "open" }),
-    ])
-      .then(([s, orders, ownerRows, kitchenRows, tickets]) => {
-        setStats(s);
-        setAllOrders(orders);
-        setOwners(ownerRows);
-        setKitchens(kitchenRows);
-        setRecentOrders(orders.slice(0, 6));
-        setOpenTickets(tickets.total);
-      })
-      .catch((e) => setError(e.message))
-      .finally(() => setLoading(false));
+    (async () => {
+      let profile: AdminMe | null = null;
+      try {
+        profile = await fetchAdminMe();
+        if (cancelled) return;
+        setMe(profile);
+        if (profile.allowed_tabs?.length) {
+          setTab((prev) =>
+            profile!.allowed_tabs.includes(prev)
+              ? prev
+              : ((profile!.allowed_tabs[0] as Tab) || "overview"),
+          );
+        }
+      } catch {
+        if (!cancelled) setMe(null);
+      }
+
+      const results = await Promise.allSettled([
+        fetchAdminStats(),
+        fetchAdminOrders(500),
+        fetchAdminOwners(),
+        fetchAdminKitchens(),
+        fetchAdminTickets({ status: "open" }),
+      ]);
+      if (cancelled) return;
+      const [s, orders, ownerRows, kitchenRows, tickets] = results;
+      if (s.status === "fulfilled") setStats(s.value);
+      if (orders.status === "fulfilled") {
+        setAllOrders(orders.value);
+        setRecentOrders(orders.value.slice(0, 6));
+      }
+      if (ownerRows.status === "fulfilled") setOwners(ownerRows.value);
+      if (kitchenRows.status === "fulfilled") setKitchens(kitchenRows.value);
+      if (tickets.status === "fulfilled") setOpenTickets(tickets.value.total);
+      const firstErr = results.find((r) => r.status === "rejected") as PromiseRejectedResult | undefined;
+      if (firstErr && results.every((r) => r.status === "rejected")) {
+        setError(String(firstErr.reason?.message || firstErr.reason || "Failed to load"));
+      } else {
+        setError("");
+      }
+      setLoading(false);
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, [token]);
 
   if (!token) {
@@ -192,7 +231,7 @@ export default function AdminApp() {
         </div>
 
         <nav className="admin-shell__nav" aria-label="Admin navigation">
-          {TABS.map((t) => (
+          {visibleTabs.map((t) => (
             <button
               key={t.id}
               type="button"
@@ -216,12 +255,18 @@ export default function AdminApp() {
 
       <div className="admin-shell__main">
         <header className="admin-shell__topbar">
+          {me && (
+            <span className="owner-muted" style={{ marginRight: "auto" }}>
+              {me.name} · <strong>{me.role}</strong>
+            </span>
+          )}
           <button
             type="button"
             className="btn btn--ghost btn--sm"
             onClick={() => {
               clearAdminToken();
               setToken(null);
+              setMe(null);
             }}
           >
             Sign out
@@ -230,8 +275,8 @@ export default function AdminApp() {
 
         <div className="admin-main">
           <header className="admin-section-head">
-            <h1>{TAB_META[tab].title}</h1>
-            <p>{TAB_META[tab].desc}</p>
+            <h1>{TAB_META[tab]?.title || "Admin"}</h1>
+            <p>{TAB_META[tab]?.desc || ""}</p>
           </header>
 
           {error && <p className="auth-card__error">{error}</p>}

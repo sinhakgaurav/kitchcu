@@ -171,7 +171,9 @@ async def admin_tickets_list(
     audience: Annotated[str | None, Query(description="Filter by 'owner' or 'customer'.")] = None,
     limit: Annotated[int, Query(ge=1, le=500, description="Max tickets to return (1-500).")] = 100,
 ) -> TicketListResponse:
-    _ = admin
+    from ckac_common.admin_rbac import assert_admin_permission
+
+    await assert_admin_permission(session, role=admin.role, permission="tickets:write")
     return await list_tickets(session, status=status_filter, audience=audience, limit=limit)
 
 
@@ -192,7 +194,9 @@ async def admin_ticket_get(
     admin: Annotated[AdminContext, Depends(get_current_admin)],
     session: Annotated[AsyncSession, Depends(get_db)],
 ) -> TicketResponse:
-    _ = admin
+    from ckac_common.admin_rbac import assert_admin_permission
+
+    await assert_admin_permission(session, role=admin.role, permission="tickets:write")
     try:
         return await get_ticket(session, ticket_id)
     except ValueError as exc:
@@ -221,6 +225,9 @@ async def admin_ticket_update(
     session: Annotated[AsyncSession, Depends(get_db)],
     publisher: Annotated[EventPublisher, Depends(get_publisher)],
 ) -> TicketResponse:
+    from ckac_common.admin_rbac import assert_admin_permission
+
+    await assert_admin_permission(session, role=admin.role, permission="tickets:write")
     try:
         ticket = await update_ticket(session, ticket_id, body, admin.id, publisher)
         await session.commit()
@@ -251,6 +258,9 @@ async def admin_ticket_reply(
     session: Annotated[AsyncSession, Depends(get_db)],
     publisher: Annotated[EventPublisher, Depends(get_publisher)],
 ) -> TicketResponse:
+    from ckac_common.admin_rbac import assert_admin_permission
+
+    await assert_admin_permission(session, role=admin.role, permission="tickets:write")
     try:
         ticket = await reply_to_ticket(session, ticket_id, body, admin.id, publisher)
         await session.commit()

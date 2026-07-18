@@ -12,6 +12,7 @@ from app.deps import (
     load_order_for_owner,
     verify_kitchen_owner,
 )
+from app.packages import KitchenEntitlementsResponse, get_kitchen_entitlements
 from app.schemas import (
     MasterPaymentCaptureResponse,
     MasterPaymentCreateRequest,
@@ -189,6 +190,26 @@ async def payment_gateway_delete(
     result = await delete_kitchen_payment_gateway(session, publisher, kitchen_id)
     await session.commit()
     return result
+
+
+@router.get(
+    "/billing/kitchens/{kitchen_id}/entitlements",
+    response_model=KitchenEntitlementsResponse,
+    tags=[TAG_PAYMENT_GATEWAY],
+    summary="Get kitchen package entitlements and module flags",
+    description=(
+        "Owner-only — package assignment + which modules are enabled. "
+        "When a package is assigned (hard_mode), missing module flags default to disabled."
+    ),
+    responses=auth_errors(),
+)
+async def kitchen_entitlements_get(
+    kitchen_id: uuid.UUID,
+    owner_id: Annotated[uuid.UUID, Depends(get_current_owner_id)],
+    session: Annotated[AsyncSession, Depends(get_db)],
+) -> KitchenEntitlementsResponse:
+    await verify_kitchen_owner(kitchen_id, owner_id, session)
+    return await get_kitchen_entitlements(session, kitchen_id)
 
 
 @router.get(

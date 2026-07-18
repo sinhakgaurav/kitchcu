@@ -92,11 +92,11 @@ Status tags: ✅ Done well · 🟡 Partial · 🔴 Gap / not built · 📋 Desig
 | **Problem (CPO)** | Live filter without Watch CTA is a broken journey. |
 | **Solution** | Nearby live card → Watch → LiveKit viewer token → phase overlay from showcase API. |
 | **Implementation (CTO)** | Exists: go-live, showcase phases, `POST .../viewer-token`. Missing: customer route + player. Feature `live_streaming`; module `streaming`/`livekit`. |
-| **Achievements / done well** | ✅ Session + phases + live discovery filter · ✅ Viewer-token API |
-| **Gaps** | 🔴 **No customer Watch page** · 🟡 No viewer count proof on owner side |
+| **Achievements / done well** | ✅ Session + phases + live discovery filter · ✅ Viewer-token API · ✅ Customer `/live/:sessionId` Watch + Nearby CTA · ✅ Showcase phase poll |
+| **Gaps** | 🟡 Embedded LiveKit player (token + URL shown; player next) · 🟡 Viewer count proof on owner side |
 | **Architecture enhancements** | Short-lived viewer tokens; rate-limit token mint; CDN for LiveKit; kill via module flags. |
 | **DB enhancements** | Already on `live_sessions` (dish_id, showcase_phase, prepared_at); add `viewer_joins` counters table if analytics needed. |
-| **UX enhancements** | `/live/:sessionId` or `/kitchen/:id/live`; phase chips read-only for customer. |
+| **UX enhancements** | Phase chips read-only; embed LiveKit JS SDK when `LIVEKIT_URL` set. |
 
 ---
 
@@ -147,11 +147,11 @@ Status tags: ✅ Done well · 🟡 Partial · 🔴 Gap / not built · 📋 Desig
 | **Problem (CPO)** | Portal promises templates/live; product stops at CRUD/session plumbing. |
 | **Solution** | Templates CRUD (done) + **send pipeline** + CRM segments + wallet; Stream phases (done) + **in-app publish/watch**; golden day (done). |
 | **Implementation (CTO)** | `POST .../templates/{id}/send` → marketing → notify → billing wallet; LiveKit embed; package module `marketing_broadcast` / `streaming` hard-gated. |
-| **Achievements / done well** | ✅ CRM/coupons/promos · ✅ Template CRUD + variables (P26) · ✅ Stream phases (P22) · ✅ Golden day (P20) · ✅ Daily menu push |
-| **Gaps** | 🔴 Template **send** · 🔴 In-app LiveKit publish/watch · 🟡 Package-aware Growth nav |
-| **Architecture enhancements** | Send = async job; outbox `template.send_requested`; notify consumer; wallet debit idempotent. |
-| **DB enhancements** | `message_template_sends(id, kitchen_id, template_id, audience_json, status, queued_count, created_at)`; indexes `(kitchen_id, created_at DESC)`. |
-| **UX enhancements** | Send wizard: template → segment → preview → confirm cost → receipt. |
+| **Achievements / done well** | ✅ CRM/coupons/promos · ✅ Template CRUD (P26) · ✅ **Send** Preview/Send + `message_template.send_requested` · ✅ Stream phases · ✅ Customer Watch · ✅ Package-gated Growth nav |
+| **Gaps** | 🟡 LiveKit embed (owner publish + customer player) · 🟡 Per-recipient fan-out + wallet debit · 🟡 Send receipt history table |
+| **Architecture enhancements** | Notify consumer per phone; wallet debit idempotent; send job table. |
+| **DB enhancements** | `message_template_sends(...)` for history; indexes `(kitchen_id, created_at DESC)`. |
+| **UX enhancements** | Confirm cost → receipt; embed player when LiveKit configured. |
 
 ---
 
@@ -165,7 +165,7 @@ Status tags: ✅ Done well · 🟡 Partial · 🔴 Gap / not built · 📋 Desig
 | **Solution** | Owner WA/PG pages + Admin kitchen tabs (done); platform secrets only API Keys (done). |
 | **Implementation (CTO)** | Identity WA fields; billing `kitchen_payment_gateways`; encrypt secrets; admin routes. |
 | **Achievements / done well** | ✅ Correct secret split (P21) · ✅ Admin + owner surfaces · ✅ Encrypt/mask patterns |
-| **Gaps** | 🟡 Outbound WA reliability · 🟡 Live Razorpay in prod · 🟡 Module soft gate |
+| **Gaps** | 🟡 Outbound WA reliability · 🟡 Live Razorpay in prod · ✅ Hard module gate when packaged |
 | **Architecture enhancements** | Health probe “WA reachable” / “PG keys valid” cached 5m for admin strip. |
 | **DB enhancements** | Already; add `last_validated_at` on WA/PG rows. |
 | **UX enhancements** | Green/red connected badges; never show raw secrets. |
@@ -185,11 +185,11 @@ Status tags: ✅ Done well · 🟡 Partial · 🔴 Gap / not built · 📋 Desig
 | **Problem (CPO)** | Control plane must match org chart: secrets ≠ tickets ≠ refunds. |
 | **Solution** | Employees + roles (done) + **enforce permissions on all mutations** + **tab filtering** + **audit log** + kitchen workspace (done) + packages (done) + flags (done). |
 | **Implementation (CTO)** | Shared `RequirePerm`; `GET /admin/me` → permissions[]; `admin_audit_events`; UI filter `TABS`. |
-| **Achievements / done well** | ✅ Kitchen workspace breadth (P28) · ✅ Packages mapper (P25) · ✅ Employees CRUD (P27) · ✅ API Keys / Control · ✅ Overview stats |
-| **Gaps** | 🔴 RBAC incomplete · 🔴 No audit UI · 🔴 Tabs not role-filtered · 🟡 Single-VM ops risk |
-| **Architecture enhancements** | Permission check in every admin service; audit write in same TX as mutation; correlation id on audit. |
-| **DB enhancements** | `ckac_identity.admin_audit_events(id, actor_admin_id, action, resource_type, resource_id, payload jsonb, created_at)` + indexes `(actor_admin_id, created_at)`, `(resource_type, resource_id)`. |
-| **UX enhancements** | Role badge in nav; hide forbidden tabs; kitchen health strip. |
+| **Achievements / done well** | ✅ Kitchen workspace (P28) · ✅ Packages (P25) · ✅ Employees (P27) · ✅ Shared `admin_rbac` enforced on identity/billing/tickets · ✅ `GET /admin/me` → permissions + allowed_tabs · ✅ UI tab filter + role badge · ✅ Overview `allSettled` |
+| **Gaps** | 🔴 No audit UI · 🟡 Single-VM ops risk |
+| **Architecture enhancements** | Audit write in same TX as mutation; correlation id on audit. |
+| **DB enhancements** | `ckac_identity.admin_audit_events(...)` + indexes; identity `014` expands customers/flags/refunds:read grants. |
+| **UX enhancements** | Kitchen health strip; audit timeline (next). |
 
 ---
 
@@ -202,8 +202,8 @@ Status tags: ✅ Done well · 🟡 Partial · 🔴 Gap / not built · 📋 Desig
 | **Problem (CPO)** | Role exists in seed; job boundary doesn’t in routes/UI. |
 | **Solution** | Enforce `kitchens:write`, `owners:write`, PG/modules perms; hide API Keys/Refunds write/Employees; ops checklist in kitchen workspace. |
 | **Implementation (CTO)** | Add asserts on subscription force, module flags, PG put; UI perm map. |
-| **Achievements / done well** | ✅ WA write gated · ✅ Kitchen status gated · ✅ Workspace tabs exist · ✅ Role grants seeded |
-| **Gaps** | 🔴 Subscription/PG/modules ungated · 🔴 UI over-exposed |
+| **Achievements / done well** | ✅ WA/status/PG/modules gated · ✅ Workspace tabs · ✅ Role grants · ✅ UI tabs filtered by `/admin/me` |
+| **Gaps** | 🟡 Ops checklist UX · 🟡 Audit trail |
 | **Architecture enhancements** | Ops playbook as read model from kitchen health. |
 | **DB enhancements** | Reuse audit; optional `ops_notes` on kitchen. |
 | **UX enhancements** | “New kitchen checklist” panel. |
@@ -219,11 +219,11 @@ Status tags: ✅ Done well · 🟡 Partial · 🔴 Gap / not built · 📋 Desig
 | **Problem (CPO)** | `tickets:write` seeded but not enforced; UI shows everything. |
 | **Solution** | Enforce tickets; `customers:read` / `customers:write` split; narrow UI; assignee + SLA. |
 | **Implementation (CTO)** | Assert on notification ticket routes; identity customer routes; UI filter. |
-| **Achievements / done well** | ✅ Tickets + AI escalation · ✅ Kitchen read context tabs |
-| **Gaps** | 🔴 tickets perm unused · 🔴 Over-privileged UI · 🟡 No SLA/assignee |
+| **Achievements / done well** | ✅ Tickets + AI escalation · ✅ `tickets:write` enforced on list/get/patch/reply · ✅ UI tabs narrowed via allowed_tabs |
+| **Gaps** | 🟡 No SLA/assignee · 🟡 Support-specific Overview metrics |
 | **Architecture enhancements** | Ticket assignment events; support metrics on Overview for support role. |
 | **DB enhancements** | `tickets.assignee_admin_id`, `first_response_at`, `sla_due_at`; index `(status, sla_due_at)`. |
-| **UX enhancements** | Only Overview + Tickets + Kitchens(read) + Customers(limited). |
+| **UX enhancements** | Assignee + SLA chips. |
 
 ---
 
@@ -236,10 +236,10 @@ Status tags: ✅ Done well · 🟡 Partial · 🔴 Gap / not built · 📋 Desig
 | **Problem (CPO)** | Package write is gated; refunds are not — inverted trust. |
 | **Solution** | Keep package RBAC; gate all money admin routes; hard entitlements on assign; CSV exports; GST rollup. |
 | **Implementation (CTO)** | `refunds:read/write` on billing admin; entitlement sync; export endpoints. |
-| **Achievements / done well** | ✅ Feature→package→plan→kitchen mapper · ✅ Seed Starter/Growth/Pro · ✅ Package RBAC on package routes |
-| **Gaps** | 🔴 Refunds ungated · 🔴 Soft module defaults · 🟡 No CSV/GST platform view |
-| **Architecture enhancements** | Entitlement resolver shared library; assign publishes `kitchen_package.assigned` (exists) → identity module sync consumer. |
-| **DB enhancements** | Already `platform_features`, `packages`, `package_features`, `plan_packages`, `kitchen_packages`; add `package_prices` / billing period if selling in-app; `entitlement_snapshots` for audit. |
+| **Achievements / done well** | ✅ Feature→package→plan→kitchen mapper · ✅ Seed packages · ✅ Package + refunds RBAC · ✅ Hard entitlements when package assigned · ✅ `GET .../entitlements` |
+| **Gaps** | 🟡 No CSV/GST platform view · 🟡 Entitlement snapshot audit |
+| **Architecture enhancements** | Cache `entitlements:{kitchen_id}` TTL 60s; invalidate on assign. |
+| **DB enhancements** | Add `package_prices` / billing period if selling in-app; `entitlement_snapshots` for audit. |
 | **UX enhancements** | Assign wizard with module preview; money console for finance-only. |
 
 ---
@@ -253,11 +253,11 @@ Status tags: ✅ Done well · 🟡 Partial · 🔴 Gap / not built · 📋 Desig
 | **Problem (CPO)** | Planner UI exists; owner/customer don’t feel the plan. |
 | **Solution** | Planner (done) + **hard entitlement mode** + owner “Your plan includes” page + customer empty states. |
 | **Implementation (CTO)** | Turn on overrides strategy; map every sellable capability to `platform_features.key` + `module_key`; enforce `require_kitchen_module` / feature on hot paths; owner nav filter from entitlement API. |
-| **Achievements / done well** | ✅ Admin Packages UI · ✅ Seed features/packages · ✅ Kitchen Package tab · ✅ Optional `sync_module_flags` |
-| **Gaps** | 🔴 Soft default-enable · 🟡 Owner doesn’t see feature matrix · 🟡 Not all APIs package-keyed |
-| **Architecture enhancements** | `GET /kitchens/{id}/entitlements` → `{features[], modules[]}`; gateway-agnostic; cache `entitlements:{kitchen_id}` TTL 60s invalidate on assign. |
-| **DB enhancements** | Ensure every module_key in `KITCHEN_MODULE_KEYS` has a feature row; `plan_packages` cover trial/starter/growth/pro/enterprise. |
-| **UX enhancements** | Package compare table on owner Subscription; admin assign diff view. |
+| **Achievements / done well** | ✅ Admin Packages UI · ✅ Seed features/packages · ✅ Kitchen Package tab · ✅ Assign syncs **all** module keys on/off · ✅ Hard default-deny for packaged kitchens · ✅ Owner nav gated by entitlements |
+| **Gaps** | 🟡 Owner “Your plan includes” matrix page · 🟡 Not every hot path package-keyed yet |
+| **Architecture enhancements** | Cache entitlements; enforce `require_kitchen_module` on remaining growth/stream edges. |
+| **DB enhancements** | Ensure every module_key in `KITCHEN_MODULE_KEYS` has a feature row; `plan_packages` cover tiers. |
+| **UX enhancements** | Package compare on Subscription; admin assign diff view. |
 
 **Seed packages (reference)**
 
@@ -279,9 +279,9 @@ Status tags: ✅ Done well · 🟡 Partial · 🔴 Gap / not built · 📋 Desig
 | **Problem (CPO)** | Powerful tools need RBAC + audit. |
 | **Solution** | Control tab (done) + perm `flags:write` / `api_keys:write` enforced + audit. |
 | **Implementation (CTO)** | Asserts on feature-flag + api-key routes; audit rows. |
-| **Achievements / done well** | ✅ Flags + journeys UI · ✅ DB-backed secrets · ✅ Correct non-kitchen placement |
-| **Gaps** | 🔴 Ungated mutations · 🔴 No audit |
-| **Architecture / DB** | As C1 audit; permission rows for `flags:read/write`. |
+| **Achievements / done well** | ✅ Flags + journeys UI · ✅ DB-backed secrets · ✅ `flags:*` + `api_keys:write` enforced · ✅ Tabs hidden without perms |
+| **Gaps** | 🔴 No audit trail UI |
+| **Architecture / DB** | As C1 audit. |
 | **UX** | Confirm modal on secret rotate; last-rotated display. |
 
 ---
@@ -299,7 +299,7 @@ Status tags: ✅ Done well · 🟡 Partial · 🔴 Gap / not built · 📋 Desig
 | **CPO** | Customer shouldn’t see Route complexity; owner sees paid/refund clearly. |
 | **CTO** | State machines + idempotency + webhooks; mocks off in prod. |
 | **Achievements** | ✅ Payments/settlements/refunds/GST/wallets modeled + events |
-| **Gaps** | 🔴 Live provider maturity · 🔴 Refund admin RBAC · 🟡 Capture/orphan UX |
+| **Gaps** | 🔴 Live provider maturity · 🟡 Capture/orphan UX · ✅ Refund admin RBAC |
 | **Arch** | Webhook workers; no pay cache; outbox for settlement events |
 | **DB** | Unique idempotency; refund evidence tables (exist); settlement indexes by kitchen_id |
 | **UX** | Pending pay recovery; owner settlement list |
@@ -315,7 +315,7 @@ Status tags: ✅ Done well · 🟡 Partial · 🔴 Gap / not built · 📋 Desig
 | **CPO** | Inbound drafts strong; outbound + templates incomplete. |
 | **CTO** | Notify service owns dispatch; marketing owns template content; wallet owns cost. |
 | **Achievements** | ✅ Webhook → drafts · ✅ Order/status notify (S14) · ✅ Support chat/tickets |
-| **Gaps** | 🔴 Template send · 🟡 Prod OTP · 🟡 Wallet UX |
+| **Gaps** | 🟡 Per-recipient WA fan-out (blast count today) · 🟡 Prod OTP · 🟡 Wallet UX · ✅ Template send API + owner Preview/Send |
 | **Arch** | Single dispatch pipeline for daily-menu + template send |
 | **DB** | `notify_dispatches` already patterned; link `template_send_id` |
 | **UX** | Delivery receipts on owner Templates page |
@@ -329,12 +329,12 @@ Status tags: ✅ Done well · 🟡 Partial · 🔴 Gap / not built · 📋 Desig
 | **Expectations** | Trial kitchen sees core ops; Pro unlocks stream/blasts; UI doesn’t tease locked tools without upgrade path. |
 | **CEO** | Monetization integrity. |
 | **CPO** | Progressive complexity charter. |
-| **CTO** | Soft gating today is a bug relative to product intent. |
-| **Achievements** | ✅ Feature flags · ✅ Module flags · ✅ Package mapper |
-| **Gaps** | 🔴 `kitchen_module_overrides` off ⇒ everything on · 🔴 Nav not gated |
-| **Arch** | Entitlement resolver; default-deny when package assigned |
+| **CTO** | Packaged kitchens default-deny missing module flags. |
+| **Achievements** | ✅ Feature/module flags · ✅ Package mapper · ✅ Hard mode + entitlements API · ✅ Owner nav filter |
+| **Gaps** | 🟡 Unpackaged kitchens still soft-open · 🟡 Upgrade CTA copy on locked routes |
+| **Arch** | Cache entitlements; invalidate on assign |
 | **DB** | Snapshot entitlements on assign |
-| **UX** | Locked nav item → “Upgrade to Growth” |
+| **UX** | Locked nav → “Upgrade to Growth” |
 
 ---
 
@@ -390,14 +390,14 @@ Status tags: ✅ Done well · 🟡 Partial · 🔴 Gap / not built · 📋 Desig
 | Discover → menu | Customer | A | Ranking |
 | Checkout → pay | Customer | B+ | Live PG + retry |
 | Track → rate | Customer | A− | Prompt timing |
-| Watch live | Customer | F | Watch page |
+| Watch live | Customer | B | LiveKit embed player |
 | Owner day-1 | Owner | A− | Checklist |
 | Order lifecycle | Owner | A | Staff roles |
-| Templates send | Owner | F | Send API |
+| Templates send | Owner | B+ | Per-recipient fan-out |
 | Stream cook | Owner | B | LiveKit embed |
-| Package plan | Finance | B+ | Hard entitlements |
-| Admin hire safely | Superadmin | C− | Full RBAC |
-| Support tickets | Support | B− | Perm + UI |
+| Package plan | Finance | A− | Owner plan matrix page |
+| Admin hire safely | Superadmin | B+ | Audit log |
+| Support tickets | Support | A− | SLA/assignee |
 | Kitchen staff | Cook | F | Not built |
 
 ---
@@ -406,30 +406,30 @@ Status tags: ✅ Done well · 🟡 Partial · 🔴 Gap / not built · 📋 Desig
 
 | Level | Surface | Permission | Enforced today? |
 |-------|---------|------------|-----------------|
-| L0 Secrets | API Keys | `api_keys:write` | 🔴 No |
-| L1 Governance | Flags/journeys | `flags:*` (add) | 🔴 No |
+| L0 Secrets | API Keys | `api_keys:write` | ✅ Yes |
+| L1 Governance | Flags/journeys | `flags:read/write` | ✅ Yes |
 | L2 Monetization | Packages | `packages:*` | ✅ Yes |
 | L3 Staff | Employees | `employees:*` | ✅ Yes |
-| L4 Kitchen | WA/status | `kitchens:write` | ✅ Partial |
-| L4 Kitchen | PG/modules | kitchens/billing | 🔴 No |
-| L5 Care | Tickets | `tickets:write` | 🔴 No |
-| L5 Care | Customers | `customers:*` (add) | 🔴 No |
-| L6 Money | Refunds | `refunds:write` | 🔴 No |
+| L4 Kitchen | WA/status | `kitchens:write` | ✅ Yes |
+| L4 Kitchen | PG/modules | kitchens/billing | ✅ Yes |
+| L5 Care | Tickets | `tickets:write` | ✅ Yes |
+| L5 Care | Customers | `customers:read/write` | ✅ Yes |
+| L6 Money | Refunds | `refunds:read/write` | ✅ Yes |
 
 ---
 
 ## E3. Solution backlog (CEO priority order)
 
-| # | Solution | Primary lens | Wave |
-|---|----------|--------------|------|
-| 1 | Enforce admin RBAC + tab filter + audit | CEO trust / hire | A |
-| 2 | Hard package entitlements + owner nav | CEO monetization | A |
-| 3 | Live Razorpay + prod OTP posture | CEO / CTO | A |
-| 4 | Template send pipeline | CPO honesty | B |
-| 5 | Customer Watch + owner LiveKit embed | CPO honesty | B |
-| 6 | Kitchen staff design→build | CEO TAM | B/C |
-| 7 | E1–E2 quality/profit | CPO OS | C |
-| 8 | Cloud Run scale path | CTO 100k | D |
+| # | Solution | Primary lens | Wave | Status |
+|---|----------|--------------|------|--------|
+| 1 | Enforce admin RBAC + tab filter (+ audit next) | CEO trust / hire | A | ✅ RBAC+tabs · ⏳ audit |
+| 2 | Hard package entitlements + owner nav | CEO monetization | A | ✅ |
+| 3 | Live Razorpay + prod OTP posture | CEO / CTO | A | ⏳ |
+| 4 | Template send pipeline | CPO honesty | B | ✅ Preview/Send · ⏳ fan-out |
+| 5 | Customer Watch (+ LiveKit embed) | CPO honesty | B | ✅ Watch page · ⏳ embed |
+| 6 | Kitchen staff design→build | CEO TAM | B/C | ⏳ |
+| 7 | E1–E2 quality/profit | CPO OS | C | ⏳ |
+| 8 | Cloud Run scale path | CTO 100k | D | ⏳ |
 
 ---
 
@@ -451,9 +451,10 @@ Status tags: ✅ Done well · 🟡 Partial · 🔴 Gap / not built · 📋 Desig
 | Version | Date | Changes |
 |---------|------|---------|
 | **1.0** | 2026-07-18 | Full solution blueprint: every major journey with CEO/CPO/CTO triad, achievements, gaps, arch/DB/UX enhancements; admin multilevel + package planner |
+| **1.1** | 2026-07-18 | Wave A/B gap-fill: admin RBAC enforced + tab filter; hard entitlements + owner nav; template send; customer Watch live |
 
 **Update policy:** Closing a 🔴 gap updates the matching section score + E1/E3 in the same PR as code. Regenerate Complete Guide PDF only when encyclopedia status tables change materially.
 
 ---
 
-*KitchCu Platform Solution Blueprint v1.0 — Confidential — July 2026*
+*KitchCu Platform Solution Blueprint v1.1 — Confidential — July 2026*

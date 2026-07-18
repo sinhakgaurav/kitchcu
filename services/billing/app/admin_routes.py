@@ -51,26 +51,9 @@ def get_publisher() -> EventPublisher:
 
 
 async def _assert_admin_perm(session: AsyncSession, admin: AdminContext, permission: str) -> None:
-    """Cross-schema RBAC check against identity role grants."""
-    try:
-        rows = (
-            await session.execute(
-                text(
-                    "SELECT permission_code FROM ckac_identity.admin_role_permissions WHERE role = :role"
-                ),
-                {"role": admin.role},
-            )
-        ).scalars().all()
-        grants = {str(r) for r in rows}
-    except Exception:
-        grants = {"*"} if admin.role == "superadmin" else set()
-    if not grants and admin.role == "superadmin":
-        grants = {"*"}
-    if "*" in grants or permission in grants:
-        return
-    if permission.endswith(":read") and permission[:-5] + ":write" in grants:
-        return
-    raise HTTPException(status_code=403, detail=f"Missing permission: {permission}")
+    from ckac_common.admin_rbac import assert_admin_permission
+
+    await assert_admin_permission(session, role=admin.role, permission=permission)
 
 
 async def _kitchen_exists(session: AsyncSession, kitchen_id: uuid.UUID) -> bool:
@@ -98,7 +81,7 @@ async def admin_kitchen_payment_gateway_get(
     admin: Annotated[AdminContext, Depends(get_current_admin)],
     session: Annotated[AsyncSession, Depends(get_db)],
 ) -> PaymentGatewayResponse:
-    _ = admin
+    await _assert_admin_perm(session, admin, "kitchens:read")
     if not await _kitchen_exists(session, kitchen_id):
         raise HTTPException(status_code=404, detail="Kitchen not found")
     return await get_kitchen_payment_gateway(session, kitchen_id)
@@ -121,7 +104,7 @@ async def admin_kitchen_payment_gateway_put(
     session: Annotated[AsyncSession, Depends(get_db)],
     publisher: Annotated[EventPublisher, Depends(get_publisher)],
 ) -> PaymentGatewayResponse:
-    _ = admin
+    await _assert_admin_perm(session, admin, "kitchens:write")
     if not await _kitchen_exists(session, kitchen_id):
         raise HTTPException(status_code=404, detail="Kitchen not found")
     result = await upsert_kitchen_payment_gateway(session, publisher, kitchen_id, body)
@@ -142,7 +125,7 @@ async def admin_kitchen_payment_gateway_delete(
     session: Annotated[AsyncSession, Depends(get_db)],
     publisher: Annotated[EventPublisher, Depends(get_publisher)],
 ) -> PaymentGatewayResponse:
-    _ = admin
+    await _assert_admin_perm(session, admin, "kitchens:write")
     if not await _kitchen_exists(session, kitchen_id):
         raise HTTPException(status_code=404, detail="Kitchen not found")
     result = await delete_kitchen_payment_gateway(session, publisher, kitchen_id)
@@ -300,7 +283,7 @@ async def admin_refunds_list(
     channel: Annotated[str | None, Query()] = None,
     limit: Annotated[int, Query(ge=1, le=500)] = 200,
 ) -> list[RefundResponse]:
-    _ = admin
+    await _assert_admin_perm(session, admin, "refunds:read")
     stmt = select(Refund).order_by(Refund.created_at.desc()).limit(limit)
     if status_filter:
         stmt = stmt.where(Refund.status == status_filter)
@@ -323,7 +306,7 @@ async def admin_refund_get(
     admin: Annotated[AdminContext, Depends(get_current_admin)],
     session: Annotated[AsyncSession, Depends(get_db)],
 ) -> RefundResponse:
-    _ = admin
+    await _assert_admin_perm(session, admin, "refunds:read")
     refund = await session.get(Refund, refund_id)
     if not refund:
         raise HTTPException(status_code=404, detail="Refund not found")
@@ -346,6 +329,7 @@ async def admin_refund_patch(
     admin: Annotated[AdminContext, Depends(get_current_admin)],
     session: Annotated[AsyncSession, Depends(get_db)],
 ) -> RefundResponse:
+    await _assert_admin_perm(session, admin, "refunds:write")
     refund = await session.get(Refund, refund_id)
     if not refund:
         raise HTTPException(status_code=404, detail="Refund not found")
@@ -384,7 +368,7 @@ async def admin_payments_list(
     status_filter: Annotated[str | None, Query(alias="status")] = None,
     limit: Annotated[int, Query(ge=1, le=500)] = 200,
 ) -> list[PaymentResponse]:
-    _ = admin
+    await _assert_admin_perm(session, admin, "refunds:read")
     stmt = select(Payment).order_by(Payment.created_at.desc()).limit(limit)
     if status_filter:
         stmt = stmt.where(Payment.status == status_filter)
@@ -403,7 +387,7 @@ async def admin_settlements_list(
     session: Annotated[AsyncSession, Depends(get_db)],
     limit: Annotated[int, Query(ge=1, le=500)] = 200,
 ) -> list[SettlementResponse]:
-    _ = admin
+    await _assert_admin_perm(session, admin, "refunds:read")
     rows = list(
         (
             await session.execute(select(Settlement).order_by(Settlement.created_at.desc()).limit(limit))
@@ -422,7 +406,7 @@ async def admin_money_stats(
     admin: Annotated[AdminContext, Depends(get_current_admin)],
     session: Annotated[AsyncSession, Depends(get_db)],
 ) -> AdminMoneyStats:
-    _ = admin
+    await _assert_admin_perm(session, admin, "refunds:read")
     row = (
         await session.execute(
             text(

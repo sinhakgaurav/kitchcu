@@ -112,6 +112,14 @@ class AdminProfile(BaseModel):
     email: str = Field(..., description="Admin login email.", examples=["admin@kitchcu.dev"])
     name: str = Field(..., description="Admin display name.", examples=["kitchCU Platform Admin"])
     role: str = Field(..., description="Admin role.", examples=["superadmin"])
+    permissions: list[str] = Field(
+        default_factory=list,
+        description="Permission codes for this role (`*` = superadmin).",
+    )
+    allowed_tabs: list[str] = Field(
+        default_factory=list,
+        description="Admin UI tabs this role may open.",
+    )
 
     model_config = {"from_attributes": True}
 
@@ -424,8 +432,21 @@ async def admin_login(body: AdminLoginRequest, session: Annotated[AsyncSession, 
     responses=auth_errors(),
     tags=["Admin"],
 )
-async def admin_me(admin: Annotated[PlatformAdmin, Depends(get_current_admin)]) -> AdminProfile:
-    return AdminProfile.model_validate(admin)
+async def admin_me(
+    admin: Annotated[PlatformAdmin, Depends(get_current_admin)],
+    session: Annotated[AsyncSession, Depends(get_db)],
+) -> AdminProfile:
+    from app.rbac import load_permissions_for_role, tabs_for_permissions
+
+    grants = await load_permissions_for_role(session, admin.role)
+    return AdminProfile(
+        id=admin.id,
+        email=admin.email,
+        name=admin.name,
+        role=admin.role,
+        permissions=sorted(grants),
+        allowed_tabs=tabs_for_permissions(grants),
+    )
 
 
 @router.get(
@@ -444,6 +465,9 @@ async def admin_stats(
     admin: Annotated[PlatformAdmin, Depends(get_current_admin)],
     session: Annotated[AsyncSession, Depends(get_db)],
 ) -> PlatformStats:
+    from app.rbac import assert_admin_permission
+
+    await assert_admin_permission(session, role=admin.role, permission="kitchens:read")
     _ = admin
     owners = (await session.execute(select(func.count()).select_from(Owner))).scalar_one()
     kitchens = (await session.execute(select(func.count()).select_from(Kitchen))).scalar_one()
@@ -500,6 +524,9 @@ async def admin_owners(
     admin: Annotated[PlatformAdmin, Depends(get_current_admin)],
     session: Annotated[AsyncSession, Depends(get_db)],
 ) -> list[AdminOwnerRow]:
+    from app.rbac import assert_admin_permission
+
+    await assert_admin_permission(session, role=admin.role, permission="owners:write")
     _ = admin
     result = await session.execute(select(Owner).order_by(Owner.created_at.desc()).limit(200))
     owners = list(result.scalars().all())
@@ -538,6 +565,9 @@ async def admin_kitchens(
     admin: Annotated[PlatformAdmin, Depends(get_current_admin)],
     session: Annotated[AsyncSession, Depends(get_db)],
 ) -> list[AdminKitchenRow]:
+    from app.rbac import assert_admin_permission
+
+    await assert_admin_permission(session, role=admin.role, permission="kitchens:read")
     _ = admin
     result = await session.execute(
         select(Kitchen, Owner)
@@ -572,6 +602,9 @@ async def admin_kitchen_detail(
     admin: Annotated[PlatformAdmin, Depends(get_current_admin)],
     session: Annotated[AsyncSession, Depends(get_db)],
 ) -> AdminKitchenDetail:
+    from app.rbac import assert_admin_permission
+
+    await assert_admin_permission(session, role=admin.role, permission="kitchens:read")
     _ = admin
     result = await session.execute(
         select(Kitchen, Owner)
@@ -608,6 +641,9 @@ async def admin_kitchen_whatsapp_get(
     admin: Annotated[PlatformAdmin, Depends(get_current_admin)],
     session: Annotated[AsyncSession, Depends(get_db)],
 ) -> KitchenWhatsAppIntegrationResponse:
+    from app.rbac import assert_admin_permission
+
+    await assert_admin_permission(session, role=admin.role, permission="kitchens:read")
     _ = admin
     kitchen = await session.get(Kitchen, kitchen_id)
     if not kitchen:
@@ -712,6 +748,9 @@ async def admin_orders(
     session: Annotated[AsyncSession, Depends(get_db)],
     limit: int = 100,
 ) -> list[AdminOrderRow]:
+    from app.rbac import assert_admin_permission
+
+    await assert_admin_permission(session, role=admin.role, permission="kitchens:read")
     _ = admin
     result = await session.execute(
         text(
@@ -748,6 +787,9 @@ async def admin_customers(
     q: str | None = None,
     limit: int = 200,
 ) -> list[AdminCustomerRow]:
+    from app.rbac import assert_admin_permission
+
+    await assert_admin_permission(session, role=admin.role, permission="customers:read")
     _ = admin
     stmt = select(Customer).order_by(Customer.created_at.desc()).limit(min(limit, 500))
     if q and q.strip():
@@ -792,6 +834,9 @@ async def admin_customer_detail(
     admin: Annotated[PlatformAdmin, Depends(get_current_admin)],
     session: Annotated[AsyncSession, Depends(get_db)],
 ) -> AdminCustomerDetail:
+    from app.rbac import assert_admin_permission
+
+    await assert_admin_permission(session, role=admin.role, permission="customers:read")
     _ = admin
     customer = await session.get(Customer, customer_id)
     if not customer:
@@ -844,6 +889,9 @@ async def admin_customer_status(
     admin: Annotated[PlatformAdmin, Depends(get_current_admin)],
     session: Annotated[AsyncSession, Depends(get_db)],
 ) -> AdminCustomerRow:
+    from app.rbac import assert_admin_permission
+
+    await assert_admin_permission(session, role=admin.role, permission="customers:write")
     _ = admin
     customer = await session.get(Customer, customer_id)
     if not customer:
@@ -878,6 +926,9 @@ async def admin_customer_clear_password(
     admin: Annotated[PlatformAdmin, Depends(get_current_admin)],
     session: Annotated[AsyncSession, Depends(get_db)],
 ) -> AdminCustomerDetail:
+    from app.rbac import assert_admin_permission
+
+    await assert_admin_permission(session, role=admin.role, permission="customers:write")
     _ = admin
     customer = await session.get(Customer, customer_id)
     if not customer:
@@ -898,6 +949,9 @@ async def admin_owner_subscription(
     admin: Annotated[PlatformAdmin, Depends(get_current_admin)],
     session: Annotated[AsyncSession, Depends(get_db)],
 ) -> AdminOwnerRow:
+    from app.rbac import assert_admin_permission
+
+    await assert_admin_permission(session, role=admin.role, permission="owners:write")
     _ = admin
     owner = await session.get(Owner, owner_id)
     if not owner:
@@ -928,6 +982,9 @@ async def admin_feature_flags_list(
     admin: Annotated[PlatformAdmin, Depends(get_current_admin)],
     session: Annotated[AsyncSession, Depends(get_db)],
 ) -> list[FeatureFlagRow]:
+    from app.rbac import assert_admin_permission
+
+    await assert_admin_permission(session, role=admin.role, permission="flags:read")
     _ = admin
     rows = list((await session.execute(select(FeatureFlag).order_by(FeatureFlag.scope, FeatureFlag.key))).scalars().all())
     return [FeatureFlagRow.model_validate(r) for r in rows]
@@ -940,6 +997,9 @@ async def admin_feature_flag_update(
     admin: Annotated[PlatformAdmin, Depends(get_current_admin)],
     session: Annotated[AsyncSession, Depends(get_db)],
 ) -> FeatureFlagRow:
+    from app.rbac import assert_admin_permission
+
+    await assert_admin_permission(session, role=admin.role, permission="flags:write")
     _ = admin
     flag = await session.get(FeatureFlag, key)
     if not flag:
@@ -976,6 +1036,9 @@ async def admin_kitchen_module_flags_list(
     admin: Annotated[PlatformAdmin, Depends(get_current_admin)],
     session: Annotated[AsyncSession, Depends(get_db)],
 ) -> KitchenModuleFlagsResponse:
+    from app.rbac import assert_admin_permission
+
+    await assert_admin_permission(session, role=admin.role, permission="kitchens:read")
     _ = admin
     from app.models import KitchenModuleFlag
     from ckac_common.risk_config import KITCHEN_MODULE_KEYS
@@ -1022,6 +1085,9 @@ async def admin_kitchen_module_flag_update(
     admin: Annotated[PlatformAdmin, Depends(get_current_admin)],
     session: Annotated[AsyncSession, Depends(get_db)],
 ) -> KitchenModuleFlagRow:
+    from app.rbac import assert_admin_permission
+
+    await assert_admin_permission(session, role=admin.role, permission="kitchens:write")
     _ = admin
     from app.models import KitchenModuleFlag
     from ckac_common.risk_config import KITCHEN_MODULE_KEYS
@@ -1051,6 +1117,9 @@ async def admin_api_keys_list(
     admin: Annotated[PlatformAdmin, Depends(get_current_admin)],
     session: Annotated[AsyncSession, Depends(get_db)],
 ) -> list[PlatformApiKeyRow]:
+    from app.rbac import assert_admin_permission
+
+    await assert_admin_permission(session, role=admin.role, permission="api_keys:write")
     _ = admin
     rows = list(
         (
@@ -1072,6 +1141,9 @@ async def admin_api_key_upsert(
     session: Annotated[AsyncSession, Depends(get_db)],
     publisher: Annotated[EventPublisher, Depends(get_publisher)],
 ) -> PlatformApiKeyRow:
+    from app.rbac import assert_admin_permission
+
+    await assert_admin_permission(session, role=admin.role, permission="api_keys:write")
     row = await session.get(PlatformApiKey, key)
     if not row:
         raise HTTPException(status_code=404, detail="API key slot not found")
@@ -1097,6 +1169,9 @@ async def admin_api_key_clear(
     session: Annotated[AsyncSession, Depends(get_db)],
     publisher: Annotated[EventPublisher, Depends(get_publisher)],
 ) -> PlatformApiKeyRow:
+    from app.rbac import assert_admin_permission
+
+    await assert_admin_permission(session, role=admin.role, permission="api_keys:write")
     row = await session.get(PlatformApiKey, key)
     if not row:
         raise HTTPException(status_code=404, detail="API key slot not found")
@@ -1120,6 +1195,9 @@ async def admin_journeys(
     admin: Annotated[PlatformAdmin, Depends(get_current_admin)],
     session: Annotated[AsyncSession, Depends(get_db)],
 ) -> JourneyMap:
+    from app.rbac import assert_admin_permission
+
+    await assert_admin_permission(session, role=admin.role, permission="flags:read")
     """Map of core application data journeys with live counters for super-admin control."""
     _ = admin
     counts = (

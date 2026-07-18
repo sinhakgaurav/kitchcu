@@ -72,3 +72,36 @@ async def test_email_template_requires_subject(client: AsyncClient, marketing_ct
         },
     )
     assert res.status_code == 400
+
+
+@pytest.mark.asyncio
+async def test_template_send_dry_run_preview(client: AsyncClient, marketing_ctx):
+    kid = marketing_ctx["kitchen_id"]
+    headers = {"Authorization": f"Bearer {marketing_ctx['owner_token']}"}
+
+    created = await client.post(
+        f"/api/v1/kitchens/{kid}/templates",
+        headers=headers,
+        json={
+            "channel": "whatsapp",
+            "name": "Send preview",
+            "body": "Hello {{ customer_name }} from {{ kitchen_name }}",
+        },
+    )
+    assert created.status_code == 201, created.text
+    tid = created.json()["id"]
+
+    preview = await client.post(
+        f"/api/v1/kitchens/{kid}/templates/{tid}/send",
+        headers=headers,
+        json={
+            "audience": "all",
+            "dry_run": True,
+            "sample_vars": {"kitchen_name": "Demo Kitchen"},
+        },
+    )
+    assert preview.status_code == 200, preview.text
+    body = preview.json()
+    assert body["dry_run"] is True
+    assert "Demo Kitchen" in body["preview"]
+    assert body["channel"] == "whatsapp"

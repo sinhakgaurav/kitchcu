@@ -200,6 +200,27 @@ export function NearbyKitchensList() {
                         <span className="nearby-kitchens__badge nearby-kitchens__badge--live">LIVE</span>
                       )}
                     </span>
+                    {live?.session_id && (
+                      <span
+                        role="link"
+                        tabIndex={0}
+                        className="btn btn--primary btn--sm"
+                        style={{ marginTop: "0.5rem", display: "inline-block" }}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          navigate(`/live/${live.session_id}`);
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" || e.key === " ") {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            navigate(`/live/${live.session_id}`);
+                          }
+                        }}
+                      >
+                        Watch live
+                      </span>
+                    )}
                   </div>
                   <span className="nearby-kitchens__arrow" aria-hidden="true">→</span>
                 </button>

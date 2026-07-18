@@ -327,6 +327,41 @@ async def get_kitchen_package(
     )
 
 
+class KitchenEntitlementsResponse(BaseModel):
+    kitchen_id: uuid.UUID
+    package_code: str | None = None
+    package_name: str | None = None
+    source: str
+    hard_mode: bool
+    feature_keys: list[str]
+    modules: dict[str, bool]
+
+
+async def get_kitchen_entitlements(
+    session: AsyncSession,
+    kitchen_id: uuid.UUID,
+) -> KitchenEntitlementsResponse:
+    from ckac_common.platform_config import is_kitchen_module_enabled, kitchen_has_assigned_package
+    from ckac_common.risk_config import KITCHEN_MODULE_KEYS
+
+    pkg_info = await get_kitchen_package(session, kitchen_id)
+    hard = await kitchen_has_assigned_package(session, kitchen_id)
+    modules = {
+        mk: await is_kitchen_module_enabled(session, kitchen_id, mk)
+        for mk in KITCHEN_MODULE_KEYS
+    }
+    feature_keys = list(pkg_info.package.feature_keys) if pkg_info.package else []
+    return KitchenEntitlementsResponse(
+        kitchen_id=kitchen_id,
+        package_code=pkg_info.package.code if pkg_info.package else None,
+        package_name=pkg_info.package.name if pkg_info.package else None,
+        source=pkg_info.source,
+        hard_mode=hard,
+        feature_keys=feature_keys,
+        modules=modules,
+    )
+
+
 async def assign_kitchen_package(
     session: AsyncSession,
     publisher: EventPublisher,
@@ -356,6 +391,8 @@ async def assign_kitchen_package(
     await session.flush()
 
     if body.sync_module_flags:
+        from ckac_common.risk_config import KITCHEN_MODULE_KEYS
+
         feat_rows = (
             await session.execute(
                 select(PlatformFeature).join(
@@ -364,20 +401,19 @@ async def assign_kitchen_package(
                 ).where(PackageFeature.package_id == pkg.id)
             )
         ).scalars().all()
-        for feat in feat_rows:
-            if not feat.module_key:
-                continue
+        enabled_mods = {f.module_key for f in feat_rows if f.module_key}
+        for mod in KITCHEN_MODULE_KEYS:
             await session.execute(
                 text(
                     """
                     INSERT INTO ckac_identity.kitchen_module_flags
                         (kitchen_id, module_key, enabled, updated_at)
-                    VALUES (:kid, :mod, true, now())
+                    VALUES (:kid, :mod, :en, now())
                     ON CONFLICT (kitchen_id, module_key)
-                    DO UPDATE SET enabled = true, updated_at = now()
+                    DO UPDATE SET enabled = EXCLUDED.enabled, updated_at = now()
                     """
                 ),
-                {"kid": kitchen_id, "mod": feat.module_key},
+                {"kid": kitchen_id, "mod": mod, "en": mod in enabled_mods},
             )
 
     event = EventPublisher.build(

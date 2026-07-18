@@ -1,12 +1,15 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Navigate, Outlet, Link, useLocation } from "react-router-dom";
 import { BrandNavMark } from "../components/BrandNavMark";
 import { KITCHEN_HOST } from "../shared/brand";
+import { fetchKitchenEntitlements } from "../shared/api";
 import { useKitchenAuth } from "../shared/kitchenAuth";
 import { useKitchen } from "../shared/kitchenContext";
 import { customerUrl } from "../shared/urls";
 
-const NAV_SECTIONS = [
+type NavItem = { to: string; label: string; end?: boolean; module?: string };
+
+const NAV_SECTIONS: { label: string; items: NavItem[] }[] = [
   {
     label: "Operations",
     items: [
@@ -23,8 +26,8 @@ const NAV_SECTIONS = [
       { to: "/dashboard/growth", label: "Intelligence" },
       { to: "/dashboard/crm", label: "CRM" },
       { to: "/dashboard/coupons", label: "Coupons" },
-      { to: "/dashboard/templates", label: "Templates" },
-      { to: "/dashboard/stream", label: "Live stream" },
+      { to: "/dashboard/templates", label: "Templates", module: "marketing_broadcast" },
+      { to: "/dashboard/stream", label: "Live stream", module: "streaming" },
     ],
   },
   {
@@ -38,13 +41,13 @@ const NAV_SECTIONS = [
     label: "Account",
     items: [
       { to: "/dashboard/subscription", label: "Subscription" },
-      { to: "/dashboard/whatsapp", label: "WhatsApp" },
-      { to: "/dashboard/payment-gateway", label: "Payment gateway" },
+      { to: "/dashboard/whatsapp", label: "WhatsApp", module: "whatsapp" },
+      { to: "/dashboard/payment-gateway", label: "Payment gateway", module: "razorpay" },
       { to: "/dashboard/gst", label: "GST & finance" },
       { to: "/dashboard/setup", label: "Kitchen setup" },
     ],
   },
-] as const;
+];
 
 export function RequireAuth({ children }: { children: React.ReactNode }) {
   const { token, loading } = useKitchenAuth();
@@ -54,10 +57,11 @@ export function RequireAuth({ children }: { children: React.ReactNode }) {
 }
 
 export function OwnerLayout() {
-  const { owner, logout } = useKitchenAuth();
+  const { owner, logout, token } = useKitchenAuth();
   const { kitchen, kitchens, setKitchenId, loading } = useKitchen();
   const location = useLocation();
   const [navOpen, setNavOpen] = useState(false);
+  const [modules, setModules] = useState<Record<string, boolean> | null>(null);
 
   useEffect(() => {
     setNavOpen(false);
@@ -70,9 +74,53 @@ export function OwnerLayout() {
     };
   }, [navOpen]);
 
-  const currentSection = NAV_SECTIONS.flatMap((s) => s.items).find((item) =>
+  useEffect(() => {
+    if (!kitchen?.id || !token) {
+      setModules(null);
+      return;
+    }
+    let cancelled = false;
+    fetchKitchenEntitlements(kitchen.id)
+      .then((ent) => {
+        if (!cancelled) setModules(ent.modules || {});
+      })
+      .catch(() => {
+        // Soft-fail: show all nav if entitlements unavailable (legacy kitchens).
+        if (!cancelled) setModules(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [kitchen?.id, token]);
+
+  const visibleSections = useMemo(() => {
+    return NAV_SECTIONS.map((section) => ({
+      ...section,
+      items: section.items.filter((item) => {
+        if (!item.module || modules == null) return true;
+        return modules[item.module] !== false;
+      }),
+    })).filter((section) => section.items.length > 0);
+  }, [modules]);
+
+  const currentSection = visibleSections.flatMap((s) => s.items).find((item) =>
     item.end ? location.pathname === item.to : location.pathname.startsWith(item.to),
   );
+
+  const gatedItem = NAV_SECTIONS.flatMap((s) => s.items).find(
+    (item) =>
+      item.module &&
+      (item.end
+        ? location.pathname === item.to
+        : location.pathname.startsWith(item.to)),
+  );
+  if (
+    modules != null &&
+    gatedItem?.module &&
+    modules[gatedItem.module] === false
+  ) {
+    return <Navigate to="/dashboard" replace />;
+  }
 
   return (
     <div className={`owner-app${navOpen ? " owner-app--nav-open" : ""}`}>
@@ -114,7 +162,7 @@ export function OwnerLayout() {
         )}
 
         <nav className="owner-app__nav">
-          {NAV_SECTIONS.map((section) => (
+          {visibleSections.map((section) => (
             <div key={section.label} className="owner-app__nav-group">
               <span className="owner-app__nav-label">{section.label}</span>
               {section.items.map((item) => {

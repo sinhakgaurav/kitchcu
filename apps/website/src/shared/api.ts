@@ -1088,6 +1088,43 @@ export async function deleteMarketingTemplate(
   });
 }
 
+export async function sendMarketingTemplate(
+  kitchenId: string,
+  templateId: string,
+  data: {
+    audience?: string;
+    phones?: string[];
+    dry_run?: boolean;
+    sample_vars?: Record<string, string>;
+  },
+): Promise<{
+  template_id: string;
+  channel: string;
+  queued: number;
+  dry_run: boolean;
+  preview: string;
+  recipient_phones: string[];
+}> {
+  return apiFetch(`/api/v1/kitchens/${kitchenId}/templates/${templateId}/send`, {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+}
+
+export type KitchenEntitlements = {
+  kitchen_id: string;
+  package_code: string | null;
+  package_name: string | null;
+  source: string;
+  hard_mode: boolean;
+  feature_keys: string[];
+  modules: Record<string, boolean>;
+};
+
+export async function fetchKitchenEntitlements(kitchenId: string): Promise<KitchenEntitlements> {
+  return apiFetch(`/api/v1/billing/kitchens/${kitchenId}/entitlements`);
+}
+
 export async function pushDailyMenu(
   kitchenId: string,
   data: { dish_ids: string[]; message?: string },

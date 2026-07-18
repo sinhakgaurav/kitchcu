@@ -1,6 +1,6 @@
 """RBAC helpers — unit (no DB)."""
 
-from app.rbac import role_has_permission
+from app.rbac import role_has_permission, tabs_for_permissions
 
 
 def test_wildcard_grants_all():
@@ -20,3 +20,12 @@ def test_write_implies_read():
 
 def test_empty_grants_deny():
     assert not role_has_permission(set(), "employees:read")
+
+
+def test_tabs_for_ops_exclude_api_keys():
+    tabs = tabs_for_permissions({"kitchens:write", "owners:write", "packages:read"})
+    assert "kitchens" in tabs
+    assert "owners" in tabs
+    assert "packages" in tabs
+    assert "api-keys" not in tabs
+    assert "employees" not in tabs
