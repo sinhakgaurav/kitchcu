@@ -71,6 +71,7 @@ For **persona lived experience** see [PLATFORM-PERSONA-DEEP-DIVE.md](./PLATFORM-
 | P29 | **Wave A/B capability close** | Admin RBAC enforce + `/me` tabs · hard entitlements + owner nav · template send · customer Watch live | ✅ | Identity `014`; `ckac_common.admin_rbac`; billing entitlements API |
 | P30 | **LiveKit embed + template fan-out + audit** | Customer/owner LiveKit player · notify `/template-blast` per phone · `admin_audit_events` + Admin Audit tab | ✅ | Identity `015`; `livekit-client` |
 | P31 | **Wallet debit + Meta outbound + billing audit** | Template send deducts messaging wallet · Graph WhatsApp send · billing PG/package/refund → identity audit | ✅ | Identity `016` WA access token slot |
+| P32 | **Porter + delivery cost share + camera fix** | In-range kitchen pays 100%; extended min-order → kitchen subsidy %; Porter quote/book; LiveKit camera preview | ✅ | Identity `017`; order `007` |
 
 ---
 

@@ -104,12 +104,13 @@ export function StreamPage() {
         showcase_phase: dishId ? "ingredients" : undefined,
       });
       setSession(res);
+      if (res?.id) await loadShowcase(res.id);
       setMsg(
         dishId
-          ? "You are live with a dish showcase — switch phases as you cook."
-          : "You are live. Feature a dish below to show ingredients & prep.",
+          ? "You are live — camera preview below. Switch dish phases as you cook."
+          : "You are live — allow camera when prompted. Feature a dish to show prep phases.",
       );
-      await load();
+      // Do not full reload — remounting LiveKit with a new token kills the camera preview mid-stream.
     } catch (err) {
       setError(err instanceof Error ? err.message : "Go live failed");
     } finally {

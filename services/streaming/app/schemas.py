@@ -447,7 +447,14 @@ async def update_live_showcase(
         },
     )
     await publisher.publish(stream_key("streaming", "session"), event, session=session)
-    return await _session_response(session, live)
+    # Re-issue publisher token so owner dashboard camera preview keeps working after phase changes.
+    token = await build_livekit_token(
+        room_name=live.room_name,
+        identity=publisher_identity(kitchen_id),
+        can_publish=True,
+        session=session,
+    )
+    return await _session_response(session, live, publisher_token=token)
 
 
 async def get_live_showcase(

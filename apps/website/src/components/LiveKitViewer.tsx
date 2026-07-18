@@ -1,5 +1,11 @@
 import { useEffect, useRef, useState } from "react";
-import { Room, RoomEvent, Track } from "livekit-client";
+import {
+  Room,
+  RoomEvent,
+  Track,
+  createLocalVideoTrack,
+  type LocalVideoTrack,
+} from "livekit-client";
 
 type Props = {
   url: string;
@@ -15,6 +21,7 @@ export function LiveKitViewer({ url, token, publish = false }: Props) {
 
   useEffect(() => {
     let cancelled = false;
+    let localTrack: LocalVideoTrack | null = null;
     const room = new Room({ adaptiveStream: true, dynacast: true });
 
     const attachRemote = (track: Track) => {
@@ -28,6 +35,12 @@ export function LiveKitViewer({ url, token, publish = false }: Props) {
       if (videoRef.current) track.detach(videoRef.current);
       if (!cancelled) setStatus("waiting");
     });
+    room.on(RoomEvent.LocalTrackPublished, (pub) => {
+      if (pub.track?.kind === Track.Kind.Video && videoRef.current) {
+        pub.track.attach(videoRef.current);
+        if (!cancelled) setStatus("live");
+      }
+    });
     room.on(RoomEvent.Disconnected, () => {
       if (!cancelled) setStatus("waiting");
     });
@@ -40,13 +53,30 @@ export function LiveKitViewer({ url, token, publish = false }: Props) {
           return;
         }
         if (publish) {
-          await room.localParticipant.setCameraEnabled(true);
-          await room.localParticipant.setMicrophoneEnabled(true);
-          const cam = room.localParticipant.getTrackPublication(Track.Source.Camera);
-          if (cam?.track && videoRef.current) {
-            cam.track.attach(videoRef.current);
+          try {
+            localTrack = await createLocalVideoTrack({
+              facingMode: "user",
+            });
+            if (cancelled) {
+              localTrack.stop();
+              return;
+            }
+            if (videoRef.current) {
+              localTrack.attach(videoRef.current);
+            }
+            await room.localParticipant.publishTrack(localTrack);
+            await room.localParticipant.setMicrophoneEnabled(true);
+            if (!cancelled) setStatus("live");
+          } catch (camErr) {
+            if (!cancelled) {
+              setError(
+                camErr instanceof Error
+                  ? `Camera: ${camErr.message}`
+                  : "Camera permission denied — allow camera access and retry",
+              );
+              setStatus("error");
+            }
           }
-          if (!cancelled) setStatus("live");
         } else {
           let found = false;
           for (const participant of room.remoteParticipants.values()) {
@@ -69,10 +99,13 @@ export function LiveKitViewer({ url, token, publish = false }: Props) {
 
     return () => {
       cancelled = true;
+      try {
+        localTrack?.stop();
+      } catch {
+        /* ignore */
+      }
       room.disconnect();
     };
-    // status intentionally omitted — only reconnect on url/token/publish change
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [url, token, publish]);
 
   return (
@@ -88,6 +121,7 @@ export function LiveKitViewer({ url, token, publish = false }: Props) {
           background: "#0b1f1c",
           borderRadius: 8,
           display: "block",
+          objectFit: "cover",
         }}
       />
       {status === "connecting" && <p className="report-hint">Connecting to live room…</p>}

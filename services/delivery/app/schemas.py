@@ -1,18 +1,16 @@
-"""Delivery domain — fee quotes, payer modes, tracking (F27-F31 + owner/platform courier).
+"""Delivery domain — fee quotes, payer modes, Porter, tracking (F27-F31).
 
-Distance rules:
-- **In range** (`distance ≤ max_delivery_radius_km`): owner may `self` deliver or book
-  `platform` courier. Logistics charged to **owner** — customer delivery fee is `0`.
-- **Out of range**: delivery still allowed. Owner may `self` (can charge customer) or
-  book `platform` — logistics charged to **customer**.
-
-Legacy kitchen per-km rules still compute a kitchen_self_fee for out-of-range self
-delivery (owner-settable amount suggested at quote time).
+Distance rules (product):
+- **In range** (`distance ≤ max_delivery_radius_km`): kitchen bears **full** logistics cost
+  (customer fee `0`) — self or Porter/platform.
+- **Out of range**: still deliverable. If cart meets `min_order_for_free_delivery`,
+  kitchen bears `delivery_subsidy_percent` of cost; else customer bears **full**.
 """
 
 from __future__ import annotations
 
 import math
+import os
 import uuid
 from datetime import datetime
 
@@ -20,6 +18,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.cost_share import split_delivery_cost
 from app.models import DeliveryQuote
 from app.platform_courier import quote_platform_delivery_fee
 from ckac_common.auth import stream_key
@@ -40,12 +39,13 @@ class DeliveryQuoteRequest(BaseModel):
 
 
 class DeliveryModeOption(BaseModel):
-    mode: str = Field(..., description="'self' or 'platform'.")
-    payer: str = Field(..., description="'owner' or 'customer' — who pays logistics.")
+    mode: str = Field(..., description="'self' or 'platform' (Porter when configured).")
+    payer: str = Field(..., description="'owner', 'customer', or 'shared'.")
     customer_fee: float = Field(..., description="INR charged to the customer at checkout.")
-    owner_fee: float = Field(..., description="INR kitchen pays for platform logistics (0 for self).")
+    owner_fee: float = Field(..., description="INR kitchen bears of logistics cost.")
     label: str
     description: str
+    partner: str | None = Field(default=None, description="Courier partner id when mode=platform.")
 
 
 class DeliveryQuoteResponse(BaseModel):
@@ -108,80 +108,64 @@ class TrackingResponse(BaseModel):
     map_directions_url: str | None = None
 
 
-def _kitchen_self_fee(
+def _gross_self_fee(
     *,
     distance_km: float,
     free_km: float,
     fee_per_km: float,
     flat_beyond: float,
-    subtotal: float,
-    min_order_free: float | None,
-    in_range: bool,
 ) -> tuple[float, dict]:
-    """Self-delivery fee suggestion — 0 when in range (owner absorbs); else per-km for customer."""
-    if in_range:
-        return 0.0, {"rule": "in_range_owner_pays", "customer_fee": 0}
-
-    # Out of range: chargeable from free radius through full distance (or full distance if no free).
+    """Gross self-delivery logistics cost before cost-share."""
     chargeable_km = max(1, math.ceil(max(0.0, distance_km - free_km)))
     fee = round(flat_beyond + chargeable_km * fee_per_km, 2)
-    breakdown: dict = {
-        "rule": "out_of_range_self_customer_pays",
+    return fee, {
         "chargeable_km": chargeable_km,
         "fee_per_km": fee_per_km,
         "flat_beyond": flat_beyond,
+        "distance_km": distance_km,
     }
-    if min_order_free is not None and subtotal >= float(min_order_free) and fee > 0:
-        fee = 0.0
-        breakdown = {
-            "rule": "min_order_free_delivery",
-            "min_order_for_free_delivery": float(min_order_free),
-            "subtotal": subtotal,
-        }
-    return fee, breakdown
 
 
 def build_mode_options(
     *,
-    in_range: bool,
-    platform_fee: float,
-    kitchen_self_fee: float,
+    self_share: dict,
+    platform_share: dict,
+    partner_name: str,
 ) -> list[DeliveryModeOption]:
-    if in_range:
-        return [
-            DeliveryModeOption(
-                mode="self",
-                payer="owner",
-                customer_fee=0.0,
-                owner_fee=0.0,
-                label="Self delivery",
-                description="Kitchen delivers. In range — no delivery charge to customer.",
-            ),
-            DeliveryModeOption(
-                mode="platform",
-                payer="owner",
-                customer_fee=0.0,
-                owner_fee=platform_fee,
-                label="Platform courier",
-                description=f"Local partner (~₹{platform_fee:.0f}). Paid by kitchen, not customer.",
-            ),
-        ]
+    self_desc = {
+        "owner": "Kitchen delivers — in range, kitchen covers logistics (₹0 to you).",
+        "customer": "Beyond kitchen range — you pay the full self-delivery fee.",
+        "shared": (
+            f"Beyond range — kitchen covers {self_share['subsidy_percent_applied']:.0f}% "
+            f"(₹{self_share['owner_fee']:.0f}); you pay ₹{self_share['customer_fee']:.0f}."
+        ),
+    }
+    plat_desc = {
+        "owner": f"{partner_name} (~₹{platform_share['gross_fee']:.0f}) — kitchen pays in full.",
+        "customer": f"{partner_name} (~₹{platform_share['gross_fee']:.0f}) — you pay in full.",
+        "shared": (
+            f"{partner_name} — kitchen covers {platform_share['subsidy_percent_applied']:.0f}% "
+            f"(₹{platform_share['owner_fee']:.0f}); you pay ₹{platform_share['customer_fee']:.0f}."
+        ),
+    }
     return [
         DeliveryModeOption(
             mode="self",
-            payer="customer",
-            customer_fee=kitchen_self_fee,
-            owner_fee=0.0,
-            label="Self delivery (extended)",
-            description="Beyond kitchen radius. Customer pays your delivery fee (editable).",
+            payer=self_share["payer"],
+            customer_fee=float(self_share["customer_fee"]),
+            owner_fee=float(self_share["owner_fee"]),
+            label="Self delivery",
+            description=self_desc.get(self_share["payer"], self_desc["customer"]),
+            partner=None,
         ),
         DeliveryModeOption(
             mode="platform",
-            payer="customer",
-            customer_fee=platform_fee,
-            owner_fee=0.0,
-            label="Platform courier (extended)",
-            description=f"Local partner (~₹{platform_fee:.0f}). Charged to customer.",
+            payer=platform_share["payer"],
+            customer_fee=float(platform_share["customer_fee"]),
+            owner_fee=float(platform_share["owner_fee"]),
+            label=f"{partner_name} courier",
+            description=plat_desc.get(platform_share["payer"], plat_desc["customer"]),
+            partner=partner_name.lower().replace(" ", "_"),
         ),
     ]
 
@@ -201,6 +185,9 @@ async def quote_delivery(
                     COALESCE(delivery_fee_per_km, 10) AS delivery_fee_per_km,
                     COALESCE(delivery_fee_flat_beyond, 0) AS delivery_fee_flat_beyond,
                     min_order_for_free_delivery,
+                    COALESCE(delivery_subsidy_percent, 50) AS delivery_subsidy_percent,
+                    ST_Y(location::geometry) AS kitchen_lat,
+                    ST_X(location::geometry) AS kitchen_lng,
                     ST_Distance(
                         location,
                         ST_SetSRID(ST_MakePoint(:lng, :lat), 4326)::geography
@@ -222,35 +209,77 @@ async def quote_delivery(
     max_km = float(row["max_delivery_radius_km"])
     in_range = distance_km <= max_km
     within_free = distance_km <= free_km
+    min_order = (
+        float(row["min_order_for_free_delivery"])
+        if row["min_order_for_free_delivery"] is not None
+        else None
+    )
+    subsidy_pct = float(row["delivery_subsidy_percent"] or 50)
 
-    platform = quote_platform_delivery_fee(distance_km)
-    platform_fee = float(platform["fee"])
-    kitchen_self_fee, self_breakdown = _kitchen_self_fee(
+    try:
+        from ckac_common.risk_config import is_risk_capability_enabled
+
+        porter_flag = await is_risk_capability_enabled(
+            session, "courier_porter_dunzo", default=False
+        )
+    except Exception:
+        porter_flag = False
+
+    # Porter partner calls require DELIVERY_PARTNER=porter + feature flag.
+    partner_env = (os.getenv("DELIVERY_PARTNER") or "mock").strip().lower()
+    use_porter = partner_env == "porter" and porter_flag
+
+    platform = quote_platform_delivery_fee(
+        distance_km,
+        pickup_lat=float(row["kitchen_lat"]) if row["kitchen_lat"] is not None else None,
+        pickup_lng=float(row["kitchen_lng"]) if row["kitchen_lng"] is not None else None,
+        drop_lat=body.latitude,
+        drop_lng=body.longitude,
+        porter_enabled=use_porter,
+    )
+    platform_gross = float(platform["fee"])
+    partner_label = "Porter" if platform.get("partner") == "porter" else "Platform"
+
+    self_gross, self_gross_bd = _gross_self_fee(
         distance_km=distance_km,
         free_km=free_km,
         fee_per_km=float(row["delivery_fee_per_km"]),
         flat_beyond=float(row["delivery_fee_flat_beyond"]),
-        subtotal=body.subtotal,
-        min_order_free=(
-            float(row["min_order_for_free_delivery"])
-            if row["min_order_for_free_delivery"] is not None
-            else None
-        ),
+    )
+    # In-range self: no partner invoice — customer ₹0, owner_fee ₹0 on self mode.
+    self_share = split_delivery_cost(
+        gross_fee=0.0 if in_range else self_gross,
         in_range=in_range,
+        subtotal=body.subtotal,
+        min_order_for_subsidy=min_order,
+        subsidy_percent=subsidy_pct,
+    )
+
+    platform_share = split_delivery_cost(
+        gross_fee=platform_gross,
+        in_range=in_range,
+        subtotal=body.subtotal,
+        min_order_for_subsidy=min_order,
+        subsidy_percent=subsidy_pct,
     )
 
     modes = build_mode_options(
-        in_range=in_range, platform_fee=platform_fee, kitchen_self_fee=kitchen_self_fee
+        self_share=self_share,
+        platform_share=platform_share,
+        partner_name=partner_label,
     )
-    # Default checkout fee = customer fee for self mode (0 in-range; kitchen fee extended).
     default_customer_fee = modes[0].customer_fee
     status = "ok" if in_range else "extended"
+    kitchen_self_fee = float(self_share["customer_fee"])
     breakdown = {
         "in_range": in_range,
         "within_free_radius": within_free,
-        "self": self_breakdown,
+        "self_gross": self_gross_bd,
+        "self_share": self_share,
         "platform": platform,
-        "payer_rule": "owner" if in_range else "customer",
+        "platform_share": platform_share,
+        "subsidy_percent": subsidy_pct,
+        "min_order_for_subsidy": min_order,
     }
 
     quote = DeliveryQuote(
@@ -277,6 +306,7 @@ async def quote_delivery(
                 "fee": default_customer_fee,
                 "status": status,
                 "in_range": in_range,
+                "partner": platform.get("partner"),
             },
         )
         await publisher.publish(stream_key("delivery", "quote"), event, session=session)
@@ -291,7 +321,7 @@ async def quote_delivery(
         free_delivery_radius_km=free_km,
         max_delivery_radius_km=max_km,
         modes=modes,
-        platform_fee=platform_fee,
+        platform_fee=platform_gross,
         kitchen_self_fee=kitchen_self_fee,
         breakdown=breakdown,
         quote_id=quote.id,

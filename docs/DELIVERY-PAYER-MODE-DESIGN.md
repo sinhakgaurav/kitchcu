@@ -1,26 +1,44 @@
-# Delivery payer + platform courier (owner control)
+# Delivery payer + Porter courier (owner control)
 
-## Rules
+## Product rules (CEO / CPO)
 
-| Distance | Modes | Who pays logistics |
-|----------|--------|--------------------|
-| **In range** (`distance ≤ max_delivery_radius_km`) | `self` or `platform` | **Owner** — customer fee `0` |
-| **Out of range** (`distance > max`) | `self` or `platform` | **Customer** — owner may set/self fee; platform quote billed to customer |
+| Distance | Min order met? | Who pays logistics |
+|----------|----------------|--------------------|
+| **In range** (`≤ max_delivery_radius_km`) | n/a | **Kitchen 100%** — customer fee `0` |
+| **Out of range** | No | **Customer 100%** |
+| **Out of range** | Yes (`subtotal ≥ min_order_for_free_delivery`) | **Kitchen `delivery_subsidy_percent`%** · customer pays the rest (`shared`) |
 
-## Platform courier
+Default subsidy: **50%**. Configurable per kitchen via `PATCH /kitchens/{id}/delivery-settings`.
 
-`services/delivery/app/platform_courier.py` — pluggable quote adapter.
+Checkout shows **two modes** (self vs Porter/platform) with clear customer vs kitchen ₹ split.
 
-- Dev/default: `base + per_km * distance` (env-tunable)
-- Swap for real local courier later (`DELIVERY_PARTNER=mock|http`, webhook optional)
+## Porter integration (CTO)
 
-## Order fields (`ckac_orders.orders`)
+`services/delivery/app/platform_courier.py`
 
-- `delivery_mode`: `self` | `platform` | null
-- `delivery_payer`: `owner` | `customer` | null
-- `owner_delivery_cost`: INR owner owes for platform logistics
-- `customer_latitude` / `customer_longitude`: for Google Maps tracking
+| `DELIVERY_PARTNER` | Behaviour |
+|--------------------|-----------|
+| `mock` (default) | `base + per_km * distance` |
+| `porter` | Porter Partner quote API (`PORTER_API_KEY`, `PORTER_BASE_URL`) when feature `courier_porter_dunzo` is on |
+| `http` | Generic POST `DELIVERY_PARTNER_QUOTE_URL` |
 
-## Tracking map
+Order booking: owner `POST .../delivery-mode` with `mode=platform` → `order.porter_client` books Porter and stores `courier_partner` / `courier_job_id`.
 
-Public track + owner order detail: Google Maps directions embed (kitchen → customer) + open-in-Maps link. No partner GPS required for v1.
+## Order fields
+
+- `delivery_mode`: `self` | `platform`
+- `delivery_payer`: `owner` | `customer` | `shared`
+- `owner_delivery_cost`: kitchen share (INR)
+- `courier_partner` / `courier_job_id`: Porter job (nullable)
+
+## Env
+
+```
+DELIVERY_PARTNER=mock|porter|http
+PORTER_API_KEY=
+PORTER_BASE_URL=https://api.porter.in
+PORTER_QUOTE_PATH=/v1/get_quote
+PORTER_ORDER_PATH=/v1/orders
+DELIVERY_PARTNER_BASE_FEE=25
+DELIVERY_PARTNER_PER_KM=12
+```

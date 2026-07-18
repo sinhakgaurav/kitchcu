@@ -1149,6 +1149,7 @@ export type DeliveryModeOption = {
   owner_fee: number;
   label: string;
   description: string;
+  partner?: string | null;
 };
 
 export type DeliveryQuote = {

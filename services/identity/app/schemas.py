@@ -139,7 +139,14 @@ class KitchenDeliverySettingsUpdate(BaseModel):
         default=None, ge=0, le=500, description="New flat delivery fee add-on beyond the free radius. Omit to leave unchanged.", examples=[10.0]
     )
     min_order_for_free_delivery: float | None = Field(
-        default=None, ge=0, description="New order subtotal threshold (INR) for free delivery. Omit to leave unchanged.", examples=[349.0]
+        default=None, ge=0, description="Min cart (INR) so kitchen subsidizes extended-range delivery. Omit to leave unchanged.", examples=[349.0]
+    )
+    delivery_subsidy_percent: float | None = Field(
+        default=None,
+        ge=0,
+        le=100,
+        description="When beyond max radius and min order met, % of logistics cost kitchen bears (customer pays the rest).",
+        examples=[50.0],
     )
     tracking_notify_interval_min: int | None = Field(
         default=None, ge=1, le=60, description="New tracking notification interval in minutes. Omit to leave unchanged.", examples=[10]
@@ -600,6 +607,8 @@ async def update_kitchen_delivery_settings(
         kitchen.delivery_fee_flat_beyond = data.delivery_fee_flat_beyond
     if data.min_order_for_free_delivery is not None:
         kitchen.min_order_for_free_delivery = data.min_order_for_free_delivery
+    if data.delivery_subsidy_percent is not None:
+        kitchen.delivery_subsidy_percent = data.delivery_subsidy_percent
     if data.tracking_notify_interval_min is not None:
         kitchen.tracking_notify_interval_min = data.tracking_notify_interval_min
     if kitchen.free_delivery_radius_km > kitchen.max_delivery_radius_km:

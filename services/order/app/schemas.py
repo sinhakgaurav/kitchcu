@@ -350,42 +350,94 @@ async def set_delivery_fulfillment(
         raise ValueError("Cannot change delivery mode on a terminal order")
 
     distance = float(order.distance_km or 0)
-    # Lazy import keeps catalog/order coupling soft; formula matches delivery service mock.
     import math
     import os
 
-    base = float(os.getenv("DELIVERY_PARTNER_BASE_FEE", "25"))
-    per_km = float(os.getenv("DELIVERY_PARTNER_PER_KM", "12"))
-    platform_fee = round(base + math.ceil(distance) * per_km, 2)
-
-    in_range = (order.delivery_payer or "owner") == "owner" or (
-        order.delivery_fee == 0 and distance > 0
-    )
-    # Prefer distance vs kitchen max when available
-    max_km_row = (
+    kitchen_row = (
         await session.execute(
             text(
-                "SELECT max_delivery_radius_km FROM ckac_identity.kitchens WHERE id = :kid LIMIT 1"
+                """
+                SELECT
+                    max_delivery_radius_km,
+                    free_delivery_radius_km,
+                    COALESCE(delivery_fee_per_km, 10) AS delivery_fee_per_km,
+                    COALESCE(delivery_fee_flat_beyond, 0) AS delivery_fee_flat_beyond,
+                    min_order_for_free_delivery,
+                    COALESCE(delivery_subsidy_percent, 50) AS delivery_subsidy_percent,
+                    ST_Y(location::geometry) AS kitchen_lat,
+                    ST_X(location::geometry) AS kitchen_lng
+                FROM ckac_identity.kitchens WHERE id = :kid LIMIT 1
+                """
             ),
             {"kid": order.kitchen_id},
         )
-    ).scalar_one_or_none()
-    if max_km_row is not None and order.distance_km is not None:
-        in_range = float(order.distance_km) <= float(max_km_row)
+    ).mappings().one_or_none()
+    max_km = float(kitchen_row["max_delivery_radius_km"]) if kitchen_row else 10.0
+    in_range = distance <= max_km if order.distance_km is not None else True
+
+    # Platform / Porter gross quote
+    base = float(os.getenv("DELIVERY_PARTNER_BASE_FEE", "25"))
+    per_km = float(os.getenv("DELIVERY_PARTNER_PER_KM", "12"))
+    platform_gross = round(base + math.ceil(max(0.0, distance)) * per_km, 2)
+    partner_name = "mock"
+    porter_job = None
+    if data.mode == "platform" and (os.getenv("DELIVERY_PARTNER") or "").lower() == "porter":
+        try:
+            from app.porter_client import quote_and_book_porter
+
+            booked = await quote_and_book_porter(session, order)
+            if booked:
+                platform_gross = float(booked.get("fee") or platform_gross)
+                partner_name = "porter"
+                porter_job = booked.get("job_id")
+        except Exception:
+            partner_name = "porter_fallback"
+
+    subsidy_pct = float(kitchen_row["delivery_subsidy_percent"]) if kitchen_row else 50.0
+    min_order = (
+        float(kitchen_row["min_order_for_free_delivery"])
+        if kitchen_row and kitchen_row["min_order_for_free_delivery"] is not None
+        else None
+    )
+    subtotal = float(order.subtotal or 0)
+
+    def _share(gross: float) -> tuple[float, float, str]:
+        if in_range:
+            return 0.0, gross if data.mode == "platform" else 0.0, "owner"
+        qualifies = min_order is not None and subtotal >= min_order and subsidy_pct > 0 and gross > 0
+        if not qualifies:
+            return gross, 0.0, "customer"
+        owner_fee = round(gross * min(100.0, subsidy_pct) / 100.0, 2)
+        customer_fee = round(gross - owner_fee, 2)
+        if customer_fee <= 0:
+            return 0.0, gross, "owner"
+        if owner_fee <= 0:
+            return gross, 0.0, "customer"
+        return customer_fee, owner_fee, "shared"
 
     order.delivery_mode = data.mode
-    if in_range:
-        order.delivery_payer = "owner"
-        order.delivery_fee = 0
-        order.owner_delivery_cost = platform_fee if data.mode == "platform" else 0
+    if data.mode == "platform":
+        cust_fee, own_fee, payer = _share(platform_gross)
+        order.delivery_fee = cust_fee
+        order.owner_delivery_cost = own_fee
+        order.delivery_payer = payer
     else:
-        order.delivery_payer = "customer"
-        order.owner_delivery_cost = 0
-        if data.mode == "platform":
-            order.delivery_fee = platform_fee
-        elif data.customer_fee is not None:
-            order.delivery_fee = float(data.customer_fee)
-        # else keep existing customer fee from checkout
+        free_km = float(kitchen_row["free_delivery_radius_km"]) if kitchen_row else 3.0
+        fee_per = float(kitchen_row["delivery_fee_per_km"]) if kitchen_row else 10.0
+        flat = float(kitchen_row["delivery_fee_flat_beyond"]) if kitchen_row else 0.0
+        chargeable = max(1, math.ceil(max(0.0, distance - free_km)))
+        self_gross = 0.0 if in_range else round(flat + chargeable * fee_per, 2)
+        if data.customer_fee is not None and not in_range:
+            self_gross = float(data.customer_fee)
+        cust_fee, own_fee, payer = _share(self_gross)
+        order.delivery_fee = cust_fee
+        order.owner_delivery_cost = own_fee
+        order.delivery_payer = payer
+
+    if porter_job or partner_name == "porter":
+        order.courier_partner = partner_name
+        order.courier_job_id = porter_job
+
     order.total = float(order.subtotal) + float(order.delivery_fee)
     order.updated_at = datetime.now(UTC)
     await session.flush()
@@ -402,6 +454,8 @@ async def set_delivery_fulfillment(
                 "payer": order.delivery_payer,
                 "customer_fee": float(order.delivery_fee),
                 "owner_cost": float(order.owner_delivery_cost or 0),
+                "partner": partner_name,
+                "porter_job_id": porter_job,
             },
         )
         await publisher.publish(stream_key("orders", "order"), event, session=session)
@@ -536,15 +590,33 @@ async def _quote_delivery_fee(
         payer = "owner"
     else:
         chargeable_km = max(1, math.ceil(max(0.0, dist - free_km)))
-        quoted = round(
+        gross = round(
             float(row["delivery_fee_flat_beyond"])
             + chargeable_km * float(row["delivery_fee_per_km"]),
             2,
         )
         min_free = row["min_order_for_free_delivery"]
-        if min_free is not None and subtotal >= float(min_free) and quoted > 0:
-            quoted = 0.0
-        payer = "customer"
+        # Match delivery-service cost share (default 50% kitchen subsidy when min order met).
+        subsidy_row = (
+            await session.execute(
+                text(
+                    "SELECT COALESCE(delivery_subsidy_percent, 50) "
+                    "FROM ckac_identity.kitchens WHERE id = :kid LIMIT 1"
+                ),
+                {"kid": kitchen_id},
+            )
+        ).scalar_one_or_none()
+        subsidy_pct = float(subsidy_row if subsidy_row is not None else 50)
+        if min_free is not None and subtotal >= float(min_free) and gross > 0 and subsidy_pct > 0:
+            owner_share = round(gross * min(100.0, subsidy_pct) / 100.0, 2)
+            quoted = round(gross - owner_share, 2)
+            payer = "shared" if quoted > 0 and owner_share > 0 else ("owner" if quoted <= 0 else "customer")
+            if quoted <= 0:
+                quoted = 0.0
+                payer = "owner"
+        else:
+            quoted = gross
+            payer = "customer"
 
     if round(delivery_fee, 2) != quoted:
         raise ValueError(f"Delivery fee mismatch: expected {quoted:.2f}")

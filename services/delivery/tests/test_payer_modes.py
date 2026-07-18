@@ -46,6 +46,8 @@ async def test_quote_out_of_range_extended_customer_pays(client: AsyncClient, de
     assert data["status"] == "extended"
     assert data["fee"] >= 0
     modes = {m["mode"]: m for m in data["modes"]}
+    # No min-order subsidy configured on seed kitchen → customer bears full.
     assert modes["self"]["payer"] == "customer"
     assert modes["platform"]["payer"] == "customer"
     assert modes["platform"]["customer_fee"] == data["platform_fee"]
+    assert modes["self"]["customer_fee"] == data["kitchen_self_fee"]

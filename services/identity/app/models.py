@@ -158,6 +158,7 @@ class Kitchen(Base):
     delivery_fee_per_km: Mapped[float] = mapped_column(default=10.0)
     delivery_fee_flat_beyond: Mapped[float] = mapped_column(default=0.0)
     min_order_for_free_delivery: Mapped[float | None] = mapped_column(nullable=True)
+    delivery_subsidy_percent: Mapped[float] = mapped_column(default=50.0)
     tracking_notify_interval_min: Mapped[int] = mapped_column(default=5)
     status: Mapped[str] = mapped_column(String(20), default="pending_verification")
     whatsapp_phone_id: Mapped[str | None] = mapped_column(String(100), nullable=True, index=True)

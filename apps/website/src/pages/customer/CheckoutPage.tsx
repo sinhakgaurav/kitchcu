@@ -40,14 +40,22 @@ function checkoutKey(cart: CustomerCart): string {
   return value;
 }
 
+function selectedModeFee(quote: DeliveryQuote | undefined, mode: string): number {
+  const opt = quote?.modes?.find((m) => m.mode === mode);
+  if (opt) return opt.customer_fee;
+  return quote?.fee ?? 0;
+}
+
 function buildGroupPayload(
   kitchen: KitchenCartGroup,
   deliveryType: DeliveryType,
   quote: DeliveryQuote | undefined,
   feeAccepted: boolean,
   coords: { latitude: number; longitude: number },
+  deliveryMode: string,
 ) {
   const isDelivery = deliveryType === "delivery";
+  const fee = isDelivery ? selectedModeFee(quote, deliveryMode) : 0;
   return {
     kitchen_id: kitchen.kitchenId,
     items: kitchen.lines.map((line) => ({
@@ -55,9 +63,9 @@ function buildGroupPayload(
       quantity: line.quantity,
     })),
     delivery_type: deliveryType,
-    delivery_fee: isDelivery ? (quote?.fee ?? 0) : 0,
+    delivery_fee: fee,
     distance_km: isDelivery ? quote?.distance_km : undefined,
-    delivery_fee_accepted: isDelivery && (quote?.fee ?? 0) > 0 ? feeAccepted : isDelivery ? true : undefined,
+    delivery_fee_accepted: isDelivery && fee > 0 ? feeAccepted : isDelivery ? true : undefined,
     customer_latitude: isDelivery ? coords.latitude : undefined,
     customer_longitude: isDelivery ? coords.longitude : undefined,
   };
@@ -72,6 +80,7 @@ export function CheckoutPage() {
   const [deliveryByKitchen, setDeliveryByKitchen] = useState<Record<string, DeliveryType>>({});
   const [quotes, setQuotes] = useState<Record<string, DeliveryQuote>>({});
   const [feeAccepted, setFeeAccepted] = useState<Record<string, boolean>>({});
+  const [modeByKitchen, setModeByKitchen] = useState<Record<string, string>>({});
   const [quoteLoading, setQuoteLoading] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("cod");
   const [busy, setBusy] = useState(false);
@@ -117,7 +126,16 @@ export function CheckoutPage() {
           // status "ok" (in range) or "extended" (beyond max — customer pays) are allowed
           next[kitchen.kitchenId] = quote;
         }
-        if (!cancelled) setQuotes(next);
+        if (!cancelled) {
+          setQuotes(next);
+          setModeByKitchen((prev) => {
+            const merged = { ...prev };
+            for (const [kid, q] of Object.entries(next)) {
+              if (!merged[kid]) merged[kid] = q.modes?.[0]?.mode || "self";
+            }
+            return merged;
+          });
+        }
       } catch (err) {
         if (!cancelled) {
           setError(err instanceof Error ? err.message : "Could not quote delivery fee");
@@ -137,9 +155,10 @@ export function CheckoutPage() {
   const deliveryFee = useMemo(
     () => cart?.kitchens.reduce((sum, kitchen) => {
       if ((deliveryByKitchen[kitchen.kitchenId] ?? "pickup") !== "delivery") return sum;
-      return sum + (quotes[kitchen.kitchenId]?.fee ?? 0);
+      const mode = modeByKitchen[kitchen.kitchenId] || "self";
+      return sum + selectedModeFee(quotes[kitchen.kitchenId], mode);
     }, 0) ?? 0,
-    [cart, deliveryByKitchen, quotes],
+    [cart, deliveryByKitchen, quotes, modeByKitchen],
   );
 
   const branded = useBrandedStorefront();
@@ -173,7 +192,9 @@ export function CheckoutPage() {
         setError("Waiting for delivery fee quote — try again in a moment");
         return;
       }
-      if (dtype === "delivery" && quote && quote.fee > 0 && !feeAccepted[kitchen.kitchenId]) {
+      const mode = modeByKitchen[kitchen.kitchenId] || "self";
+      const fee = selectedModeFee(quote, mode);
+      if (dtype === "delivery" && fee > 0 && !feeAccepted[kitchen.kitchenId]) {
         setError(`Accept the delivery fee for ${kitchen.kitchenName} to continue`);
         return;
       }
@@ -191,6 +212,7 @@ export function CheckoutPage() {
               quotes[kitchen.kitchenId],
               feeAccepted[kitchen.kitchenId] ?? false,
               coords,
+              modeByKitchen[kitchen.kitchenId] || "self",
             )),
           },
           checkoutKey(cart),
@@ -223,6 +245,7 @@ export function CheckoutPage() {
             quotes[kitchen.kitchenId],
             feeAccepted[kitchen.kitchenId] ?? false,
             coords,
+            modeByKitchen[kitchen.kitchenId] || "self",
           ),
           payment_method: paymentMethod,
         },
@@ -338,18 +361,36 @@ export function CheckoutPage() {
                     <span>
                       {quote.distance_km.toFixed(1)} km ·{" "}
                       {quote.in_range !== false && quote.status !== "extended"
-                        ? "in kitchen range — delivery fee ₹0 (kitchen covers logistics)"
-                        : `beyond kitchen range — customer delivery fee ₹${Math.round(quote.fee)}`}
+                        ? "In kitchen range — kitchen covers full delivery cost (₹0 to you)"
+                        : "Beyond kitchen range — choose how delivery is fulfilled below"}
                     </span>
-                    {quote.platform_fee != null && (
-                      <p style={{ marginTop: "0.35rem" }}>
-                        Kitchen can self-deliver or book platform courier
-                        {quote.in_range === false || quote.status === "extended"
-                          ? ` (~₹${Math.round(quote.platform_fee)} billed to you if they use partner).`
-                          : ` (~₹${Math.round(quote.platform_fee)} paid by kitchen if they use partner).`}
-                      </p>
+                    {quote.modes && quote.modes.length > 0 && (
+                      <label style={{ display: "block", marginTop: "0.65rem" }}>
+                        Delivery option
+                        <select
+                          value={modeByKitchen[kitchen.kitchenId] || quote.modes[0].mode}
+                          onChange={(e) => {
+                            setModeByKitchen((c) => ({ ...c, [kitchen.kitchenId]: e.target.value }));
+                            setFeeAccepted((c) => ({ ...c, [kitchen.kitchenId]: false }));
+                          }}
+                        >
+                          {quote.modes.map((m) => (
+                            <option key={m.mode} value={m.mode}>
+                              {m.label} — you pay ₹{Math.round(m.customer_fee)}
+                              {m.owner_fee > 0 ? ` (kitchen ₹${Math.round(m.owner_fee)})` : ""}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
                     )}
-                    {quote.fee > 0 && (
+                    {(() => {
+                      const mode = modeByKitchen[kitchen.kitchenId] || quote.modes?.[0]?.mode || "self";
+                      const opt = quote.modes?.find((m) => m.mode === mode);
+                      const fee = opt?.customer_fee ?? quote.fee;
+                      return (
+                        <>
+                          {opt && <p style={{ marginTop: "0.35rem" }}>{opt.description}</p>}
+                          {fee > 0 && (
                       <>
                         <label style={{ display: "block", marginTop: "0.5rem" }}>
                           <input
@@ -360,7 +401,7 @@ export function CheckoutPage() {
                               [kitchen.kitchenId]: event.target.checked,
                             }))}
                           />
-                          {" "}I accept the ₹{Math.round(quote.fee)} delivery fee
+                          {" "}I accept the ₹{Math.round(fee)} delivery fee
                         </label>
                         {!feeAccepted[kitchen.kitchenId] && (
                           deniedFeeKitchens[kitchen.kitchenId] ? (
@@ -387,7 +428,10 @@ export function CheckoutPage() {
                           )
                         )}
                       </>
-                    )}
+                          )}
+                        </>
+                      );
+                    })()}
                   </>
                 )}
               </div>
