@@ -1,7 +1,12 @@
 # KitchCu — Persona, Flow, Architecture & Implementation Deep Dive
 
 **Living document.** Written as if each role used the product for a week, then the CEO/CPO/CTO staff synthesized what to keep, fix, and build.  
-Companion to [`PLATFORM-STRATEGIC-ANALYSIS.md`](./PLATFORM-STRATEGIC-ANALYSIS.md) (waves & prioritization) and [`CKAC-USERFLOWS.md`](./CKAC-USERFLOWS.md) (step APIs).
+
+| Companion | Job |
+|-----------|-----|
+| [`PLATFORM-SOLUTION-BLUEPRINT.md`](./PLATFORM-SOLUTION-BLUEPRINT.md) | **Expectations → problem → solution → CTO impl → arch/DB/UX** per journey |
+| [`PLATFORM-STRATEGIC-ANALYSIS.md`](./PLATFORM-STRATEGIC-ANALYSIS.md) | Competitive + Waves A–D |
+| [`CKAC-USERFLOWS.md`](./CKAC-USERFLOWS.md) | Step APIs |
 
 | Field | Value |
 |-------|-------|

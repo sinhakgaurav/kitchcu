@@ -5,7 +5,7 @@
 | Field | Value |
 |-------|-------|
 | Version | **3.2** |
-| Status | Phase 1 **S1–S18** + post-S18 **P19–P28** (branded storefront, golden day, kitchen integrations, live dish showcase, package mapper, marketing templates, employees RBAC, super-admin kitchen workspace); GST + Control live; prod `*.kitchcu.com`; tracker [`ADVANCEMENT-TRACKER.md`](./ADVANCEMENT-TRACKER.md); **E1/E2** design pack only |
+| Status | Phase 1 **S1–S18** + post-S18 **P19–P28**; prod `*.kitchcu.com`; tracker [`ADVANCEMENT-TRACKER.md`](./ADVANCEMENT-TRACKER.md); solution depth [`PLATFORM-SOLUTION-BLUEPRINT.md`](./PLATFORM-SOLUTION-BLUEPRINT.md); **E1/E2** design pack only |
 | Audience | CEO, CPO, CTO, Product, Engineering, DBA, QA, Investors, AI coding agents |
 | Last updated | July 2026 |
 | Supersedes | `CKAC-COMPLETE-GUIDE.md` v3.1 (July 2026) |
@@ -1566,6 +1566,10 @@ Full acceptance criteria for every feature: [`CKAC-COMPLETE-PLANNING-BENCHMARK.m
 | Doc | Role |
 |-----|------|
 | **This guide (v3.2)** | CEO/CPO/CTO master encyclopedia |
+| [`PLATFORM-SOLUTION-BLUEPRINT.md`](./PLATFORM-SOLUTION-BLUEPRINT.md) | Expectations → CEO/CPO solution → CTO impl → arch/DB/UX per journey & admin controls |
+| [`PLATFORM-PERSONA-DEEP-DIVE.md`](./PLATFORM-PERSONA-DEEP-DIVE.md) | Persona lived experience + scorecards |
+| [`PLATFORM-STRATEGIC-ANALYSIS.md`](./PLATFORM-STRATEGIC-ANALYSIS.md) | Competitive honesty + Waves A–D |
+| [`ADVANCEMENT-TRACKER.md`](./ADVANCEMENT-TRACKER.md) | Living ship board |
 | [`CKAC-USERFLOWS.md`](./CKAC-USERFLOWS.md) / [`.pdf`](./CKAC-USERFLOWS.pdf) | Full user journey pack — every persona, every screen, every API call |
 | [`API.md`](./API.md) | Public API reference — auth cheat-sheet, quick-start examples, error catalog |
 | Gateway `/openapi.json`, `/docs`, `/redoc` · Portal `/openapi` (`/api-docs`) | Live, always-current aggregated OpenAPI contract (see §15.5) |
@@ -1588,6 +1592,7 @@ Full acceptance criteria for every feature: [`CKAC-COMPLETE-PLANNING-BENCHMARK.m
 
 | Version | Date | Changes |
 |---------|------|---------|
+| **3.2.3** | July 2026 | Platform Solution Blueprint + Persona Deep Dive + Strategic Analysis linked from tracker/index; multilevel admin & package planner solution matrices. |
 | **3.2.2** | July 2026 | Post-S18 P25–P28: package mapper, owner WA/email templates, employees CRUD+RBAC, expanded kitchen workspace + always-on super-admin Cursor gate; docs/PDFs/tracker refresh. |
 | **3.2.1** | July 2026 | Post-S18 P19–P24: branded storefront, golden performance day, kitchen integrations admin workspace, live dish showcase, admin password env sync; prod admin `admin@kitchcu.com`; living [`ADVANCEMENT-TRACKER.md`](./ADVANCEMENT-TRACKER.md). |
 | **3.2** | July 2026 | Super-admin Control plane (Customers/Refunds/Control, feature flags, journeys); dish prep/delivery/`max_time` + customer ready-within; delivery payer modes (owner in-range / customer extended) + platform courier + Google Maps tracking; login `AuthLoginHighlights` + owner `CommissionAdvantagePanel` + customer dashboard; expanded UI Catalog (§18.1–18.8) with new screenshots; flows §17.9–17.10; PDF layout v3.2 (header clearance, caption-above-figure, no overlap). |

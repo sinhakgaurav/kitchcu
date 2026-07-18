@@ -23,8 +23,9 @@
 For acceptance criteria of F01–F48 see [CKAC-COMPLETE-PLANNING-BENCHMARK.md](./CKAC-COMPLETE-PLANNING-BENCHMARK.md).  
 For code map see [CKAC-IMPLEMENTATION-GUIDE.md](./CKAC-IMPLEMENTATION-GUIDE.md).  
 For journeys see [CKAC-USERFLOWS.md](./CKAC-USERFLOWS.md).  
-For **CEO/CPO/CTO strategic waves** see [PLATFORM-STRATEGIC-ANALYSIS.md](./PLATFORM-STRATEGIC-ANALYSIS.md).  
-For **persona-level flow/architecture/implementation depth** see [PLATFORM-PERSONA-DEEP-DIVE.md](./PLATFORM-PERSONA-DEEP-DIVE.md).
+For **solution blueprint** (expectations → CEO/CPO solution → CTO impl → arch/DB per journey) see [PLATFORM-SOLUTION-BLUEPRINT.md](./PLATFORM-SOLUTION-BLUEPRINT.md).  
+For **strategic waves** see [PLATFORM-STRATEGIC-ANALYSIS.md](./PLATFORM-STRATEGIC-ANALYSIS.md).  
+For **persona lived experience** see [PLATFORM-PERSONA-DEEP-DIVE.md](./PLATFORM-PERSONA-DEEP-DIVE.md).
 
 ---
 
@@ -107,8 +108,8 @@ Run `.\scripts\seed-all.ps1` (or GCP `run-seed=1`) after migrations.
 
 | Wave | Item | Doc |
 |------|------|-----|
-| **A (trust)** | Admin RBAC complete · hard package entitlements · live Razorpay / prod OTP | [PLATFORM-STRATEGIC-ANALYSIS.md](./PLATFORM-STRATEGIC-ANALYSIS.md) §8–9 |
-| **B (promises)** | Template send · customer live watch · media upload UX | same |
+| **A (trust)** | Admin RBAC + audit · hard entitlements · live Razorpay / prod OTP | [PLATFORM-SOLUTION-BLUEPRINT.md](./PLATFORM-SOLUTION-BLUEPRINT.md) E3 · Strategic §8–9 |
+| **B (promises)** | Template send · customer live watch · media upload · kitchen staff design | Solution Blueprint B3/A4/D5 |
 | **C (design)** | E1–E2 Kitchen Quality Loop | [E1-E2-KITCHEN-QUALITY-LOOP-DESIGN.md](./E1-E2-KITCHEN-QUALITY-LOOP-DESIGN.md) |
 | **D (scale)** | Cloud Run architecture · OTel · load SLOs | [DEPLOYMENT-GCP.md](./DEPLOYMENT-GCP.md) §1–10 |
 

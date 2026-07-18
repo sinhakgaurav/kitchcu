@@ -15,10 +15,11 @@ Update whenever a journey ships, a gap closes, or competitive posture changes.
 | Encyclopedia | [`CKAC-COMPLETE-GUIDE.md`](./CKAC-COMPLETE-GUIDE.md) v3.2.2 |
 | Next design (not built) | [`E1-E2-KITCHEN-QUALITY-LOOP-DESIGN.md`](./E1-E2-KITCHEN-QUALITY-LOOP-DESIGN.md) |
 | Super-admin gate | `.cursor/rules/kitchcu-superadmin-integration.mdc` |
-| **Persona deep dive** | **[`PLATFORM-PERSONA-DEEP-DIVE.md`](./PLATFORM-PERSONA-DEEP-DIVE.md)** — customer / owner / superadmin / ops / support / finance / staff; flow scorecards; architecture & RBAC implementation |
+| **Persona deep dive** | [`PLATFORM-PERSONA-DEEP-DIVE.md`](./PLATFORM-PERSONA-DEEP-DIVE.md) — lived voice per role |
+| **Solution blueprint** | **[`PLATFORM-SOLUTION-BLUEPRINT.md`](./PLATFORM-SOLUTION-BLUEPRINT.md)** — expectations → CEO/CPO problem → solution → CTO impl → achievements/gaps/arch/DB/UX for every journey & control surface |
 
-> **Note on stale docs:** [`CKAC-GAPS.md`](./CKAC-GAPS.md) (2026-07-12) still lists checkout/billing/ratings as open — those shipped later. Prefer this file + Advancement Tracker for open gaps.  
-> **For lived-experience depth** (what each role feels, flow achievements/gaps, how to improve): read the Persona Deep Dive first.
+> **Note on stale docs:** [`CKAC-GAPS.md`](./CKAC-GAPS.md) is stale for many open rows. Prefer Advancement Tracker + Solution Blueprint.  
+> **Read order:** Solution Blueprint (what to build) → Persona Deep Dive (how it feels) → this file (waves) → Userflows (APIs).
 
 ---
 

@@ -5,8 +5,9 @@
 | **[KITCHCU-ENGINEERING-STANDARDS.md](./KITCHCU-ENGINEERING-STANDARDS.md)** | **Engineering constitution — DDD, EDD, TDD, security, observability** | Engineering, AI agents |
 | **[templates/MODULE-DESIGN-PACK.md](./templates/MODULE-DESIGN-PACK.md)** | Pre-code design template (mandatory for new modules) | Engineering |
 | **[ADVANCEMENT-TRACKER.md](./ADVANCEMENT-TRACKER.md)** | **Living release board** — S1–S18 + post-S18 increments, credentials, seed checklist, kitchcu.com gate | CEO, CPO, CTO, Engineering, AI agents |
-| **[PLATFORM-STRATEGIC-ANALYSIS.md](./PLATFORM-STRATEGIC-ANALYSIS.md)** | **CEO/CPO/CTO strategic brief** — competitive honesty, gaps, Waves A–D | CEO, CPO, CTO, Investors, AI agents |
-| **[PLATFORM-PERSONA-DEEP-DIVE.md](./PLATFORM-PERSONA-DEEP-DIVE.md)** | **Persona/flow/architecture/implementation deep dive** — customer, owner, superadmin, ops, support, finance, kitchen staff; RBAC matrix; scorecards | CEO, CPO, CTO, Ops, Support, Finance, AI agents |
+| **[PLATFORM-SOLUTION-BLUEPRINT.md](./PLATFORM-SOLUTION-BLUEPRINT.md)** | **Solution blueprint** — every journey: expectations, CEO/CPO problem→solution, CTO impl, achievements, gaps, arch/DB/UX; admin multilevel + package planner | CEO, CPO, CTO, Ops, Support, Finance, AI agents |
+| **[PLATFORM-STRATEGIC-ANALYSIS.md](./PLATFORM-STRATEGIC-ANALYSIS.md)** | **Strategic brief** — competitive honesty, gaps, Waves A–D | CEO, CPO, CTO, Investors, AI agents |
+| **[PLATFORM-PERSONA-DEEP-DIVE.md](./PLATFORM-PERSONA-DEEP-DIVE.md)** | **Persona lived experience** — friction, scorecards, RBAC reality | CEO, CPO, CTO, Ops, Support, Finance, AI agents |
 | **[CKAC-COMPLETE-GUIDE.md](./CKAC-COMPLETE-GUIDE.md)** | **Master guide v3.2.2 — modules through P28 (packages, templates, employees RBAC, kitchen workspace), flows §17.9–17.10, UI Catalog, OpenAPI** | CEO, CPO, CTO, DBA, QA, Investors, AI agents |
 | **[CKAC-COMPLETE-GUIDE.pdf](./CKAC-COMPLETE-GUIDE.pdf)** | Complete Executive Guide PDF v3.2.2 (portrait; UI Catalog figures) | CEO, CPO, CTO, Investors |
 | **[CKAC-USERFLOWS.md](./CKAC-USERFLOWS.md)** | **Full user journey pack** — every persona, every screen, every API call, step-by-step | Product, Design, Engineering, QA |
