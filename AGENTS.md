@@ -15,6 +15,7 @@
 | **`docs/templates/MODULE-DESIGN-PACK.md`** | **Required pre-code design template (10-step gate)** |
 | **`packages/ai-context/`** | **WhatsApp + support AI training/context pack** (options-first, FAQ answer_ids, order/menu extract, tickets) — branch `feature/whatsapp-ai-model-training` |
 | `docs/ADVANCEMENT-TRACKER.md` | **Living release board** — S1–S18 + post-S18 increments, credentials, seed checklist |
+| `docs/PLATFORM-STRATEGIC-ANALYSIS.md` | **CEO/CPO/CTO strategic analysis** — achievements, gaps, journey/flow/impl changes, release waves |
 | `docs/CKAC-COMPLETE-GUIDE.md` | **Master guide v3.2** — CEO + CPO + CTO encyclopedia (definitions, how/why, flows, UI Catalog, aggregated OpenAPI reference + PDF) |
 | `docs/CKAC-USERFLOWS.md` | **Full user journey pack** — every persona, every screen, every API call, step-by-step (+ PDF) |
 | `docs/API.md` | **Public API reference** — auth, body/response examples; live aggregated OpenAPI at gateway `/openapi.json`/`/docs`/`/redoc` + portal `/openapi` |

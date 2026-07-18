@@ -22,7 +22,8 @@
 
 For acceptance criteria of F01–F48 see [CKAC-COMPLETE-PLANNING-BENCHMARK.md](./CKAC-COMPLETE-PLANNING-BENCHMARK.md).  
 For code map see [CKAC-IMPLEMENTATION-GUIDE.md](./CKAC-IMPLEMENTATION-GUIDE.md).  
-For journeys see [CKAC-USERFLOWS.md](./CKAC-USERFLOWS.md).
+For journeys see [CKAC-USERFLOWS.md](./CKAC-USERFLOWS.md).  
+For **CEO/CPO/CTO deep analysis** (achievements, gaps, flow/impl changes, Waves A–D) see [PLATFORM-STRATEGIC-ANALYSIS.md](./PLATFORM-STRATEGIC-ANALYSIS.md).
 
 ---
 
@@ -101,11 +102,14 @@ Run `.\scripts\seed-all.ps1` (or GCP `run-seed=1`) after migrations.
 
 ---
 
-## Next (design only — do not build unless requested)
+## Next (prioritized — see strategic analysis)
 
-| ID | Item | Doc |
-|----|------|-----|
-| E1–E2 | Kitchen Quality Loop (purchase inventory + chef standard lock) | [E1-E2-KITCHEN-QUALITY-LOOP-DESIGN.md](./E1-E2-KITCHEN-QUALITY-LOOP-DESIGN.md) |
+| Wave | Item | Doc |
+|------|------|-----|
+| **A (trust)** | Admin RBAC complete · hard package entitlements · live Razorpay / prod OTP | [PLATFORM-STRATEGIC-ANALYSIS.md](./PLATFORM-STRATEGIC-ANALYSIS.md) §8–9 |
+| **B (promises)** | Template send · customer live watch · media upload UX | same |
+| **C (design)** | E1–E2 Kitchen Quality Loop | [E1-E2-KITCHEN-QUALITY-LOOP-DESIGN.md](./E1-E2-KITCHEN-QUALITY-LOOP-DESIGN.md) |
+| **D (scale)** | Cloud Run architecture · OTel · load SLOs | [DEPLOYMENT-GCP.md](./DEPLOYMENT-GCP.md) §1–10 |
 
 ---
 
