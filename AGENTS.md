@@ -457,4 +457,4 @@ Delivered order only → home_taste (1–5) + quality (1–5) → optional anony
 
 ---
 
-*Last updated: Phase 1 S1–S18 + P19–P28 (packages, marketing templates, employees RBAC, super-admin kitchen workspace). Tracker: `docs/ADVANCEMENT-TRACKER.md`. Prod: `*.kitchcu.com`. Next design: E1–E2 Quality Loop.*
+*Last updated: Phase 1 S1–S18 + P19–P32.1 (RBAC, hard entitlements, LiveKit Watch, templates+wallet, Porter cost-share). Tracker: `docs/ADVANCEMENT-TRACKER.md`. Flows: `docs/PLATFORM-ARCHITECTURE-FLOWS.md`. Prod: `*.kitchcu.com`. Next: kitchen staff · live Razorpay/prod OTP · Porter webhooks · E1–E2.*
