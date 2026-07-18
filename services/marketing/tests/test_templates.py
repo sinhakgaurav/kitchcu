@@ -105,3 +105,41 @@ async def test_template_send_dry_run_preview(client: AsyncClient, marketing_ctx)
     assert body["dry_run"] is True
     assert "Demo Kitchen" in body["preview"]
     assert body["channel"] == "whatsapp"
+
+
+@pytest.mark.asyncio
+async def test_template_send_402_when_wallet_deduct_fails(
+    client: AsyncClient, marketing_ctx, monkeypatch
+):
+    async def _fail_deduct(*_a, **_k) -> bool:
+        return False
+
+    from app import billing_client
+
+    monkeypatch.setattr(billing_client, "deduct_messaging_wallet", _fail_deduct)
+
+    kid = marketing_ctx["kitchen_id"]
+    headers = {"Authorization": f"Bearer {marketing_ctx['owner_token']}"}
+    created = await client.post(
+        f"/api/v1/kitchens/{kid}/templates",
+        headers=headers,
+        json={
+            "channel": "whatsapp",
+            "name": "Paid blast",
+            "body": "Specials for {{ customer_name }} — order now!",
+        },
+    )
+    assert created.status_code == 201, created.text
+    tid = created.json()["id"]
+
+    res = await client.post(
+        f"/api/v1/kitchens/{kid}/templates/{tid}/send",
+        headers=headers,
+        json={
+            "audience": "phones",
+            "phones": ["+919111111111"],
+            "dry_run": False,
+        },
+    )
+    assert res.status_code == 402, res.text
+    assert "wallet" in res.json()["detail"].lower()

@@ -1,10 +1,10 @@
-"""Identity service client — owner profile sync (no cross-schema writes)."""
+"""Identity service client — platform admin audit writes."""
 
 from __future__ import annotations
 
 import logging
 import uuid
-from datetime import datetime
+from typing import Any
 
 import httpx
 
@@ -15,26 +15,40 @@ logger = logging.getLogger(__name__)
 settings = get_settings()
 
 
-async def sync_owner_subscription(
-    owner_id: uuid.UUID,
+async def record_remote_admin_audit(
     *,
-    plan_tier: str,
-    subscription_expires_at: datetime,
+    actor_admin_id: uuid.UUID | None,
+    actor_email: str,
+    actor_role: str,
+    action: str,
+    resource_type: str,
+    resource_id: str,
+    kitchen_id: uuid.UUID | None = None,
+    summary: str = "",
+    before: dict[str, Any] | None = None,
+    after: dict[str, Any] | None = None,
 ) -> None:
-    """Notify identity to update owner subscription fields after billing activation."""
-    url = (
-        f"{settings.identity_service_url.rstrip('/')}"
-        f"/api/v1/internal/owners/{owner_id}/subscription"
-    )
+    """Best-effort audit write into identity (never fails the billing mutation)."""
+    url = f"{settings.identity_service_url.rstrip('/')}/api/v1/internal/admin-audit"
     payload = {
-        "plan_tier": plan_tier,
-        "subscription_status": "active",
-        "subscription_expires_at": subscription_expires_at.isoformat(),
+        "actor_admin_id": str(actor_admin_id) if actor_admin_id else None,
+        "actor_email": actor_email,
+        "actor_role": actor_role,
+        "action": action,
+        "resource_type": resource_type,
+        "resource_id": resource_id,
+        "kitchen_id": str(kitchen_id) if kitchen_id else None,
+        "summary": summary,
+        "before": before,
+        "after": after,
     }
-    async with httpx.AsyncClient(timeout=10.0) as client:
-        response = await client.patch(
-            url,
-            json=payload,
-            headers={"X-Internal-Key": resolve_internal_api_key()},
-        )
-        response.raise_for_status()
+    try:
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            response = await client.post(
+                url,
+                json=payload,
+                headers={"X-Internal-Key": resolve_internal_api_key()},
+            )
+            response.raise_for_status()
+    except Exception as exc:
+        logger.warning("billing→identity admin audit failed: %s", exc)

@@ -109,6 +109,19 @@ async def admin_kitchen_payment_gateway_put(
         raise HTTPException(status_code=404, detail="Kitchen not found")
     result = await upsert_kitchen_payment_gateway(session, publisher, kitchen_id, body)
     await session.commit()
+    from app.identity_client import record_remote_admin_audit
+
+    await record_remote_admin_audit(
+        actor_admin_id=admin.id,
+        actor_email=admin.email,
+        actor_role=admin.role,
+        action="kitchen.payment_gateway.updated",
+        resource_type="payment_gateway",
+        resource_id=str(kitchen_id),
+        kitchen_id=kitchen_id,
+        summary="Kitchen Razorpay payment gateway upserted",
+        after={"configured": True, "provider": "razorpay"},
+    )
     return result
 
 
@@ -130,6 +143,19 @@ async def admin_kitchen_payment_gateway_delete(
         raise HTTPException(status_code=404, detail="Kitchen not found")
     result = await delete_kitchen_payment_gateway(session, publisher, kitchen_id)
     await session.commit()
+    from app.identity_client import record_remote_admin_audit
+
+    await record_remote_admin_audit(
+        actor_admin_id=admin.id,
+        actor_email=admin.email,
+        actor_role=admin.role,
+        action="kitchen.payment_gateway.cleared",
+        resource_type="payment_gateway",
+        resource_id=str(kitchen_id),
+        kitchen_id=kitchen_id,
+        summary="Kitchen Razorpay payment gateway cleared",
+        after={"configured": False},
+    )
     return result
 
 
@@ -251,6 +277,23 @@ async def admin_kitchen_package_assign(
     await _assert_admin_perm(session, admin, "packages:write")
     result = await assign_kitchen_package(session, publisher, kitchen_id, body)
     await session.commit()
+    from app.identity_client import record_remote_admin_audit
+
+    await record_remote_admin_audit(
+        actor_admin_id=admin.id,
+        actor_email=admin.email,
+        actor_role=admin.role,
+        action="kitchen.package.assigned",
+        resource_type="kitchen_package",
+        resource_id=str(kitchen_id),
+        kitchen_id=kitchen_id,
+        summary=f"Package assigned (sync_modules={body.sync_module_flags})",
+        after={
+            "package_id": str(body.package_id),
+            "sync_module_flags": body.sync_module_flags,
+            "package_code": result.package.code if result.package else None,
+        },
+    )
     return result
 
 
@@ -333,6 +376,7 @@ async def admin_refund_patch(
     refund = await session.get(Refund, refund_id)
     if not refund:
         raise HTTPException(status_code=404, detail="Refund not found")
+    before_status = refund.status
     if body.status:
         if body.status == "completed" and refund.channel == "direct_transfer" and not refund.evidence_url:
             raise HTTPException(
@@ -353,6 +397,20 @@ async def admin_refund_patch(
         refund.reason = f"{refund.reason} | {prefix}" if refund.reason else prefix
         refund.updated_at = datetime.now(UTC)
     await session.flush()
+    from app.identity_client import record_remote_admin_audit
+
+    await record_remote_admin_audit(
+        actor_admin_id=admin.id,
+        actor_email=admin.email,
+        actor_role=admin.role,
+        action="refund.admin_updated",
+        resource_type="refund",
+        resource_id=str(refund_id),
+        kitchen_id=refund.kitchen_id,
+        summary=f"Refund {before_status} → {refund.status}",
+        before={"status": before_status},
+        after={"status": refund.status, "note_appended": bool(body.admin_note)},
+    )
     return refund_to_response(refund)
 
 

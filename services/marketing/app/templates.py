@@ -336,6 +336,25 @@ async def send_template(
     await publisher.publish(stream_key("marketing", "template"), event, session=session)
 
     if not body.dry_run and row.channel == "whatsapp" and recipients:
+        from ckac_common.risk_config import is_risk_capability_enabled, messaging_fee_per_recipient_inr
+
+        if await is_risk_capability_enabled(session, "messaging_wallet_deduct", default=True):
+            fee = round(len(recipients) * messaging_fee_per_recipient_inr(), 2)
+            if fee > 0:
+                from app.billing_client import deduct_messaging_wallet
+
+                ok = await deduct_messaging_wallet(
+                    kitchen_id,
+                    amount_inr=fee,
+                    reason="marketing_template_blast",
+                    recipient_count=len(recipients),
+                )
+                if not ok:
+                    raise HTTPException(
+                        status_code=status.HTTP_402_PAYMENT_REQUIRED,
+                        detail="Insufficient messaging wallet balance for broadcast",
+                    )
+
         from app.notify_client import notify_template_blast
 
         await notify_template_blast(

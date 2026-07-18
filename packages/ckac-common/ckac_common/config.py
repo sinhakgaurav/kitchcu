@@ -37,6 +37,7 @@ class Settings(BaseSettings):
     google_maps_api_key: str = ""
     demo_otp: str = "123456"
     whatsapp_app_secret: str = ""
+    whatsapp_access_token: str = ""
     internal_api_key: str = "dev-internal-key-change-in-production"
     whatsapp_verify_token: str = "ckac-dev-verify"
     admin_email: str = "admin@kitchcu.dev"

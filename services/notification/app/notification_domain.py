@@ -164,6 +164,7 @@ async def _send_notification(
     recipient_phone: str | None,
     payload: dict,
     channel: str = "whatsapp",
+    status: str = "sent",
 ) -> NotificationLog:
     now = datetime.now(UTC)
     row = NotificationLog(
@@ -174,20 +175,21 @@ async def _send_notification(
         template_id=template_id,
         body=body,
         payload=payload,
-        status="sent",
-        sent_at=now,
+        status=status,
+        sent_at=now if status == "sent" else None,
     )
     session.add(row)
     await session.flush()
 
     event = publisher.build(
-        event_type="notification.sent",
+        event_type="notification.sent" if status == "sent" else "notification.failed",
         aggregate_type="notification",
         aggregate_id=str(row.id),
         producer="notification-service",
         payload={
             "template_id": template_id,
             "channel": channel,
+            "status": status,
             "order_id": str(order_id) if order_id else None,
             "kitchen_id": str(kitchen_id) if kitchen_id else None,
             "recipient_phone": recipient_phone,
@@ -468,12 +470,28 @@ def _mask_phone(phone: str) -> str:
     return f"***{digits[-4:]}"
 
 
+async def _kitchen_whatsapp_phone_id(session: AsyncSession, kitchen_id: uuid.UUID) -> str | None:
+    row = (
+        await session.execute(
+            text(
+                "SELECT whatsapp_phone_id FROM ckac_identity.kitchens "
+                "WHERE id = :kid LIMIT 1"
+            ),
+            {"kid": kitchen_id},
+        )
+    ).scalar_one_or_none()
+    return str(row).strip() if row else None
+
+
 async def notify_template_blast(
     session: AsyncSession,
     body: TemplateBlastRequest,
     publisher: EventPublisher,
 ) -> TemplateBlastResponse:
-    """One NotificationLog + notification.sent event per recipient phone."""
+    """Fan-out Meta WhatsApp (when configured) + one NotificationLog per phone."""
+    from ckac_common.platform_config import get_platform_secret
+    from app.whatsapp_send import send_text_message
+
     phones: list[str] = []
     seen: set[str] = set()
     for raw in body.recipient_phones:
@@ -485,7 +503,20 @@ async def notify_template_blast(
         if len(phones) >= 200:
             break
 
+    phone_number_id = await _kitchen_whatsapp_phone_id(session, body.kitchen_id)
+    access_token = await get_platform_secret(session, "whatsapp_access_token")
+    sent = 0
+
     for phone in phones:
+        meta = await send_text_message(
+            phone_number_id=phone_number_id or "",
+            to_phone=phone,
+            text=body.message,
+            access_token=access_token or "",
+        )
+        status = "sent" if meta.ok else "failed"
+        if meta.ok:
+            sent += 1
         await _send_notification(
             session,
             publisher,
@@ -494,18 +525,22 @@ async def notify_template_blast(
             kitchen_id=body.kitchen_id,
             order_id=None,
             recipient_phone=phone,
+            status=status,
             payload={
                 "template_name": body.template_name,
                 "recipient_phone_masked": _mask_phone(phone),
                 "message_preview": body.message[:200],
+                "meta_simulated": meta.simulated,
+                "meta_message_id": meta.provider_message_id,
+                "meta_error": meta.error,
             },
         )
 
     return TemplateBlastResponse(
-        sent=len(phones),
+        sent=sent,
         template_id="marketing_template",
         channel="whatsapp",
-        status="sent" if phones else "empty",
+        status="sent" if sent else ("empty" if not phones else "failed"),
     )
 
 

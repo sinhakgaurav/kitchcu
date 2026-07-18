@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
-from typing import Annotated, Literal
+from typing import Annotated, Any, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
@@ -26,6 +26,21 @@ class OwnerSubscriptionSyncRequest(BaseModel):
     subscription_expires_at: datetime = Field(..., description="Current billing period end (UTC).")
 
 
+class InternalAdminAuditRequest(BaseModel):
+    """Cross-service admin audit write (billing → identity)."""
+
+    actor_admin_id: uuid.UUID | None = None
+    actor_email: str = Field(..., min_length=3, max_length=255)
+    actor_role: str = Field(..., min_length=2, max_length=32)
+    action: str = Field(..., min_length=3, max_length=64)
+    resource_type: str = Field(..., min_length=2, max_length=64)
+    resource_id: str = Field(..., min_length=1, max_length=64)
+    kitchen_id: uuid.UUID | None = None
+    summary: str = Field(default="", max_length=500)
+    before: dict[str, Any] | None = None
+    after: dict[str, Any] | None = None
+
+
 @router.patch(
     "/owners/{owner_id}/subscription",
     status_code=status.HTTP_204_NO_CONTENT,
@@ -45,3 +60,31 @@ async def sync_owner_subscription(
     owner.subscription_status = body.subscription_status
     owner.subscription_expires_at = body.subscription_expires_at
     await session.commit()
+
+
+@router.post(
+    "/admin-audit",
+    status_code=status.HTTP_201_CREATED,
+    summary="Record a platform admin audit event from another service",
+)
+async def internal_admin_audit(
+    body: InternalAdminAuditRequest,
+    session: Annotated[AsyncSession, Depends(get_db)],
+) -> dict[str, str]:
+    from app.admin_audit import record_admin_audit
+
+    row = await record_admin_audit(
+        session,
+        action=body.action,
+        resource_type=body.resource_type,
+        resource_id=body.resource_id,
+        kitchen_id=body.kitchen_id,
+        summary=body.summary,
+        before=body.before,
+        after=body.after,
+        actor_admin_id=body.actor_admin_id,
+        actor_email=body.actor_email,
+        actor_role=body.actor_role,
+    )
+    await session.commit()
+    return {"id": str(row.id)}

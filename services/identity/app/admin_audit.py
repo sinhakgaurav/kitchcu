@@ -61,7 +61,7 @@ class AdminAuditListResponse(BaseModel):
 async def record_admin_audit(
     session: AsyncSession,
     *,
-    actor,
+    actor=None,
     action: str,
     resource_type: str,
     resource_id: str,
@@ -69,11 +69,18 @@ async def record_admin_audit(
     summary: str = "",
     before: dict[str, Any] | None = None,
     after: dict[str, Any] | None = None,
+    actor_admin_id: uuid.UUID | None = None,
+    actor_email: str | None = None,
+    actor_role: str | None = None,
 ) -> AdminAuditEvent:
     row = AdminAuditEvent(
-        actor_admin_id=getattr(actor, "id", None),
-        actor_email=str(getattr(actor, "email", "") or ""),
-        actor_role=str(getattr(actor, "role", "") or ""),
+        actor_admin_id=actor_admin_id if actor_admin_id is not None else getattr(actor, "id", None),
+        actor_email=str(
+            actor_email if actor_email is not None else getattr(actor, "email", "") or ""
+        ),
+        actor_role=str(
+            actor_role if actor_role is not None else getattr(actor, "role", "") or ""
+        ),
         action=action,
         resource_type=resource_type,
         resource_id=str(resource_id),

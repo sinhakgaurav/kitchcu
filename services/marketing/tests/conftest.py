@@ -195,6 +195,20 @@ def _seed_marketing_ctx() -> dict:
 
 
 @pytest.fixture(autouse=True)
+def wire_wallet_and_notify_shims(monkeypatch):
+    async def _noop_deduct(*_args, **_kwargs) -> bool:
+        return True
+
+    async def _noop_notify(*_args, **_kwargs) -> None:
+        return None
+
+    from app import billing_client, notify_client
+
+    monkeypatch.setattr(billing_client, "deduct_messaging_wallet", _noop_deduct)
+    monkeypatch.setattr(notify_client, "notify_template_blast", _noop_notify)
+
+
+@pytest.fixture(autouse=True)
 async def clean_db():
     _truncate_all()
     await _flush_marketing_streams()

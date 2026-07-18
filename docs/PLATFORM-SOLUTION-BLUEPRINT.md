@@ -148,7 +148,7 @@ Status tags: ✅ Done well · 🟡 Partial · 🔴 Gap / not built · 📋 Desig
 | **Solution** | Templates CRUD (done) + **send pipeline** + CRM segments + wallet; Stream phases (done) + **in-app publish/watch**; golden day (done). |
 | **Implementation (CTO)** | `POST .../templates/{id}/send` → marketing → notify → billing wallet; LiveKit embed; package module `marketing_broadcast` / `streaming` hard-gated. |
 | **Achievements / done well** | ✅ CRM/coupons/promos · ✅ Template CRUD (P26) · ✅ **Send** Preview/Send + `message_template.send_requested` · ✅ Stream phases · ✅ Customer Watch · ✅ Package-gated Growth nav |
-| **Gaps** | 🟡 Meta outbound delivery + wallet debit · 🟡 Send receipt history table · ✅ LiveKit embed · ✅ Per-phone fan-out |
+| **Gaps** | ✅ Meta outbound client · ✅ Wallet debit · 🟡 Delivery webhooks / receipts · ✅ LiveKit embed · ✅ Per-phone fan-out |
 | **Architecture enhancements** | Notify consumer per phone; wallet debit idempotent; send job table. |
 | **DB enhancements** | `message_template_sends(...)` for history; indexes `(kitchen_id, created_at DESC)`. |
 | **UX enhancements** | Confirm cost → receipt; embed player when LiveKit configured. |
@@ -186,7 +186,7 @@ Status tags: ✅ Done well · 🟡 Partial · 🔴 Gap / not built · 📋 Desig
 | **Solution** | Employees + roles (done) + **enforce permissions on all mutations** + **tab filtering** + **audit log** + kitchen workspace (done) + packages (done) + flags (done). |
 | **Implementation (CTO)** | Shared `RequirePerm`; `GET /admin/me` → permissions[]; `admin_audit_events`; UI filter `TABS`. |
 | **Achievements / done well** | ✅ Kitchen workspace (P28) · ✅ Packages (P25) · ✅ Employees (P27) · ✅ Shared `admin_rbac` enforced on identity/billing/tickets · ✅ `GET /admin/me` → permissions + allowed_tabs · ✅ UI tab filter + role badge · ✅ Overview `allSettled` |
-| **Gaps** | ✅ Audit tab + `admin_audit_events` · 🟡 Billing mutations not yet audited · 🟡 Single-VM ops risk |
+| **Gaps** | ✅ Audit tab + identity + billing writes · 🟡 Package CRUD audit · 🟡 Single-VM ops risk |
 | **Architecture enhancements** | Audit write in same TX as mutation; correlation id on audit. |
 | **DB enhancements** | `ckac_identity.admin_audit_events(...)` + indexes; identity `014` expands customers/flags/refunds:read grants. |
 | **UX enhancements** | Kitchen health strip; audit timeline (next). |
@@ -315,7 +315,7 @@ Status tags: ✅ Done well · 🟡 Partial · 🔴 Gap / not built · 📋 Desig
 | **CPO** | Inbound drafts strong; outbound + templates incomplete. |
 | **CTO** | Notify service owns dispatch; marketing owns template content; wallet owns cost. |
 | **Achievements** | ✅ Webhook → drafts · ✅ Order/status notify (S14) · ✅ Support chat/tickets |
-| **Gaps** | ✅ Per-phone fan-out · 🟡 Meta Cloud outbound · 🟡 Prod OTP · 🟡 Wallet UX |
+| **Gaps** | ✅ Per-phone fan-out · ✅ Meta Cloud outbound client · 🟡 Prod OTP · 🟡 Wallet top-up UX |
 | **Arch** | Single dispatch pipeline for daily-menu + template send |
 | **DB** | `notify_dispatches` already patterned; link `template_send_id` |
 | **UX** | Delivery receipts on owner Templates page |
@@ -422,10 +422,10 @@ Status tags: ✅ Done well · 🟡 Partial · 🔴 Gap / not built · 📋 Desig
 
 | # | Solution | Primary lens | Wave | Status |
 |---|----------|--------------|------|--------|
-| 1 | Enforce admin RBAC + tab filter + audit | CEO trust / hire | A | ✅ |
+| 1 | Enforce admin RBAC + tab filter + audit | CEO trust / hire | A | ✅ (+ billing audit) |
 | 2 | Hard package entitlements + owner nav | CEO monetization | A | ✅ |
 | 3 | Live Razorpay + prod OTP posture | CEO / CTO | A | ⏳ |
-| 4 | Template send pipeline | CPO honesty | B | ✅ Preview/Send + per-phone fan-out |
+| 4 | Template send pipeline | CPO honesty | B | ✅ send + fan-out + wallet + Meta client |
 | 5 | Customer Watch + LiveKit embed | CPO honesty | B | ✅ |
 | 6 | Kitchen staff design→build | CEO TAM | B/C | ⏳ |
 | 7 | E1–E2 quality/profit | CPO OS | C | ⏳ |
@@ -453,9 +453,10 @@ Status tags: ✅ Done well · 🟡 Partial · 🔴 Gap / not built · 📋 Desig
 | **1.0** | 2026-07-18 | Full solution blueprint: every major journey with CEO/CPO/CTO triad, achievements, gaps, arch/DB/UX enhancements; admin multilevel + package planner |
 | **1.1** | 2026-07-18 | Wave A/B gap-fill: admin RBAC enforced + tab filter; hard entitlements + owner nav; template send; customer Watch live |
 | **1.2** | 2026-07-18 | P30: LiveKit embed (watch+publish), template per-phone fan-out, admin audit events + Audit tab |
+| **1.3** | 2026-07-18 | P31: messaging wallet debit on template send; Meta Cloud outbound client; billing→identity audit |
 
 **Update policy:** Closing a 🔴 gap updates the matching section score + E1/E3 in the same PR as code. Regenerate Complete Guide PDF only when encyclopedia status tables change materially.
 
 ---
 
-*KitchCu Platform Solution Blueprint v1.2 — Confidential — July 2026*
+*KitchCu Platform Solution Blueprint v1.3 — Confidential — July 2026*
