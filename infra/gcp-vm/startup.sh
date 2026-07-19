@@ -115,12 +115,27 @@ bash infra/gcp-vm/build-serial.sh
 RUN_SEED="$(meta run-seed)"
 SEED_MARKER=/var/lib/ckac/.bulk-seeded
 if { [ "$RUN_SEED" = "1" ] || [ "$RUN_SEED" = "true" ]; } && [ ! -f "$SEED_MARKER" ]; then
-  echo "Waiting for gateway before bulk seed..."
+  echo "Waiting for identity (+ core services) before bulk seed..."
   ready=0
-  for _ in $(seq 1 90); do
-    if curl -sf http://127.0.0.1:18000/health/ready | grep -q '"status"[[:space:]]*:[[:space:]]*"ok"'; then
-      ready=1
-      break
+  for i in $(seq 1 90); do
+    ready_json="$(curl -sf http://127.0.0.1:18000/health/ready || true)"
+    # Require full gateway status=ok AND identity:true (never seed on live-only / degraded).
+    if echo "$ready_json" | grep -q '"status"[[:space:]]*:[[:space:]]*"ok"' \
+      && echo "$ready_json" | grep -q '"identity"[[:space:]]*:[[:space:]]*true'; then
+      # Confirm stable for 10s (alembic crash-loops can briefly pass /health/live).
+      sleep 10
+      ready_json="$(curl -sf http://127.0.0.1:18000/health/ready || true)"
+      if echo "$ready_json" | grep -q '"status"[[:space:]]*:[[:space:]]*"ok"' \
+        && echo "$ready_json" | grep -q '"identity"[[:space:]]*:[[:space:]]*true'; then
+        ready=1
+        echo "Stack ready for seed: $ready_json"
+        break
+      fi
+    fi
+    if [ $((i % 6)) -eq 0 ]; then
+      echo "  still waiting ($i/90): ${ready_json:-unreachable}"
+      docker compose -f infra/gcp-vm/docker-compose.prod.yml --env-file infra/gcp-vm/.env \
+        ps identity billing catalog 2>/dev/null || true
     fi
     sleep 10
   done
@@ -131,14 +146,19 @@ if { [ "$RUN_SEED" = "1" ] || [ "$RUN_SEED" = "true" ]; } && [ ! -f "$SEED_MARKE
     # shellcheck disable=SC1091
     source infra/gcp-vm/.env
     set +a
-    if CKAC_GATEWAY_URL=http://127.0.0.1:18000 CKAC_BULK_KITCHENS=30 CKAC_BULK_FULL=1 python3 scripts/seed-bulk-data.py; then
+    if CKAC_GATEWAY_URL=http://127.0.0.1:18000 CKAC_SEED_WAIT_SEC=120 \
+      CKAC_BULK_KITCHENS=30 CKAC_BULK_FULL=1 python3 scripts/seed-bulk-data.py; then
       touch "$SEED_MARKER"
       echo "Bulk seed complete."
     else
       echo "Bulk seed failed — marker not set; will retry on next boot." >&2
+      docker compose -f infra/gcp-vm/docker-compose.prod.yml --env-file infra/gcp-vm/.env \
+        logs --tail=60 identity 2>/dev/null || true
     fi
   else
-    echo "Gateway not ready after ~15 min — bulk seed skipped this boot." >&2
+    echo "Identity/core not ready after ~15 min — bulk seed skipped this boot." >&2
+    docker compose -f infra/gcp-vm/docker-compose.prod.yml --env-file infra/gcp-vm/.env \
+      logs --tail=80 identity 2>/dev/null || true
   fi
 fi
 

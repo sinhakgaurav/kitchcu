@@ -10,7 +10,9 @@ import urllib.error
 import urllib.request
 
 GATEWAY = os.environ.get("CKAC_GATEWAY_URL", "http://localhost:18000").rstrip("/")
-MAX_WAIT_SEC = int(os.environ.get("CKAC_SEED_WAIT_SEC", "120"))
+# GCP VM alembic on e2-small can take several minutes after compose up.
+MAX_WAIT_SEC = int(os.environ.get("CKAC_SEED_WAIT_SEC", "600"))
+REQUIRED_SERVICES = ("identity", "catalog", "order", "billing")
 
 
 def resolve_postgres_container() -> str:
@@ -67,17 +69,54 @@ def request(
         raise ApiError(f"{method} {path} -> {exc.code}: {msg}") from exc
 
 
+def _ready_payload() -> dict | None:
+    url = f"{GATEWAY}/health/ready"
+    try:
+        with urllib.request.urlopen(url, timeout=10) as resp:
+            raw = resp.read().decode()
+            return json.loads(raw) if raw else {}
+    except (urllib.error.HTTPError, urllib.error.URLError, TimeoutError, json.JSONDecodeError):
+        return None
+
+
 def wait_for_gateway() -> None:
-    print(f"Waiting for gateway at {GATEWAY} ...")
+    """Block until gateway /health/ready is status=ok (identity + core services up).
+
+    Do not seed on /health/live alone — that only proves the gateway process is up.
+    """
+    print(f"Waiting for stack ready at {GATEWAY}/health/ready (need identity) ...")
     deadline = time.time() + MAX_WAIT_SEC
+    last_note = ""
     while time.time() < deadline:
-        try:
-            request("GET", "/health/live")
-            print("Gateway live.")
-            return
-        except (ApiError, urllib.error.URLError, TimeoutError):
-            time.sleep(2)
-    raise SystemExit(f"Gateway not ready after {MAX_WAIT_SEC}s")
+        body = _ready_payload()
+        if body:
+            services = body.get("services") or {}
+            missing = [s for s in REQUIRED_SERVICES if not services.get(s)]
+            if body.get("status") == "ok" and not missing:
+                # Re-check once — identity can flap during alembic restart loops.
+                time.sleep(5)
+                body2 = _ready_payload() or {}
+                services2 = body2.get("services") or {}
+                missing2 = [s for s in REQUIRED_SERVICES if not services2.get(s)]
+                if body2.get("status") == "ok" and not missing2:
+                    print(
+                        "Stack ready: "
+                        + ", ".join(f"{k}={v}" for k, v in sorted(services2.items()))
+                    )
+                    return
+            note = f"status={body.get('status')} missing={missing or 'none'} services={services}"
+            if note != last_note:
+                print(f"  … {note}")
+                last_note = note
+        else:
+            if last_note != "unreachable":
+                print("  … gateway /health/ready unreachable")
+                last_note = "unreachable"
+        time.sleep(5)
+    raise SystemExit(
+        f"Stack not ready after {MAX_WAIT_SEC}s — identity (and core services) must be up. "
+        "On GCP: docker compose -f infra/gcp-vm/docker-compose.prod.yml logs --tail=80 identity"
+    )
 
 
 def login_owner(phone_e164: str, otp: str) -> str:

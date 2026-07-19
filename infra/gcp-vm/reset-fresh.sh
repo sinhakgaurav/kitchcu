@@ -43,19 +43,32 @@ bash infra/gcp-vm/build-serial.sh
 echo "=== Starting stack (images already built) ==="
 "${COMPOSE[@]}" up -d --no-build
 
-echo "=== Waiting for gateway /health/ready (status=ok) ==="
+echo "=== Waiting for /health/ready status=ok AND identity:true ==="
 ready=0
-for _ in $(seq 1 90); do
-  if curl -sf http://127.0.0.1:18000/health/ready | grep -q '"status"[[:space:]]*:[[:space:]]*"ok"'; then
-    ready=1
-    break
+for i in $(seq 1 90); do
+  ready_json="$(curl -sf http://127.0.0.1:18000/health/ready || true)"
+  if echo "$ready_json" | grep -q '"status"[[:space:]]*:[[:space:]]*"ok"' \
+    && echo "$ready_json" | grep -q '"identity"[[:space:]]*:[[:space:]]*true'; then
+    sleep 10
+    ready_json="$(curl -sf http://127.0.0.1:18000/health/ready || true)"
+    if echo "$ready_json" | grep -q '"status"[[:space:]]*:[[:space:]]*"ok"' \
+      && echo "$ready_json" | grep -q '"identity"[[:space:]]*:[[:space:]]*true'; then
+      ready=1
+      echo "Stack ready: $ready_json"
+      break
+    fi
+  fi
+  if [ $((i % 6)) -eq 0 ]; then
+    echo "  still waiting ($i/90): ${ready_json:-unreachable}"
+    "${COMPOSE[@]}" ps identity billing catalog || true
   fi
   sleep 10
 done
 
 if [ "$ready" -ne 1 ]; then
-  echo "ERROR: gateway not ready after ~15 min. Check: docker compose ... ps / logs gateway" >&2
+  echo "ERROR: identity/core not ready after ~15 min." >&2
   "${COMPOSE[@]}" ps || true
+  "${COMPOSE[@]}" logs --tail=80 identity || true
   exit 1
 fi
 
