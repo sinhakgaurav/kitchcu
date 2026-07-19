@@ -19,7 +19,7 @@ from httpx import ASGITransport, AsyncClient, Response
 
 from app import main as gateway_main
 from app.main import app
-from app.rate_limit import check_rate_limit, client_ip, resolve_rule
+from app.rate_limit import check_rate_limit, client_ip, is_loopback_client, resolve_rule
 
 
 def _fake_request(method: str = "GET", ip: str = "1.2.3.4", forwarded: str | None = None) -> Request:
@@ -73,6 +73,27 @@ def test_client_ip_falls_back_to_direct_client():
     assert client_ip(req) == "10.0.0.1"
 
 
+def test_is_loopback_client():
+    assert is_loopback_client(_fake_request(ip="127.0.0.1")) is True
+    assert is_loopback_client(_fake_request(ip="::1")) is True
+    assert is_loopback_client(_fake_request(ip="1.2.3.4")) is False
+    # Spoofed XFF must not count as loopback
+    spoofed = _fake_request(ip="203.0.113.9", forwarded="127.0.0.1")
+    assert is_loopback_client(spoofed) is False
+
+
+@pytest.mark.asyncio
+async def test_check_rate_limit_skips_loopback_even_when_over_limit():
+    redis = AsyncMock()
+    redis.incr = AsyncMock(return_value=999)
+    req = _fake_request(method="POST", ip="127.0.0.1")
+    allowed, retry_after, rule_name = await check_rate_limit(redis, req, "/api/v1/auth/otp/request")
+    assert allowed is True
+    assert retry_after == 0
+    assert rule_name == "otp_request"
+    redis.incr.assert_not_called()
+
+
 @pytest.mark.asyncio
 async def test_check_rate_limit_allows_when_redis_is_none():
     req = _fake_request(method="POST")
@@ -121,7 +142,8 @@ async def test_proxy_returns_429_when_rate_limited():
     identity = AsyncMock()
     gateway_main.redis_client = mock_redis
     gateway_main.http_clients = {"identity": identity}
-    transport = ASGITransport(app=app)
+    # Non-loopback peer — loopback is exempt (GCP seed via 127.0.0.1).
+    transport = ASGITransport(app=app, client=("203.0.113.50", 50000))
     async with AsyncClient(transport=transport, base_url="http://test") as client:
         response = await client.post(
             "/api/v1/auth/otp/request", json={"phone": "9876543210"}

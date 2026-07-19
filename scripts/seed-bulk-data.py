@@ -21,6 +21,7 @@ import os
 import random
 import subprocess
 import sys
+import time
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -238,6 +239,9 @@ def ensure_orders(token: str, kitchen_id: str, dish_ids: dict[str, str], target:
         created += 1
         if created % 25 == 0:
             log(f"    ... {created}/{need} orders")
+        # Soft pacing so gateway default budget (600/min) is not blown on e2-small.
+        if created % 10 == 0:
+            time.sleep(0.35)
 
     log(f"  Created {created} orders.")
     return created

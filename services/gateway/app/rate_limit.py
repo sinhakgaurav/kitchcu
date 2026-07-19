@@ -80,13 +80,26 @@ def client_ip(request: Request) -> str:
     return request.client.host if request.client else "unknown"
 
 
+def is_loopback_client(request: Request) -> bool:
+    """True when the TCP peer is localhost (VM seed / ops via 127.0.0.1).
+
+    Uses ``request.client.host`` only — never ``X-Forwarded-For`` — so a
+    public client cannot spoof loopback to bypass limits.
+    """
+    host = (request.client.host if request.client else "") or ""
+    return host in ("127.0.0.1", "::1", "localhost")
+
+
 async def check_rate_limit(redis_client, request: Request, path: str) -> tuple[bool, int, str]:
     """Returns ``(allowed, retry_after_seconds, rule_name)``.
 
     Fails open (``allowed=True``) when Redis is unavailable or returns an
     unexpected type — enforcement is best-effort, not a hard dependency.
+    Loopback peers are not limited so GCP ``seed-bulk-data.py`` can finish.
     """
     rule = resolve_rule(request.method, path)
+    if is_loopback_client(request):
+        return True, 0, rule.name
     if redis_client is None:
         return True, 0, rule.name
 

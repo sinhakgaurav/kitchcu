@@ -42,31 +42,69 @@ class ApiError(Exception):
     pass
 
 
+def _retry_after_seconds(exc: urllib.error.HTTPError, detail: str) -> float:
+    """Parse Retry-After header or ``try again in Ns`` detail for 429 backoff."""
+    raw = exc.headers.get("Retry-After") if exc.headers else None
+    if raw:
+        try:
+            return max(1.0, float(raw))
+        except ValueError:
+            pass
+    # e.g. "Too many requests — try again in 2s"
+    marker = "try again in "
+    lower = detail.lower()
+    if marker in lower:
+        tail = lower.split(marker, 1)[1]
+        digits = ""
+        for ch in tail:
+            if ch.isdigit() or ch == ".":
+                digits += ch
+            else:
+                break
+        if digits:
+            try:
+                return max(1.0, float(digits))
+            except ValueError:
+                pass
+    return 3.0
+
+
 def request(
     method: str,
     path: str,
     body: dict | None = None,
     token: str | None = None,
     timeout: int = 30,
+    *,
+    max_retries: int = 8,
 ) -> dict | list:
     url = f"{GATEWAY}{path}"
     data = json.dumps(body).encode() if body is not None else None
     headers = {"Content-Type": "application/json", "Accept": "application/json"}
     if token:
         headers["Authorization"] = f"Bearer {token}"
-    req = urllib.request.Request(url, data=data, headers=headers, method=method)
-    try:
-        with urllib.request.urlopen(req, timeout=timeout) as resp:
-            raw = resp.read().decode()
-            return json.loads(raw) if raw else {}
-    except urllib.error.HTTPError as exc:
-        detail = exc.read().decode()
+    last_msg = ""
+    for attempt in range(max_retries + 1):
+        req = urllib.request.Request(url, data=data, headers=headers, method=method)
         try:
-            parsed = json.loads(detail)
-            msg = parsed.get("detail", detail)
-        except json.JSONDecodeError:
-            msg = detail or exc.reason
-        raise ApiError(f"{method} {path} -> {exc.code}: {msg}") from exc
+            with urllib.request.urlopen(req, timeout=timeout) as resp:
+                raw = resp.read().decode()
+                return json.loads(raw) if raw else {}
+        except urllib.error.HTTPError as exc:
+            detail = exc.read().decode()
+            try:
+                parsed = json.loads(detail)
+                msg = parsed.get("detail", detail)
+            except json.JSONDecodeError:
+                msg = detail or exc.reason
+            last_msg = f"{method} {path} -> {exc.code}: {msg}"
+            if exc.code == 429 and attempt < max_retries:
+                wait = _retry_after_seconds(exc, str(msg))
+                print(f"  … rate limited, retry in {wait:.0f}s ({attempt + 1}/{max_retries})")
+                time.sleep(wait)
+                continue
+            raise ApiError(last_msg) from exc
+    raise ApiError(last_msg or f"{method} {path} -> failed")
 
 
 def _ready_payload() -> dict | None:
