@@ -113,7 +113,14 @@ def _ready_payload() -> dict | None:
         with urllib.request.urlopen(url, timeout=10) as resp:
             raw = resp.read().decode()
             return json.loads(raw) if raw else {}
-    except (urllib.error.HTTPError, urllib.error.URLError, TimeoutError, json.JSONDecodeError):
+    except (
+        urllib.error.HTTPError,
+        urllib.error.URLError,
+        TimeoutError,
+        ConnectionError,  # includes http.client.RemoteDisconnected during gateway restart
+        OSError,
+        json.JSONDecodeError,
+    ):
         return None
 
 
