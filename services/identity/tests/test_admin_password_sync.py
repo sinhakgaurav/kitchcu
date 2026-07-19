@@ -27,24 +27,16 @@ async def test_admin_login_hint_reveals_password_in_non_production(client: Async
 
 @pytest.mark.asyncio
 async def test_admin_login_hint_hides_password_in_production(client: AsyncClient, monkeypatch):
-    monkeypatch.setenv("APP_ENV", "production")
-    monkeypatch.delenv("ADMIN_LOGIN_REVEAL_PASSWORD", raising=False)
+    # Patch the gate directly — do not mutate global APP_ENV (breaks later OTP tests).
+    monkeypatch.setattr("app.admin_routes._admin_login_reveal_allowed", lambda: False)
     monkeypatch.setattr("app.admin_routes.settings.admin_email", "admin@kitchcu.com")
     monkeypatch.setattr("app.admin_routes.settings.admin_password", "secret-should-hide")
-    # Clear settings cache used by is_non_production
-    from ckac_common.config import get_settings
-
-    get_settings.cache_clear()
-    try:
-        res = await client.get("/api/v1/admin/auth/login-hint")
-        assert res.status_code == 200, res.text
-        body = res.json()
-        assert body["email"] == "admin@kitchcu.com"
-        assert body["revealed"] is False
-        assert body["password"] is None
-    finally:
-        monkeypatch.setenv("APP_ENV", "test")
-        get_settings.cache_clear()
+    res = await client.get("/api/v1/admin/auth/login-hint")
+    assert res.status_code == 200, res.text
+    body = res.json()
+    assert body["email"] == "admin@kitchcu.com"
+    assert body["revealed"] is False
+    assert body["password"] is None
 
 
 @pytest.mark.asyncio
