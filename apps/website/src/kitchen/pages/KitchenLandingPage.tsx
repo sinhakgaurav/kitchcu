@@ -8,7 +8,7 @@ import { KitchenFooter } from "../../components/KitchenFooter";
 
 export function KitchenLandingPage() {
   return (
-    <>
+    <div className="kitchen-landing">
       <KitchenNavbar />
       <main>
         <Hero variant="kitchen" />
@@ -19,6 +19,6 @@ export function KitchenLandingPage() {
         <Contact />
       </main>
       <KitchenFooter />
-    </>
+    </div>
   );
 }

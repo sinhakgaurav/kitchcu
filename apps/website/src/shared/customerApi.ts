@@ -142,9 +142,13 @@ export async function uploadCustomerPayoutQr(file: File): Promise<CustomerProfil
   return body as CustomerProfile;
 }
 
-export async function loginWithCustomerOAuthProvider(provider: string): Promise<CustomerAuthResult> {
+export async function loginWithCustomerOAuthProvider(
+  provider: string,
+  opts?: { next?: string },
+): Promise<CustomerAuthResult> {
   const start = await startCustomerOAuth(provider);
   const redirect_uri = customerOAuthRedirectUri();
+  const next = opts?.next && opts.next.startsWith("/") ? opts.next : "/";
 
   if (start.dev_mode) {
     return completeCustomerOAuth(provider, {
@@ -160,10 +164,23 @@ export async function loginWithCustomerOAuthProvider(provider: string): Promise<
 
   sessionStorage.setItem(
     `${APP_STORAGE_PREFIX}_oauth_pending_${provider}`,
-    JSON.stringify({ state: start.state, redirect_uri, provider }),
+    JSON.stringify({ state: start.state, redirect_uri, provider, next }),
   );
   window.location.assign(start.authorization_url);
   return new Promise(() => {
     /* redirect */
   });
+}
+
+/** Read+clear `next` path stashed before OAuth redirect (defaults to `/`). */
+export function takeCustomerOAuthNext(provider: string): string {
+  const raw = sessionStorage.getItem(`${APP_STORAGE_PREFIX}_oauth_pending_${provider}`);
+  if (!raw) return "/";
+  try {
+    const parsed = JSON.parse(raw) as { next?: string };
+    const next = parsed.next?.startsWith("/") ? parsed.next : "/";
+    return next;
+  } catch {
+    return "/";
+  }
 }

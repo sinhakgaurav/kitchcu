@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Navigate, Outlet, Link, useLocation } from "react-router-dom";
 import { BrandNavMark } from "../components/BrandNavMark";
+import { LanguageSwitcher } from "../i18n/LanguageSwitcher";
 import { KITCHEN_HOST } from "../shared/brand";
 import { fetchKitchenEntitlements } from "../shared/api";
 import { useKitchenAuth } from "../shared/kitchenAuth";
@@ -16,6 +17,7 @@ const NAV_SECTIONS: { label: string; items: NavItem[] }[] = [
       { to: "/dashboard", label: "Overview", end: true },
       { to: "/dashboard/orders", label: "Orders" },
       { to: "/dashboard/menu", label: "Menu" },
+      { to: "/dashboard/brand", label: "Brand page" },
       { to: "/dashboard/ingredients", label: "Ingredients" },
     ],
   },
@@ -181,6 +183,7 @@ export function OwnerLayout() {
         </nav>
 
         <div className="owner-app__sidebar-foot">
+          <LanguageSwitcher />
           <span>{owner?.name}</span>
           <a href={customerUrl("/")} className="owner-app__customer-link" target="_blank" rel="noopener noreferrer">Customer app</a>
           <button type="button" className="owner-app__signout btn btn--ghost btn--sm" onClick={logout}>

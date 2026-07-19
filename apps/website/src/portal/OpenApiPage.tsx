@@ -120,10 +120,10 @@ export function OpenApiPage() {
             <a href="/openapi.json" target="_blank" rel="noreferrer">
               openapi.json
             </a>
-            <a href="http://localhost:18000/docs" target="_blank" rel="noreferrer">
+            <a href="/docs" target="_blank" rel="noreferrer">
               Gateway /docs
             </a>
-            <a href="http://localhost:18000/redoc" target="_blank" rel="noreferrer">
+            <a href="/redoc" target="_blank" rel="noreferrer">
               ReDoc
             </a>
             <Link to="/" className="btn btn--ghost btn--sm">
@@ -158,7 +158,7 @@ export function OpenApiPage() {
           <p>{error}</p>
           <p>
             Ensure <code>docker compose up -d</code> is running, then open{" "}
-            <a href="http://localhost:18000/openapi.json">gateway OpenAPI</a> directly.
+            <a href="/openapi.json">gateway OpenAPI</a> directly.
           </p>
         </div>
       ) : null}

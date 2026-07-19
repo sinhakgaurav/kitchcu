@@ -4,11 +4,11 @@ import {
   createSubscriptionPlan,
   decideKitchenSubscription,
   fetchKitchenSubscriptions,
-  fetchSubscriptionPlans,
+  fetchKitchenSubscriptionPlans,
   fetchSubscriptionSummary,
   updateSubscriptionPlan,
   type CustomerKitchenSubscription,
-  type SubscriptionPlan,
+  type KitchenMealPlan,
   type SubscriptionSummary,
 } from "../../lib/api";
 import { useKitchen } from "../../lib/kitchen";
@@ -24,7 +24,7 @@ const inr = (n: number) => `₹${Math.round(n).toLocaleString("en-IN")}`;
 
 export function TiffinSubscriptionsPage() {
   const { kitchen } = useKitchen();
-  const [plans, setPlans] = useState<SubscriptionPlan[]>([]);
+  const [plans, setPlans] = useState<KitchenMealPlan[]>([]);
   const [subs, setSubs] = useState<CustomerKitchenSubscription[]>([]);
   const [summary, setSummary] = useState<SubscriptionSummary | null>(null);
   const [filter, setFilter] = useState<string>("");
@@ -41,7 +41,7 @@ export function TiffinSubscriptionsPage() {
     if (!kitchen) return;
     setLoading(true);
     Promise.all([
-      fetchSubscriptionPlans(kitchen.id),
+      fetchKitchenSubscriptionPlans(kitchen.id),
       fetchKitchenSubscriptions(kitchen.id, filter || undefined),
       fetchSubscriptionSummary(kitchen.id),
     ])
@@ -99,7 +99,7 @@ export function TiffinSubscriptionsPage() {
     }
   };
 
-  const togglePlan = async (plan: SubscriptionPlan) => {
+  const togglePlan = async (plan: KitchenMealPlan) => {
     if (!kitchen) return;
     setBusy(true);
     try {

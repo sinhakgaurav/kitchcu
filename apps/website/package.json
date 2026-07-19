@@ -19,9 +19,11 @@
     "preview:kitchen": "vite preview --config vite.kitchen.config.ts"
   },
   "dependencies": {
+    "i18next": "^26.3.6",
     "livekit-client": "^2.20.1",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
+    "react-i18next": "^17.0.10",
     "react-router-dom": "^7.1.1"
   },
   "devDependencies": {

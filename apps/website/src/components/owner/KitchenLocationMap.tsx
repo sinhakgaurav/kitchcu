@@ -3,6 +3,7 @@ import {
   formatCoordinates,
   formatKitchenAddress,
   googleMapsDirectionsUrl,
+  googleMapsEmbedPlaceUrl,
   googleMapsUrl,
   openStreetMapEmbedUrl,
   type KitchenAddressParts,
@@ -29,7 +30,7 @@ export function KitchenLocationMap({
   const mapsUrl = googleMapsUrl(latitude, longitude, name ?? (address || undefined));
   const directionsUrl = googleMapsDirectionsUrl(latitude, longitude);
   const mapSrc = useMemo(
-    () => openStreetMapEmbedUrl(latitude, longitude),
+    () => googleMapsEmbedPlaceUrl(latitude, longitude) || openStreetMapEmbedUrl(latitude, longitude),
     [latitude, longitude],
   );
 

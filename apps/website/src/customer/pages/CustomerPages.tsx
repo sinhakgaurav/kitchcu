@@ -47,13 +47,23 @@ export function CustomerLoginPage() {
   };
 
   const afterAuth = async (kitchenCode: string) => {
+    const safeNext = nextPath.startsWith("/") ? nextPath : "/";
+    let kitchenMenu: string | null = null;
     if (kitchenCode.trim()) {
-      const kitchen = await fetchKitchenByCode(kitchenCode);
-      saveKitchenToSession(kitchen);
-      navigate(`/kitchen/${kitchen.id}/menu`);
+      try {
+        const kitchen = await fetchKitchenByCode(kitchenCode);
+        saveKitchenToSession(kitchen);
+        kitchenMenu = `/kitchen/${kitchen.id}/menu`;
+      } catch {
+        // Optional kitchen pin — don't block return to checkout/dashboard.
+      }
+    }
+    // Explicit return path (checkout, rate, dashboard) always wins over kitchen redirect.
+    if (safeNext !== "/") {
+      navigate(safeNext, { replace: true });
       return;
     }
-    navigate(nextPath.startsWith("/") ? nextPath : "/");
+    navigate(kitchenMenu ?? "/", { replace: true });
   };
 
   const handleRequestOtp = async (e: FormEvent) => {
@@ -241,6 +251,7 @@ export function CustomerLoginPage() {
 
           <CustomerSocialLogin
             policiesAgreed={policiesAgreed}
+            nextPath={nextPath}
             onAuth={(result) => {
               applyAuthResult(result);
             }}

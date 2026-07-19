@@ -8,9 +8,11 @@ COPY . .
 ARG VITE_CUSTOMER_APP_URL=http://localhost:13001
 ARG VITE_KITCHEN_APP_URL=http://localhost:13002
 ARG VITE_ADMIN_APP_URL=http://localhost:13003
+ARG VITE_GOOGLE_MAPS_API_KEY=
 ENV VITE_CUSTOMER_APP_URL=$VITE_CUSTOMER_APP_URL
 ENV VITE_KITCHEN_APP_URL=$VITE_KITCHEN_APP_URL
 ENV VITE_ADMIN_APP_URL=$VITE_ADMIN_APP_URL
+ENV VITE_GOOGLE_MAPS_API_KEY=$VITE_GOOGLE_MAPS_API_KEY
 RUN if [ "$APP" = "customer" ]; then npm run build:customer; \
     elif [ "$APP" = "kitchen" ]; then npm run build:kitchen; \
     elif [ "$APP" = "admin" ]; then npm run build:admin; \

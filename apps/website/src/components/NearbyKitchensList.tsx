@@ -10,6 +10,13 @@ import { useCustomerAuth } from "../shared/customerAuth";
 import { saveKitchenToSession } from "../shared/customerSession";
 import { useGeolocation } from "../hooks/useGeolocation";
 import { useInView } from "../hooks/useParallax";
+import {
+  discoveryMapEmbedUrl,
+  distanceKm,
+  googleMapsNearbyStaticUrl,
+  googleMapsUrl,
+  hasGoogleMapsApiKey,
+} from "../lib/locationMaps";
 
 type SortOrder = "asc" | "desc";
 type DietFilter = "" | "veg" | "non_veg" | "vegan";
@@ -32,13 +39,27 @@ export function NearbyKitchensList() {
   const [liveCaptureOnly, setLiveCaptureOnly] = useState(false);
   const [liveOnly, setLiveOnly] = useState(false);
 
-  const mapSrc = useMemo(() => {
-    const pad = 0.04;
-    const lat = coords.latitude;
-    const lng = coords.longitude;
-    const bbox = [lng - pad, lat - pad, lng + pad, lat + pad].join("%2C");
-    return `https://www.openstreetmap.org/export/embed.html?bbox=${bbox}&layer=mapnik&marker=${lat}%2C${lng}`;
-  }, [coords.latitude, coords.longitude]);
+  const mapsEnabled = hasGoogleMapsApiKey();
+  const kmFromDemo = distanceKm(coords, DEMO.defaultLocation);
+
+  const staticMapSrc = useMemo(() => {
+    if (!mapsEnabled) return null;
+    return googleMapsNearbyStaticUrl(
+      coords.latitude,
+      coords.longitude,
+      kitchens.map((k) => ({
+        latitude: k.latitude,
+        longitude: k.longitude,
+        label: k.name,
+      })),
+      { zoom: kitchens.length ? 12 : 11 },
+    );
+  }, [mapsEnabled, coords.latitude, coords.longitude, kitchens]);
+
+  const embedMapSrc = useMemo(
+    () => discoveryMapEmbedUrl(coords.latitude, coords.longitude),
+    [coords.latitude, coords.longitude],
+  );
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -83,6 +104,7 @@ export function NearbyKitchensList() {
 
   const useDemoLocation = () => {
     setCoords(DEMO.defaultLocation);
+    setMaxKm((km) => (km < 50 ? 50 : km));
   };
 
   const displayed = useMemo(() => {
@@ -110,6 +132,8 @@ export function NearbyKitchensList() {
     if (next === "distance_desc") setSort("desc");
   };
 
+  const showFarHint = !loading && kitchens.length === 0 && kmFromDemo > 80;
+
   return (
     <section
       className="nearby-kitchens"
@@ -122,7 +146,8 @@ export function NearbyKitchensList() {
             <span className="section__eyebrow">Near you</span>
             <h2>Cloud kitchens nearby</h2>
             <p>
-              Map + list sorted by distance. Filter by diet, live-capture menu photos, or kitchens streaming now.
+              {mapsEnabled ? "Google Map" : "Map"} + list sorted by distance. Filter by diet,
+              live-capture menu photos, or kitchens streaming now.
               {geoError && <span className="nearby-kitchens__geo-hint"> {geoError}</span>}
             </p>
           </div>
@@ -170,22 +195,61 @@ export function NearbyKitchensList() {
             <button type="button" className="btn btn--ghost btn--sm" onClick={refresh} disabled={status === "loading"}>
               {status === "loading" ? "Locating…" : "Use my location"}
             </button>
-            <button type="button" className="btn btn--ghost btn--sm" onClick={useDemoLocation}>
-              Demo: Pune
+            <button type="button" className="btn btn--primary btn--sm" onClick={useDemoLocation}>
+              Demo: Pune kitchens
             </button>
           </div>
         </div>
 
         <div className="nearby-kitchens__map glass">
-          <iframe
-            title="Kitchen discovery map"
-            src={mapSrc}
-            loading="lazy"
-            referrerPolicy="no-referrer-when-downgrade"
-          />
+          {staticMapSrc ? (
+            <a
+              className="nearby-kitchens__map-link"
+              href={googleMapsUrl(coords.latitude, coords.longitude, "Near me")}
+              target="_blank"
+              rel="noopener noreferrer"
+              title="Open in Google Maps"
+            >
+              <img
+                src={staticMapSrc}
+                alt="Map of kitchens near you"
+                className="nearby-kitchens__map-img"
+                loading="lazy"
+                referrerPolicy="no-referrer-when-downgrade"
+              />
+            </a>
+          ) : (
+            <iframe
+              title="Kitchen discovery map"
+              src={embedMapSrc}
+              loading="lazy"
+              referrerPolicy="no-referrer-when-downgrade"
+              allow="geolocation"
+            />
+          )}
         </div>
 
         {fetchError && <div className="auth-card__error">{fetchError}</div>}
+
+        {showFarHint && (
+          <div className="glass nearby-kitchens__empty nearby-kitchens__empty--hint">
+            <p>
+              No active kitchens within {maxKm} km of your current GPS
+              ({kmFromDemo.toFixed(0)} km from the Pune demo cluster).
+            </p>
+            <p className="nearby-kitchens__empty-hint">
+              Seeded demo kitchens sit around Pune. Widen the radius or jump to the demo pin.
+            </p>
+            <div className="nearby-kitchens__empty-actions">
+              <button type="button" className="btn btn--primary btn--sm" onClick={useDemoLocation}>
+                Show Pune demo kitchens
+              </button>
+              <button type="button" className="btn btn--ghost btn--sm" onClick={() => setMaxKm(100)}>
+                Search 100 km
+              </button>
+            </div>
+          </div>
+        )}
 
         <ListingToolbar
           search={search}
@@ -204,14 +268,17 @@ export function NearbyKitchensList() {
 
         {loading ? (
           <p className="app-loading nearby-kitchens__loading">Finding kitchens near you…</p>
-        ) : kitchens.length === 0 ? (
+        ) : kitchens.length === 0 && !showFarHint ? (
           <div className="glass nearby-kitchens__empty">
             <p>No active kitchens within {maxKm} km with these filters.</p>
             <p className="nearby-kitchens__empty-hint">
-              Run <code>python scripts/seed-dev-data.py</code> or widen the search radius.
+              Run <code>python scripts/seed-dev-data.py</code>, clear filters, or try{" "}
+              <button type="button" className="btn btn--ghost btn--sm" onClick={useDemoLocation}>
+                Demo: Pune
+              </button>
             </p>
           </div>
-        ) : displayed.length === 0 ? (
+        ) : displayed.length === 0 && kitchens.length > 0 ? (
           <div className="glass nearby-kitchens__empty">
             <p>No kitchens match “{search}”.</p>
           </div>

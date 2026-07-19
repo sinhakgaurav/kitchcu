@@ -14,6 +14,8 @@ type Props = {
   onError: (message: string) => void;
   /** Required for new customer signup / social continue */
   policiesAgreed?: boolean;
+  /** Return path after real OAuth redirect (`/oauth/callback`). */
+  nextPath?: string;
 };
 
 const PROVIDER_LABELS: Record<string, string> = {
@@ -37,6 +39,7 @@ export function CustomerSocialLogin({
   onAuth,
   onError,
   policiesAgreed = true,
+  nextPath = "/",
 }: Props) {
   const [busy, setBusy] = useState<string | null>(null);
   const [whatsappPhone, setWhatsappPhone] = useState("");
@@ -62,7 +65,7 @@ export function CustomerSocialLogin({
       if (!ensurePolicies()) return;
       setBusy(provider);
       try {
-        const result = await loginWithCustomerOAuthProvider(provider);
+        const result = await loginWithCustomerOAuthProvider(provider, { next: nextPath });
         await onAuth(result);
         await onSuccess();
       } catch (err) {
@@ -71,7 +74,7 @@ export function CustomerSocialLogin({
         setBusy(null);
       }
     },
-    [onSuccess, onAuth, onError, ensurePolicies],
+    [onSuccess, onAuth, onError, ensurePolicies, nextPath],
   );
 
   const handleWhatsAppRequest = async () => {

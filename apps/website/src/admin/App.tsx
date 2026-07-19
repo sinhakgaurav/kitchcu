@@ -1,4 +1,5 @@
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
+import { DataTable, type DataColumn } from "../components/DataTable";
 import {
   adminLogin,
   clearAdminKitchenPaymentGateway,
@@ -13,6 +14,7 @@ import {
   fetchAdminKitchenTiffinSummary,
   fetchAdminKitchenWhatsApp,
   updateAdminKitchenDeliverySettings,
+  updateAdminKitchenBrandedPage,
   fetchAdminMe,
   fetchAdminOrders,
   fetchAdminOwners,
@@ -107,7 +109,7 @@ const TAB_META: Record<Tab, { title: string; desc: string }> = {
   },
   kitchens: {
     title: "Kitchens",
-    desc: "Kitchen workspace — WhatsApp, payments, package, marketing, modules, streaming",
+    desc: "Kitchen workspace — brand page, WhatsApp, payments, package, marketing, modules, streaming",
   },
   owners: { title: "Owners", desc: "Subscription tiers and kitchen counts — force plan changes" },
   customers: {
@@ -794,6 +796,7 @@ function AdminKitchens() {
   const [templates, setTemplates] = useState<{ id: string; channel: string; name: string; is_active: boolean; body: string }[]>([]);
   const [panelTab, setPanelTab] = useState<
     | "profile"
+    | "brand"
     | "whatsapp"
     | "payments"
     | "package"
@@ -811,6 +814,8 @@ function AdminKitchens() {
   const [busy, setBusy] = useState(false);
   const [phoneId, setPhoneId] = useState("");
   const [displayPhone, setDisplayPhone] = useState("");
+  const [brandTagline, setBrandTagline] = useState("");
+  const [brandAccent, setBrandAccent] = useState("#0F766E");
   const [keyId, setKeyId] = useState("");
   const [keySecret, setKeySecret] = useState("");
   const [webhookSecret, setWebhookSecret] = useState("");
@@ -857,6 +862,8 @@ function AdminKitchens() {
       setPorterDelayMin(d.porter_auto_book_delay_min ?? 15);
       setPhoneId(w.whatsapp_phone_id ?? "");
       setDisplayPhone(w.whatsapp_display_phone ?? "");
+      setBrandTagline(d.branded_page?.tagline ?? "");
+      setBrandAccent(d.branded_page?.accent_color ?? "#0F766E");
       setKeyId(p.key_id ?? "");
       setLinkedAccountId(p.linked_account_id ?? "");
       setPgwActive(p.is_active);
@@ -871,6 +878,100 @@ function AdminKitchens() {
   const suspended = rows.filter((k) => k.status === "suspended").length;
   const waLinked = rows.filter((k) => k.whatsapp_connected).length;
   const pgwReady = rows.filter((k) => k.payment_gateway_configured).length;
+
+  const kitchenColumns = useMemo<DataColumn<AdminKitchen>[]>(
+    () => [
+      {
+        id: "code",
+        header: "Code",
+        sortable: true,
+        sortValue: (k) => k.code,
+        cell: (k) => <code className="admin-code">{k.code}</code>,
+      },
+      {
+        id: "name",
+        header: "Name",
+        sortable: true,
+        sortValue: (k) => k.name,
+        cell: (k) => k.name,
+      },
+      {
+        id: "owner",
+        header: "Owner",
+        sortable: true,
+        sortValue: (k) => k.owner_name,
+        cell: (k) => k.owner_name,
+      },
+      {
+        id: "wa",
+        header: "WA",
+        sortable: true,
+        sortValue: (k) => (k.whatsapp_connected ? 1 : 0),
+        cell: (k) => (k.whatsapp_connected ? "●" : "○"),
+      },
+      {
+        id: "pay",
+        header: "Pay",
+        sortable: true,
+        sortValue: (k) => (k.payment_gateway_configured ? 1 : 0),
+        cell: (k) => (k.payment_gateway_configured ? "●" : "○"),
+      },
+      {
+        id: "brand",
+        header: "Brand",
+        sortable: true,
+        sortValue: (k) => (k.branded_page_enabled ? 1 : 0),
+        cell: (k) => (k.branded_page_enabled ? "●" : "○"),
+      },
+      {
+        id: "status",
+        header: "Status",
+        sortable: true,
+        sortValue: (k) => k.status,
+        cell: (k) => <span className={`status-badge status-badge--${k.status}`}>{k.status}</span>,
+      },
+      {
+        id: "workspace",
+        header: "Workspace",
+        cell: (k) => (
+          <button type="button" className="btn btn--sm btn--primary" onClick={() => openKitchen(k.id)}>
+            Open
+          </button>
+        ),
+      },
+    ],
+    // openKitchen closes over setters only — stable enough for column defs
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [],
+  );
+
+  const saveBrandedPage = async (enabled?: boolean) => {
+    if (!selectedId) return;
+    setBusy(true);
+    setError("");
+    try {
+      const next = await updateAdminKitchenBrandedPage(selectedId, {
+        enabled,
+        tagline: brandTagline.trim() || null,
+        accent_color: brandAccent.trim() || null,
+      });
+      setDetail(next);
+      setBrandTagline(next.branded_page?.tagline ?? "");
+      setBrandAccent(next.branded_page?.accent_color ?? "#0F766E");
+      await reloadList();
+      setOk(
+        enabled === true
+          ? "Branded page published."
+          : enabled === false
+            ? "Branded page unpublished."
+            : "Brand page saved.",
+      );
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Brand page update failed");
+    } finally {
+      setBusy(false);
+    }
+  };
 
   const setStatus = async (id: string, status: string) => {
     setBusy(true);
@@ -1004,47 +1105,25 @@ function AdminKitchens() {
       {error && <p className="auth-card__error">{error}</p>}
       {ok && <p className="auth-card__success">{ok}</p>}
 
-      <div className="admin-kitchen-workspace">
-        <div className="dash-card admin-table-wrap">
-          {loading ? (
-            <p className="admin-panel__empty">Loading kitchens…</p>
-          ) : (
-            <table className="admin-table">
-              <thead>
-                <tr>
-                  <th>Code</th>
-                  <th>Name</th>
-                  <th>Owner</th>
-                  <th>WA</th>
-                  <th>Pay</th>
-                  <th>Status</th>
-                  <th>Workspace</th>
-                </tr>
-              </thead>
-              <tbody>
-                {rows.map((k) => (
-                  <tr key={k.id} className={selectedId === k.id ? "admin-table__row--active" : undefined}>
-                    <td><code className="admin-code">{k.code}</code></td>
-                    <td>{k.name}</td>
-                    <td>{k.owner_name}</td>
-                    <td>{k.whatsapp_connected ? "●" : "○"}</td>
-                    <td>{k.payment_gateway_configured ? "●" : "○"}</td>
-                    <td><span className={`status-badge status-badge--${k.status}`}>{k.status}</span></td>
-                    <td>
-                      <button
-                        type="button"
-                        className="btn btn--sm btn--primary"
-                        onClick={() => openKitchen(k.id)}
-                      >
-                        Open
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-        </div>
+      <div
+        className={`admin-kitchen-workspace${detail && selectedId ? "" : " admin-kitchen-workspace--list-only"}`}
+      >
+        <DataTable
+          rows={rows}
+          loading={loading}
+          emptyMessage="No kitchens yet."
+          searchPlaceholder="Search code, name, owner…"
+          getSearchText={(k) => `${k.code} ${k.name} ${k.owner_name} ${k.status}`}
+          filterChips={[
+            { id: "", label: "All" },
+            { id: "active", label: "Active" },
+            { id: "suspended", label: "Suspended" },
+          ]}
+          getFilterValue={(k) => k.status}
+          rowKey={(k) => k.id}
+          rowClassName={(k) => (selectedId === k.id ? "admin-table__row--active" : undefined)}
+          columns={kitchenColumns}
+        />
 
         {detail && selectedId && (
           <section className="dash-card admin-kitchen-panel">
@@ -1058,6 +1137,16 @@ function AdminKitchens() {
                 </p>
               </div>
               <div className="admin-kitchen-panel__status">
+                <button
+                  type="button"
+                  className="btn btn--ghost btn--sm"
+                  onClick={() => {
+                    setSelectedId(null);
+                    setDetail(null);
+                  }}
+                >
+                  Close
+                </button>
                 {detail.status !== "active" && (
                   <button type="button" className="btn btn--sm btn--primary" disabled={busy} onClick={() => setStatus(selectedId, "active")}>
                     Activate
@@ -1073,7 +1162,18 @@ function AdminKitchens() {
 
             <div className="admin-kitchen-panel__tabs">
               {(
-                ["profile", "whatsapp", "payments", "package", "marketing", "modules", "streaming", "delivery", "tiffin"] as const
+                [
+                  "profile",
+                  "brand",
+                  "whatsapp",
+                  "payments",
+                  "package",
+                  "marketing",
+                  "modules",
+                  "streaming",
+                  "delivery",
+                  "tiffin",
+                ] as const
               ).map((t) => (
                 <button
                   key={t}
@@ -1099,10 +1199,92 @@ function AdminKitchens() {
                   <div><dt>State / PIN</dt><dd>{detail.state ?? "—"} / {detail.pincode ?? "—"}</dd></div>
                   <div><dt>WhatsApp</dt><dd>{detail.whatsapp_connected ? "Linked" : "Not linked"}</dd></div>
                   <div><dt>Payment gateway</dt><dd>{detail.payment_gateway_configured ? "Configured" : "Not set"}</dd></div>
+                  <div>
+                    <dt>Brand page</dt>
+                    <dd>{detail.branded_page?.enabled || detail.branded_page_enabled ? "Published" : "Not published"}</dd>
+                  </div>
                 </dl>
               </div>
             )}
 
+            {panelTab === "brand" && (
+              <div className="admin-kitchen-panel__body owner-forms">
+                <p className="report-hint">
+                  Customer storefront at <code>/k/{detail.code}</code>. Owners manage this from kitchen → Brand page;
+                  ops can publish/unpublish here for support.
+                </p>
+                <dl className="admin-kv">
+                  <div>
+                    <dt>Public link</dt>
+                    <dd>
+                      <a
+                        href={customerUrl(`/k/${detail.code}`)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                      >
+                        {customerUrl(`/k/${detail.code}`)}
+                      </a>
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>Status</dt>
+                    <dd>{detail.branded_page?.enabled ? "Published" : "Not published"}</dd>
+                  </div>
+                </dl>
+                <label>
+                  Tagline
+                  <input
+                    value={brandTagline}
+                    onChange={(e) => setBrandTagline(e.target.value)}
+                    maxLength={160}
+                    placeholder="Home-style thalis · live-capture menu"
+                  />
+                </label>
+                <label>
+                  Accent colour
+                  <input
+                    value={brandAccent}
+                    onChange={(e) => setBrandAccent(e.target.value.toUpperCase())}
+                    maxLength={7}
+                    placeholder="#0F766E"
+                  />
+                </label>
+                <div className="owner-forms__actions">
+                  <button
+                    type="button"
+                    className="btn btn--primary"
+                    disabled={busy}
+                    onClick={() => saveBrandedPage(true)}
+                  >
+                    Publish
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn--ghost"
+                    disabled={busy}
+                    onClick={() => saveBrandedPage()}
+                  >
+                    Save content
+                  </button>
+                  {detail.branded_page?.enabled && (
+                    <button
+                      type="button"
+                      className="btn btn--ghost"
+                      disabled={busy}
+                      onClick={() => saveBrandedPage(false)}
+                    >
+                      Unpublish
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {panelTab === "whatsapp" && !wa && (
+              <p className="admin-kitchen-panel__body report-hint">
+                WhatsApp settings unavailable. Close and reopen this kitchen, or check the gateway.
+              </p>
+            )}
             {panelTab === "whatsapp" && wa && (
               <form className="admin-kitchen-panel__body owner-forms" onSubmit={saveWhatsApp}>
                 <p className="report-hint">{wa.platform_secrets_note}</p>
@@ -1125,6 +1307,11 @@ function AdminKitchens() {
               </form>
             )}
 
+            {panelTab === "payments" && !pgw && (
+              <p className="admin-kitchen-panel__body report-hint">
+                Payment gateway settings unavailable. Close and reopen this kitchen, or check the gateway.
+              </p>
+            )}
             {panelTab === "payments" && pgw && (
               <form className="admin-kitchen-panel__body owner-forms" onSubmit={savePayments}>
                 <p className="report-hint">
@@ -1259,6 +1446,11 @@ function AdminKitchens() {
               </div>
             )}
 
+            {panelTab === "streaming" && !modules && (
+              <p className="admin-kitchen-panel__body report-hint">
+                Module flags unavailable. Close and reopen this kitchen, or check the gateway.
+              </p>
+            )}
             {panelTab === "streaming" && modules && (
               <div className="admin-kitchen-panel__body">
                 <p className="report-hint">
@@ -1287,6 +1479,11 @@ function AdminKitchens() {
               </div>
             )}
 
+            {panelTab === "modules" && !modules && (
+              <p className="admin-kitchen-panel__body report-hint">
+                Module flags unavailable. Close and reopen this kitchen, or check the gateway.
+              </p>
+            )}
             {panelTab === "modules" && modules && (
               <ul className="admin-kitchen-panel__body report-rank">
                 {modules.modules.map((m) => (
@@ -1404,7 +1601,8 @@ function AdminKitchens() {
 }
 
 function AdminOwners() {
-  const [rows, setRows] = useState<Awaited<ReturnType<typeof fetchAdminOwners>>>([]);
+  type OwnerRow = Awaited<ReturnType<typeof fetchAdminOwners>>[number];
+  const [rows, setRows] = useState<OwnerRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -1425,6 +1623,76 @@ function AdminOwners() {
   }, {});
   const topTier = Object.entries(tierCounts).sort((a, b) => b[1] - a[1])[0]?.[0] ?? "—";
 
+  const ownerColumns = useMemo<DataColumn<OwnerRow>[]>(
+    () => [
+      {
+        id: "name",
+        header: "Name",
+        sortable: true,
+        sortValue: (o) => o.name,
+        cell: (o) => o.name,
+      },
+      {
+        id: "phone",
+        header: "Phone",
+        sortable: true,
+        sortValue: (o) => o.phone,
+        cell: (o) => o.phone,
+      },
+      {
+        id: "tier",
+        header: "Tier",
+        sortable: true,
+        sortValue: (o) => o.subscription_tier,
+        cell: (o) => <span className="od-pill od-pill--sub">{o.subscription_tier}</span>,
+      },
+      {
+        id: "status",
+        header: "Status",
+        sortable: true,
+        sortValue: (o) => o.subscription_status,
+        cell: (o) => o.subscription_status,
+      },
+      {
+        id: "kitchens",
+        header: "Kitchens",
+        sortable: true,
+        sortValue: (o) => o.kitchen_count,
+        align: "right",
+        cell: (o) => o.kitchen_count,
+      },
+      {
+        id: "control",
+        header: "Control",
+        cell: (o) => (
+          <button
+            type="button"
+            className="btn btn--ghost btn--sm"
+            disabled={busyId === o.id}
+            onClick={async () => {
+              setBusyId(o.id);
+              setError("");
+              try {
+                await updateAdminOwnerSubscription(o.id, {
+                  subscription_tier: "growth",
+                  subscription_status: "active",
+                });
+                await load();
+              } catch (e) {
+                setError(e instanceof Error ? e.message : "Update failed");
+              } finally {
+                setBusyId(null);
+              }
+            }}
+          >
+            Force growth/active
+          </button>
+        ),
+      },
+    ],
+    [busyId],
+  );
+
   return (
     <>
       {error && <p className="auth-card__error">{error}</p>}
@@ -1442,63 +1710,29 @@ function AdminOwners() {
           <span>Most common tier</span>
         </div>
       </div>
-    <div className="dash-card admin-table-wrap">
-      {loading ? <p className="admin-panel__empty">Loading owners…</p> : (
-      <table className="admin-table">
-        <thead>
-          <tr>
-            <th>Name</th>
-            <th>Phone</th>
-            <th>Tier</th>
-            <th>Status</th>
-            <th>Kitchens</th>
-            <th>Control</th>
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((o) => (
-            <tr key={o.id}>
-              <td>{o.name}</td>
-              <td>{o.phone}</td>
-              <td><span className="od-pill od-pill--sub">{o.subscription_tier}</span></td>
-              <td>{o.subscription_status}</td>
-              <td>{o.kitchen_count}</td>
-              <td>
-                <button
-                  type="button"
-                  className="btn btn--ghost btn--sm"
-                  disabled={busyId === o.id}
-                  onClick={async () => {
-                    setBusyId(o.id);
-                    setError("");
-                    try {
-                      await updateAdminOwnerSubscription(o.id, {
-                        subscription_tier: "growth",
-                        subscription_status: "active",
-                      });
-                      await load();
-                    } catch (e) {
-                      setError(e instanceof Error ? e.message : "Update failed");
-                    } finally {
-                      setBusyId(null);
-                    }
-                  }}
-                >
-                  Force growth/active
-                </button>
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-      )}
-    </div>
+      <DataTable
+        rows={rows}
+        loading={loading}
+        emptyMessage="No owners yet."
+        searchPlaceholder="Search name, phone, tier…"
+        getSearchText={(o) => `${o.name} ${o.phone} ${o.subscription_tier} ${o.subscription_status}`}
+        filterChips={[
+          { id: "", label: "All tiers" },
+          ...Object.keys(tierCounts)
+            .sort()
+            .map((t) => ({ id: t, label: t })),
+        ]}
+        getFilterValue={(o) => o.subscription_tier}
+        rowKey={(o) => o.id}
+        columns={ownerColumns}
+      />
     </>
   );
 }
 
 function AdminOrders() {
-  const [rows, setRows] = useState<Awaited<ReturnType<typeof fetchAdminOrders>>>([]);
+  type OrderRow = Awaited<ReturnType<typeof fetchAdminOrders>>[number];
+  const [rows, setRows] = useState<OrderRow[]>([]);
   const [loading, setLoading] = useState(true);
   useEffect(() => {
     fetchAdminOrders(300)
@@ -1510,6 +1744,55 @@ function AdminOrders() {
   const totalRevenue = rows.reduce((sum, o) => sum + o.total, 0);
   const activeCount = rows.filter((o) => !["delivered", "cancelled"].includes(o.status)).length;
   const inr = (n: number) => `₹${Math.round(n).toLocaleString("en-IN")}`;
+
+  const orderColumns = useMemo<DataColumn<OrderRow>[]>(
+    () => [
+      {
+        id: "code",
+        header: "Code",
+        sortable: true,
+        sortValue: (o) => o.order_code,
+        cell: (o) => <code className="admin-code">{o.order_code}</code>,
+      },
+      {
+        id: "kitchen",
+        header: "Kitchen",
+        sortable: true,
+        sortValue: (o) => o.kitchen_name,
+        cell: (o) => o.kitchen_name,
+      },
+      {
+        id: "customer",
+        header: "Customer",
+        sortable: true,
+        sortValue: (o) => o.customer_name ?? "",
+        cell: (o) => o.customer_name ?? "—",
+      },
+      {
+        id: "status",
+        header: "Status",
+        sortable: true,
+        sortValue: (o) => o.status,
+        cell: (o) => <span className={`status-badge status-badge--${o.status}`}>{o.status}</span>,
+      },
+      {
+        id: "when",
+        header: "When",
+        sortable: true,
+        sortValue: (o) => new Date(o.created_at).getTime(),
+        cell: (o) => new Date(o.created_at).toLocaleDateString("en-IN"),
+      },
+      {
+        id: "total",
+        header: "Total",
+        sortable: true,
+        sortValue: (o) => o.total,
+        align: "right",
+        cell: (o) => inr(o.total),
+      },
+    ],
+    [],
+  );
 
   return (
     <>
@@ -1527,59 +1810,52 @@ function AdminOrders() {
           <span>Sample revenue</span>
         </div>
       </div>
-      <div className="dash-card admin-table-wrap">
-      {loading ? <p className="admin-panel__empty">Loading orders…</p> : (
-      <table className="admin-table">
-        <thead>
-          <tr>
-            <th>Code</th>
-            <th>Kitchen</th>
-            <th>Customer</th>
-            <th>Status</th>
-            <th>When</th>
-            <th>Total</th>
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((o) => (
-            <tr key={o.id}>
-              <td><code className="admin-code">{o.order_code}</code></td>
-              <td>{o.kitchen_name}</td>
-              <td>{o.customer_name ?? "—"}</td>
-              <td><span className={`status-badge status-badge--${o.status}`}>{o.status}</span></td>
-              <td>{new Date(o.created_at).toLocaleDateString("en-IN")}</td>
-              <td>{inr(o.total)}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-      )}
-    </div>
+      <DataTable
+        rows={rows}
+        loading={loading}
+        emptyMessage="No orders loaded."
+        searchPlaceholder="Search code, kitchen, customer…"
+        getSearchText={(o) =>
+          `${o.order_code} ${o.kitchen_name} ${o.customer_name ?? ""} ${o.status}`
+        }
+        filterChips={[
+          { id: "", label: "All" },
+          { id: "received", label: "Received" },
+          { id: "accepted", label: "Accepted" },
+          { id: "preparing", label: "Preparing" },
+          { id: "ready", label: "Ready" },
+          { id: "out_for_delivery", label: "Out for delivery" },
+          { id: "delivered", label: "Delivered" },
+          { id: "cancelled", label: "Cancelled" },
+        ]}
+        getFilterValue={(o) => o.status}
+        rowKey={(o) => o.id}
+        columns={orderColumns}
+        defaultPageSize={25}
+      />
     </>
   );
 }
 
 function AdminTickets() {
   const [tickets, setTickets] = useState<AdminTicket[]>([]);
+  const [loading, setLoading] = useState(true);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [detail, setDetail] = useState<AdminTicket | null>(null);
-  const [statusFilter, setStatusFilter] = useState("");
-  const [audienceFilter, setAudienceFilter] = useState("");
   const [reply, setReply] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
   const loadTickets = async () => {
-    const res = await fetchAdminTickets({
-      status: statusFilter || undefined,
-      audience: audienceFilter || undefined,
-    });
+    const res = await fetchAdminTickets();
     setTickets(res.tickets);
   };
 
   useEffect(() => {
-    loadTickets().catch((e) => setError(e.message));
-  }, [statusFilter, audienceFilter]);
+    loadTickets()
+      .catch((e) => setError(e.message))
+      .finally(() => setLoading(false));
+  }, []);
 
   useEffect(() => {
     if (!selectedId) {
@@ -1626,65 +1902,93 @@ function AdminTickets() {
     }
   };
 
+  const ticketColumns = useMemo<DataColumn<AdminTicket>[]>(
+    () => [
+      {
+        id: "ticket",
+        header: "Ticket",
+        sortable: true,
+        sortValue: (t) => t.ticket_number,
+        cell: (t) => (
+          <div>
+            <strong>{t.ticket_number}</strong>
+            <span className="admin-tickets__meta">
+              {t.audience} · {t.category}
+            </span>
+          </div>
+        ),
+      },
+      {
+        id: "subject",
+        header: "Subject",
+        sortable: true,
+        sortValue: (t) => t.subject,
+        cell: (t) => t.subject,
+      },
+      {
+        id: "status",
+        header: "Status",
+        sortable: true,
+        sortValue: (t) => t.status,
+        cell: (t) => <span className={`status-badge status-badge--${t.status}`}>{t.status}</span>,
+      },
+      {
+        id: "priority",
+        header: "Priority",
+        sortable: true,
+        sortValue: (t) => t.priority,
+        cell: (t) => t.priority,
+      },
+      {
+        id: "open",
+        header: "",
+        cell: (t) => (
+          <button type="button" className="btn btn--ghost btn--sm" onClick={() => setSelectedId(t.id)}>
+            Open
+          </button>
+        ),
+      },
+    ],
+    [],
+  );
+
   return (
     <div className="admin-tickets">
-      <div className="admin-tickets__filters">
-        <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
-          <option value="">All statuses</option>
-          <option value="open">Open</option>
-          <option value="in_progress">In progress</option>
-          <option value="waiting_customer">Waiting customer</option>
-          <option value="resolved">Resolved</option>
-          <option value="closed">Closed</option>
-        </select>
-        <select value={audienceFilter} onChange={(e) => setAudienceFilter(e.target.value)}>
-          <option value="">All audiences</option>
-          <option value="customer">Customer</option>
-          <option value="owner">Owner</option>
-        </select>
-      </div>
-
       {error && <p className="auth-card__error">{error}</p>}
 
-      <div className="admin-tickets__grid">
-        <div className="dash-card admin-tickets__list">
-          <table className="admin-table">
-            <thead>
-              <tr>
-                <th>Ticket</th>
-                <th>Subject</th>
-                <th>Status</th>
-                <th>Priority</th>
-              </tr>
-            </thead>
-            <tbody>
-              {tickets.map((t) => (
-                <tr
-                  key={t.id}
-                  className={selectedId === t.id ? "admin-tickets__row--active" : ""}
-                  onClick={() => setSelectedId(t.id)}
-                >
-                  <td>
-                    <strong>{t.ticket_number}</strong>
-                    <span className="admin-tickets__meta">{t.audience} · {t.category}</span>
-                  </td>
-                  <td>{t.subject}</td>
-                  <td><span className={`status-badge status-badge--${t.status}`}>{t.status}</span></td>
-                  <td>{t.priority}</td>
-                </tr>
-              ))}
-              {tickets.length === 0 && (
-                <tr><td colSpan={4}>No tickets yet — customers can raise them via AI chat on the portal.</td></tr>
-              )}
-            </tbody>
-          </table>
-        </div>
+      <div className={`admin-tickets__grid${detail ? "" : " admin-tickets__grid--list-only"}`}>
+        <DataTable
+          rows={tickets}
+          loading={loading}
+          emptyMessage="No tickets yet — customers can raise them via AI chat on the portal."
+          searchPlaceholder="Search ticket, subject, audience…"
+          getSearchText={(t) =>
+            `${t.ticket_number} ${t.subject} ${t.status} ${t.priority} ${t.audience} ${t.category} ${t.customer_name ?? ""}`
+          }
+          filterChips={[
+            { id: "", label: "All" },
+            { id: "open", label: "Open" },
+            { id: "in_progress", label: "In progress" },
+            { id: "waiting_customer", label: "Waiting" },
+            { id: "resolved", label: "Resolved" },
+            { id: "closed", label: "Closed" },
+          ]}
+          getFilterValue={(t) => t.status}
+          rowKey={(t) => t.id}
+          rowClassName={(t) => (selectedId === t.id ? "admin-tickets__row--active" : undefined)}
+          columns={ticketColumns}
+        />
 
         {detail && (
           <div className="dash-card admin-tickets__detail">
             <header>
-              <h2>{detail.ticket_number}</h2>
-              <p>{detail.subject}</p>
+              <div>
+                <h2>{detail.ticket_number}</h2>
+                <p>{detail.subject}</p>
+              </div>
+              <button type="button" className="btn btn--ghost btn--sm" onClick={() => setSelectedId(null)}>
+                Close
+              </button>
             </header>
             <dl className="admin-tickets__info">
               <div><dt>Status</dt><dd>{detail.status}</dd></div>

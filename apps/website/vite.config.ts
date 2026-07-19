@@ -1,5 +1,9 @@
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
+
+const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 
 const apiProxy = {
   "/api": {
@@ -22,6 +26,7 @@ const apiProxy = {
 
 /** kitchCU portal homepage — choose customer.kitchcu.in or kitchen.kitchcu.in (port 13000) */
 export default defineConfig({
+  envDir: repoRoot,
   plugins: [react()],
   server: {
     port: 13000,

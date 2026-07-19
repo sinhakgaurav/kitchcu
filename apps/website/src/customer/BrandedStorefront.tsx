@@ -3,6 +3,7 @@ import { Link, Navigate, Outlet, useParams } from "react-router-dom";
 import { APP_NAME } from "../shared/brand";
 import { fetchKitchenByCode, type KitchenPublic } from "../shared/api";
 import { saveKitchenToSession } from "../shared/customerSession";
+import { portalUrl } from "../shared/urls";
 
 type BrandedCtx = {
   kitchen: KitchenPublic;
@@ -99,7 +100,7 @@ export function BrandedStorefrontLayout() {
           <span>
             Powered by <strong>{APP_NAME}</strong>
           </span>
-          <a href="https://kitchcu.in" target="_blank" rel="noreferrer">
+          <a href={portalUrl("/")} target="_blank" rel="noreferrer">
             Grow your kitchen →
           </a>
         </footer>

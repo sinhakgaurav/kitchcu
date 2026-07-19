@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { BrandNavMark } from "./BrandNavMark";
 import { APP_TAGLINE } from "../shared/brand";
 import { useAuth } from "../lib/auth";
+import { customerUrl } from "../shared/urls";
 
 const links = [
   { href: "/#for-owners", label: "Owners" },
@@ -35,9 +36,15 @@ export function Navbar() {
           {links.map((l) => (
             <a key={l.href} href={hashLink(l.href)} onClick={() => setOpen(false)}>{l.label}</a>
           ))}
-          <Link to="/customers" className="btn btn--ghost btn--sm" onClick={() => setOpen(false)}>
+          <a
+            href={customerUrl("/browse")}
+            className="btn btn--ghost btn--sm"
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={() => setOpen(false)}
+          >
             Customers
-          </Link>
+          </a>
           <Link
             to={token ? "/dashboard" : "/login"}
             className="btn btn--primary btn--sm"

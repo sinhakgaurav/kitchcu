@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { BrandNavMark } from "./BrandNavMark";
+import { LanguageSwitcher } from "../i18n/LanguageSwitcher";
 import { APP_TAGLINE } from "../shared/brand";
 import { customerUrl, kitchenUrl } from "../shared/urls";
 
@@ -54,6 +55,7 @@ export function PortalNavbar() {
           >
             Owner login
           </a>
+          <LanguageSwitcher />
         </nav>
 
         <button

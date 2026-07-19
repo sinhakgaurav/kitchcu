@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom";
 import { BrandNavMark } from "./BrandNavMark";
 import { APP_NAME } from "../shared/brand";
+import { customerUrl } from "../shared/urls";
 
 export function Footer() {
   return (
@@ -12,7 +13,9 @@ export function Footer() {
         </div>
         <div className="footer__links">
           <a href="/#for-owners">Owners</a>
-          <Link to="/customers">Customers</Link>
+          <a href={customerUrl("/browse")} target="_blank" rel="noopener noreferrer">
+            Customers
+          </a>
           <Link to="/login">Owner Login</Link>
           <a href="/#contact">Contact</a>
         </div>

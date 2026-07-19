@@ -1,7 +1,11 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { APP_STORAGE_PREFIX } from "../../shared/brand";
-import { completeCustomerOAuth, customerOAuthRedirectUri } from "../../shared/customerApi";
+import {
+  completeCustomerOAuth,
+  customerOAuthRedirectUri,
+  takeCustomerOAuthNext,
+} from "../../shared/customerApi";
 import { useCustomerAuth } from "../../shared/customerAuth";
 
 const OAUTH_PROVIDERS = ["google", "facebook", "instagram", "twitter"] as const;
@@ -39,11 +43,12 @@ export function CustomerOAuthCallbackPage() {
 
     const redirect_uri = customerOAuthRedirectUri();
 
+    const next = takeCustomerOAuthNext(provider);
     completeCustomerOAuth(provider, { code, state, redirect_uri })
       .then((result) => {
         sessionStorage.removeItem(`${APP_STORAGE_PREFIX}_oauth_pending_${provider}`);
         applyAuthResult(result);
-        navigate("/", { replace: true });
+        navigate(next.startsWith("/") ? next : "/", { replace: true });
       })
       .catch((err) => {
         setError(err instanceof Error ? err.message : "OAuth sign in failed");

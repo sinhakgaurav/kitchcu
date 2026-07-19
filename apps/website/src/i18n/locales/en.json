@@ -1,0 +1,24 @@
+{
+  "lang": {
+    "title": "Choose your language",
+    "detected": "We think your local language is {{language}}.",
+    "ask": "Would you like to continue in English or {{language}}?",
+    "continueEn": "Continue in English",
+    "continueLocal": "Continue in {{language}}",
+    "detecting": "Detecting your location…",
+    "change": "Language"
+  },
+  "portal": {
+    "heroSubtitle": "Growth OS for home chefs, tiffin services, and delivery-only kitchens — WhatsApp orders, live-capture menus, zero food commission.",
+    "ctaOwner": "Start as kitchen owner",
+    "ctaCustomer": "Browse as customer →",
+    "trustCommission": "Zero food commission",
+    "trustCrm": "Owner-owned CRM",
+    "trustHonest": "Honest prep & delivery times"
+  },
+  "common": {
+    "continue": "Continue",
+    "cancel": "Cancel",
+    "loading": "Loading…"
+  }
+}

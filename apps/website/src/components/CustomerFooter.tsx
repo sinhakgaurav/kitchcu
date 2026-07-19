@@ -14,6 +14,8 @@ export function CustomerFooter() {
         </div>
         <div className="footer__links">
           <Link to="/">Home</Link>
+          <a href="/#nearby">Nearby</a>
+          <Link to="/browse">Find by code</Link>
           <Link to="/login">Customer sign in</Link>
           <a href={kitchenUrl("/login")} target="_blank" rel="noopener noreferrer">Kitchen owner login</a>
         </div>

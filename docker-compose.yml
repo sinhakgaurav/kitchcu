@@ -389,6 +389,7 @@ services:
         VITE_CUSTOMER_APP_URL: http://localhost:13001
         VITE_KITCHEN_APP_URL: http://localhost:13002
         VITE_ADMIN_APP_URL: http://localhost:13003
+        VITE_GOOGLE_MAPS_API_KEY: ${VITE_GOOGLE_MAPS_API_KEY:-}
     ports:
       - "13001:80"
     depends_on:
@@ -404,6 +405,7 @@ services:
         VITE_CUSTOMER_APP_URL: http://localhost:13001
         VITE_KITCHEN_APP_URL: http://localhost:13002
         VITE_ADMIN_APP_URL: http://localhost:13003
+        VITE_GOOGLE_MAPS_API_KEY: ${VITE_GOOGLE_MAPS_API_KEY:-}
     ports:
       - "13002:80"
     depends_on:
@@ -419,6 +421,7 @@ services:
         VITE_CUSTOMER_APP_URL: http://localhost:13001
         VITE_KITCHEN_APP_URL: http://localhost:13002
         VITE_ADMIN_APP_URL: http://localhost:13003
+        VITE_GOOGLE_MAPS_API_KEY: ${VITE_GOOGLE_MAPS_API_KEY:-}
     ports:
       - "13000:80"
 
@@ -431,6 +434,7 @@ services:
         VITE_CUSTOMER_APP_URL: http://localhost:13001
         VITE_KITCHEN_APP_URL: http://localhost:13002
         VITE_ADMIN_APP_URL: http://localhost:13003
+        VITE_GOOGLE_MAPS_API_KEY: ${VITE_GOOGLE_MAPS_API_KEY:-}
     ports:
       - "13003:80"
     depends_on:

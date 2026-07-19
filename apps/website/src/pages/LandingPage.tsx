@@ -9,7 +9,7 @@ import { Footer } from "../components/Footer";
 
 export function LandingPage() {
   return (
-    <>
+    <div className="kitchen-landing">
       <Navbar />
       <main>
         <Hero variant="kitchen" />
@@ -22,6 +22,6 @@ export function LandingPage() {
         <Contact />
       </main>
       <Footer />
-    </>
+    </div>
   );
 }

@@ -73,7 +73,7 @@ For **architecture + end-to-end flows** see [PLATFORM-ARCHITECTURE-FLOWS.md](./P
 
 | ID | Feature | Surfaces | Status | Notes |
 |----|---------|----------|--------|-------|
-| P19 | **Branded kitchen storefront** | Identity `branded_page` · customer `/k/:code` · owner Overview publish | ✅ | Shareable brand page → menu/checkout |
+| P19 | **Branded kitchen storefront** | Identity `branded_page` · customer `/k/:code` · owner **Brand page** nav (`/dashboard/brand`) + Overview teaser · admin kitchen **Brand** tab | ✅ | Shareable brand page → menu/checkout; verify: `node scripts/check-platform-ui-map.mjs` |
 | P20 | **Golden performance day + ML comments** | Growth scorer + sentiment · owner Growth/Menu · notify golden day | ✅ | Pins recipes from peak days |
 | P21 | **Kitchen WhatsApp + Razorpay workspace** | Owner Integrations · Admin kitchen detail (Profile/WA/Payments/Modules) | ✅ | Platform SaaS keys stay Admin → API Keys |
 | P22 | **Go-live per-dish showcase** | Streaming dish_id + phases ingredients→prep→prepared · StreamPage · Nearby live filter | ✅ | Event `stream.showcase_updated` |
@@ -136,6 +136,17 @@ Run `.\scripts\seed-all.ps1` (or GCP `run-seed=1`) after migrations.
 | **B (promises)** | ✅ Templates/Watch/Porter cost-share · ✅ Porter webhooks · ⏳ kitchen staff **build** (design pack ✅) | [KITCHEN-STAFF-RBAC-DESIGN.md](./design/KITCHEN-STAFF-RBAC-DESIGN.md) |
 | **C (design)** | E1–E2 Kitchen Quality Loop | [E1-E2-KITCHEN-QUALITY-LOOP-DESIGN.md](./E1-E2-KITCHEN-QUALITY-LOOP-DESIGN.md) |
 | **D (scale)** | Cloud Run architecture · OTel · load SLOs | [DEPLOYMENT-GCP.md](./DEPLOYMENT-GCP.md) §1–10 |
+
+---
+
+## UI ↔ endpoint verification
+
+```powershell
+node scripts/check-platform-ui-map.mjs   # feature → UI → /api/v1 client paths
+node scripts/check-ui-reach.mjs          # Brand + DataTable reach graph
+```
+
+Both must exit 0 before calling a UI surface “done.”
 
 ---
 

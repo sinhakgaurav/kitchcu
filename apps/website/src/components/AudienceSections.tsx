@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom";
 import { useInView } from "../hooks/useParallax";
 import { images } from "../data/content";
+import { customerUrl } from "../shared/urls";
 import { ParallaxImage } from "./ParallaxImage";
 import type { RefObject } from "react";
 export function ForCustomers() {
@@ -23,9 +24,14 @@ export function ForCustomers() {
             <li>See real dish photos with live-capture badge</li>
             <li>Order tracking coming to customer app</li>
           </ul>
-          <Link to="/customers" className="btn btn--primary btn--lg">
-            Browse Kitchens
-          </Link>
+          <a
+            href={customerUrl("/browse")}
+            className="btn btn--primary btn--lg"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            Browse kitchens
+          </a>
         </div>
       </div>
     </section>

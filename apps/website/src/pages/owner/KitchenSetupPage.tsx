@@ -1,11 +1,12 @@
 import { FormEvent, useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { KitchenLocationMap } from "../../components/owner/KitchenLocationMap";
 import { OwnerPageShell, OwnerPanel } from "../../components/owner/OwnerPageShell";
 import { useGeolocation } from "../../hooks/useGeolocation";
 import { formatKitchenAddress } from "../../lib/locationMaps";
 import { createKitchen, updateKitchenDeliverySettings } from "../../lib/api";
 import { useKitchen } from "../../lib/kitchen";
+import { customerUrl } from "../../shared/urls";
 
 const PUNE_DEFAULT = { latitude: 18.5362, longitude: 73.8958 };
 
@@ -52,7 +53,7 @@ export function KitchenSetupPage() {
         pincode: String(fd.get("pincode") || "") || undefined,
       });
       await reloadKitchens();
-      navigate("/dashboard");
+      navigate("/dashboard/brand");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to create kitchen");
     } finally {
@@ -114,6 +115,20 @@ export function KitchenSetupPage() {
                 }) || "—"}
               </p>
             </div>
+          </OwnerPanel>
+
+          <OwnerPanel
+            title="Brand page"
+            description="Share your kitchen-first storefront with customers — publish tagline and /k/code link."
+          >
+            <p className="owner-muted" style={{ marginBottom: "0.75rem" }}>
+              Public link:{" "}
+              <code>{customerUrl(`/k/${kitchen.code}`)}</code>
+              {kitchen.branded_page?.enabled ? " · Published" : " · Not published yet"}
+            </p>
+            <Link to="/dashboard/brand" className="btn btn--primary btn--sm">
+              Open Brand page
+            </Link>
           </OwnerPanel>
 
           <OwnerPanel

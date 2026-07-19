@@ -23,10 +23,14 @@ from app.models import (
 )
 from app.routes import get_publisher
 from app.schemas import (
+    KitchenBrandedPageSettings,
+    KitchenBrandedPageUpdate,
     KitchenDeliverySettingsUpdate,
     KitchenWhatsAppIntegrationResponse,
     KitchenWhatsAppIntegrationUpdate,
+    branded_page_from_settings,
     kitchen_whatsapp_to_response,
+    update_kitchen_branded_page,
     update_kitchen_delivery_settings,
     update_kitchen_whatsapp_integration,
 )
@@ -289,6 +293,10 @@ class AdminKitchenRow(BaseModel):
         default=False,
         description="True when Razorpay kitchen credentials / linked account exist in billing.",
     )
+    branded_page_enabled: bool = Field(
+        default=False,
+        description="True when the public branded storefront at `/k/{code}` is published.",
+    )
 
 
 class AdminKitchenDetail(AdminKitchenRow):
@@ -300,6 +308,10 @@ class AdminKitchenDetail(AdminKitchenRow):
     pincode: str | None = Field(default=None, description="PIN code.")
     whatsapp_phone_id: str | None = Field(default=None, description="Meta phone_number_id, if linked.")
     whatsapp_display_phone: str | None = Field(default=None, description="E.164 display number, if set.")
+    branded_page: KitchenBrandedPageSettings = Field(
+        default_factory=KitchenBrandedPageSettings,
+        description="Kitchen-first branded storefront settings (publish, tagline, accent).",
+    )
     porter_auto_book_enabled: bool = Field(
         default=True,
         description="When true (and module entitled), Porter is auto-booked after accept delay.",
@@ -322,6 +334,9 @@ def _admin_kitchen_row(
     *,
     payment_gateway_configured: bool = False,
 ) -> AdminKitchenRow:
+    bp = branded_page_from_settings(
+        kitchen.settings if isinstance(kitchen.settings, dict) else None
+    )
     return AdminKitchenRow(
         id=kitchen.id,
         code=kitchen.code,
@@ -332,6 +347,33 @@ def _admin_kitchen_row(
         owner_phone=owner.phone,
         whatsapp_connected=bool(kitchen.whatsapp_phone_id),
         payment_gateway_configured=payment_gateway_configured,
+        branded_page_enabled=bool(bp.enabled),
+    )
+
+
+def _admin_kitchen_detail(
+    kitchen: Kitchen,
+    owner: Owner,
+    *,
+    payment_gateway_configured: bool = False,
+) -> AdminKitchenDetail:
+    wa = kitchen_whatsapp_to_response(kitchen)
+    base = _admin_kitchen_row(
+        kitchen, owner, payment_gateway_configured=payment_gateway_configured
+    )
+    return AdminKitchenDetail(
+        **base.model_dump(),
+        owner_id=owner.id,
+        address_line=kitchen.address_line,
+        state=kitchen.state,
+        pincode=kitchen.pincode,
+        whatsapp_phone_id=wa.whatsapp_phone_id,
+        whatsapp_display_phone=wa.whatsapp_display_phone,
+        branded_page=branded_page_from_settings(
+            kitchen.settings if isinstance(kitchen.settings, dict) else None
+        ),
+        porter_auto_book_enabled=bool(getattr(kitchen, "porter_auto_book_enabled", True)),
+        porter_auto_book_delay_min=int(getattr(kitchen, "porter_auto_book_delay_min", 15) or 15),
     )
 
 
@@ -717,19 +759,9 @@ async def admin_kitchen_detail(
     if not row:
         raise HTTPException(status_code=404, detail="Kitchen not found")
     kitchen, owner = row
-    wa = kitchen_whatsapp_to_response(kitchen)
     gateway_ids = await _payment_gateway_kitchen_ids(session, [kitchen.id])
-    base = _admin_kitchen_row(kitchen, owner, payment_gateway_configured=kitchen.id in gateway_ids)
-    return AdminKitchenDetail(
-        **base.model_dump(),
-        owner_id=owner.id,
-        address_line=kitchen.address_line,
-        state=kitchen.state,
-        pincode=kitchen.pincode,
-        whatsapp_phone_id=wa.whatsapp_phone_id,
-        whatsapp_display_phone=wa.whatsapp_display_phone,
-        porter_auto_book_enabled=bool(getattr(kitchen, "porter_auto_book_enabled", True)),
-        porter_auto_book_delay_min=int(getattr(kitchen, "porter_auto_book_delay_min", 15) or 15),
+    return _admin_kitchen_detail(
+        kitchen, owner, payment_gateway_configured=kitchen.id in gateway_ids
     )
 
 
@@ -780,19 +812,67 @@ async def admin_kitchen_delivery_settings(
     await session.commit()
     await session.refresh(kitchen)
 
-    wa = kitchen_whatsapp_to_response(kitchen)
     gateway_ids = await _payment_gateway_kitchen_ids(session, [kitchen.id])
-    base = _admin_kitchen_row(kitchen, owner, payment_gateway_configured=kitchen.id in gateway_ids)
-    return AdminKitchenDetail(
-        **base.model_dump(),
-        owner_id=owner.id,
-        address_line=kitchen.address_line,
-        state=kitchen.state,
-        pincode=kitchen.pincode,
-        whatsapp_phone_id=wa.whatsapp_phone_id,
-        whatsapp_display_phone=wa.whatsapp_display_phone,
-        porter_auto_book_enabled=bool(getattr(kitchen, "porter_auto_book_enabled", True)),
-        porter_auto_book_delay_min=int(getattr(kitchen, "porter_auto_book_delay_min", 15) or 15),
+    return _admin_kitchen_detail(
+        kitchen, owner, payment_gateway_configured=kitchen.id in gateway_ids
+    )
+
+
+@router.patch(
+    "/kitchens/{kitchen_id}/branded-page",
+    response_model=AdminKitchenDetail,
+    summary="Publish / customize kitchen branded storefront (super admin)",
+    description=(
+        "Platform ops can publish, unpublish, or edit tagline/accent for a kitchen's "
+        "`/k/{code}` storefront. Same domain rules as owner PATCH."
+    ),
+    responses=auth_errors(include_404=True),
+    tags=["Admin"],
+)
+async def admin_kitchen_branded_page(
+    kitchen_id: uuid.UUID,
+    body: KitchenBrandedPageUpdate,
+    admin: Annotated[PlatformAdmin, Depends(get_current_admin)],
+    session: Annotated[AsyncSession, Depends(get_db)],
+    publisher: Annotated[EventPublisher, Depends(get_publisher)],
+) -> AdminKitchenDetail:
+    from app.admin_audit import record_admin_audit
+    from app.rbac import assert_admin_permission
+
+    await assert_admin_permission(session, role=admin.role, permission="kitchens:write")
+    result = await session.execute(
+        select(Kitchen, Owner)
+        .join(Owner, Owner.id == Kitchen.owner_id)
+        .where(Kitchen.id == kitchen_id)
+    )
+    row = result.first()
+    if not row:
+        raise HTTPException(status_code=404, detail="Kitchen not found")
+    kitchen, owner = row
+    try:
+        kitchen = await update_kitchen_branded_page(session, kitchen, body, publisher)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    bp = branded_page_from_settings(
+        kitchen.settings if isinstance(kitchen.settings, dict) else None
+    )
+    await record_admin_audit(
+        session,
+        actor=admin,
+        action="kitchen.branded_page.update",
+        resource_type="kitchen",
+        resource_id=str(kitchen_id),
+        kitchen_id=kitchen_id,
+        summary=f"{kitchen.code} branded page {'published' if bp.enabled else 'updated'}",
+        after=bp.model_dump(),
+    )
+    await session.commit()
+    await session.refresh(kitchen)
+
+    gateway_ids = await _payment_gateway_kitchen_ids(session, [kitchen.id])
+    return _admin_kitchen_detail(
+        kitchen, owner, payment_gateway_configured=kitchen.id in gateway_ids
     )
 
 

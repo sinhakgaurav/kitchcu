@@ -293,6 +293,12 @@ export async function fetchAdminJourneys() {
   }>("/api/v1/admin/journeys");
 }
 
+export type AdminKitchenBrandedPage = {
+  enabled: boolean;
+  tagline: string | null;
+  accent_color: string | null;
+};
+
 export type AdminKitchen = {
   id: string;
   code: string;
@@ -303,6 +309,7 @@ export type AdminKitchen = {
   owner_phone: string;
   whatsapp_connected: boolean;
   payment_gateway_configured: boolean;
+  branded_page_enabled?: boolean;
 };
 
 export type AdminKitchenDetail = AdminKitchen & {
@@ -312,6 +319,7 @@ export type AdminKitchenDetail = AdminKitchen & {
   pincode: string | null;
   whatsapp_phone_id: string | null;
   whatsapp_display_phone: string | null;
+  branded_page?: AdminKitchenBrandedPage;
   porter_auto_book_enabled?: boolean;
   porter_auto_book_delay_min?: number;
   platform_secrets_note: string;
@@ -350,6 +358,20 @@ export async function fetchAdminKitchens() {
 
 export async function fetchAdminKitchen(kitchenId: string) {
   return adminFetch<AdminKitchenDetail>(`/api/v1/admin/kitchens/${kitchenId}`);
+}
+
+export async function updateAdminKitchenBrandedPage(
+  kitchenId: string,
+  data: {
+    enabled?: boolean;
+    tagline?: string | null;
+    accent_color?: string | null;
+  },
+) {
+  return adminFetch<AdminKitchenDetail>(`/api/v1/admin/kitchens/${kitchenId}/branded-page`, {
+    method: "PATCH",
+    body: JSON.stringify(data),
+  });
 }
 
 export async function fetchAdminKitchenWhatsApp(kitchenId: string) {

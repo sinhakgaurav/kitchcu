@@ -13,7 +13,6 @@ import {
   fetchStreamSettings,
   fetchTopDishes,
   saveGoldenRecipe,
-  updateKitchenBrandedPage,
   STATUS_LABELS,
   type GoldenRecipePin,
   type GrowthSuggestion,
@@ -23,7 +22,6 @@ import {
   type StreamSettings,
 } from "../../lib/api";
 import { CommissionAdvantagePanel } from "../../components/owner/CommissionAdvantagePanel";
-import { CUSTOMER_HOST } from "../../shared/brand";
 import { customerUrl } from "../../shared/urls";
 
 const inr = (n: number) => `₹${Math.round(n).toLocaleString("en-IN")}`;
@@ -54,6 +52,7 @@ function chartDayLabel(isoDate: string): string {
 
 const QUICK_ACTIONS = [
   { to: "/dashboard/orders/new", title: "New order", desc: "Manual or walk-in", accent: "orange" },
+  { to: "/dashboard/brand", title: "Brand page", desc: "Publish & share /k/code", accent: "teal" },
   { to: "/dashboard/orders?tab=drafts", title: "WhatsApp drafts", desc: "Review parsed orders", accent: "teal" },
   { to: "/dashboard/menu/new", title: "Add dish", desc: "Live-capture photo", accent: "orange" },
   { to: "/dashboard/reports", title: "Growth reports", desc: "Revenue & retention", accent: "teal" },
@@ -63,7 +62,7 @@ const QUICK_ACTIONS = [
 ] as const;
 
 export function OwnerHomePage() {
-  const { kitchen, kitchens, loading, reloadKitchens } = useKitchen();
+  const { kitchen, kitchens, loading } = useKitchen();
   const { owner } = useKitchenAuth();
   const [orders, setOrders] = useState<Order[]>([]);
   const [draftCount, setDraftCount] = useState(0);
@@ -73,18 +72,9 @@ export function OwnerHomePage() {
   const [topDish, setTopDish] = useState<string | null>(null);
   const [stream, setStream] = useState<StreamSettings | null>(null);
   const [pageLoading, setPageLoading] = useState(true);
-  const [copied, setCopied] = useState(false);
-  const [brandBusy, setBrandBusy] = useState(false);
-  const [brandMsg, setBrandMsg] = useState("");
-  const [taglineDraft, setTaglineDraft] = useState("");
   const [goldenSuggestions, setGoldenSuggestions] = useState<GrowthSuggestion[]>([]);
   const [goldenPins, setGoldenPins] = useState<GoldenRecipePin[]>([]);
   const [savingGoldenId, setSavingGoldenId] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (!kitchen) return;
-    setTaglineDraft(kitchen.branded_page?.tagline ?? "");
-  }, [kitchen?.id, kitchen?.branded_page?.tagline]);
 
   useEffect(() => {
     if (!kitchen) return;
@@ -150,52 +140,8 @@ export function OwnerHomePage() {
 
   const brandedEnabled = kitchen.branded_page?.enabled ?? false;
   const brandedLink = customerUrl(`/k/${kitchen.code}`);
-  const platformMenuLink = customerUrl(`/kitchen/${kitchen.id}/menu`);
   const subTier = owner?.subscription_tier ?? "trial";
   const subStatus = owner?.subscription_status ?? "active";
-
-  const copyLink = async () => {
-    await navigator.clipboard.writeText(brandedLink);
-    setCopied(true);
-    window.setTimeout(() => setCopied(false), 2000);
-  };
-
-  const openBrandedPage = () => {
-    window.open(brandedLink, "_blank", "noopener,noreferrer");
-  };
-
-  const toggleBranded = async (enabled: boolean) => {
-    setBrandBusy(true);
-    setBrandMsg("");
-    try {
-      await updateKitchenBrandedPage(kitchen.id, {
-        enabled,
-        tagline: taglineDraft.trim() || null,
-      });
-      await reloadKitchens();
-      setBrandMsg(enabled ? "Branded page published." : "Branded page unpublished.");
-    } catch (err) {
-      setBrandMsg(err instanceof Error ? err.message : "Could not update branded page");
-    } finally {
-      setBrandBusy(false);
-    }
-  };
-
-  const saveTagline = async () => {
-    setBrandBusy(true);
-    setBrandMsg("");
-    try {
-      await updateKitchenBrandedPage(kitchen.id, {
-        tagline: taglineDraft.trim() || null,
-      });
-      await reloadKitchens();
-      setBrandMsg("Tagline saved.");
-    } catch (err) {
-      setBrandMsg(err instanceof Error ? err.message : "Could not save tagline");
-    } finally {
-      setBrandBusy(false);
-    }
-  };
 
   const onSaveGolden = async (suggestionId: string) => {
     setSavingGoldenId(suggestionId);
@@ -240,7 +186,29 @@ export function OwnerHomePage() {
         </div>
         <div className="od-board__hero-actions">
           <Link to="/dashboard/orders/new" className="btn btn--primary">New order</Link>
-          <Link to="/dashboard/reports" className="btn btn--ghost">View reports</Link>
+          <Link to="/dashboard/brand" className="btn btn--ghost">Brand page</Link>
+        </div>
+      </section>
+
+      <section className="dash-card od-share od-branded od-branded--teaser">
+        <div className="od-share__copy">
+          <h2>Your brand page</h2>
+          <p>
+            Share <code>{brandedLink}</code> on WhatsApp Status — kitchen-first menu &amp; checkout.
+            {brandedEnabled ? " · Published" : " · Not published yet"}
+          </p>
+        </div>
+        <div className="od-share__aside od-branded__teaser-actions">
+          <Link to="/dashboard/brand" className="btn btn--primary btn--sm">
+            Manage brand page
+          </Link>
+          <button
+            type="button"
+            className="btn btn--ghost btn--sm"
+            onClick={() => window.open(brandedLink, "_blank", "noopener,noreferrer")}
+          >
+            Preview
+          </button>
         </div>
       </section>
 
@@ -442,75 +410,6 @@ export function OwnerHomePage() {
             )}
           </section>
 
-          <section className="dash-card od-share od-branded">
-            <div className="od-share__copy">
-              <h2>Your branded kitchen page</h2>
-              <p>
-                Kitchen-first menu, order, and bill flow on <strong>{CUSTOMER_HOST}</strong> — with{" "}
-                <strong>Powered by kitchCU</strong> at the foot. Opens in a new tab for customers.
-              </p>
-              <label className="od-branded__toggle">
-                <input
-                  type="checkbox"
-                  checked={brandedEnabled}
-                  disabled={brandBusy}
-                  onChange={(e) => toggleBranded(e.target.checked)}
-                />
-                <span>
-                  {brandedEnabled
-                    ? `Published — customers can open /k/${kitchen.code}`
-                    : "Publish branded page"}
-                </span>
-              </label>
-              <label className="od-branded__tagline">
-                <span>Tagline on the page</span>
-                <div className="od-branded__tagline-row">
-                  <input
-                    type="text"
-                    maxLength={160}
-                    value={taglineDraft}
-                    onChange={(e) => setTaglineDraft(e.target.value)}
-                    placeholder="Home-style thalis · live-capture menu"
-                  />
-                  <button
-                    type="button"
-                    className="btn btn--ghost btn--sm"
-                    disabled={brandBusy}
-                    onClick={saveTagline}
-                  >
-                    Save
-                  </button>
-                </div>
-              </label>
-              <div className="kc-copy-field owner-share__row">
-                <code>{brandedLink}</code>
-                <button type="button" className="btn btn--primary btn--sm" onClick={openBrandedPage}>
-                  Open in new tab
-                </button>
-                <button type="button" className="btn btn--ghost btn--sm" onClick={copyLink}>
-                  {copied ? "Copied!" : "Copy link"}
-                </button>
-              </div>
-              <p className="od-branded__hint">
-                {brandedEnabled
-                  ? "Published — copy/share the branded link as your primary customer entry."
-                  : "Page works now (open in new tab). Publish to make it your primary share link."}{" "}
-                Discover fallback: <code>{platformMenuLink}</code>
-              </p>
-              {brandMsg && <p className="od-branded__msg">{brandMsg}</p>}
-            </div>
-            <div className="od-share__aside">
-              <p className="od-share__tip-title">What customers get</p>
-              <ul className="od-share__tips">
-                <li>Your name &amp; menu (not the kitchCU discover home)</li>
-                <li>Cart → checkout → PDF bill</li>
-                <li>Kitchen code <strong className="od-board__code">{kitchen.code}</strong></li>
-              </ul>
-              <Link to="/dashboard/subscription" className="btn btn--ghost btn--sm">
-                Manage subscription
-              </Link>
-            </div>
-          </section>
         </>
       )}
     </div>

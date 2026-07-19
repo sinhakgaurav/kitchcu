@@ -1,4 +1,5 @@
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
+import { DataTable, type DataColumn } from "../components/DataTable";
 import {
   clearAdminApiKey,
   clearAdminCustomerPassword,
@@ -222,86 +223,105 @@ export function AdminApiKeysPanel() {
 
 export function AdminCustomers() {
   const [rows, setRows] = useState<AdminCustomer[]>([]);
-  const [q, setQ] = useState("");
+  const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<AdminCustomerDetail | null>(null);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
 
-  const load = async (query?: string) => {
+  const load = async () => {
     setError("");
     try {
-      setRows(await fetchAdminCustomers(query));
+      setRows(await fetchAdminCustomers());
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to load customers");
     }
   };
 
   useEffect(() => {
-    load();
+    load().finally(() => setLoading(false));
   }, []);
 
+  const customerColumns = useMemo<DataColumn<AdminCustomer>[]>(
+    () => [
+      {
+        id: "name",
+        header: "Name",
+        sortable: true,
+        sortValue: (c) => c.name,
+        cell: (c) => c.name,
+      },
+      {
+        id: "phone",
+        header: "Phone",
+        sortable: true,
+        sortValue: (c) => c.phone ?? "",
+        cell: (c) => c.phone || "—",
+      },
+      {
+        id: "status",
+        header: "Status",
+        sortable: true,
+        sortValue: (c) => c.status,
+        cell: (c) => <span className={`status-badge status-badge--${c.status}`}>{c.status}</span>,
+      },
+      {
+        id: "payout",
+        header: "Payout",
+        sortable: true,
+        sortValue: (c) => (c.has_payout ? 1 : 0),
+        cell: (c) => (c.has_payout ? "Yes" : "No"),
+      },
+      {
+        id: "addresses",
+        header: "Addresses",
+        sortable: true,
+        sortValue: (c) => c.address_count,
+        align: "right",
+        cell: (c) => c.address_count,
+      },
+      {
+        id: "open",
+        header: "",
+        cell: (c) => (
+          <button
+            type="button"
+            className="btn btn--ghost btn--sm"
+            onClick={async () => {
+              try {
+                setSelected(await fetchAdminCustomer(c.id));
+              } catch (e) {
+                setError(e instanceof Error ? e.message : "Load failed");
+              }
+            }}
+          >
+            Open
+          </button>
+        ),
+      },
+    ],
+    [],
+  );
+
   return (
-    <div className="admin-panel">
+    <div className={`admin-panel admin-panel--bleed${selected ? "" : " admin-panel--list-only"}`}>
       {error && <p className="auth-card__error">{error}</p>}
-      <form
-        className="admin-toolbar"
-        onSubmit={(e) => {
-          e.preventDefault();
-          load(q);
-        }}
-      >
-        <input
-          value={q}
-          onChange={(e) => setQ(e.target.value)}
-          placeholder="Search name / phone / email"
+      <div className={`admin-split${selected ? "" : " admin-split--list-only"}`}>
+        <DataTable
+          rows={rows}
+          loading={loading}
+          emptyMessage="No customers yet."
+          searchPlaceholder="Search name, phone, email…"
+          getSearchText={(c) => `${c.name} ${c.phone ?? ""} ${c.email ?? ""} ${c.status}`}
+          filterChips={[
+            { id: "", label: "All" },
+            { id: "active", label: "Active" },
+            { id: "suspended", label: "Suspended" },
+          ]}
+          getFilterValue={(c) => c.status}
+          rowKey={(c) => c.id}
+          rowClassName={(c) => (selected?.id === c.id ? "admin-table__row--active" : undefined)}
+          columns={customerColumns}
         />
-        <button type="submit" className="btn btn--primary btn--sm">
-          Search
-        </button>
-      </form>
-      <div className="admin-split">
-        <div className="admin-table-wrap">
-          <table className="admin-table">
-            <thead>
-              <tr>
-                <th>Name</th>
-                <th>Phone</th>
-                <th>Status</th>
-                <th>Payout</th>
-                <th>Addresses</th>
-                <th />
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((c) => (
-                <tr key={c.id}>
-                  <td>{c.name}</td>
-                  <td>{c.phone || "—"}</td>
-                  <td>
-                    <span className={`status-badge status-badge--${c.status}`}>{c.status}</span>
-                  </td>
-                  <td>{c.has_payout ? "Yes" : "No"}</td>
-                  <td>{c.address_count}</td>
-                  <td>
-                    <button
-                      type="button"
-                      className="btn btn--ghost btn--sm"
-                      onClick={async () => {
-                        try {
-                          setSelected(await fetchAdminCustomer(c.id));
-                        } catch (e) {
-                          setError(e instanceof Error ? e.message : "Load failed");
-                        }
-                      }}
-                    >
-                      Open
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
         {selected && (
           <aside className="admin-detail glass">
             <h3>{selected.name}</h3>
@@ -337,7 +357,7 @@ export function AdminCustomers() {
                     const next = selected.status === "active" ? "suspended" : "active";
                     await updateAdminCustomerStatus(selected.id, next);
                     setSelected(await fetchAdminCustomer(selected.id));
-                    await load(q);
+                    await load();
                   } catch (e) {
                     setError(e instanceof Error ? e.message : "Update failed");
                   } finally {
@@ -366,6 +386,9 @@ export function AdminCustomers() {
                   Clear password
                 </button>
               )}
+              <button type="button" className="btn btn--ghost btn--sm" onClick={() => setSelected(null)}>
+                Close
+              </button>
             </div>
           </aside>
         )}
@@ -376,7 +399,7 @@ export function AdminCustomers() {
 
 export function AdminRefunds() {
   const [rows, setRows] = useState<AdminRefund[]>([]);
-  const [status, setStatus] = useState("");
+  const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<AdminRefund | null>(null);
   const [note, setNote] = useState("");
   const [money, setMoney] = useState<Awaited<ReturnType<typeof fetchAdminMoneyStats>> | null>(null);
@@ -386,7 +409,7 @@ export function AdminRefunds() {
   const load = async () => {
     try {
       const [refunds, stats] = await Promise.all([
-        fetchAdminRefunds(status ? { status } : undefined),
+        fetchAdminRefunds(),
         fetchAdminMoneyStats(),
       ]);
       setRows(refunds);
@@ -397,11 +420,62 @@ export function AdminRefunds() {
   };
 
   useEffect(() => {
-    load();
-  }, [status]);
+    load().finally(() => setLoading(false));
+  }, []);
+
+  const refundColumns = useMemo<DataColumn<AdminRefund>[]>(
+    () => [
+      {
+        id: "amount",
+        header: "Amount",
+        sortable: true,
+        sortValue: (r) => r.amount,
+        align: "right",
+        cell: (r) => inr(r.amount),
+      },
+      {
+        id: "kind",
+        header: "Kind",
+        sortable: true,
+        sortValue: (r) => r.kind,
+        cell: (r) => r.kind,
+      },
+      {
+        id: "channel",
+        header: "Channel",
+        sortable: true,
+        sortValue: (r) => r.channel,
+        cell: (r) => r.channel,
+      },
+      {
+        id: "status",
+        header: "Status",
+        sortable: true,
+        sortValue: (r) => r.status,
+        cell: (r) => <span className={`status-badge status-badge--${r.status}`}>{r.status}</span>,
+      },
+      {
+        id: "remark",
+        header: "Remark",
+        sortable: true,
+        sortValue: (r) => r.transfer_remark,
+        cell: (r) => r.transfer_remark || "—",
+      },
+      {
+        id: "open",
+        header: "",
+        cell: (r) => (
+          <button type="button" className="btn btn--ghost btn--sm" onClick={() => setSelected(r)}>
+            Open
+          </button>
+        ),
+      },
+    ],
+    [],
+  );
 
   return (
-    <div className="admin-panel">
+    <div className="admin-panel admin-panel--bleed">
       {error && <p className="auth-card__error">{error}</p>}
       {money && (
         <div className="admin-stats admin-stats--rich">
@@ -423,46 +497,27 @@ export function AdminRefunds() {
           </div>
         </div>
       )}
-      <div className="admin-toolbar">
-        <select value={status} onChange={(e) => setStatus(e.target.value)}>
-          <option value="">All statuses</option>
-          <option value="requested">requested</option>
-          <option value="processing">processing</option>
-          <option value="completed">completed</option>
-          <option value="failed">failed</option>
-        </select>
-      </div>
-      <div className="admin-split">
-        <div className="admin-table-wrap">
-          <table className="admin-table">
-            <thead>
-              <tr>
-                <th>Amount</th>
-                <th>Kind</th>
-                <th>Channel</th>
-                <th>Status</th>
-                <th>Remark</th>
-                <th />
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((r) => (
-                <tr key={r.id}>
-                  <td>{inr(r.amount)}</td>
-                  <td>{r.kind}</td>
-                  <td>{r.channel}</td>
-                  <td>{r.status}</td>
-                  <td>{r.transfer_remark}</td>
-                  <td>
-                    <button type="button" className="btn btn--ghost btn--sm" onClick={() => setSelected(r)}>
-                      Open
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+      <div className={`admin-split${selected ? "" : " admin-split--list-only"}`}>
+        <DataTable
+          rows={rows}
+          loading={loading}
+          emptyMessage="No refunds yet."
+          searchPlaceholder="Search kind, channel, remark…"
+          getSearchText={(r) =>
+            `${r.kind} ${r.channel} ${r.status} ${r.transfer_remark} ${r.reason ?? ""} ${r.amount}`
+          }
+          filterChips={[
+            { id: "", label: "All" },
+            { id: "requested", label: "Requested" },
+            { id: "processing", label: "Processing" },
+            { id: "completed", label: "Completed" },
+            { id: "failed", label: "Failed" },
+          ]}
+          getFilterValue={(r) => r.status}
+          rowKey={(r) => r.id}
+          rowClassName={(r) => (selected?.id === r.id ? "admin-table__row--active" : undefined)}
+          columns={refundColumns}
+        />
         {selected && (
           <aside className="admin-detail glass">
             <h3>
@@ -513,6 +568,9 @@ export function AdminRefunds() {
                   Mark {s}
                 </button>
               ))}
+              <button type="button" className="btn btn--ghost btn--sm" onClick={() => setSelected(null)}>
+                Close
+              </button>
             </div>
           </aside>
         )}
@@ -747,8 +805,83 @@ export function AdminEmployeesPanel() {
     }
   };
 
+  const employeeColumns = useMemo<DataColumn<AdminEmployee>[]>(
+    () => [
+      {
+        id: "name",
+        header: "Name",
+        sortable: true,
+        sortValue: (emp) => emp.name,
+        cell: (emp) => emp.name,
+      },
+      {
+        id: "email",
+        header: "Email",
+        sortable: true,
+        sortValue: (emp) => emp.email,
+        cell: (emp) => emp.email,
+      },
+      {
+        id: "role",
+        header: "Role",
+        sortable: true,
+        sortValue: (emp) => emp.role,
+        cell: (emp) => (
+          <select
+            value={emp.role}
+            onChange={async (e) => {
+              try {
+                await updateAdminEmployee(emp.id, { role: e.target.value });
+                await load();
+              } catch (err) {
+                setError(err instanceof Error ? err.message : "Role update failed");
+              }
+            }}
+          >
+            {roles.map((r) => (
+              <option key={r} value={r}>
+                {r}
+              </option>
+            ))}
+          </select>
+        ),
+      },
+      {
+        id: "status",
+        header: "Status",
+        sortable: true,
+        sortValue: (emp) => (emp.is_active ? 1 : 0),
+        cell: (emp) => (emp.is_active ? "active" : "inactive"),
+      },
+      {
+        id: "actions",
+        header: "Actions",
+        cell: (emp) =>
+          emp.is_active ? (
+            <button
+              type="button"
+              className="btn btn--sm btn--ghost"
+              onClick={async () => {
+                try {
+                  await updateAdminEmployee(emp.id, { is_active: false });
+                  await load();
+                } catch (err) {
+                  setError(err instanceof Error ? err.message : "Deactivate failed");
+                }
+              }}
+            >
+              Deactivate
+            </button>
+          ) : (
+            "—"
+          ),
+      },
+    ],
+    [roles],
+  );
+
   return (
-    <div className="admin-panel">
+    <div className="admin-panel admin-panel--bleed">
       {error && <p className="auth-card__error">{error}</p>}
       {ok && <p className="auth-card__success">{ok}</p>}
       <section className="glass admin-detail" style={{ marginBottom: "1.25rem" }}>
@@ -786,67 +919,21 @@ export function AdminEmployeesPanel() {
           </button>
         </form>
       </section>
-      <div className="dash-card admin-table-wrap">
-        {loading ? (
-          <p className="admin-panel__empty">Loading…</p>
-        ) : (
-          <table className="admin-table">
-            <thead>
-              <tr>
-                <th>Name</th>
-                <th>Email</th>
-                <th>Role</th>
-                <th>Status</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((emp) => (
-                <tr key={emp.id}>
-                  <td>{emp.name}</td>
-                  <td>{emp.email}</td>
-                  <td>
-                    <select
-                      value={emp.role}
-                      onChange={async (e) => {
-                        try {
-                          await updateAdminEmployee(emp.id, { role: e.target.value });
-                          await load();
-                        } catch (err) {
-                          setError(err instanceof Error ? err.message : "Role update failed");
-                        }
-                      }}
-                    >
-                      {roles.map((r) => (
-                        <option key={r} value={r}>{r}</option>
-                      ))}
-                    </select>
-                  </td>
-                  <td>{emp.is_active ? "active" : "inactive"}</td>
-                  <td>
-                    {emp.is_active && (
-                      <button
-                        type="button"
-                        className="btn btn--sm btn--ghost"
-                        onClick={async () => {
-                          try {
-                            await updateAdminEmployee(emp.id, { is_active: false });
-                            await load();
-                          } catch (err) {
-                            setError(err instanceof Error ? err.message : "Deactivate failed");
-                          }
-                        }}
-                      >
-                        Deactivate
-                      </button>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-      </div>
+      <DataTable
+        rows={rows}
+        loading={loading}
+        emptyMessage="No employees yet."
+        searchPlaceholder="Search name, email, role…"
+        getSearchText={(emp) => `${emp.name} ${emp.email} ${emp.role} ${emp.is_active ? "active" : "inactive"}`}
+        filterChips={[
+          { id: "", label: "All" },
+          { id: "active", label: "Active" },
+          { id: "inactive", label: "Inactive" },
+        ]}
+        getFilterValue={(emp) => (emp.is_active ? "active" : "inactive")}
+        rowKey={(emp) => emp.id}
+        columns={employeeColumns}
+      />
     </div>
   );
 }

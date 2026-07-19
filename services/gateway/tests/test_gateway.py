@@ -123,6 +123,14 @@ def test_resolve_service_url_billing():
         resolve_service_url("/api/v1/admin/kitchens/abc/whatsapp-integration")
         == settings.identity_service_url
     )
+    assert (
+        resolve_service_url("/api/v1/admin/kitchens/abc/branded-page")
+        == settings.identity_service_url
+    )
+    assert (
+        resolve_service_url("/api/v1/kitchens/abc/branded-page")
+        == settings.identity_service_url
+    )
     assert resolve_service_url("/api/v1/admin/customers") == settings.identity_service_url
     assert resolve_service_url("/api/v1/admin/feature-flags") == settings.identity_service_url
     assert resolve_service_url("/api/v1/admin/journeys") == settings.identity_service_url

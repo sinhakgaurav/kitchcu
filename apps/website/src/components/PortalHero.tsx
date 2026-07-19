@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import { BrandLogo } from "./BrandLogo";
 import { HeroCopyParallax } from "./HeroCopyParallax";
 import { ParallaxScene } from "./ParallaxScene";
@@ -6,6 +7,7 @@ import { customerUrl, kitchenUrl } from "../shared/urls";
 
 /** Full-bleed home banner — brand-first, single CTA group. */
 export function PortalHero() {
+  const { t } = useTranslation();
   return (
     <section className="hero hero--fullbleed portal-hero-full" id="top">
       <ParallaxScene variant="hero" />
@@ -20,10 +22,7 @@ export function PortalHero() {
             <span className="gradient-text">{APP_NAME}</span>
           </h1>
 
-          <p className="hero__subtitle">
-            Growth OS for home chefs, tiffin services, and delivery-only kitchens —
-            WhatsApp orders, live-capture menus, <strong>zero food commission</strong>.
-          </p>
+          <p className="hero__subtitle">{t("portal.heroSubtitle")}</p>
 
           <div className="hero__actions">
             <a
@@ -32,7 +31,7 @@ export function PortalHero() {
               target="_blank"
               rel="noopener noreferrer"
             >
-              Start as kitchen owner
+              {t("portal.ctaOwner")}
             </a>
             <a
               href={customerUrl("/")}
@@ -40,19 +39,19 @@ export function PortalHero() {
               target="_blank"
               rel="noopener noreferrer"
             >
-              Browse as customer →
+              {t("portal.ctaCustomer")}
             </a>
           </div>
 
           <ul className="hero__trust" aria-label="Highlights">
             <li>
-              <span className="hero__trust-dot" /> Zero food commission
+              <span className="hero__trust-dot" /> {t("portal.trustCommission")}
             </li>
             <li>
-              <span className="hero__trust-dot" /> Owner-owned CRM
+              <span className="hero__trust-dot" /> {t("portal.trustCrm")}
             </li>
             <li>
-              <span className="hero__trust-dot" /> Honest prep & delivery times
+              <span className="hero__trust-dot" /> {t("portal.trustHonest")}
             </li>
           </ul>
         </div>

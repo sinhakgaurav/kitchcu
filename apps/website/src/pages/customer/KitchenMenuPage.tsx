@@ -1,10 +1,10 @@
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import { useEffect, useMemo, useState } from "react";
 import { ListingToolbar } from "../../components/ListingToolbar";
 import { useBrandedStorefront } from "../../customer/BrandedStorefront";
 import { RichHtml } from "../../components/RichTextEditor";
 import { sampleDishImages } from "../../data/content";
-import type { CuisineMenuGroup, Dish, Menu, SubscriptionPlan } from "../../shared/api";
+import type { CuisineMenuGroup, Dish, KitchenMealPlan, Menu } from "../../shared/api";
 import {
   fetchPublicSubscriptionPlans,
   requestKitchenSubscription,
@@ -43,6 +43,7 @@ export function KitchenMenuPage() {
   const { kitchenId: kitchenIdParam } = useParams<{ kitchenId: string }>();
   const branded = useBrandedStorefront();
   const navigate = useNavigate();
+  const location = useLocation();
   const kitchenId = kitchenIdParam || branded?.kitchen.id;
   const [menu, setMenu] = useState<Menu | null>(null);
   const [kitchenName, setKitchenName] = useState(branded?.kitchen.name ?? "");
@@ -51,7 +52,7 @@ export function KitchenMenuPage() {
   const [cartLines, setCartLines] = useState(0);
   const [cartReadyMin, setCartReadyMin] = useState(0);
   const [ratingMap, setRatingMap] = useState<Record<string, DishRatingSummary>>({});
-  const [plans, setPlans] = useState<SubscriptionPlan[]>([]);
+  const [plans, setPlans] = useState<KitchenMealPlan[]>([]);
   const [subMsg, setSubMsg] = useState("");
   const [subBusy, setSubBusy] = useState(false);
   const [search, setSearch] = useState("");
@@ -154,7 +155,8 @@ export function KitchenMenuPage() {
   const requestPlan = async (planId: string) => {
     if (!kitchenId) return;
     if (!getCustomerToken()) {
-      navigate("/login");
+      const next = `${location.pathname}${location.search}`;
+      navigate(`/login?next=${encodeURIComponent(next)}`);
       return;
     }
     setSubBusy(true);

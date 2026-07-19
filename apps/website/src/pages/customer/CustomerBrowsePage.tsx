@@ -2,8 +2,9 @@ import { FormEvent, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { BrandTextLogo } from "../../components/BrandLogo";
 import { images, sampleDishImages } from "../../data/content";
-import { DEMO } from "../../data/demo";
-import { fetchKitchenByCode } from "../../lib/api";
+import { DEMO } from "../../shared/demo";
+import { fetchKitchenByCode } from "../../shared/publicApi";
+import { kitchenUrl } from "../../shared/urls";
 
 export function CustomerBrowsePage() {
   const navigate = useNavigate();
@@ -17,7 +18,8 @@ export function CustomerBrowsePage() {
     setBusy(true);
     try {
       const kitchen = await fetchKitchenByCode(code);
-      navigate(`/kitchen/${kitchen.id}/menu`);
+      // Brand-first entry — same share link owners publish from Brand page.
+      navigate(`/k/${kitchen.code}/menu`);
     } catch {
       setError("Kitchen not found. Check the code from your kitchen (e.g. CKPNQ001).");
     } finally {
@@ -31,7 +33,7 @@ export function CustomerBrowsePage() {
     setBusy(true);
     try {
       const kitchen = await fetchKitchenByCode(DEMO.kitchenCode);
-      navigate(`/kitchen/${kitchen.id}/menu`);
+      navigate(`/k/${kitchen.code}/menu`);
     } catch {
       setError(`Demo kitchen not found. Run: python scripts/seed-dev-data.py`);
     } finally {
@@ -45,7 +47,14 @@ export function CustomerBrowsePage() {
         <Link to="/" className="nav__brand nav__brand--row">
           <BrandTextLogo subtitle="For Customers" />
         </Link>
-        <Link to="/login" className="btn btn--ghost btn--sm">Owner Login</Link>
+        <a
+          href={kitchenUrl("/login")}
+          className="btn btn--ghost btn--sm"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          Owner login →
+        </a>
       </header>
 
       <div className="customer-page__hero">

@@ -1,6 +1,7 @@
 import { Link, useLocation } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { BrandNavMark } from "./BrandNavMark";
+import { LanguageSwitcher } from "../i18n/LanguageSwitcher";
 import { CUSTOMER_HOST } from "../shared/brand";
 import { useCustomerAuth } from "../shared/customerAuth";
 import { kitchenUrl } from "../shared/urls";
@@ -27,10 +28,10 @@ export function CustomerNavbar() {
 
         <nav className={`nav__links ${open ? "nav__links--open" : ""}`}>
           <a href={hashLink("/#nearby")} onClick={() => setOpen(false)}>Nearby</a>
+          <Link to="/browse" onClick={() => setOpen(false)}>Find by code</Link>
           <Link to="/orders" onClick={() => setOpen(false)}>My orders</Link>
           <Link to="/dashboard" onClick={() => setOpen(false)}>Dashboard</Link>
           <Link to="/account" onClick={() => setOpen(false)}>Payout details</Link>
-          <a href={hashLink("/#discover")} onClick={() => setOpen(false)}>Find by code</a>
           <a href={hashLink("/#how")} onClick={() => setOpen(false)}>How it works</a>
           <Link to="/login" className="btn btn--ghost btn--sm" onClick={() => setOpen(false)}>
             {session ? session.name : "Customer sign in"}
@@ -44,6 +45,7 @@ export function CustomerNavbar() {
           >
             Kitchen owner →
           </a>
+          <LanguageSwitcher />
         </nav>
 
         <button

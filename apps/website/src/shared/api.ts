@@ -958,7 +958,8 @@ export async function deactivateCoupon(kitchenId: string, couponId: string): Pro
   });
 }
 
-export type SubscriptionPlan = {
+/** Kitchen tiffin / meal-plan (marketing) — distinct from SaaS `SubscriptionPlan`. */
+export type KitchenMealPlan = {
   id: string;
   kitchen_id: string;
   name: string;
@@ -979,6 +980,9 @@ export type SubscriptionPlan = {
   pending_count: number;
   created_at: string;
 };
+
+/** @deprecated Use KitchenMealPlan — kept for older imports during rename. */
+export type TiffinSubscriptionPlan = KitchenMealPlan;
 
 export type CustomerKitchenSubscription = {
   id: string;
@@ -1010,17 +1014,18 @@ export type SubscriptionSummary = {
   mrr_estimate: number;
 };
 
-export async function fetchSubscriptionPlans(
+/** Kitchen tiffin / meal-plan catalog (marketing service) — not SaaS billing plans. */
+export async function fetchKitchenSubscriptionPlans(
   kitchenId: string,
   activeOnly = false,
-): Promise<{ plans: SubscriptionPlan[]; total: number }> {
+): Promise<{ plans: KitchenMealPlan[]; total: number }> {
   const q = activeOnly ? "?active_only=true" : "";
   return apiFetch(`/api/v1/kitchens/${kitchenId}/subscription-plans${q}`);
 }
 
 export async function fetchPublicSubscriptionPlans(
   kitchenId: string,
-): Promise<{ plans: SubscriptionPlan[]; total: number }> {
+): Promise<{ plans: KitchenMealPlan[]; total: number }> {
   return apiFetch(`/api/v1/kitchens/${kitchenId}/subscription-plans/public`);
 }
 
@@ -1031,11 +1036,11 @@ export async function createSubscriptionPlan(
     description?: string;
     plan_type: string;
     price_monthly: number;
-    dishes_config?: SubscriptionPlan["dishes_config"];
+    dishes_config?: KitchenMealPlan["dishes_config"];
     delivery_included?: boolean;
     max_subscribers?: number | null;
   },
-): Promise<SubscriptionPlan> {
+): Promise<KitchenMealPlan> {
   return apiFetch(`/api/v1/kitchens/${kitchenId}/subscription-plans`, {
     method: "POST",
     body: JSON.stringify(data),
@@ -1050,12 +1055,12 @@ export async function updateSubscriptionPlan(
     description: string | null;
     plan_type: string;
     price_monthly: number;
-    dishes_config: SubscriptionPlan["dishes_config"];
+    dishes_config: KitchenMealPlan["dishes_config"];
     delivery_included: boolean;
     max_subscribers: number | null;
     is_active: boolean;
   }>,
-): Promise<SubscriptionPlan> {
+): Promise<KitchenMealPlan> {
   return apiFetch(`/api/v1/kitchens/${kitchenId}/subscription-plans/${planId}`, {
     method: "PATCH",
     body: JSON.stringify(data),

@@ -1,0 +1,16 @@
+{
+  "lang": {
+    "title": "Choose your language",
+    "detected": "We think your local language is {{language}}.",
+    "ask": "Would you like to continue in English or {{language}}?",
+    "continueEn": "Continue in English",
+    "continueLocal": "Continue in {{language}}",
+    "detecting": "Detecting your location…",
+    "change": "Language"
+  },
+  "common": {
+    "continue": "Continue",
+    "cancel": "Cancel",
+    "loading": "Loading…"
+  }
+}
