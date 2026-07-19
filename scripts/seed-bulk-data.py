@@ -157,6 +157,9 @@ def ensure_dishes(
         added += 1
         if added % 10 == 0:
             log(f"    ... {added} dishes added")
+        # e2-small: give catalog breathing room between dish creates
+        if added % 5 == 0:
+            time.sleep(0.5)
 
     if added:
         log(f"  Added {added} dishes to kitchen {kitchen_id[:8]}...")

@@ -69,14 +69,17 @@ def _retry_after_seconds(exc: urllib.error.HTTPError, detail: str) -> float:
     return 3.0
 
 
+_RETRYABLE_HTTP = frozenset({429, 502, 503, 504})
+
+
 def request(
     method: str,
     path: str,
     body: dict | None = None,
     token: str | None = None,
-    timeout: int = 30,
+    timeout: int = 60,
     *,
-    max_retries: int = 8,
+    max_retries: int = 10,
 ) -> dict | list:
     url = f"{GATEWAY}{path}"
     data = json.dumps(body).encode() if body is not None else None
@@ -98,9 +101,24 @@ def request(
             except json.JSONDecodeError:
                 msg = detail or exc.reason
             last_msg = f"{method} {path} -> {exc.code}: {msg}"
-            if exc.code == 429 and attempt < max_retries:
-                wait = _retry_after_seconds(exc, str(msg))
-                print(f"  … rate limited, retry in {wait:.0f}s ({attempt + 1}/{max_retries})")
+            if exc.code in _RETRYABLE_HTTP and attempt < max_retries:
+                if exc.code == 429:
+                    wait = _retry_after_seconds(exc, str(msg))
+                    print(f"  … rate limited, retry in {wait:.0f}s ({attempt + 1}/{max_retries})")
+                else:
+                    wait = min(30.0, 2.0 * (attempt + 1))
+                    print(
+                        f"  … HTTP {exc.code}, backoff {wait:.0f}s "
+                        f"({attempt + 1}/{max_retries})"
+                    )
+                time.sleep(wait)
+                continue
+            raise ApiError(last_msg) from exc
+        except (urllib.error.URLError, TimeoutError, ConnectionError, OSError) as exc:
+            last_msg = f"{method} {path} -> transport: {exc}"
+            if attempt < max_retries:
+                wait = min(30.0, 2.0 * (attempt + 1))
+                print(f"  … transport error, retry in {wait:.0f}s ({attempt + 1}/{max_retries})")
                 time.sleep(wait)
                 continue
             raise ApiError(last_msg) from exc

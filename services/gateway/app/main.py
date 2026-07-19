@@ -157,18 +157,20 @@ def resolve_client_key(base_url: str) -> str:
 async def lifespan(app: FastAPI):
     global http_clients, redis_client, _openapi_cache
     http_clients = {
-        "identity": httpx.AsyncClient(base_url=settings.identity_service_url, timeout=httpx.Timeout(10.0, connect=5.0)),
-        "catalog": httpx.AsyncClient(base_url=settings.catalog_service_url, timeout=httpx.Timeout(10.0, connect=5.0)),
-        "order": httpx.AsyncClient(base_url=settings.order_service_url, timeout=httpx.Timeout(30.0, connect=5.0)),
-        "billing": httpx.AsyncClient(base_url=settings.billing_service_url, timeout=httpx.Timeout(10.0, connect=5.0)),
-        "notification": httpx.AsyncClient(base_url=settings.notification_service_url, timeout=httpx.Timeout(10.0, connect=5.0)),
-        "marketing": httpx.AsyncClient(base_url=settings.marketing_service_url, timeout=httpx.Timeout(10.0, connect=5.0)),
-        "ratings": httpx.AsyncClient(base_url=settings.ratings_service_url, timeout=httpx.Timeout(10.0, connect=5.0)),
-        "growth": httpx.AsyncClient(base_url=settings.growth_service_url, timeout=httpx.Timeout(10.0, connect=5.0)),
-        "delivery": httpx.AsyncClient(base_url=settings.delivery_service_url, timeout=httpx.Timeout(10.0, connect=5.0)),
-        "learning": httpx.AsyncClient(base_url=settings.learning_service_url, timeout=httpx.Timeout(10.0, connect=5.0)),
-        "community": httpx.AsyncClient(base_url=settings.community_service_url, timeout=httpx.Timeout(10.0, connect=5.0)),
-        "streaming": httpx.AsyncClient(base_url=settings.streaming_service_url, timeout=httpx.Timeout(10.0, connect=5.0)),
+        # Catalog gets a longer read timeout — dish create + media on e2-small GCP
+        # can exceed 10s under bulk seed load (otherwise gateway returns 504).
+        "identity": httpx.AsyncClient(base_url=settings.identity_service_url, timeout=httpx.Timeout(20.0, connect=5.0)),
+        "catalog": httpx.AsyncClient(base_url=settings.catalog_service_url, timeout=httpx.Timeout(45.0, connect=5.0)),
+        "order": httpx.AsyncClient(base_url=settings.order_service_url, timeout=httpx.Timeout(45.0, connect=5.0)),
+        "billing": httpx.AsyncClient(base_url=settings.billing_service_url, timeout=httpx.Timeout(20.0, connect=5.0)),
+        "notification": httpx.AsyncClient(base_url=settings.notification_service_url, timeout=httpx.Timeout(15.0, connect=5.0)),
+        "marketing": httpx.AsyncClient(base_url=settings.marketing_service_url, timeout=httpx.Timeout(20.0, connect=5.0)),
+        "ratings": httpx.AsyncClient(base_url=settings.ratings_service_url, timeout=httpx.Timeout(15.0, connect=5.0)),
+        "growth": httpx.AsyncClient(base_url=settings.growth_service_url, timeout=httpx.Timeout(30.0, connect=5.0)),
+        "delivery": httpx.AsyncClient(base_url=settings.delivery_service_url, timeout=httpx.Timeout(15.0, connect=5.0)),
+        "learning": httpx.AsyncClient(base_url=settings.learning_service_url, timeout=httpx.Timeout(15.0, connect=5.0)),
+        "community": httpx.AsyncClient(base_url=settings.community_service_url, timeout=httpx.Timeout(15.0, connect=5.0)),
+        "streaming": httpx.AsyncClient(base_url=settings.streaming_service_url, timeout=httpx.Timeout(20.0, connect=5.0)),
     }
     redis_client = redis.from_url(settings.redis_url, decode_responses=True)
     _openapi_cache = None
