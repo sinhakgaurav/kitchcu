@@ -185,6 +185,11 @@ def ensure_orders(token: str, kitchen_id: str, dish_ids: dict[str, str]) -> None
             payload["customer_phone"] = spec["customer_phone"]
         if spec["delivery_type"] == "delivery" and spec.get("delivery_fee", 0) > 0:
             payload["delivery_fee_accepted"] = True
+            # P34: customer-paid fee requires prepaid | pay_on_delivery
+            method = (spec.get("payment_method") or "cod").lower()
+            payload["delivery_fee_payment"] = (
+                "pay_on_delivery" if method == "cod" else "prepaid"
+            )
 
         order = request("POST", f"/api/v1/kitchens/{kitchen_id}/orders/manual", payload, token=token)
         target = spec["target_status"]

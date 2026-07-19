@@ -227,6 +227,12 @@ def ensure_orders(token: str, kitchen_id: str, dish_ids: dict[str, str], target:
         }
         if delivery == "delivery" and delivery_fee > 0:
             payload["delivery_fee_accepted"] = True
+            # Customer pays full logistics fee — choice required (P34).
+            # COD cannot be prepaid; UPI/online can be either.
+            if payment == "cod":
+                payload["delivery_fee_payment"] = "pay_on_delivery"
+            else:
+                payload["delivery_fee_payment"] = rng.choice(["prepaid", "pay_on_delivery"])
         order = request("POST", f"/api/v1/kitchens/{kitchen_id}/orders/manual", payload, token=token)
         advance_order(token, order["id"], chain_key)
         created += 1
