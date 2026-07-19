@@ -73,6 +73,12 @@ if [ "$(meta demo-mode)" = "1" ] || [ "$(meta demo-mode)" = "true" ] \
   APP_ENV="development"
 fi
 
+# Reveal ADMIN_PASSWORD on admin login during demo/seed bring-up only.
+ADMIN_LOGIN_REVEAL_PASSWORD=0
+if [ "$APP_ENV" = "development" ]; then
+  ADMIN_LOGIN_REVEAL_PASSWORD=1
+fi
+
 cat > "$ENV_DIR/.env" <<EOF
 POSTGRES_USER=ckac
 POSTGRES_PASSWORD=$(meta db-password)
@@ -91,6 +97,7 @@ WHATSAPP_VERIFY_TOKEN=$(meta whatsapp-verify-token)
 
 ADMIN_EMAIL=admin@kitchcu.com
 ADMIN_PASSWORD=$(meta admin-password)
+ADMIN_LOGIN_REVEAL_PASSWORD=${ADMIN_LOGIN_REVEAL_PASSWORD}
 
 MEDIA_STORAGE_BACKEND=minio
 MINIO_ENDPOINT=${MINIO_ENDPOINT}

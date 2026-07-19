@@ -3,6 +3,7 @@ import {
   adminLogin,
   clearAdminKitchenPaymentGateway,
   clearAdminToken,
+  fetchAdminLoginHint,
   fetchAdminKitchen,
   fetchAdminKitchenModuleFlags,
   fetchAdminKitchenPaymentGateway,
@@ -667,8 +668,31 @@ function AdminLogin({ onSuccess }: { onSuccess: (token: string) => void }) {
   const defaults = adminLoginDefaults();
   const [email, setEmail] = useState(defaults.email);
   const [password, setPassword] = useState(defaults.password);
+  const [revealedPassword, setRevealedPassword] = useState<string | null>(
+    defaults.isProductionHost ? null : defaults.password || null,
+  );
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const hint = await fetchAdminLoginHint();
+        if (cancelled) return;
+        if (hint.email) setEmail(hint.email);
+        if (hint.revealed && hint.password) {
+          setPassword(hint.password);
+          setRevealedPassword(hint.password);
+        }
+      } catch {
+        /* identity down — keep hostname defaults */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();
@@ -713,13 +737,29 @@ function AdminLogin({ onSuccess }: { onSuccess: (token: string) => void }) {
           </label>
           <label>
             Password
-            <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required />
+            <input
+              type={revealedPassword ? "text" : "password"}
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+              autoComplete="current-password"
+            />
           </label>
           <button type="submit" className="btn btn--primary btn--lg" disabled={busy}>
             {busy ? "Signing in..." : "Sign in"}
           </button>
           <p className="auth-card__hint">
-            {defaults.isProductionHost ? (
+            {revealedPassword ? (
+              <>
+                Admin: <strong>{email}</strong> · password: <code>{revealedPassword}</code>
+                {defaults.isProductionHost ? (
+                  <>
+                    {" "}
+                    (from VM <code>ADMIN_PASSWORD</code> / GCE <code>admin-password</code>; synced on login)
+                  </>
+                ) : null}
+              </>
+            ) : defaults.isProductionHost ? (
               <>
                 Production admin: <strong>admin@kitchcu.com</strong> — password from VM{" "}
                 <code>ADMIN_PASSWORD</code> / GCE metadata <code>admin-password</code> (synced on login).

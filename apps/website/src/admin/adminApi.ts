@@ -47,6 +47,23 @@ export async function adminLogin(email: string, password: string) {
   });
 }
 
+export type AdminLoginHint = {
+  email: string;
+  password: string | null;
+  revealed: boolean;
+  source: string;
+};
+
+/** Public bring-up hint — password only when identity allows reveal (demo / flag). */
+export async function fetchAdminLoginHint(): Promise<AdminLoginHint> {
+  const res = await fetch("/api/v1/admin/auth/login-hint", {
+    headers: apiHeaders(),
+  });
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(typeof body.detail === "string" ? body.detail : "Request failed");
+  return body as AdminLoginHint;
+}
+
 export type AdminMe = {
   id: string;
   email: string;

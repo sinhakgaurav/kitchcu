@@ -689,6 +689,7 @@ async def _quote_delivery_fee(
                     drop_lat=float(customer_latitude),
                     drop_lng=float(customer_longitude),
                     distance_km=dist,
+                    session=session,
                 )
                 if porter_fee is not None:
                     gross = float(porter_fee)

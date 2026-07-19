@@ -12,6 +12,42 @@ SYNC_DB_URL = os.environ["DATABASE_SYNC_URL"]
 
 
 @pytest.mark.asyncio
+async def test_admin_login_hint_reveals_password_in_non_production(client: AsyncClient, monkeypatch):
+    monkeypatch.setattr("app.admin_routes.settings.admin_email", "admin@kitchcu.com")
+    monkeypatch.setattr("app.admin_routes.settings.admin_password", "gcp-meta-secret")
+    monkeypatch.delenv("ADMIN_LOGIN_REVEAL_PASSWORD", raising=False)
+    # APP_ENV=test in conftest → reveal allowed
+    res = await client.get("/api/v1/admin/auth/login-hint")
+    assert res.status_code == 200, res.text
+    body = res.json()
+    assert body["email"] == "admin@kitchcu.com"
+    assert body["revealed"] is True
+    assert body["password"] == "gcp-meta-secret"
+
+
+@pytest.mark.asyncio
+async def test_admin_login_hint_hides_password_in_production(client: AsyncClient, monkeypatch):
+    monkeypatch.setenv("APP_ENV", "production")
+    monkeypatch.delenv("ADMIN_LOGIN_REVEAL_PASSWORD", raising=False)
+    monkeypatch.setattr("app.admin_routes.settings.admin_email", "admin@kitchcu.com")
+    monkeypatch.setattr("app.admin_routes.settings.admin_password", "secret-should-hide")
+    # Clear settings cache used by is_non_production
+    from ckac_common.config import get_settings
+
+    get_settings.cache_clear()
+    try:
+        res = await client.get("/api/v1/admin/auth/login-hint")
+        assert res.status_code == 200, res.text
+        body = res.json()
+        assert body["email"] == "admin@kitchcu.com"
+        assert body["revealed"] is False
+        assert body["password"] is None
+    finally:
+        monkeypatch.setenv("APP_ENV", "test")
+        get_settings.cache_clear()
+
+
+@pytest.mark.asyncio
 async def test_admin_login_resyncs_password_from_env(client: AsyncClient, monkeypatch):
     email = "admin-sync@test.ckac"
     stale_hash = bcrypt.hashpw(b"old-password-999999", bcrypt.gensalt()).decode()

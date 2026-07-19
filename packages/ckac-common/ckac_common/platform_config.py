@@ -145,6 +145,50 @@ async def is_feature_enabled(
     return bool(val)
 
 
+# Master kill-switch for outbound Meta / Porter / OpenAI / OAuth IdP calls.
+# Super-admin toggles ``ckac_identity.feature_flags.third_party_integrations``.
+# Env ``THIRD_PARTY_INTEGRATIONS=0|1`` overrides DB (ops / local dry-run).
+THIRD_PARTY_INTEGRATIONS_FLAG = "third_party_integrations"
+
+
+def env_third_party_override() -> bool | None:
+    """Return True/False when ``THIRD_PARTY_INTEGRATIONS`` is set, else None."""
+    raw = os.environ.get("THIRD_PARTY_INTEGRATIONS", "").strip().lower()
+    if raw in ("0", "false", "no", "off"):
+        return False
+    if raw in ("1", "true", "yes", "on"):
+        return True
+    return None
+
+
+def third_party_integrations_enabled_sync(*, default: bool = False) -> bool:
+    """Sync adapters without a DB session (env override, else default)."""
+    override = env_third_party_override()
+    if override is not None:
+        return override
+    return default
+
+
+async def third_party_integrations_enabled(
+    session: AsyncSession | None,
+    *,
+    default: bool = False,
+) -> bool:
+    """True when outbound third-party HTTP is allowed.
+
+    Default **False** so GCP/local bring-up stays green until super-admin
+    enables the flag (or ops sets ``THIRD_PARTY_INTEGRATIONS=1``).
+    """
+    override = env_third_party_override()
+    if override is not None:
+        return override
+    if session is None:
+        return default
+    return await is_feature_enabled(
+        session, THIRD_PARTY_INTEGRATIONS_FLAG, default=default
+    )
+
+
 async def require_feature(session: AsyncSession, key: str) -> None:
     """Raise ValueError when the named feature flag is off."""
     if not await is_feature_enabled(session, key):

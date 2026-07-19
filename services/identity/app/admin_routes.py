@@ -107,6 +107,28 @@ class AdminTokenResponse(BaseModel):
     expires_in: int = Field(..., description="Token lifetime in seconds from issuance.", examples=[3600])
 
 
+class AdminLoginHintResponse(BaseModel):
+    """Public bootstrap hint for the admin login form.
+
+    Password is only included when bring-up reveal is allowed
+    (``APP_ENV`` development/test, or ``ADMIN_LOGIN_REVEAL_PASSWORD=1``).
+    """
+
+    email: str = Field(..., description="Expected admin login email from ADMIN_EMAIL.")
+    password: str | None = Field(
+        default=None,
+        description="ADMIN_PASSWORD when reveal is enabled; otherwise null.",
+    )
+    revealed: bool = Field(
+        ...,
+        description="True when password is included in this response.",
+    )
+    source: str = Field(
+        default="env",
+        description="Where credentials come from (env / metadata via startup).",
+    )
+
+
 class AdminProfile(BaseModel):
     """Platform admin profile returned by `GET /admin/me`."""
 
@@ -399,6 +421,46 @@ async def ensure_default_admin(session: AsyncSession) -> None:
     if not verify_password(settings.admin_password, admin.password_hash):
         admin.password_hash = hash_password(settings.admin_password)
     await session.flush()
+
+
+def _admin_login_reveal_allowed() -> bool:
+    """Allow showing ADMIN_PASSWORD on the login form during bring-up only."""
+    import os
+
+    from ckac_common.platform_config import is_non_production
+
+    raw = os.environ.get("ADMIN_LOGIN_REVEAL_PASSWORD", "").strip().lower()
+    if raw in ("1", "true", "yes", "on"):
+        return True
+    return is_non_production()
+
+
+@router.get(
+    "/auth/login-hint",
+    response_model=AdminLoginHintResponse,
+    summary="Admin login credential hint (bring-up)",
+    description=(
+        "Returns the expected admin email. Includes plaintext `ADMIN_PASSWORD` only when "
+        "`APP_ENV` is development/test (GCP demo-mode / run-seed) or "
+        "`ADMIN_LOGIN_REVEAL_PASSWORD=1`. Never enabled for hard production without that flag."
+    ),
+    tags=["Admin"],
+)
+async def admin_login_hint() -> AdminLoginHintResponse:
+    email = settings.admin_email.lower().strip()
+    if _admin_login_reveal_allowed():
+        return AdminLoginHintResponse(
+            email=email,
+            password=settings.admin_password,
+            revealed=True,
+            source="ADMIN_EMAIL/ADMIN_PASSWORD",
+        )
+    return AdminLoginHintResponse(
+        email=email,
+        password=None,
+        revealed=False,
+        source="ADMIN_EMAIL/ADMIN_PASSWORD",
+    )
 
 
 @router.post(

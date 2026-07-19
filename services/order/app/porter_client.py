@@ -19,8 +19,13 @@ async def quote_porter_fee(
     drop_lat: float,
     drop_lng: float,
     distance_km: float,
+    session: AsyncSession | None = None,
 ) -> float | None:
     """Best-effort Porter quote; returns fee INR or None (caller uses mock formula)."""
+    from ckac_common.platform_config import third_party_integrations_enabled
+
+    if not await third_party_integrations_enabled(session, default=False):
+        return None
     api_key = (os.getenv("PORTER_API_KEY") or "").strip()
     if not api_key:
         return None
@@ -78,9 +83,18 @@ async def quote_and_book_porter(
     """Book Porter when configured; returns {fee, job_id} or None.
 
     ``pickup_time`` (datetime) is sent when present so the partner arrives near food-ready.
+    When ``third_party_integrations`` is OFF, returns a simulated booking (no HTTP).
     """
+    from ckac_common.platform_config import third_party_integrations_enabled
+
     if (os.getenv("DELIVERY_PARTNER") or "").strip().lower() != "porter":
         return None
+    if not await third_party_integrations_enabled(session, default=False):
+        return {
+            "fee": None,
+            "job_id": f"sim-{uuid.uuid4()}",
+            "partner": "porter_simulated",
+        }
     if not (os.getenv("PORTER_API_KEY") or "").strip():
         return None
 

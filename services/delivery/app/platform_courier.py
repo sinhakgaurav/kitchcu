@@ -85,6 +85,10 @@ def quote_porter_delivery_fee(
     drop_lat: float | None,
     drop_lng: float | None,
 ) -> dict[str, Any] | None:
+    from ckac_common.platform_config import third_party_integrations_enabled_sync
+
+    if not third_party_integrations_enabled_sync(default=False):
+        return None
     api_key = (os.getenv("PORTER_API_KEY") or "").strip()
     if not api_key:
         return None
@@ -143,10 +147,18 @@ def book_porter_delivery(
     customer_phone: str = "+919999999999",
 ) -> dict[str, Any] | None:
     """Create a Porter job when owner chooses platform courier. Best-effort."""
+    from ckac_common.platform_config import third_party_integrations_enabled_sync
+
+    if (os.getenv("DELIVERY_PARTNER") or "mock").strip().lower() != "porter":
+        return None
+    if not third_party_integrations_enabled_sync(default=False):
+        return {
+            "partner": "porter_simulated",
+            "job_id": f"sim-{request_id}",
+            "raw": {"simulated": True},
+        }
     api_key = (os.getenv("PORTER_API_KEY") or "").strip()
     if not api_key:
-        return None
-    if (os.getenv("DELIVERY_PARTNER") or "mock").strip().lower() != "porter":
         return None
 
     base = (os.getenv("PORTER_BASE_URL") or "https://api.porter.in").rstrip("/")
@@ -210,10 +222,17 @@ def quote_platform_delivery_fee(
     porter_enabled: bool = True,
 ) -> dict[str, Any]:
     """Return ``{fee, currency, partner, breakdown}`` for a local courier job."""
+    from ckac_common.platform_config import third_party_integrations_enabled_sync
+
     partner = (os.getenv("DELIVERY_PARTNER") or "mock").strip().lower()
     distance_km = max(0.0, float(distance_km))
+    tp_on = third_party_integrations_enabled_sync(default=False)
 
-    if partner == "porter" and porter_enabled:
+    if partner == "http" and not tp_on:
+        # Generic partner HTTP is also third-party — fall through to mock.
+        partner = "mock"
+
+    if partner == "porter" and porter_enabled and tp_on:
         quoted = quote_porter_delivery_fee(
             distance_km=distance_km,
             pickup_lat=pickup_lat,

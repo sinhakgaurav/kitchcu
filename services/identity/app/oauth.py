@@ -175,9 +175,15 @@ async def start_oauth(provider: str, *, redirect_uri: str, session=None) -> OAut
     if provider not in SUPPORTED_OAUTH_PROVIDERS or provider == "whatsapp":
         raise ValueError(f"Unsupported OAuth provider: {provider}")
 
+    from ckac_common.platform_config import third_party_integrations_enabled
+
     state = secrets.token_urlsafe(32)
     client_id, _ = await resolve_provider_client(provider, session=session)
     configured = bool(client_id)
+    tp_on = await third_party_integrations_enabled(session, default=False)
+    # Super-admin OFF → no IdP redirect; simulated / code=dev path only.
+    if not tp_on:
+        configured = False
     code_verifier: str | None = None
     code_challenge: str | None = None
 
@@ -195,6 +201,9 @@ async def start_oauth(provider: str, *, redirect_uri: str, session=None) -> OAut
             state=state,
             code_challenge=code_challenge,
         )
+    elif not tp_on:
+        # Bring-up: allow simulated OAuth without calling Google/Meta/X.
+        pass
     elif not dev_oauth_allowed():
         raise ValueError(f"OAuth not configured for {provider}")
 
@@ -268,8 +277,13 @@ async def exchange_oauth_code(
     code_verifier: str | None = None,
     session=None,
 ) -> OAuthProfile:
-    if code == DEV_OAUTH_CODE:
-        if not dev_oauth_allowed():
+    from ckac_common.platform_config import third_party_integrations_enabled
+
+    tp_on = await third_party_integrations_enabled(session, default=False)
+
+    # Simulated path: DEV code in non-prod, or any code when third-party kill-switch is OFF.
+    if not tp_on or code == DEV_OAUTH_CODE:
+        if tp_on and code == DEV_OAUTH_CODE and not dev_oauth_allowed():
             raise ValueError("Dev OAuth login is not allowed in this environment")
         mock = DEV_OAUTH_PROFILES.get(provider)
         if not mock:
@@ -279,7 +293,7 @@ async def exchange_oauth_code(
             name=mock["name"],
             email=mock.get("email"),
             avatar_url=mock.get("avatar_url") or None,
-            raw={"dev": True, "provider": provider},
+            raw={"dev": True, "provider": provider, "third_party_disabled": not tp_on},
         )
 
     client_id, client_secret = await resolve_provider_client(provider, session=session)

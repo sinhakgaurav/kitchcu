@@ -29,12 +29,21 @@ async def send_text_message(
     to_phone: str,
     text: str,
     access_token: str,
+    session=None,
 ) -> WhatsAppSendResult:
     """Send a WhatsApp Cloud API text message.
 
     In development/test without a real token, returns simulated success so CI
     and local demos stay green. Production without token/phone_id fails closed.
+
+    When super-admin ``third_party_integrations`` is OFF (or env override),
+    returns simulated success without calling Meta.
     """
+    from ckac_common.platform_config import third_party_integrations_enabled
+
+    if not await third_party_integrations_enabled(session, default=False):
+        return WhatsAppSendResult(ok=True, simulated=True)
+
     to = to_phone.strip().lstrip("+")
     if not phone_number_id or not access_token:
         if is_non_production():

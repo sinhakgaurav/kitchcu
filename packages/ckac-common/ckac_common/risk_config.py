@@ -17,6 +17,7 @@ RISK_FEATURE_FLAGS: dict[str, str] = {
     "payments_stripe_multi_region": "payments_stripe_multi_region",
     "messaging_wallet_deduct": "messaging_wallet_deduct",
     "kitchen_module_overrides": "kitchen_module_overrides",
+    "third_party_integrations": "third_party_integrations",
 }
 
 # Per-kitchen module keys → optional global gate (None = kitchen override only).

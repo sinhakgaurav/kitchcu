@@ -530,6 +530,7 @@ async def notify_template_blast(
             to_phone=phone,
             text=body.message,
             access_token=access_token or "",
+            session=session,
         )
         status = "sent" if meta.ok else "failed"
         if meta.ok:
@@ -668,6 +669,7 @@ async def notify_otp(
         to_phone=body.phone,
         text=text,
         access_token=access_token or "",
+        session=session,
     )
     if not meta.ok:
         raise ValueError(meta.error or "WhatsApp OTP send failed")

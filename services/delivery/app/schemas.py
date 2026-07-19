@@ -222,17 +222,20 @@ async def quote_delivery(
     subsidy_pct = float(row["delivery_subsidy_percent"] or 50)
 
     try:
+        from ckac_common.platform_config import third_party_integrations_enabled
         from ckac_common.risk_config import is_risk_capability_enabled
 
         porter_flag = await is_risk_capability_enabled(
             session, "courier_porter_dunzo", default=False
         )
+        tp_on = await third_party_integrations_enabled(session, default=False)
     except Exception:
         porter_flag = False
+        tp_on = False
 
-    # Porter partner calls require DELIVERY_PARTNER=porter + feature flag.
+    # Porter partner calls require DELIVERY_PARTNER=porter + feature flags.
     partner_env = (os.getenv("DELIVERY_PARTNER") or "mock").strip().lower()
-    use_porter = partner_env == "porter" and porter_flag
+    use_porter = partner_env == "porter" and porter_flag and tp_on
 
     platform = quote_platform_delivery_fee(
         distance_km,

@@ -24,6 +24,10 @@ async def resolve_livekit_creds(
 
 
 async def livekit_configured(session: AsyncSession | None = None) -> bool:
+    from ckac_common.platform_config import third_party_integrations_enabled
+
+    if not await third_party_integrations_enabled(session, default=False):
+        return False
     url, key, secret = await resolve_livekit_creds(session)
     return bool(url and key and secret)
 
@@ -42,6 +46,10 @@ async def build_livekit_token(
     ttl_seconds: int = 3600,
     session: AsyncSession | None = None,
 ) -> str | None:
+    from ckac_common.platform_config import third_party_integrations_enabled
+
+    if not await third_party_integrations_enabled(session, default=False):
+        return None
     url, api_key, api_secret = await resolve_livekit_creds(session)
     if not (url and api_key and api_secret):
         return None

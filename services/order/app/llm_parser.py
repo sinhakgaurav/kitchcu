@@ -8,7 +8,11 @@ import logging
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.parser import ParseResult, ParsedLine, match_dishes, parse_message_text
-from ckac_common.platform_config import get_platform_secret, is_feature_enabled
+from ckac_common.platform_config import (
+    get_platform_secret,
+    is_feature_enabled,
+    third_party_integrations_enabled,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -19,7 +23,9 @@ async def parse_order_message(
     menu: list[dict],
 ) -> ParseResult:
     """Parse WhatsApp order text — LLM when enabled, else rule-based."""
-    if await is_feature_enabled(session, "order_parser_llm", default=False):
+    if await is_feature_enabled(session, "order_parser_llm", default=False) and await third_party_integrations_enabled(
+        session, default=False
+    ):
         try:
             llm_result = await _try_llm_parse(session, message_text, menu)
             if llm_result is not None:

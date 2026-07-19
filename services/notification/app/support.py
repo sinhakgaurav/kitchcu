@@ -253,7 +253,7 @@ async def generate_support_reply(
     session=None,
 ) -> SupportChatResponse:
     from app.tickets import infer_category, should_suggest_ticket
-    from ckac_common.platform_config import get_platform_secret
+    from ckac_common.platform_config import get_platform_secret, third_party_integrations_enabled
 
     api_key = (await get_platform_secret(session, "support_ai_api_key") if session is not None else None) or ""
     if not api_key:
@@ -263,7 +263,8 @@ async def generate_support_reply(
     suggest = should_suggest_ticket(body.message, used_fallback)
     category = infer_category(body.message, body.audience) if suggest else None
 
-    if api_key:
+    tp_on = await third_party_integrations_enabled(session, default=False)
+    if api_key and tp_on:
         ai = await _ai_reply(body.audience, body.message, body.history, api_key)
         if ai:
             ticket_hint = ""
