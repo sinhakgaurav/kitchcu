@@ -84,7 +84,9 @@ def resolve_service_url(path: str) -> str | None:
     ):
         return settings.billing_service_url
     if path.startswith("/api/v1/admin/kitchens/") and (
-        "/templates" in path or path.rstrip("/").endswith("/tiffin-summary")
+        "/templates" in path
+        or path.rstrip("/").endswith("/tiffin-summary")
+        or "/subscriptions" in path
     ):
         return settings.marketing_service_url
     if any(path.startswith(p) for p in IDENTITY_PREFIXES):
@@ -112,6 +114,9 @@ def resolve_service_url(path: str) -> str | None:
     if path.startswith("/api/v1/orders"):
         return settings.order_service_url
     if path.startswith("/api/v1/kitchens"):
+        # Branded-page settings/upload live on identity — must win before `/media` catalog marker.
+        if "/branded-page" in path:
+            return settings.identity_service_url
         if any(marker in path for marker in STREAMING_PATH_MARKERS):
             return settings.streaming_service_url
         if any(marker in path for marker in COMMUNITY_PATH_MARKERS):

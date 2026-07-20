@@ -7,6 +7,7 @@ import {
   fetchCoupons,
   fetchMenu,
   fetchPromotions,
+  updatePromotion,
   type Coupon,
   type Dish,
   type Promotion,
@@ -115,6 +116,20 @@ export function CouponsPage() {
     if (!kitchen) return;
     await deactivateCoupon(kitchen.id, couponId);
     load();
+  };
+
+  const endPromotion = async (promotionId: string) => {
+    if (!kitchen) return;
+    setBusy(true);
+    setError("");
+    try {
+      await updatePromotion(kitchen.id, promotionId, { is_active: false });
+      load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not end promotion");
+    } finally {
+      setBusy(false);
+    }
   };
 
   if (!kitchen) return null;
@@ -274,6 +289,16 @@ export function CouponsPage() {
                     <strong>{p.name}</strong> — {p.dish_name} at ₹{p.special_price} for{" "}
                     {p.segment.replace("_", " ")}
                     {!p.is_active && " · inactive"}
+                    {p.is_active && (
+                      <button
+                        type="button"
+                        className="btn btn--ghost btn--sm"
+                        disabled={busy}
+                        onClick={() => endPromotion(p.id)}
+                      >
+                        End promo
+                      </button>
+                    )}
                   </li>
                 ))}
               </ul>

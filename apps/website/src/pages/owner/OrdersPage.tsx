@@ -1,5 +1,6 @@
 import { Link, useSearchParams } from "react-router-dom";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { ListingToolbar } from "../../components/ListingToolbar";
 import {
   confirmDraft,
@@ -35,6 +36,7 @@ function OrdersSkeleton() {
 }
 
 export function OrdersPage() {
+  const { t } = useTranslation();
   const { kitchen } = useKitchen();
   const [params, setParams] = useSearchParams();
   const tab = params.get("tab") ?? "active";
@@ -61,7 +63,31 @@ export function OrdersPage() {
     }
   }, [kitchen]);
 
-  useEffect(() => { load().catch(() => {}); }, [load]);
+  useEffect(() => {
+    load().catch(() => {});
+  }, [load]);
+
+  // Service-mode inbox: poll for new received orders / drafts without full-page refresh noise.
+  useEffect(() => {
+    if (!kitchen) return;
+    const tick = () => {
+      Promise.all([fetchOrders(kitchen.id), fetchDrafts(kitchen.id)])
+        .then(([o, d]) => {
+          setOrders(o.orders);
+          setDrafts(d.drafts);
+        })
+        .catch(() => undefined);
+    };
+    const id = window.setInterval(tick, 20000);
+    const onVis = () => {
+      if (document.visibilityState === "visible") tick();
+    };
+    document.addEventListener("visibilitychange", onVis);
+    return () => {
+      window.clearInterval(id);
+      document.removeEventListener("visibilitychange", onVis);
+    };
+  }, [kitchen]);
 
   const activeOrders = useMemo(
     () => orders.filter((o) => !["delivered", "cancelled"].includes(o.status)),
@@ -150,10 +176,10 @@ export function OrdersPage() {
     <div className="owner-screen od-board od-orders">
       <section className="od-board__hero dash-card">
         <div className="od-board__hero-text">
-          <p className="od-board__eyebrow">Order operations</p>
-          <h1>Orders</h1>
+          <p className="od-board__eyebrow">{t("owner.nav.operations")}</p>
+          <h1>{t("owner.pages.orders")}</h1>
           <p className="od-board__meta">
-            WhatsApp drafts · manual intake · lifecycle tracking
+            {t("owner.orders.drafts")} · {t("owner.orders.newOrder")} · {t("owner.orders.updateStatus")}
           </p>
           {drafts.length > 0 && (
             <div className="od-board__pills">

@@ -1,9 +1,11 @@
 import type { CSSProperties, RefObject } from "react";
+import { useTranslation } from "react-i18next";
 import { useInView } from "../hooks/useParallax";
-import { features } from "../data/content";
+import { featureCards } from "../data/content";
 import { ParallaxScene } from "./ParallaxScene";
 
 export function Features() {
+  const { t } = useTranslation();
   const { ref, visible } = useInView();
 
   return (
@@ -12,27 +14,24 @@ export function Features() {
 
       <div className="container">
         <div className={`section__header reveal reveal--blur ${visible ? "reveal--visible" : ""}`}>
-          <span className="section__eyebrow">Platform Features</span>
-          <h2>Built for how cloud kitchens actually work</h2>
-          <p>
-            WhatsApp-first operations, honest menus, and owner control —
-            without paying commission on every order.
-          </p>
+          <span className="section__eyebrow">{t("portal.featuresEyebrow")}</span>
+          <h2>{t("portal.featuresTitle")}</h2>
+          <p>{t("portal.featuresBody")}</p>
         </div>
 
         <div className={`features__grid reveal-stagger ${visible ? "reveal--visible" : ""}`}>
-          {features.map((f, i) => (
+          {featureCards.map((f, i) => (
             <article
-              key={f.title}
+              key={f.titleKey}
               className="feature-card glass feature-card--with-image"
               style={{ "--i": i } as CSSProperties}
             >
               <div className="feature-card__image-wrap">
-                <img src={f.image.src} alt={f.image.alt} loading="lazy" />
+                <img src={f.image.src} alt={t(f.titleKey)} loading="lazy" />
               </div>
               <div className="feature-card__body">
-                <h3>{f.title}</h3>
-                <p>{f.desc}</p>
+                <h3>{t(f.titleKey)}</h3>
+                <p>{t(f.descKey)}</p>
               </div>
               <div className="feature-card__shine" />
             </article>

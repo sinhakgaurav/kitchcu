@@ -951,6 +951,30 @@
   font-size: 0.85rem;
 }
 
+.stream-live__preview {
+  margin: 0.75rem 0 1rem;
+}
+
+.stream-live__hint {
+  margin: 0.5rem 0 0;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+.livekit-viewer__video,
+.local-camera-preview__video {
+  width: 100%;
+  max-height: 420px;
+  background: #0b1f1c;
+  border-radius: 8px;
+  display: block;
+  object-fit: cover;
+}
+
+.local-camera-preview {
+  margin: 0;
+}
+
 .owner-screen .owner-new-order {
   display: grid;
   grid-template-columns: 1fr 1fr;

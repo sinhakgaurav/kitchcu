@@ -1,9 +1,11 @@
 import type { RefObject } from "react";
+import { useTranslation } from "react-i18next";
 import { useInView } from "../hooks/useParallax";
 import { pricingPlans } from "../data/content";
 import { PricingParallaxBg } from "./PricingParallaxBg";
 
 export function Pricing() {
+  const { t } = useTranslation();
   const { ref, visible } = useInView();
 
   return (
@@ -11,11 +13,9 @@ export function Pricing() {
       <PricingParallaxBg />
       <div className="container pricing__inner">
         <div className={`section__header reveal reveal--blur ${visible ? "reveal--visible" : ""}`}>
-          <span className="section__eyebrow">Pricing</span>
-          <h2>Subscription plans — no food commission</h2>
-          <p>
-            Pay a flat monthly fee. Keep 100% of your food revenue. Scale when your kitchen grows.
-          </p>
+          <span className="section__eyebrow">{t("portal.pricingEyebrow")}</span>
+          <h2>{t("portal.pricingTitle")}</h2>
+          <p>{t("portal.pricingBody")}</p>
         </div>
 
         <div className={`pricing__grid reveal-stagger ${visible ? "reveal--visible" : ""}`}>
@@ -24,28 +24,32 @@ export function Pricing() {
               key={plan.id}
               className={`pricing-card glass ${plan.featured ? "pricing-card--featured" : ""}`}
             >
-              {plan.featured && <span className="pricing-card__badge">Most popular</span>}
-              <h3>{plan.name}</h3>
-              <p className="pricing-card__desc">{plan.description}</p>
+              {plan.featured && (
+                <span className="pricing-card__badge">{t("portal.pricingPopular")}</span>
+              )}
+              <h3>{t(plan.nameKey)}</h3>
+              <p className="pricing-card__desc">{t(plan.descKey)}</p>
               <div className="pricing-card__price">
                 <strong>₹{plan.price.toLocaleString("en-IN")}</strong>
-                <span>/{plan.period}</span>
+                <span>/{t("portal.pricingMonth")}</span>
               </div>
               <ul className="pricing-card__features">
-                {plan.features.map((f) => (
-                  <li key={f}>{f}</li>
+                {plan.featureKeys.map((key) => (
+                  <li key={key}>{t(key)}</li>
                 ))}
               </ul>
-              <a href="#contact" className={`btn ${plan.featured ? "btn--primary" : "btn--ghost"} btn--lg`}>
-                {plan.cta}
+              <a
+                href="#contact"
+                className={`btn ${plan.featured ? "btn--primary" : "btn--ghost"} btn--lg`}
+              >
+                {t(plan.ctaKey)}
               </a>
             </article>
           ))}
         </div>
 
         <p className={`pricing__note reveal ${visible ? "reveal--visible" : ""}`}>
-          All plans include order lifecycle, live-capture menus, and customer menu links.
-          Pilot kitchens get onboarding support. No hidden fees on orders.
+          {t("portal.pricingNote")}
         </p>
       </div>
     </section>

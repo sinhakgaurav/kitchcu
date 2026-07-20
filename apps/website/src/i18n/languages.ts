@@ -10,7 +10,9 @@ export type LocaleCode =
   | "ml"
   | "bn"
   | "gu"
-  | "pa";
+  | "pa"
+  | "bho"
+  | "mai";
 
 export type LanguageMeta = {
   code: LocaleCode;
@@ -31,7 +33,25 @@ export const LANGUAGES: Record<LocaleCode, LanguageMeta> = {
   bn: { code: "bn", name: "বাংলা", nameEn: "Bengali" },
   gu: { code: "gu", name: "ગુજરાતી", nameEn: "Gujarati" },
   pa: { code: "pa", name: "ਪੰਜਾਬੀ", nameEn: "Punjabi" },
+  bho: { code: "bho", name: "भोजपुरी", nameEn: "Bhojpuri" },
+  mai: { code: "mai", name: "मैथिली", nameEn: "Maithili" },
 };
+
+/** Chooser order — India launch languages first. */
+export const LOCALE_PICKER_ORDER: LocaleCode[] = [
+  "en",
+  "mr",
+  "hi",
+  "bn",
+  "pa",
+  "te",
+  "kn",
+  "ml",
+  "bho",
+  "mai",
+  "ta",
+  "gu",
+];
 
 export const DEFAULT_LOCALE: LocaleCode = "en";
 

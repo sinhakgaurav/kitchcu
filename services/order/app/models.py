@@ -55,6 +55,8 @@ class Order(Base):
     customer_name: Mapped[str | None] = mapped_column(String(255))
     customer_phone: Mapped[str | None] = mapped_column(String(20))
     subtotal: Mapped[float] = mapped_column(Numeric(10, 2), nullable=False)
+    coupon_code: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    discount_amount: Mapped[float] = mapped_column(Numeric(10, 2), default=0)
     delivery_fee: Mapped[float] = mapped_column(Numeric(10, 2), default=0)
     distance_km: Mapped[float | None] = mapped_column(Numeric(6, 2), nullable=True)
     delivery_fee_accepted: Mapped[bool | None] = mapped_column(Boolean, nullable=True)

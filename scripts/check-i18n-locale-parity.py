@@ -30,6 +30,8 @@ LOCALE_FILES = (
     "bn.json",
     "gu.json",
     "pa.json",
+    "bho.json",
+    "mai.json",
 )
 
 

@@ -145,6 +145,35 @@ export function OwnerHomePage() {
   const subTier = owner?.subscription_tier ?? "trial";
   const subStatus = owner?.subscription_status ?? "active";
 
+  const day1Steps = [
+    {
+      id: "dishes",
+      done: dishCount >= 3,
+      label: dishCount >= 3 ? `${dishCount} dishes on menu` : "Add 3 live-capture dishes",
+      to: "/dashboard/menu/new",
+    },
+    {
+      id: "brand",
+      done: brandedEnabled,
+      label: brandedEnabled ? "Branded page published" : "Publish your branded kitchen page",
+      to: "/dashboard/brand",
+    },
+    {
+      id: "share",
+      done: brandedEnabled && dishCount >= 1,
+      label: "Share storefront link with customers",
+      to: "/dashboard/brand",
+    },
+    {
+      id: "whatsapp",
+      done: false,
+      label: "Connect WhatsApp (optional for day-1)",
+      to: "/dashboard/whatsapp",
+    },
+  ];
+  const day1Done = day1Steps.filter((s) => s.done).length;
+  const showDay1 = day1Done < 3;
+
   const onSaveGolden = async (suggestionId: string) => {
     setSavingGoldenId(suggestionId);
     try {
@@ -177,11 +206,11 @@ export function OwnerHomePage() {
               {subTier} · {subStatus}
             </span>
             {stream?.is_live && (
-              <span className="od-pill od-pill--live">Live now</span>
+              <span className="od-pill od-pill--live">{t("owner.home.liveNow")}</span>
             )}
             {draftCount > 0 && (
               <Link to="/dashboard/orders?tab=drafts" className="od-pill od-pill--alert">
-                {draftCount} draft{draftCount !== 1 ? "s" : ""} waiting
+                {t("owner.home.draftsWaiting", { count: draftCount })}
               </Link>
             )}
           </div>
@@ -192,24 +221,45 @@ export function OwnerHomePage() {
         </div>
       </section>
 
+      {showDay1 && (
+        <section className="dash-card owner-day1">
+          <h2>Day-1 kitchen setup</h2>
+          <p className="owner-muted">
+            {day1Done}/3 core steps — get menu live, publish brand, share the link.
+          </p>
+          <ul className="owner-day1__list">
+            {day1Steps.map((step) => (
+              <li key={step.id} className={step.done ? "owner-day1__done" : undefined}>
+                <span>{step.done ? "✓" : "○"}</span>
+                {step.done ? (
+                  <span>{step.label}</span>
+                ) : (
+                  <Link to={step.to}>{step.label}</Link>
+                )}
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
       <section className="dash-card od-share od-branded od-branded--teaser">
         <div className="od-share__copy">
-          <h2>Your brand page</h2>
+          <h2>{t("owner.home.brandTitle")}</h2>
           <p>
-            Share <code>{brandedLink}</code> on WhatsApp Status — kitchen-first menu &amp; checkout.
-            {brandedEnabled ? " · Published" : " · Not published yet"}
+            {t("owner.home.brandShare", { link: brandedLink })}{" "}
+            · {brandedEnabled ? t("owner.home.published") : t("owner.home.notPublished")}
           </p>
         </div>
         <div className="od-share__aside od-branded__teaser-actions">
           <Link to="/dashboard/brand" className="btn btn--primary btn--sm">
-            Manage brand page
+            {t("owner.home.manageBrand")}
           </Link>
           <button
             type="button"
             className="btn btn--ghost btn--sm"
             onClick={() => window.open(brandedLink, "_blank", "noopener,noreferrer")}
           >
-            Preview
+            {t("owner.home.preview")}
           </button>
         </div>
       </section>
@@ -229,10 +279,10 @@ export function OwnerHomePage() {
             <section className="dash-card od-panel od-golden">
               <header className="od-panel__head">
                 <div>
-                  <h2>Golden performance</h2>
-                  <p>Peak days with strong ratings — save that recipe for the future</p>
+                  <h2>{t("owner.home.goldenTitle")}</h2>
+                  <p>{t("owner.home.goldenDesc")}</p>
                 </div>
-                <Link to="/dashboard/growth" className="od-panel__link">Growth →</Link>
+                <Link to="/dashboard/growth" className="od-panel__link">{t("owner.home.growthLink")}</Link>
               </header>
               <ul className="od-golden__list">
                 {goldenSuggestions.slice(0, 3).map((s) => {
@@ -245,14 +295,14 @@ export function OwnerHomePage() {
                         <strong>{dishName}</strong>
                         <span>
                           {String(s.action_payload.performance_date ?? "")}
-                          {qty ? ` · ${qty} portions` : ""}
+                          {qty ? ` · ${t("owner.home.portions", { count: qty })}` : ""}
                           {s.action_payload.avg_rating != null
                             ? ` · ${Number(s.action_payload.avg_rating).toFixed(1)}★`
                             : ""}
                         </span>
                       </div>
                       {saved ? (
-                        <span className="golden-day-badge">Saved</span>
+                        <span className="golden-day-badge">{t("owner.home.saved")}</span>
                       ) : (
                         <button
                           type="button"
@@ -260,7 +310,7 @@ export function OwnerHomePage() {
                           disabled={savingGoldenId === s.id}
                           onClick={() => onSaveGolden(s.id)}
                         >
-                          {savingGoldenId === s.id ? "Saving…" : "Save recipe"}
+                          {savingGoldenId === s.id ? t("owner.home.saving") : t("owner.home.saveRecipe")}
                         </button>
                       )}
                     </li>
@@ -271,9 +321,9 @@ export function OwnerHomePage() {
                     <li key={p.id} className="od-golden__item">
                       <div>
                         <strong>{p.dish_name}</strong>
-                        <span>Pinned baseline · {p.performance_date}</span>
+                        <span>{t("owner.home.pinnedBaseline")} · {p.performance_date}</span>
                       </div>
-                      <span className="golden-day-badge">Golden</span>
+                      <span className="golden-day-badge">{t("owner.home.goldenBadge")}</span>
                     </li>
                   ))}
               </ul>
@@ -285,9 +335,9 @@ export function OwnerHomePage() {
               <span className="od-kpi__icon od-kpi__icon--revenue" aria-hidden="true" />
               <div>
                 <strong>{summary ? inr(summary.gross_revenue) : "—"}</strong>
-                <span>Revenue · last 7 days</span>
+                <span>{t("owner.home.kpiRevenue")}</span>
                 {summary && summary.completed_orders > 0 && (
-                  <em>{inr(summary.avg_order_value)} avg order</em>
+                  <em>{t("owner.home.kpiAvgOrder", { amount: inr(summary.avg_order_value) })}</em>
                 )}
               </div>
             </Link>
@@ -295,24 +345,28 @@ export function OwnerHomePage() {
               <span className="od-kpi__icon od-kpi__icon--orders" aria-hidden="true" />
               <div>
                 <strong>{activeOrders.length}</strong>
-                <span>Active orders</span>
-                <em>{summary?.completed_orders ?? 0} completed this week</em>
+                <span>{t("owner.home.kpiActiveOrders")}</span>
+                <em>{t("owner.home.kpiCompletedWeek", { count: summary?.completed_orders ?? 0 })}</em>
               </div>
             </Link>
             <Link to="/dashboard/orders?tab=drafts" className="od-kpi dash-card">
               <span className="od-kpi__icon od-kpi__icon--drafts" aria-hidden="true" />
               <div>
                 <strong>{draftCount}</strong>
-                <span>WhatsApp drafts</span>
-                <em>Parse & confirm incoming</em>
+                <span>{t("owner.home.kpiDrafts")}</span>
+                <em>{t("owner.home.kpiDraftsHint")}</em>
               </div>
             </Link>
             <Link to="/dashboard/menu" className="od-kpi dash-card">
               <span className="od-kpi__icon od-kpi__icon--menu" aria-hidden="true" />
               <div>
                 <strong>{dishCount}</strong>
-                <span>Menu dishes</span>
-                {topDish ? <em>Top: {topDish}</em> : <em>Add live-capture photos</em>}
+                <span>{t("owner.home.kpiMenu")}</span>
+                {topDish ? (
+                  <em>{t("owner.home.kpiTop", { name: topDish })}</em>
+                ) : (
+                  <em>{t("owner.home.kpiAddPhotos")}</em>
+                )}
               </div>
             </Link>
           </div>
@@ -327,10 +381,10 @@ export function OwnerHomePage() {
             <section className="dash-card od-panel">
               <header className="od-panel__head">
                 <div>
-                  <h2>Revenue pulse</h2>
-                  <p>Last 7 days — tap Reports for full analytics</p>
+                  <h2>{t("owner.home.revenuePulse")}</h2>
+                  <p>{t("owner.home.revenuePulseDesc")}</p>
                 </div>
-                <Link to="/dashboard/reports" className="od-panel__link">Full reports →</Link>
+                <Link to="/dashboard/reports" className="od-panel__link">{t("owner.home.fullReports")}</Link>
               </header>
               {series && series.points.some((p) => p.revenue > 0) ? (
                 <div className="report-bars od-board__spark">
@@ -349,13 +403,13 @@ export function OwnerHomePage() {
                   ))}
                 </div>
               ) : (
-                <p className="od-panel__empty">No revenue yet — share your menu link and take your first order.</p>
+                <p className="od-panel__empty">{t("owner.home.noRevenue")}</p>
               )}
               {summary && (
                 <dl className="od-board__mini-stats">
-                  <div><dt>Repeat rate</dt><dd>{pct(summary.repeat_rate)}</dd></div>
-                  <div><dt>Customers</dt><dd>{summary.unique_customers}</dd></div>
-                  <div><dt>Cancel rate</dt><dd>{pct(summary.cancellation_rate)}</dd></div>
+                  <div><dt>{t("owner.home.repeatRate")}</dt><dd>{pct(summary.repeat_rate)}</dd></div>
+                  <div><dt>{t("owner.home.customers")}</dt><dd>{summary.unique_customers}</dd></div>
+                  <div><dt>{t("owner.home.cancelRate")}</dt><dd>{pct(summary.cancellation_rate)}</dd></div>
                 </dl>
               )}
             </section>
@@ -363,8 +417,8 @@ export function OwnerHomePage() {
             <section className="dash-card od-panel">
               <header className="od-panel__head">
                 <div>
-                  <h2>Quick actions</h2>
-                  <p>Common tasks for your kitchen</p>
+                  <h2>{t("owner.home.quickActions")}</h2>
+                  <p>{t("owner.home.quickActionsDesc")}</p>
                 </div>
               </header>
               <div className="od-actions">
@@ -382,7 +436,7 @@ export function OwnerHomePage() {
             <header className="od-panel__head">
               <div>
                 <h2>{t("owner.home.recentOrders")}</h2>
-                <p>Latest activity across all channels</p>
+                <p>{t("owner.home.recentOrdersDesc")}</p>
               </div>
               <Link to="/dashboard/orders" className="od-panel__link">{t("owner.home.viewAllOrders")}</Link>
             </header>
@@ -395,7 +449,7 @@ export function OwnerHomePage() {
                     <Link to={`/dashboard/orders/${o.id}`} className="od-recent__row">
                       <div>
                         <strong>{o.order_code}</strong>
-                        <span>{o.customer_name ?? o.customer_phone ?? "Walk-in"}</span>
+                        <span>{o.customer_name ?? o.customer_phone ?? t("owner.home.walkIn")}</span>
                       </div>
                       <div className="od-recent__end">
                         <span className={`status-badge status-badge--${o.status}`}>

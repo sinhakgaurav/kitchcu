@@ -1,5 +1,6 @@
 """Extended platform seed — every persona, CRM, ratings, recipes, subscriptions,
-WhatsApp/payments/GST/refunds, delivery, support, growth, community, streaming, learning."""
+WhatsApp/payments/GST/refunds, delivery, support, growth, community, streaming,
+learning, dual referrals (P37)."""
 
 from __future__ import annotations
 
@@ -7,7 +8,7 @@ import os
 import subprocess
 from datetime import datetime, timedelta, timezone
 
-from demo_data import DEMO_ADMIN, DEMO_CUSTOMERS, DEMO_OTP
+from demo_data import DEMO_ADMIN, DEMO_CUSTOMERS, DEMO_OTP, DEMO_REFERRAL
 from seed_common import (
     ApiError,
     login_admin,
@@ -703,6 +704,151 @@ def ensure_learning_trial(owner_token: str, kitchen_id: str) -> None:
         log(f"  ! learning trial: {exc}")
 
 
+def ensure_referrals(
+    admin_token: str,
+    owner_token: str,
+    kitchen_id: str,
+    customers: list[dict],
+) -> None:
+    """Seed dual referral program: settings, pending/rejected leads, converted credit.
+
+    Idempotent — open leads dedupe by contact phone; grant/reject are status-safe.
+    """
+    try:
+        request(
+            "PATCH",
+            "/api/v1/admin/referrals/settings",
+            {
+                "enabled": True,
+                "customer_to_kitchen_reward_inr": 10,
+                "kitchen_to_customer_reward_inr": 10,
+                "kitchen_reward_trigger": "first_order_or_onboard",
+            },
+            token=admin_token,
+        )
+        log("  Referral settings enabled (₹10 / ₹10)")
+    except ApiError as exc:
+        log(f"  ! referral settings: {exc}")
+        return
+
+    if not customers:
+        log("  ! referrals skipped — no customer sessions")
+        return
+
+    cust_token = customers[0]["token"]
+    reject_ids: list[str] = []
+    grant_id: str | None = None
+
+    for spec in DEMO_REFERRAL["pending_kitchen_leads"]:
+        body = {
+            "kitchen_name": spec["kitchen_name"],
+            "contact_name": spec.get("contact_name"),
+            "contact_phone": spec["contact_phone"],
+            "city": spec.get("city"),
+            "notes": "Seeded demo referral (customer → kitchen)",
+        }
+        try:
+            lead = request(
+                "POST",
+                "/api/v1/customers/me/referrals/kitchens",
+                body,
+                token=cust_token,
+            )
+            if spec.get("reject") and lead.get("status") == "submitted":
+                reject_ids.append(lead["id"])
+            log(f"  Customer→kitchen lead: {spec['kitchen_name']} ({lead.get('status')})")
+        except ApiError as exc:
+            log(f"  ! customer kitchen lead {spec['contact_phone']}: {exc}")
+
+    grant_spec = DEMO_REFERRAL["grant_kitchen_lead"]
+    try:
+        lead = request(
+            "POST",
+            "/api/v1/customers/me/referrals/kitchens",
+            {
+                "kitchen_name": grant_spec["kitchen_name"],
+                "contact_name": grant_spec.get("contact_name"),
+                "contact_phone": grant_spec["contact_phone"],
+                "city": grant_spec.get("city"),
+                "notes": "Seeded — admin grant for demo credit",
+            },
+            token=cust_token,
+        )
+        grant_id = lead.get("id")
+        log(f"  Customer→kitchen grant lead: {lead.get('status')}")
+    except ApiError as exc:
+        log(f"  ! customer grant lead: {exc}")
+
+    for lead_id in reject_ids:
+        try:
+            request(
+                "POST",
+                f"/api/v1/admin/referrals/leads/{lead_id}/reject",
+                {"reason": "Seed demo — not a fit for platform"},
+                token=admin_token,
+            )
+            log("  Admin rejected demo kitchen referral")
+        except ApiError as exc:
+            log(f"  ! referral reject: {exc}")
+
+    if grant_id:
+        try:
+            granted = request(
+                "POST",
+                f"/api/v1/admin/referrals/leads/{grant_id}/grant",
+                {"note": "Seed demo conversion credit"},
+                token=admin_token,
+            )
+            log(f"  Admin granted kitchen referral → customer credit ({granted.get('status')})")
+        except ApiError as exc:
+            log(f"  ! referral grant: {exc}")
+
+    for spec in DEMO_REFERRAL["pending_customer_leads"]:
+        try:
+            lead = request(
+                "POST",
+                "/api/v1/owners/me/referrals/customers",
+                {
+                    "kitchen_id": kitchen_id,
+                    "contact_name": spec.get("contact_name"),
+                    "contact_phone": spec["contact_phone"],
+                    "city": spec.get("city"),
+                    "notes": "Seeded demo referral (kitchen → customer)",
+                },
+                token=owner_token,
+            )
+            log(f"  Owner→customer lead: {spec['contact_phone']} ({lead.get('status')})")
+        except ApiError as exc:
+            log(f"  ! owner customer lead {spec['contact_phone']}: {exc}")
+
+    onboard = DEMO_REFERRAL["onboard_customer"]
+    try:
+        lead = request(
+            "POST",
+            "/api/v1/owners/me/referrals/customers",
+            {
+                "kitchen_id": kitchen_id,
+                "contact_name": onboard.get("contact_name"),
+                "contact_phone": onboard["contact_phone"],
+                "city": onboard.get("city"),
+                "notes": "Seeded — convert on WhatsApp onboard",
+            },
+            token=owner_token,
+        )
+        log(f"  Owner→customer onboard lead: {lead.get('status')}")
+    except ApiError as exc:
+        log(f"  ! owner onboard lead: {exc}")
+        return
+
+    try:
+        login_customer(onboard["phone_e164"], DEMO_OTP)
+        dash = request("GET", "/api/v1/owners/me/referrals", token=owner_token)
+        bal = (dash.get("credit") or {}).get("balance_inr")
+        log(f"  Owner referral credit after onboard: ₹{bal}")
+    except ApiError as exc:
+        log(f"  ! referral customer onboard: {exc}")
+
+
 def ensure_crm_and_coupon_extras(owner_token: str, kitchen_id: str, customers: list[dict]) -> None:
     """CRM tag update + coupon validation + active-promotion read (F36-F38 polish)."""
     try:
@@ -789,7 +935,8 @@ def seed_platform_extras(
     kitchen_name: str = "Sharma Home Kitchen",
 ) -> None:
     """Seed every persona + module: admin, customers, ratings, marketing, subscription,
-    community, growth, WhatsApp, payments/GST/refunds, delivery, support, streaming, learning."""
+    community, growth, referrals, WhatsApp, payments/GST/refunds, delivery, support,
+    streaming, learning."""
     if os.environ.get("CKAC_SEED_EXTRAS", "1").strip().lower() in ("0", "false", "no"):
         log("Platform extras disabled (CKAC_SEED_EXTRAS=0)")
         return
@@ -797,7 +944,7 @@ def seed_platform_extras(
     log("")
     log("Platform extras (all user types + all modules)")
     log("-" * 50)
-    ensure_admin_session()
+    admin_token = ensure_admin_session()
     customers = ensure_customer_sessions()
     if dish_ids:
         ensure_customer_orders(customers, kitchen_id, dish_ids, owner_token)
@@ -810,6 +957,11 @@ def seed_platform_extras(
         ensure_growth_blast(owner_token, kitchen_id, list(dish_ids.values())[:5])
         ensure_growth_suggestions(owner_token, kitchen_id)
         ensure_crm_and_coupon_extras(owner_token, kitchen_id, customers)
+
+    log("")
+    log("Referrals (customer↔kitchen leads + demo credit)")
+    log("-" * 50)
+    ensure_referrals(admin_token, owner_token, kitchen_id, customers)
 
     log("")
     log("Owner integrations (WhatsApp, payments, GST, refunds, delivery, streaming, learning)")

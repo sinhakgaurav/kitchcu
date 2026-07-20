@@ -128,6 +128,14 @@ export function TrackOrderPage() {
               {new Date(info.estimated_delivery_at).toLocaleString("en-IN", { timeZone: "Asia/Kolkata" })}
             </p>
           )}
+          {(info.courier_partner || info.courier_job_id || info.courier_status) && (
+            <div className="report-hint">
+              <strong>Courier</strong>
+              {info.courier_partner ? ` · ${info.courier_partner}` : ""}
+              {info.courier_status ? ` · ${info.courier_status}` : ""}
+              {info.courier_job_id ? ` · job ${info.courier_job_id}` : ""}
+            </div>
+          )}
           <p className="report-hint">
             Progress updates every {info.tracking_notify_interval_min} minutes while your order is preparing.
           </p>

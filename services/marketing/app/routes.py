@@ -52,6 +52,7 @@ from app.schemas import (
     PromotionCreateRequest,
     PromotionListResponse,
     PromotionResponse,
+    PromotionUpdateRequest,
     coupon_to_response,
     create_coupon,
     create_promotion,
@@ -62,6 +63,7 @@ from app.schemas import (
     promotion_to_response,
     update_coupon,
     update_customer_tags,
+    update_promotion,
     validate_coupon,
 )
 from app.templates import (
@@ -306,6 +308,37 @@ async def promotions_create(
         promo = await create_promotion(session, kitchen_id, body, publisher)
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    await session.commit()
+    return promotion_to_response(promo)
+
+
+@router.patch(
+    "/kitchens/{kitchen_id}/promotions/{promotion_id}",
+    response_model=PromotionResponse,
+    tags=[TAG_PROMOTIONS],
+    summary="Update / end a promotion",
+    description=(
+        "**Auth:** Owner JWT — caller must own `kitchen_id`.\n\n"
+        "**Body:** `PromotionUpdateRequest` — set `is_active=false` to end the promotion "
+        "immediately (preserves history). Publishes `promotion.updated`."
+    ),
+    responses={**auth_errors(include_403=True), 400: RESP_400, 404: RESP_404},
+)
+async def promotions_update(
+    kitchen_id: uuid.UUID,
+    promotion_id: uuid.UUID,
+    body: PromotionUpdateRequest,
+    owner_id: Annotated[uuid.UUID, Depends(get_current_owner_id)],
+    session: Annotated[AsyncSession, Depends(get_db)],
+    publisher: Annotated[EventPublisher, Depends(get_publisher)],
+) -> PromotionResponse:
+    await verify_kitchen_owner(kitchen_id, owner_id, session)
+    try:
+        promo = await update_promotion(session, kitchen_id, promotion_id, body, publisher)
+    except ValueError as exc:
+        detail = str(exc)
+        code = status.HTTP_404_NOT_FOUND if "not found" in detail.lower() else status.HTTP_400_BAD_REQUEST
+        raise HTTPException(status_code=code, detail=detail) from exc
     await session.commit()
     return promotion_to_response(promo)
 

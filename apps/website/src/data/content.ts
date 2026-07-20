@@ -131,48 +131,56 @@ export const heroParallaxImages = {
   },
 };
 
-export const features = [
+/** Portal feature cards — copy via i18n keys (portal.feature*). */
+export const featureCards = [
   {
-    title: "WhatsApp Order Hub",
-    desc: "Turn chat messages into structured orders. Confirm drafts in one tap.",
+    titleKey: "portal.featureWhatsappTitle",
+    descKey: "portal.featureWhatsappDesc",
     image: { src: m("samosa.jpg"), alt: "WhatsApp orders food" },
   },
   {
-    title: "Live-Capture Menu",
-    desc: "Hero dish photos are captured live so customers trust what they order.",
+    titleKey: "portal.featureLiveTitle",
+    descKey: "portal.featureLiveDesc",
     image: { src: m("skewers.jpg"), alt: "Live cooking" },
   },
   {
-    title: "Branded kitchen page",
-    desc: "Publish a shareable storefront at /k/your-code — your brand, menu, and checkout.",
+    titleKey: "portal.featureBrandTitle",
+    descKey: "portal.featureBrandDesc",
     image: { src: m("dining.jpg"), alt: "Branded kitchen storefront" },
   },
   {
-    title: "Golden performance day",
-    desc: "ML reads ratings and comments to pin your best cooking days and recipes.",
+    titleKey: "portal.featureGoldenTitle",
+    descKey: "portal.featureGoldenDesc",
     image: { src: m("bowls.jpg"), alt: "Peak kitchen performance" },
   },
   {
-    title: "Live dish showcase",
-    desc: "Go live with ingredients → prep → prepared so customers see the real dish.",
+    titleKey: "portal.featureStreamTitle",
+    descKey: "portal.featureStreamDesc",
     image: { src: m("kitchen.jpg"), alt: "Live cooking showcase" },
   },
   {
-    title: "Marketing templates",
-    desc: "Create WhatsApp and email templates for daily menu and CRM — owned by your kitchen.",
+    titleKey: "portal.featureTemplatesTitle",
+    descKey: "portal.featureTemplatesDesc",
     image: { src: m("service.jpg"), alt: "Kitchen messaging" },
   },
   {
-    title: "Order Lifecycle",
-    desc: "Track every order from received to delivered with status updates.",
+    titleKey: "portal.featureLifecycleTitle",
+    descKey: "portal.featureLifecycleDesc",
     image: { src: m("restaurant.jpg"), alt: "Kitchen service" },
   },
   {
-    title: "Owner Dashboard",
-    desc: "Menus, orders, WhatsApp & payments, templates, growth — one kitchen workspace.",
+    titleKey: "portal.featureDashboardTitle",
+    descKey: "portal.featureDashboardDesc",
     image: { src: m("restaurant.jpg"), alt: "Commercial kitchen" },
   },
-];
+] as const;
+
+/** @deprecated Use featureCards + t() — kept for parallax story English fallbacks */
+export const features = featureCards.map((f) => ({
+  title: f.titleKey,
+  desc: f.descKey,
+  image: f.image,
+}));
 
 export const images = {
   hero: heroParallaxImages.back,
@@ -191,26 +199,34 @@ export const images = {
   owners: { src: m("restaurant.jpg"), alt: "Commercial kitchen" },
 };
 
-export const howItWorks = [
+export const howItWorksSteps = [
   {
     step: "01",
-    title: "Register your kitchen",
-    desc: "Sign up as an owner, verify OTP, and create your cloud kitchen profile.",
+    titleKey: "portal.how1Title",
+    descKey: "portal.how1Desc",
     image: images.onboardRegister,
   },
   {
     step: "02",
-    title: "Publish your menu",
-    desc: "Add dishes with live photos. Share your customer menu link.",
+    titleKey: "portal.how2Title",
+    descKey: "portal.how2Desc",
     image: images.onboardMenu,
   },
   {
     step: "03",
-    title: "Serve customers",
-    desc: "Accept WhatsApp orders, manage lifecycle, and grow repeat customers.",
+    titleKey: "portal.how3Title",
+    descKey: "portal.how3Desc",
     image: images.onboardWhatsapp,
   },
-];
+] as const;
+
+/** @deprecated Use howItWorksSteps + t() */
+export const howItWorks = howItWorksSteps.map((s) => ({
+  step: s.step,
+  title: s.titleKey,
+  desc: s.descKey,
+  image: s.image,
+}));
 
 export const stats = [
   { value: "0%", label: "Food commission" },
@@ -218,64 +234,57 @@ export const stats = [
   { value: "₹499", label: "Starter plan from" },
 ];
 
+/** Pricing cards — names/features via portal.plan* i18n keys. */
 export const pricingPlans = [
   {
     id: "starter",
-    name: "Starter",
     price: 499,
-    period: "month",
-    description: "Perfect for home chefs launching their first cloud kitchen.",
     featured: false,
-    features: [
-      "1 kitchen location",
-      "Manual & WhatsApp orders",
-      "Live-capture menu (cuisine → veg/non-veg → dish)",
-      "Order lifecycle tracking",
-      "Customer menu link sharing",
-      "Email support",
+    nameKey: "portal.planStarterName",
+    descKey: "portal.planStarterDesc",
+    ctaKey: "portal.planStarterCta",
+    featureKeys: [
+      "portal.planStarterF1",
+      "portal.planStarterF2",
+      "portal.planStarterF3",
+      "portal.planStarterF4",
+      "portal.planStarterF5",
+      "portal.planStarterF6",
     ],
-    cta: "Start free trial",
   },
   {
     id: "growth",
-    name: "Growth",
     price: 999,
-    period: "month",
-    description: "For kitchens ready to grow repeat customers and revenue.",
     featured: true,
-    features: [
-      "Everything in Starter",
-      "Growth reports & revenue analytics",
-      "Golden performance day + recipe pins",
-      "Top dishes & peak-hour insights",
-      "Branded customer storefront (/k/code)",
-      "Customer CRM & repeat-rate tracking",
-      "Churn win-back customer list",
-      "Kitchen WhatsApp + Razorpay integrations",
-      "Priority email support",
+    nameKey: "portal.planGrowthName",
+    descKey: "portal.planGrowthDesc",
+    ctaKey: "portal.planGrowthCta",
+    featureKeys: [
+      "portal.planGrowthF1",
+      "portal.planGrowthF2",
+      "portal.planGrowthF3",
+      "portal.planGrowthF4",
+      "portal.planGrowthF5",
+      "portal.planGrowthF6",
     ],
-    cta: "Most popular",
   },
   {
     id: "scale",
-    name: "Scale",
     price: 1999,
-    period: "month",
-    description: "Multi-kitchen operators scaling across neighbourhoods.",
     featured: false,
-    features: [
-      "Everything in Growth",
-      "Up to 5 kitchens",
-      "Multi-kitchen dashboard",
-      "Advanced customer segmentation",
-      "Festival & daily menu campaigns",
-      "Live dish showcase (ingredients → prep → prepared)",
-      "Dedicated onboarding call",
-      "Priority support + AI assistant",
+    nameKey: "portal.planScaleName",
+    descKey: "portal.planScaleDesc",
+    ctaKey: "portal.planScaleCta",
+    featureKeys: [
+      "portal.planScaleF1",
+      "portal.planScaleF2",
+      "portal.planScaleF3",
+      "portal.planScaleF4",
+      "portal.planScaleF5",
+      "portal.planScaleF6",
     ],
-    cta: "Contact sales",
   },
-];
+] as const;
 
 export const supportFaqs = {
   owner: [

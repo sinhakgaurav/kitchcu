@@ -15,18 +15,19 @@
 | Location → language suggestion | Server-side locale / Accept-Language APIs |
 | One-time chooser (EN vs suggested) | Live translation / LLM |
 | Portal + customer + kitchen shells + dashboard chrome | Admin (ops stays English for now) |
-| Catalogs: en + hi + mr + ta + te + kn + ml + bn + gu + pa (184 keys; parity checked) | 100% of every long-form page body |
+| Catalogs: en + hi + mr + ta + te + kn + ml + bn + gu + pa + **bho** + **mai** (336 keys; parity checked) | Long FAQ bodies may remain EN |
 
-**Wired to `t()`:** LanguageGate/Switcher · PortalNavbar · PortalHero · OwnerLayout nav · Owner login/home/subscription · CustomerNavbar · customer login/discovery/checkout/orders/dashboard tabs.
+**Wired to `t()`:** LanguageGate/Switcher · PortalNavbar/Hero/Features/HowItWorks/Pricing/Support/Contact/Apps · OwnerLayout nav · Owner login/home/subscription/orders/brand/referrals · CustomerNavbar · customer login/discovery/checkout/orders/dashboard tabs.
 
-**Parity:** `python scripts/check-i18n-locale-parity.py`
+**Parity:** `python scripts/check-i18n-locale-parity.py` · regions: `python scripts/check-i18n-regions.py`
 
 ## 3. Detection order
 
 1. Saved locale (`localStorage`) — skip prompt  
-2. Geolocation → coarse India lat/lng regions → language code  
-3. `navigator.languages` / `navigator.language`  
-4. Default `en`
+2. Geolocation → coarse India lat/lng regions → language code (**MH → Marathi**; kn box stops south of MH)  
+3. If GPS weak/denied → **full language picker** (do not claim “location = Hindi” from `hi-IN` browser alone)  
+4. Browser tags (prefer non-Hindi regional first)  
+5. Default `en`
 
 No third-party geocoding (Maps) — bounding boxes only.
 

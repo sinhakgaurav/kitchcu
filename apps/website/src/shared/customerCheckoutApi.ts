@@ -22,6 +22,24 @@ async function checkoutFetch<T>(path: string, init?: RequestInit): Promise<T> {
   return body as T;
 }
 
+export async function validateCheckoutCoupon(data: {
+  kitchen_id: string;
+  code: string;
+  subtotal: number;
+}): Promise<{
+  valid: boolean;
+  coupon_id: string | null;
+  code: string | null;
+  discount_type: string | null;
+  discount_amount: number;
+  message: string;
+}> {
+  return checkoutFetch("/api/v1/marketing/coupons/validate", {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+}
+
 export async function createCustomerOrder(
   kitchenId: string,
   data: {
@@ -34,6 +52,7 @@ export async function createCustomerOrder(
     delivery_fee_accepted?: boolean;
     customer_latitude?: number;
     customer_longitude?: number;
+    coupon_code?: string;
   },
   idempotencyKey?: string,
 ): Promise<Order> {

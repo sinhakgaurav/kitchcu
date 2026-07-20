@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { fetchDishRecipe, type DishRecipe } from "../lib/api";
+import { RichHtml } from "./RichTextEditor";
 
 type Props = {
   kitchenId: string;
@@ -86,10 +87,7 @@ export function DishRecipeGuide({
                           )}
                         </div>
                         {step.body_html && (
-                          <div
-                            className="owner-recipe-guide__html"
-                            dangerouslySetInnerHTML={{ __html: step.body_html }}
-                          />
+                          <RichHtml html={step.body_html} className="owner-recipe-guide__html" />
                         )}
                         {step.photo_url && (
                           <img src={step.photo_url} alt="" className="owner-recipe-preview" />

@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { OwnerPageShell, OwnerPanel } from "../../components/owner/OwnerPageShell";
 import { useKitchen } from "../../shared/kitchenContext";
 import { getToken } from "../../shared/api";
@@ -24,6 +25,7 @@ const emptyRow = (): Row => ({
 });
 
 export function ReferralsPage() {
+  const { t } = useTranslation();
   const { kitchen } = useKitchen();
   const [dash, setDash] = useState<ReferralDashboard | null>(null);
   const [error, setError] = useState("");
@@ -103,9 +105,9 @@ export function ReferralsPage() {
 
   return (
     <OwnerPageShell
-      eyebrow="Growth"
-      title="Refer customers"
-      description="Refer your customers to KitchCu. When they onboard or place a first order, you earn subscription credit."
+      eyebrow={t("owner.nav.growth")}
+      title={t("owner.pages.referrals")}
+      description={t("owner.referrals.title")}
     >
       {error && <div className="auth-card__error">{error}</div>}
 

@@ -143,25 +143,29 @@ export function AddDishPage() {
             ))}
           </select>
         </label>
-        <label>Description</label>
-        <RichTextEditor
-          value={descriptionHtml}
-          onChange={setDescriptionHtml}
-          kitchenId={kitchen.id}
-          uploadContext="dish"
-          placeholder="What makes this dish special — texture, spice level, serving size…"
-          minHeight={100}
-        />
+        <div className="kc-field">
+          <span className="kc-field__label">Description</span>
+          <RichTextEditor
+            value={descriptionHtml}
+            onChange={setDescriptionHtml}
+            kitchenId={kitchen.id}
+            uploadContext="dish"
+            placeholder="What makes this dish special — texture, spice level, serving size…"
+            minHeight={100}
+          />
+        </div>
 
-        <label>Ingredients & quality notes</label>
-        <RichTextEditor
-          value={ingredientsHtml}
-          onChange={setIngredientsHtml}
-          kitchenId={kitchen.id}
-          uploadContext="dish"
-          placeholder="Key ingredients, allergens, quality notes — add photos inline if helpful"
-          minHeight={100}
-        />
+        <div className="kc-field">
+          <span className="kc-field__label">Ingredients & quality notes</span>
+          <RichTextEditor
+            value={ingredientsHtml}
+            onChange={setIngredientsHtml}
+            kitchenId={kitchen.id}
+            uploadContext="dish"
+            placeholder="Key ingredients, allergens, quality notes — add photos inline if helpful"
+            minHeight={100}
+          />
+        </div>
 
         <LiveCapturePhotoField
           kitchenId={kitchen.id}

@@ -144,6 +144,18 @@ def test_resolve_service_url_marketing():
     assert resolve_service_url("/api/v1/kitchens/abc/crm/customers") == settings.marketing_service_url
     assert resolve_service_url("/api/v1/kitchens/abc/coupons") == settings.marketing_service_url
     assert resolve_service_url("/api/v1/kitchens/abc/promotions/active") == settings.marketing_service_url
+    assert (
+        resolve_service_url("/api/v1/admin/kitchens/abc/tiffin-summary")
+        == settings.marketing_service_url
+    )
+    assert (
+        resolve_service_url("/api/v1/admin/kitchens/abc/subscriptions")
+        == settings.marketing_service_url
+    )
+    assert (
+        resolve_service_url("/api/v1/admin/kitchens/abc/subscriptions/xyz/accept")
+        == settings.marketing_service_url
+    )
 
 
 def test_resolve_service_url_ratings():

@@ -55,6 +55,21 @@ async def test_customer_order_requires_auth(client: AsyncClient, order_ctx, manu
     assert response.status_code == 401
 
 
+def _seed_coupon(kitchen_id: uuid.UUID, code: str = "SAVE10", *, percent: float = 10) -> None:
+    conn = psycopg2.connect(SYNC_DB_URL)
+    conn.autocommit = True
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            INSERT INTO ckac_marketing.coupons
+            (id, kitchen_id, code, discount_type, discount_value, min_order_amount, is_active, used_count)
+            VALUES (%s::uuid, %s::uuid, %s, 'percent', %s, 0, true, 0)
+            """,
+            (str(uuid.uuid4()), str(kitchen_id), code, percent),
+        )
+    conn.close()
+
+
 @pytest.mark.asyncio
 async def test_customer_order_success(client: AsyncClient, order_ctx):
     _, kitchen_id, dish_id, kitchen_code, _ = order_ctx
@@ -76,6 +91,47 @@ async def test_customer_order_success(client: AsyncClient, order_ctx):
     assert data["customer_name"] == "Test Customer"
     assert data["subtotal"] == 398.0
     assert kitchen_code in data["order_code"]
+
+
+@pytest.mark.asyncio
+async def test_customer_order_applies_coupon(client: AsyncClient, order_ctx):
+    _, kitchen_id, dish_id, _, _ = order_ctx
+    _seed_coupon(kitchen_id, "SAVE10", percent=10)
+    customer_id = _seed_customer(phone="+919900112233")
+    token = _make_customer_token(customer_id)
+    payload = CUSTOMER_ORDER_PAYLOAD.copy()
+    payload["items"] = [{"dish_id": str(dish_id), "quantity": 2}]
+    payload["coupon_code"] = "save10"
+
+    response = await client.post(
+        f"/api/v1/kitchens/{kitchen_id}/orders/customer",
+        json=payload,
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert response.status_code == 201, response.text
+    data = response.json()
+    assert data["subtotal"] == 398.0
+    assert data["coupon_code"] == "SAVE10"
+    assert data["discount_amount"] == 39.8
+    assert data["total"] == 358.2
+
+
+@pytest.mark.asyncio
+async def test_customer_order_rejects_invalid_coupon(client: AsyncClient, order_ctx):
+    _, kitchen_id, dish_id, _, _ = order_ctx
+    customer_id = _seed_customer(phone="+919900112244")
+    token = _make_customer_token(customer_id)
+    payload = CUSTOMER_ORDER_PAYLOAD.copy()
+    payload["items"] = [{"dish_id": str(dish_id), "quantity": 1}]
+    payload["coupon_code"] = "NOPE"
+
+    response = await client.post(
+        f"/api/v1/kitchens/{kitchen_id}/orders/customer",
+        json=payload,
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert response.status_code == 400
+    assert "coupon" in response.json()["detail"].lower()
 
 
 @pytest.mark.asyncio

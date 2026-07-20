@@ -1,0 +1,232 @@
+{
+  "lang": {
+    "title": "अपन भाषा चुनू",
+    "detected": "हमरा सभकेँ लगैत अछि जे अहाँक स्थानीय भाषा {{language}} अछि।",
+    "ask": "की अहाँ अंग्रेजी मे आगू बढ़य चाहैत छी आकि {{language}}?",
+    "continueEn": "अंग्रेजी मे जारी राखू",
+    "continueLocal": "{{language}} मे जारी रखें",
+    "detecting": "अपन स्थान के पता लगा रहल छी...",
+    "change": "भाषा"
+  },
+  "common": {
+    "continue": "करैत रहू",
+    "cancel": "रद्द",
+    "loading": "लोड भ रहल अछि...",
+    "save": "बचाउ",
+    "close": "बंद",
+    "search": "खोजनाइ",
+    "back": "पाछू",
+    "retry": "पुनः प्रयास करू",
+    "yes": "हँ",
+    "no": "नहि",
+    "error": "किछु गड़बड़ भ’ गेलै",
+    "signOut": "साइन आउट करू",
+    "openMenu": "मेनू खोलू",
+    "closeMenu": "मेनू बंद करू",
+    "toggleMenu": "मेनू टॉगल करू",
+    "dashboard": "डैशबोर्ड",
+    "customerApp": "ग्राहक ऐप",
+    "kitchenOwner": "किचन मालिक →",
+    "ownerLogin": "मालिक लॉगिन"
+  },
+  "status": {
+    "received": "प्राप्त कयल गेल",
+    "accepted": "स्वीकार कयल गेल",
+    "preparing": "तैयारी करब",
+    "ready": "तैयार",
+    "out_for_delivery": "डिलीवरी के लिये बाहर",
+    "delivered": "पहुंचल",
+    "cancelled": "रद्द क देल गेल",
+    "active": "चुस्त",
+    "suspended": "निलंबित",
+    "trial": "परीक्षण",
+    "open": "खुलल",
+    "closed": "बंद भ गेल"
+  },
+  "portal": {
+    "heroSubtitle": "घरक शेफ, टिफिन सेवा, आ केवल डिलीवरी-ओनली किचन कें लेल ग्रोथ ओएस — व्हाट्सएप ऑर्डर, लाइव-कैप्चर मेनू, जीरो फूड कमीशन.",
+    "ctaOwner": "किचन मालिक के रूप में शुरू",
+    "ctaCustomer": "ग्राहक के रूप में ब्राउज़ करें →",
+    "trustCommission": "शून्य खाद्य आयोग",
+    "trustCrm": "मालिक के स्वामित्व वाला सीआरएम",
+    "trustHonest": "ईमानदार प्रिप एवं डिलीवरी के समय",
+    "navApps": "ऐप्स",
+    "navFeatures": "विशेषता",
+    "navPricing": "मूल्य निर्धारण",
+    "navSupport": "सहायता",
+    "navContact": "संपर्क करनाइ"
+  },
+  "owner": {
+    "nav": {
+      "operations": "संचालन",
+      "overview": "अवलोकन",
+      "orders": "आदेश",
+      "menu": "मेनू",
+      "brand": "ब्रांड पेज",
+      "ingredients": "अवयव",
+      "growth": "वृद्धि",
+      "reports": "रिपोर्ट",
+      "intelligence": "बुद्धि",
+      "crm": "सीआरएम",
+      "coupons": "कूपन",
+      "tiffin": "टिफिन योजना",
+      "templates": "टेम्पलेट्स",
+      "stream": "लाइव स्ट्रीम",
+      "learn": "सीखें एवं कनेक्ट करें",
+      "learning": "अधिगम",
+      "community": "समुदाय",
+      "account": "खाता",
+      "subscription": "सदस्यता",
+      "referrals": "रेफरल के लिये",
+      "whatsapp": "व्हाट्सएप",
+      "paymentGateway": "भुगतान गेटवे",
+      "gst": "जीएसटी एवं वित्त",
+      "setup": "किचन सेटअप"
+    },
+    "shell": {
+      "activeKitchen": "सक्रिय रसोईघर",
+      "loadingKitchen": "लोड हो रहल अछि किचन...",
+      "loadingAuth": "लोड भ रहल अछि..."
+    },
+    "auth": {
+      "titleLogin": "मालिक साइन इन करू",
+      "titleRegister": "मालिक खाता बनाइए",
+      "phone": "फोन",
+      "name": "नाम",
+      "email": "ईमेल (वैकल्पिक) २.",
+      "otp": "ओटीपी",
+      "sendOtp": "ओटीपी भेजें",
+      "verify": "सत्यापन एवं जारी रखें",
+      "register": "पंजीकरण",
+      "haveAccount": "पहिने स खाता अछि? साइन इन करू",
+      "needAccount": "नवका भनसा घर? पंजीकरण",
+      "sessionExpired": "अहाँक सत्र समाप्त भ' गेल। कृपया पुनः साइन इन करू।",
+      "agreePolicies": "कृपया पंजीकरण करय कें लेल नियम, गोपनीयता, आ वापसी नीतियक सं सहमत होय.",
+      "demoHint": "डेमो ओटीपी {{otp}} अछि"
+    },
+    "home": {
+      "greetingMorning": "सुप्रभात",
+      "greetingAfternoon": "नमस्कार",
+      "greetingEvening": "शुभ संध्या",
+      "quickNewOrder": "नया क्रम",
+      "quickNewOrderDesc": "मैनुअल या वॉक-इन",
+      "quickBrand": "ब्रांड पेज",
+      "quickBrandDesc": "/k/code प्रकाशित एवं साझा करें",
+      "quickDrafts": "व्हाट्सएप के मसौदा",
+      "quickDraftsDesc": "पार्स कएल गेल आदेशक समीक्षा करू",
+      "quickAddDish": "पकवान मिला दियौ",
+      "quickAddDishDesc": "लाइव-कैप्चर फोटो",
+      "quickReports": "विकास के रिपोर्ट",
+      "quickReportsDesc": "राजस्व एवं अवधारण",
+      "quickStream": "लाइव स्ट्रीम",
+      "quickStreamDesc": "ग्राहक के लाइव जाओ",
+      "quickCoupons": "कूपन",
+      "quickCouponsDesc": "प्रचार चलाउ",
+      "quickTiffin": "टिफिन योजना",
+      "quickTiffinDesc": "मासिक थाली सब्सक्राइबर",
+      "recentOrders": "हाल के आदेश",
+      "noOrders": "एखन धरि कोनो ऑर्डर नहि",
+      "viewAllOrders": "सब ऑर्डर देखु"
+    },
+    "orders": {
+      "title": "आदेश",
+      "newOrder": "नया क्रम",
+      "drafts": "मसौदा",
+      "empty": "एखन धरि कोनो ऑर्डर नहि",
+      "searchPlaceholder": "खोज ऑर्डर कोड, ग्राहक...",
+      "detail": "आदेश विस्तार",
+      "accept": "स्वीकार",
+      "reject": "ऑर्डर रद्द करू",
+      "updateStatus": "स्थिति अपडेट करू"
+    },
+    "menu": {
+      "title": "मेनू",
+      "addDish": "पकवान मिला दियौ",
+      "empty": "एखन धरि कोनो व्यंजन नहि",
+      "liveCapture": "हीरो फोटो के लिये लाइव-कैप्चर आवश्यक",
+      "price": "दाम",
+      "prepTime": "तैयारी के समय (मिनट)।",
+      "active": "मेनू पर"
+    },
+    "subscription": {
+      "title": "सदस्यता",
+      "loading": "योजना लोड भ रहल अछि...",
+      "monthly": "मासिक",
+      "yearly": "वार्षिक",
+      "subscribe": "सब्सक्राइब करें",
+      "activate": "सक्रिय (देव) 1।",
+      "current": "वर्तमान योजना",
+      "referralCredit": "रेफरल क्रेडिट: ₹{{amount}}",
+      "referralNote": "अहां कें अगिला सदस्यता शुल्क पर क्रेडिट स्वचालित रूप सं लागू भ जायत छै.",
+      "loadError": "सदस्यता डाटा लोड नहि क' सकल"
+    },
+    "setup": {
+      "title": "किचन सेटअप",
+      "save": "सेटिंग्स सहेजें"
+    },
+    "referrals": {
+      "title": "रेफरल के लिये",
+      "creditBalance": "क्रेडिट बैलेंस",
+      "submitLead": "कोनो ग्राहक के रेफर करू",
+      "empty": "एखन धरि कोनो रेफरल लीड नहि"
+    }
+  },
+  "customer": {
+    "nav": {
+      "nearYou": "अहाँक समीप",
+      "featured": "फीचर्ड",
+      "bestPrices": "बेस्ट दाम",
+      "kitchenCode": "किचन कोड",
+      "myOrders": "हमर आदेश",
+      "dashboard": "डैशबोर्ड",
+      "account": "खाता",
+      "signIn": "ग्राहक साइन इन करू"
+    },
+    "auth": {
+      "title": "ग्राहक साइन इन करू",
+      "whatsappOtp": "व्हाट्सएप ओटीपी",
+      "socialContinue": "सामाजिक के साथ जारी रखें",
+      "phone": "फोन",
+      "sendOtp": "ओटीपी भेजें",
+      "verify": "सत्यापित करु"
+    },
+    "discovery": {
+      "title": "अपन पास घरक किचन खोजू",
+      "searchPlaceholder": "खोज रसोई, व्यंजन, पकवान...",
+      "useLocation": "हमर लोकेशन के प्रयोग करू",
+      "noResults": "कोनो किचन अहाँक फिल्टर स मेल नहि खाइत अछि"
+    },
+    "checkout": {
+      "title": "चेकआउट",
+      "placeOrder": "आदेश दे",
+      "cartEmpty": "अहाँक गाड़ी खाली अछि",
+      "deliveryAddress": "वितरण पता",
+      "payment": "भुगतान केयल गेल पाई",
+      "total": "पूरा"
+    },
+    "orders": {
+      "title": "हमर आदेश",
+      "empty": "एखन धरि कोनो ऑर्डर नहि",
+      "track": "पगडंडी",
+      "repeat": "पुनः क्रमबद्ध",
+      "history": "आदेश इतिहास"
+    },
+    "track": {
+      "title": "क्रम के ट्रैक",
+      "eta": "अनुमानित समय",
+      "status": "स्थिति"
+    },
+    "dashboard": {
+      "title": "अहाँक डैशबोर्ड",
+      "savedKitchens": "बचत भनसा घर",
+      "referrals": "रेफरल के लिये",
+      "tickets": "सहायता"
+    },
+    "account": {
+      "title": "खाता",
+      "addresses": "पता",
+      "payout": "वापसी भुगतान",
+      "save": "प्रोफाइल सहेजें"
+    }
+  }
+}

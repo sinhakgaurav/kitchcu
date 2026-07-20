@@ -449,6 +449,10 @@ class DishUpdateRequest(BaseModel):
     description: str | None = Field(default=None, description="New customer-facing description.")
     ingredients_description: str | None = Field(default=None, description="New ingredient list for customers.")
     quality_measures: str | None = Field(default=None, description="New hygiene/quality notes.")
+    media: DishMediaInput | None = Field(
+        default=None,
+        description="Replace hero/gallery photo. Active hero must be live-capture.",
+    )
 
     @field_validator("description", "ingredients_description", "quality_measures")
     @classmethod
@@ -478,11 +482,33 @@ async def update_dish(
         raise ValueError("Dish not found")
 
     updates = data.model_dump(exclude_unset=True)
-    if not updates:
+    media_input = updates.pop("media", None)
+    if not updates and media_input is None:
         raise ValueError("No fields to update")
 
     for field, value in updates.items():
         setattr(dish, field, value)
+
+    will_be_active = dish.is_active if data.is_active is None else data.is_active
+    if media_input is not None:
+        media_model = DishMediaInput.model_validate(media_input)
+        if media_model.is_hero and not media_model.is_live_capture and will_be_active:
+            raise ValueError("Active dish hero image must be a live capture (truth in media)")
+        if media_model.is_hero:
+            existing = await session.execute(
+                select(DishMedia).where(DishMedia.dish_id == dish.id, DishMedia.is_hero.is_(True))
+            )
+            for row in existing.scalars().all():
+                row.is_hero = False
+        session.add(
+            DishMedia(
+                dish_id=dish.id,
+                url=media_model.url,
+                is_hero=media_model.is_hero,
+                is_live_capture=media_model.is_live_capture,
+                captured_at=media_model.captured_at or datetime.now(UTC),
+            )
+        )
 
     try:
         validate_timing(dish.prep_time_min, dish.delivery_time_min, dish.max_time_min)
@@ -497,6 +523,9 @@ async def update_dish(
     await session.flush()
 
     if publisher:
+        changed = list(updates.keys())
+        if media_input is not None:
+            changed.append("media")
         event = EventPublisher.build(
             event_type="dish.updated",
             aggregate_type="dish",
@@ -505,7 +534,7 @@ async def update_dish(
             payload={
                 "kitchen_id": str(kitchen_id),
                 "dish_id": str(dish.id),
-                "changes": list(updates.keys()),
+                "changes": changed,
             },
         )
         await publisher.publish(stream_key("catalog", "dish"), event, session=session)

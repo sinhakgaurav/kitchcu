@@ -1,12 +1,13 @@
 import uuid
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jose import JWTError, jwt
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.brand_media import upload_brand_media
 from app.models import Kitchen, Owner
 from app.discovery import DiscoveryHomeResponse, build_discovery_home
 from app.schemas import (
@@ -336,6 +337,50 @@ async def kitchen_branded_page_update(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Kitchen not found")
     try:
         kitchen = await update_kitchen_branded_page(session, kitchen, body, publisher)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    await session.commit()
+    return await kitchen_to_response(session, kitchen)
+
+
+@router.post(
+    "/kitchens/{kitchen_id}/branded-page/upload",
+    response_model=KitchenResponse,
+    summary="Upload branded storefront logo or background image",
+    description=(
+        "Owner-only multipart upload for kitchen brand art. "
+        "`slot=logo` or `slot=background`. JPEG/PNG/WebP · max 10MB. "
+        "Stores the file and patches `settings.branded_page` in one step."
+    ),
+    responses={**auth_errors(include_404=True), 400: RESP_400, 422: RESP_422},
+    tags=["Kitchens"],
+)
+async def kitchen_branded_page_upload(
+    kitchen_id: uuid.UUID,
+    owner: Annotated[Owner, Depends(get_current_owner)],
+    session: Annotated[AsyncSession, Depends(get_db)],
+    publisher: Annotated[EventPublisher, Depends(get_publisher)],
+    file: Annotated[UploadFile, File(..., description="Image file — JPEG, PNG, or WebP.")],
+    slot: Annotated[str, Form(description="logo or background")] = "logo",
+) -> KitchenResponse:
+    result = await session.execute(
+        select(Kitchen).where(Kitchen.id == kitchen_id, Kitchen.owner_id == owner.id)
+    )
+    kitchen = result.scalar_one_or_none()
+    if not kitchen:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Kitchen not found")
+    try:
+        uploaded = await upload_brand_media(kitchen_id=kitchen_id, file=file, slot=slot)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+
+    if slot == "logo":
+        patch = KitchenBrandedPageUpdate(logo_url=uploaded.url)
+    else:
+        patch = KitchenBrandedPageUpdate(background_url=uploaded.url)
+
+    try:
+        kitchen = await update_kitchen_branded_page(session, kitchen, patch, publisher)
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
     await session.commit()

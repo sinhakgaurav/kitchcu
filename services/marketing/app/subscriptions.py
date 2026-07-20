@@ -30,6 +30,11 @@ class DishesConfig(BaseModel):
     )
     meals_per_day: int = Field(default=1, ge=1, le=3)
     notes: str | None = Field(default=None, max_length=500)
+    image_url: str | None = Field(
+        default=None,
+        max_length=2000,
+        description="Optional cover image URL (kitchen media upload).",
+    )
 
     @field_validator("weekdays")
     @classmethod
@@ -42,7 +47,11 @@ class DishesConfig(BaseModel):
 
 class SubscriptionPlanCreate(BaseModel):
     name: str = Field(..., min_length=2, max_length=255, examples=["Veg Thali Monthly"])
-    description: str | None = Field(default=None, max_length=1000)
+    description: str | None = Field(
+        default=None,
+        max_length=20000,
+        description="Plain text or sanitized rich HTML for the plan story.",
+    )
     plan_type: Literal["tiffin", "thali", "combo", "single_dish"] = "tiffin"
     dishes_config: DishesConfig = Field(default_factory=DishesConfig)
     price_monthly: float = Field(..., gt=0, le=100000, examples=[2499.0])
@@ -54,7 +63,7 @@ class SubscriptionPlanCreate(BaseModel):
 
 class SubscriptionPlanUpdate(BaseModel):
     name: str | None = Field(default=None, min_length=2, max_length=255)
-    description: str | None = None
+    description: str | None = Field(default=None, max_length=20000)
     plan_type: Literal["tiffin", "thali", "combo", "single_dish"] | None = None
     dishes_config: DishesConfig | None = None
     price_monthly: float | None = Field(default=None, gt=0, le=100000)

@@ -3,7 +3,6 @@ import { useEffect, useMemo, useState } from "react";
 import { ListingToolbar } from "../../components/ListingToolbar";
 import { useBrandedStorefront } from "../../customer/BrandedStorefront";
 import { RichHtml } from "../../components/RichTextEditor";
-import { sampleDishImages } from "../../data/content";
 import type { CuisineMenuGroup, Dish, KitchenMealPlan, Menu } from "../../shared/api";
 import {
   fetchPublicSubscriptionPlans,
@@ -217,23 +216,33 @@ export function KitchenMenuPage() {
               <h2 className="customer-menu__cuisine-title">Monthly thali / tiffin</h2>
               <p className="owner-muted">Request a plan — kitchen confirms before it starts.</p>
               {subMsg && <p className="report-hint">{subMsg}</p>}
-              <ul className="owner-detail-items">
-                {plans.map((p) => (
-                  <li key={p.id}>
-                    <span>
-                      <strong>{p.name}</strong> · {p.plan_type} · ₹{Math.round(p.price_monthly)}/mo
-                      {p.description ? ` — ${p.description}` : ""}
-                    </span>
-                    <button
-                      type="button"
-                      className="btn btn--primary btn--sm"
-                      disabled={subBusy}
-                      onClick={() => requestPlan(p.id)}
-                    >
-                      Request subscribe
-                    </button>
-                  </li>
-                ))}
+              <ul className="owner-detail-items plan-list">
+                {plans.map((p) => {
+                  const img = p.dishes_config?.image_url;
+                  const dishCount = p.dishes_config?.dish_ids?.length ?? 0;
+                  return (
+                    <li key={p.id} className="plan-list__item">
+                      {img ? (
+                        <img className="plan-list__thumb" src={img} alt="" />
+                      ) : (
+                        <span className="plan-list__thumb plan-list__thumb--empty" aria-hidden />
+                      )}
+                      <span className="plan-list__body">
+                        <strong>{p.name}</strong> · {p.plan_type} · ₹{Math.round(p.price_monthly)}/mo
+                        {dishCount > 0 ? ` · ${dishCount} dish${dishCount === 1 ? "" : "es"}` : ""}
+                        {p.description ? <RichHtml html={p.description} className="plan-list__desc" /> : null}
+                      </span>
+                      <button
+                        type="button"
+                        className="btn btn--primary btn--sm"
+                        disabled={subBusy}
+                        onClick={() => requestPlan(p.id)}
+                      >
+                        Request subscribe
+                      </button>
+                    </li>
+                  );
+                })}
               </ul>
             </section>
           )}
@@ -344,14 +353,16 @@ function DishCard({
   onAdd: () => void;
 }) {
   const hero = dish.media.find((m) => m.is_hero) ?? dish.media[0];
-  const placeholders = Object.values(sampleDishImages);
-  const fallback =
-    placeholders[Math.abs(hashCode(dish.name)) % placeholders.length];
-  const imageSrc = hero?.url || fallback;
   const badges = dishHighlightBadges(dish);
   return (
     <article className="glass customer-dish">
-      <img src={imageSrc} alt={dish.name} loading="lazy" className="customer-dish__img" />
+      {hero?.url ? (
+        <img src={hero.url} alt={dish.name} loading="lazy" className="customer-dish__img" />
+      ) : (
+        <div className="customer-dish__img customer-dish__img--pending" aria-hidden>
+          Photo pending — kitchen live capture
+        </div>
+      )}
       <div>
         <h4>{dish.name}</h4>
         {badges.length > 0 && (
@@ -391,10 +402,4 @@ function DishCard({
       </div>
     </article>
   );
-}
-
-function hashCode(value: string): number {
-  let h = 0;
-  for (let i = 0; i < value.length; i += 1) h = (h * 31 + value.charCodeAt(i)) | 0;
-  return h;
 }

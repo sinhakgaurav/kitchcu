@@ -442,3 +442,75 @@ form.auth-card > .btn {
 .owner-screen .btn--primary:hover {
   transform: translateY(-1px);
 }
+
+/* Monthly plan create — dish chips, cover, list */
+.owner-form__fieldset {
+  margin: 0;
+  padding: 0.85rem 0 0;
+  border: none;
+  border-top: 1px solid color-mix(in srgb, var(--text-muted) 22%, transparent);
+}
+
+.owner-form__fieldset legend {
+  padding: 0;
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--text-muted);
+}
+
+.owner-chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
+.plan-cover-preview {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0.75rem;
+}
+
+.plan-cover-preview img {
+  width: min(100%, 220px);
+  height: 140px;
+  object-fit: cover;
+  border-radius: 10px;
+  border: 1px solid color-mix(in srgb, var(--text-muted) 25%, transparent);
+}
+
+.plan-list__item {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 0.75rem;
+}
+
+.plan-list__thumb {
+  width: 64px;
+  height: 64px;
+  object-fit: cover;
+  border-radius: 8px;
+  flex-shrink: 0;
+  background: color-mix(in srgb, var(--text-muted) 12%, transparent);
+}
+
+.plan-list__thumb--empty {
+  display: inline-block;
+}
+
+.plan-list__body {
+  flex: 1;
+  min-width: 12rem;
+}
+
+.plan-list__desc {
+  margin: 0.35rem 0 0;
+  font-size: 0.9rem;
+  color: var(--text-muted);
+}
+
+.plan-list__desc p {
+  margin: 0 0 0.25rem;
+}

@@ -1,40 +1,46 @@
 import { useRef, type MutableRefObject } from "react";
 import type { CSSProperties } from "react";
-import { customerShowcase, features } from "../data/content";
+import { useTranslation } from "react-i18next";
+import { customerShowcase, featureCards } from "../data/content";
 import { useInView, useSectionScrollProgress } from "../hooks/useParallax";
 
 const STORY_PANELS = [
   {
+    key: "live",
     eyebrow: "Truth in media",
-    title: "Live-capture menus customers trust",
-    desc: customerShowcase[0].desc,
+    titleKey: "portal.featureLiveTitle",
+    descKey: "portal.featureLiveDesc",
     image: customerShowcase[0].image,
     accent: "teal" as const,
   },
   {
+    key: "whatsapp",
     eyebrow: "WhatsApp-first",
-    title: "Turn chat into confirmed orders",
-    desc: features[0].desc,
-    image: features[0].image,
+    titleKey: "portal.featureWhatsappTitle",
+    descKey: "portal.featureWhatsappDesc",
+    image: featureCards[0].image,
     accent: "orange" as const,
   },
   {
+    key: "golden",
     eyebrow: "Owner control",
-    title: "Run every kitchen from one dashboard",
-    desc: features[3].desc,
-    image: features[3].image,
+    titleKey: "portal.featureGoldenTitle",
+    descKey: "portal.featureGoldenDesc",
+    image: featureCards[3].image,
     accent: "orange" as const,
   },
   {
+    key: "brand",
     eyebrow: "Local & honest",
-    title: "Support neighbourhood cloud kitchens",
-    desc: customerShowcase[1].desc,
+    titleKey: "portal.featureBrandTitle",
+    descKey: "portal.featureBrandDesc",
     image: customerShowcase[1].image,
     accent: "teal" as const,
   },
-];
+] as const;
 
 export function ParallaxStickyStory() {
+  const { t } = useTranslation();
   const wrapRef = useRef<HTMLElement>(null);
   const progress = useSectionScrollProgress(wrapRef);
   const { ref: inViewRef, visible } = useInView(0.05);
@@ -63,7 +69,7 @@ export function ParallaxStickyStory() {
 
             return (
               <div
-                key={panel.title}
+                key={panel.key}
                 className={`pl-sticky-story__frame pl-sticky-story__frame--${panel.accent}`}
                 style={{
                   opacity,
@@ -79,24 +85,24 @@ export function ParallaxStickyStory() {
         </div>
 
         <div className={`pl-sticky-story__content ${visible ? "pl-sticky-story__content--visible" : ""}`}>
-          <span className="section__eyebrow">The kitchCU story</span>
+          <span className="section__eyebrow">{t("portal.featuresEyebrow")}</span>
           {STORY_PANELS.map((panel, i) => (
             <article
-              key={panel.title}
+              key={panel.key}
               className={`pl-sticky-story__panel ${i === activeIdx ? "pl-sticky-story__panel--active" : ""}`}
               style={{ "--i": i } as CSSProperties}
             >
               <span className="pl-sticky-story__step">0{i + 1}</span>
               <p className="pl-sticky-story__eyebrow">{panel.eyebrow}</p>
-              <h2>{panel.title}</h2>
-              <p>{panel.desc}</p>
+              <h2>{t(panel.titleKey)}</h2>
+              <p>{t(panel.descKey)}</p>
             </article>
           ))}
         </div>
 
         <div className="pl-sticky-story__dots" aria-hidden="true">
-          {STORY_PANELS.map((_, i) => (
-            <span key={i} className={i === activeIdx ? "active" : ""} />
+          {STORY_PANELS.map((panel, i) => (
+            <span key={panel.key} className={i === activeIdx ? "active" : ""} />
           ))}
         </div>
       </div>

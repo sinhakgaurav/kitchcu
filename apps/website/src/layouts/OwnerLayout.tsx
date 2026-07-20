@@ -9,7 +9,24 @@ import { useKitchenAuth } from "../shared/kitchenAuth";
 import { useKitchen } from "../shared/kitchenContext";
 import { customerUrl } from "../shared/urls";
 
-type NavItem = { to: string; labelKey: string; end?: boolean; module?: string };
+type NavItem = {
+  to: string;
+  labelKey: string;
+  end?: boolean;
+  module?: string;
+  /** Package feature key — hidden in hard_mode when missing from entitlements. */
+  feature?: string;
+  /** Minimum package code when hard_mode (starter < growth < pro). */
+  minPackage?: "growth" | "pro";
+};
+
+const PACKAGE_RANK: Record<string, number> = {
+  starter: 1,
+  trial: 1,
+  growth: 2,
+  pro: 3,
+  enterprise: 3,
+};
 
 const NAV_SECTIONS: { labelKey: string; items: NavItem[] }[] = [
   {
@@ -26,9 +43,9 @@ const NAV_SECTIONS: { labelKey: string; items: NavItem[] }[] = [
     labelKey: "owner.nav.growth",
     items: [
       { to: "/dashboard/reports", labelKey: "owner.nav.reports" },
-      { to: "/dashboard/growth", labelKey: "owner.nav.intelligence" },
-      { to: "/dashboard/crm", labelKey: "owner.nav.crm" },
-      { to: "/dashboard/coupons", labelKey: "owner.nav.coupons" },
+      { to: "/dashboard/growth", labelKey: "owner.nav.intelligence", minPackage: "growth" },
+      { to: "/dashboard/crm", labelKey: "owner.nav.crm", feature: "loyalty_crm" },
+      { to: "/dashboard/coupons", labelKey: "owner.nav.coupons", feature: "loyalty_crm" },
       { to: "/dashboard/tiffin", labelKey: "owner.nav.tiffin", module: "tiffin_plans" },
       { to: "/dashboard/templates", labelKey: "owner.nav.templates", module: "marketing_broadcast" },
       { to: "/dashboard/stream", labelKey: "owner.nav.stream", module: "streaming" },
@@ -37,8 +54,8 @@ const NAV_SECTIONS: { labelKey: string; items: NavItem[] }[] = [
   {
     labelKey: "owner.nav.learn",
     items: [
-      { to: "/dashboard/learning", labelKey: "owner.nav.learning" },
-      { to: "/dashboard/community", labelKey: "owner.nav.community" },
+      { to: "/dashboard/learning", labelKey: "owner.nav.learning", minPackage: "pro" },
+      { to: "/dashboard/community", labelKey: "owner.nav.community", minPackage: "pro" },
     ],
   },
   {
@@ -69,6 +86,9 @@ export function OwnerLayout() {
   const location = useLocation();
   const [navOpen, setNavOpen] = useState(false);
   const [modules, setModules] = useState<Record<string, boolean> | null>(null);
+  const [featureKeys, setFeatureKeys] = useState<string[] | null>(null);
+  const [packageCode, setPackageCode] = useState<string | null>(null);
+  const [hardMode, setHardMode] = useState(false);
 
   useEffect(() => {
     setNavOpen(false);
@@ -84,50 +104,63 @@ export function OwnerLayout() {
   useEffect(() => {
     if (!kitchen?.id || !token) {
       setModules(null);
+      setFeatureKeys(null);
+      setPackageCode(null);
+      setHardMode(false);
       return;
     }
     let cancelled = false;
     fetchKitchenEntitlements(kitchen.id)
       .then((ent) => {
-        if (!cancelled) setModules(ent.modules || {});
+        if (cancelled) return;
+        setModules(ent.modules || {});
+        setFeatureKeys(ent.feature_keys || []);
+        setPackageCode(ent.package_code);
+        setHardMode(Boolean(ent.hard_mode));
       })
       .catch(() => {
-        if (!cancelled) setModules(null);
+        if (!cancelled) {
+          setModules(null);
+          setFeatureKeys(null);
+          setPackageCode(null);
+          setHardMode(false);
+        }
       });
     return () => {
       cancelled = true;
     };
   }, [kitchen?.id, token]);
 
+  const itemAllowed = (item: NavItem) => {
+    if (item.module && modules != null && modules[item.module] === false) return false;
+    if (!hardMode) return true;
+    if (item.feature && featureKeys && !featureKeys.includes(item.feature)) return false;
+    if (item.minPackage) {
+      const have = PACKAGE_RANK[packageCode || "starter"] ?? 1;
+      const need = PACKAGE_RANK[item.minPackage] ?? 1;
+      if (have < need) return false;
+    }
+    return true;
+  };
+
   const visibleSections = useMemo(() => {
     return NAV_SECTIONS.map((section) => ({
       ...section,
       label: t(section.labelKey),
       items: section.items
-        .filter((item) => {
-          if (!item.module || modules == null) return true;
-          return modules[item.module] !== false;
-        })
+        .filter(itemAllowed)
         .map((item) => ({ ...item, label: t(item.labelKey) })),
     })).filter((section) => section.items.length > 0);
-  }, [modules, t]);
+  }, [modules, featureKeys, packageCode, hardMode, t]);
 
   const currentSection = visibleSections.flatMap((s) => s.items).find((item) =>
     item.end ? location.pathname === item.to : location.pathname.startsWith(item.to),
   );
 
-  const gatedItem = NAV_SECTIONS.flatMap((s) => s.items).find(
-    (item) =>
-      item.module &&
-      (item.end
-        ? location.pathname === item.to
-        : location.pathname.startsWith(item.to)),
+  const deepLinked = NAV_SECTIONS.flatMap((s) => s.items).find((item) =>
+    item.end ? location.pathname === item.to : location.pathname.startsWith(item.to),
   );
-  if (
-    modules != null &&
-    gatedItem?.module &&
-    modules[gatedItem.module] === false
-  ) {
+  if (deepLinked && !itemAllowed(deepLinked)) {
     return <Navigate to="/dashboard" replace />;
   }
 

@@ -118,6 +118,11 @@ class ManualOrderCreateRequest(BaseModel):
             "Forced prepaid when delivery_payer=shared. Omit when fee is 0 / owner pays."
         ),
     )
+    coupon_code: str | None = Field(
+        default=None,
+        max_length=32,
+        description="Optional kitchen coupon code applied at order create.",
+    )
 
 
 class CustomerOrderCreateRequest(BaseModel):
@@ -163,6 +168,11 @@ class CustomerOrderCreateRequest(BaseModel):
     delivery_fee_payment: Literal["prepaid", "pay_on_delivery"] | None = Field(
         default=None,
         description="prepaid (required for shared) or pay_on_delivery (customer-only fee).",
+    )
+    coupon_code: str | None = Field(
+        default=None,
+        max_length=32,
+        description="Optional kitchen coupon code — validated server-side against marketing coupons.",
     )
 
 
@@ -313,7 +323,15 @@ class OrderResponse(BaseModel):
     tracking_token: str | None = Field(
         default=None, description="Opaque public tracking token for `GET /api/v1/delivery/track/{token}` on the delivery service. Set only for delivery orders."
     )
-    total: float = Field(..., description="Amount charged to the customer: `subtotal + delivery_fee`.", examples=[480.0])
+    coupon_code: str | None = Field(default=None, description="Applied coupon code, if any.")
+    discount_amount: float = Field(
+        default=0, description="Coupon discount in INR (applied to food subtotal before delivery fee)."
+    )
+    total: float = Field(
+        ...,
+        description="Amount charged: `subtotal - discount_amount + delivery_fee`.",
+        examples=[480.0],
+    )
     estimated_prep_min: int | None = Field(default=None, description="Max prep time across line items, in minutes.")
     estimated_delivery_min: int | None = Field(
         default=None, description="Max delivery travel time across line items, in minutes (delivery orders)."
@@ -818,7 +836,19 @@ async def create_manual_order(
         payment_method=data.payment_method,
         delivery_fee_payment=getattr(data, "delivery_fee_payment", None),
     )
-    total = subtotal + delivery_fee
+    coupon_code: str | None = None
+    discount_amount = 0.0
+    raw_coupon = getattr(data, "coupon_code", None)
+    if raw_coupon and str(raw_coupon).strip():
+        from app.coupon_client import resolve_coupon_discount
+
+        coupon_code, discount_amount = await resolve_coupon_discount(
+            session,
+            kitchen_id=kitchen_id,
+            code=str(raw_coupon),
+            subtotal=subtotal,
+        )
+    total = max(0.0, round(subtotal - discount_amount + delivery_fee, 2))
     from app.porter_auto_book import compute_order_eta
 
     created_at = datetime.now(UTC)
@@ -841,6 +871,8 @@ async def create_manual_order(
         customer_name=data.customer_name,
         customer_phone=customer_phone or data.customer_phone,
         subtotal=subtotal,
+        coupon_code=coupon_code,
+        discount_amount=discount_amount,
         delivery_fee=delivery_fee,
         distance_km=distance_km,
         delivery_fee_accepted=fee_accepted,
@@ -861,6 +893,15 @@ async def create_manual_order(
     )
     session.add(order)
     await session.flush()
+
+    if coupon_code:
+        from app.coupon_client import redeem_coupon_internal
+
+        await redeem_coupon_internal(
+            kitchen_id=kitchen_id,
+            code=coupon_code,
+            order_id=order.id,
+        )
 
     for name, price, prep_min, _delivery_min, item in line_items:
         session.add(
@@ -943,6 +984,7 @@ async def create_customer_order(
         customer_longitude=data.customer_longitude,
         delivery_mode=data.delivery_mode,
         delivery_fee_payment=data.delivery_fee_payment,
+        coupon_code=data.coupon_code,
     )
     order, created = await create_manual_order(
         session,
@@ -1225,6 +1267,8 @@ async def order_to_response(session: AsyncSession, order: Order) -> OrderRespons
         customer_latitude=getattr(order, "customer_latitude", None),
         customer_longitude=getattr(order, "customer_longitude", None),
         tracking_token=order.tracking_token,
+        coupon_code=getattr(order, "coupon_code", None),
+        discount_amount=float(getattr(order, "discount_amount", 0) or 0),
         total=float(order.total),
         estimated_prep_min=order.estimated_prep_min,
         estimated_delivery_min=getattr(order, "estimated_delivery_min", None),

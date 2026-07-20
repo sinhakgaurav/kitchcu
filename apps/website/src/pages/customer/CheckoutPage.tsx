@@ -13,6 +13,7 @@ import {
   captureMasterPayment,
   createMasterOrder,
   createMasterPayment,
+  validateCheckoutCoupon,
 } from "../../shared/customerCheckoutApi";
 import {
   cartSubtotal,
@@ -28,6 +29,7 @@ import {
 } from "../../shared/customerCart";
 import { APP_STORAGE_PREFIX } from "../../shared/brand";
 import { denyDeliveryFee, fetchDeliveryQuote, type DeliveryQuote } from "../../shared/api";
+import { fetchMyAddresses, type CustomerAddress } from "../../shared/customerDashboardApi";
 
 type DeliveryType = "pickup" | "delivery";
 type PaymentMethod = "cod" | "online" | "upi";
@@ -103,6 +105,12 @@ export function CheckoutPage() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [deniedFeeKitchens, setDeniedFeeKitchens] = useState<Record<string, boolean>>({});
+  const [addresses, setAddresses] = useState<CustomerAddress[]>([]);
+  const [selectedAddressId, setSelectedAddressId] = useState<string>("");
+  const [couponCode, setCouponCode] = useState("");
+  const [couponDiscount, setCouponDiscount] = useState(0);
+  const [couponMsg, setCouponMsg] = useState("");
+  const [couponBusy, setCouponBusy] = useState(false);
 
   const requiresPrepaid = useMemo(() => {
     if (!cart) return false;
@@ -144,6 +152,37 @@ export function CheckoutPage() {
   }, []);
 
   useEffect(() => {
+    if (!token) return;
+    fetchMyAddresses()
+      .then((list) => {
+        setAddresses(list);
+        const def = list.find((a) => a.is_default) ?? list[0];
+        if (def) setSelectedAddressId(def.id);
+      })
+      .catch(() => setAddresses([]));
+  }, [token]);
+
+  const selectedAddress = useMemo(
+    () => addresses.find((a) => a.id === selectedAddressId) ?? null,
+    [addresses, selectedAddressId],
+  );
+
+  const dropCoords = useMemo(() => {
+    if (
+      selectedAddress?.latitude != null &&
+      selectedAddress.longitude != null &&
+      Number.isFinite(selectedAddress.latitude) &&
+      Number.isFinite(selectedAddress.longitude)
+    ) {
+      return {
+        latitude: selectedAddress.latitude,
+        longitude: selectedAddress.longitude,
+      };
+    }
+    return coords;
+  }, [selectedAddress, coords]);
+
+  useEffect(() => {
     if (!cart) return;
     let cancelled = false;
     const loadQuotes = async () => {
@@ -154,8 +193,8 @@ export function CheckoutPage() {
           if ((deliveryByKitchen[kitchen.kitchenId] ?? "pickup") !== "delivery") continue;
           const quote = await fetchDeliveryQuote({
             kitchen_id: kitchen.kitchenId,
-            latitude: coords.latitude,
-            longitude: coords.longitude,
+            latitude: dropCoords.latitude,
+            longitude: dropCoords.longitude,
             subtotal: kitchenCartSubtotal(kitchen),
           });
           if (quote.status === "out_of_range") {
@@ -186,7 +225,7 @@ export function CheckoutPage() {
     return () => {
       cancelled = true;
     };
-  }, [cart, deliveryByKitchen, coords.latitude, coords.longitude]);
+  }, [cart, deliveryByKitchen, dropCoords.latitude, dropCoords.longitude]);
 
   const isMultiKitchen = (cart?.kitchens.length ?? 0) > 1;
 
@@ -219,7 +258,35 @@ export function CheckoutPage() {
   }
 
   const subtotal = cartSubtotal(cart);
-  const total = subtotal + deliveryFee;
+  const discount = cart.kitchens.length === 1 ? couponDiscount : 0;
+  const total = Math.max(0, subtotal - discount + deliveryFee);
+
+  const applyCoupon = async () => {
+    if (!cart || cart.kitchens.length !== 1 || !couponCode.trim()) return;
+    setCouponBusy(true);
+    setCouponMsg("");
+    try {
+      const kitchen = cart.kitchens[0];
+      const res = await validateCheckoutCoupon({
+        kitchen_id: kitchen.kitchenId,
+        code: couponCode.trim(),
+        subtotal: kitchenCartSubtotal(kitchen),
+      });
+      if (!res.valid) {
+        setCouponDiscount(0);
+        setCouponMsg(res.message || "Invalid coupon");
+        return;
+      }
+      setCouponDiscount(res.discount_amount || 0);
+      setCouponCode(res.code || couponCode.trim().toUpperCase());
+      setCouponMsg(res.message || "Coupon applied");
+    } catch (err) {
+      setCouponDiscount(0);
+      setCouponMsg(err instanceof Error ? err.message : "Could not validate coupon");
+    } finally {
+      setCouponBusy(false);
+    }
+  };
 
   const placeOrder = async () => {
     setError("");
@@ -273,7 +340,7 @@ export function CheckoutPage() {
               deliveryByKitchen[kitchen.kitchenId] ?? "pickup",
               quotes[kitchen.kitchenId],
               feeAccepted[kitchen.kitchenId] ?? false,
-              coords,
+              dropCoords,
               modeByKitchen[kitchen.kitchenId] || "self",
               feePayByKitchen[kitchen.kitchenId],
             )),
@@ -307,20 +374,22 @@ export function CheckoutPage() {
             deliveryByKitchen[kitchen.kitchenId] ?? "pickup",
             quotes[kitchen.kitchenId],
             feeAccepted[kitchen.kitchenId] ?? false,
-            coords,
+            dropCoords,
             modeByKitchen[kitchen.kitchenId] || "self",
             feePayByKitchen[kitchen.kitchenId],
           ),
           payment_method: paymentMethod,
+          coupon_code: discount > 0 ? couponCode.trim().toUpperCase() : undefined,
         },
         checkoutKey(cart),
       );
 
+      let upiIntent = null;
       if (paymentMethod === "online") {
         const payment = await createCustomerPayment(order.id, "online");
         await captureCustomerPayment(payment.id);
       } else if (paymentMethod === "upi") {
-        await createCustomerUpiIntent(order.id);
+        upiIntent = await createCustomerUpiIntent(order.id);
       }
 
       clearCart();
@@ -328,7 +397,7 @@ export function CheckoutPage() {
         branded
           ? `${branded.basePath}/orders/${order.id}/confirm`
           : `/orders/${order.id}/confirm`,
-        { state: { order, paymentMethod } },
+        { state: { order, paymentMethod, upiIntent } },
       );
     } catch (err) {
       setError(err instanceof Error ? err.message : "Checkout failed");
@@ -352,14 +421,49 @@ export function CheckoutPage() {
         </div>
       </header>
 
-      {geoError && (
+      {addresses.length > 0 && (
+        <section className="glass" style={{ marginBottom: "1rem" }}>
+          <label>
+            Delivery address
+            <select
+              value={selectedAddressId}
+              onChange={(e) => setSelectedAddressId(e.target.value)}
+            >
+              {addresses.map((a) => (
+                <option key={a.id} value={a.id}>
+                  {a.label}
+                  {a.is_default ? " (default)" : ""} — {a.address_line}, {a.city}
+                </option>
+              ))}
+            </select>
+          </label>
+          {selectedAddress && (
+            <p className="report-hint">
+              {selectedAddress.address_line}
+              {selectedAddress.landmark ? ` · ${selectedAddress.landmark}` : ""}
+              {selectedAddress.latitude == null &&
+                " · No pin saved — using GPS for fee distance"}
+            </p>
+          )}
+          <Link to="/dashboard" className="btn btn--ghost btn--sm">
+            Manage addresses
+          </Link>
+        </section>
+      )}
+
+      {geoError && !selectedAddress?.latitude && (
         <p className="nearby-kitchens__geo-hint">
           {geoError}{" "}
           <button type="button" className="btn btn--ghost" onClick={refreshGeo}>Retry GPS</button>
         </p>
       )}
-      {geoStatus === "granted" && (
-        <p className="nearby-kitchens__geo-hint">Using your location for distance-based delivery fees.</p>
+      {geoStatus === "granted" && !selectedAddress?.latitude && (
+        <p className="nearby-kitchens__geo-hint">Using your GPS for distance-based delivery fees.</p>
+      )}
+      {selectedAddress?.latitude != null && (
+        <p className="nearby-kitchens__geo-hint">
+          Using saved pin for {selectedAddress.label} for delivery distance.
+        </p>
       )}
 
       {error && <div className="auth-card__error">{error}</div>}
@@ -542,6 +646,37 @@ export function CheckoutPage() {
       })}
 
       <section className="glass owner-form customer-checkout__form">
+        {!isMultiKitchen && (
+          <div className="form-row" style={{ alignItems: "flex-end" }}>
+            <label style={{ flex: 1 }}>
+              Coupon code
+              <input
+                value={couponCode}
+                onChange={(e) => {
+                  setCouponCode(e.target.value.toUpperCase());
+                  setCouponDiscount(0);
+                  setCouponMsg("");
+                }}
+                placeholder="SAVE10"
+                maxLength={32}
+              />
+            </label>
+            <button
+              type="button"
+              className="btn btn--ghost"
+              disabled={couponBusy || !couponCode.trim()}
+              onClick={() => void applyCoupon()}
+            >
+              {couponBusy ? "Checking…" : "Apply"}
+            </button>
+          </div>
+        )}
+        {couponMsg && (
+          <p className={couponDiscount > 0 ? "auth-card__success" : "auth-card__error"}>{couponMsg}</p>
+        )}
+        {isMultiKitchen && (
+          <p className="nearby-kitchens__geo-hint">Coupons apply per kitchen — use single-kitchen checkout to redeem.</p>
+        )}
         <label>
           Payment
           <select
@@ -564,6 +699,16 @@ export function CheckoutPage() {
           <p className="nearby-kitchens__geo-hint">
             One payment is captured at checkout and split to each kitchen via Razorpay Route.
           </p>
+        )}
+        <div className="owner-detail-total">
+          <span>Food subtotal</span>
+          <strong>₹{subtotal.toFixed(0)}</strong>
+        </div>
+        {discount > 0 && (
+          <div className="owner-detail-total">
+            <span>Coupon ({couponCode})</span>
+            <strong>−₹{discount.toFixed(0)}</strong>
+          </div>
         )}
         <div className="owner-detail-total">
           <span>Delivery fees</span>

@@ -231,6 +231,7 @@ def main() -> None:
     print(f"  Admin         : {DEMO_ADMIN['email']} / {DEMO_ADMIN['password']}")
     for c in DEMO_CUSTOMERS:
         print(f"  Customer      : {c['phone']} — {c['name']} ({c.get('note', '')})")
+    print("  Referrals     : seeded by seed-bulk-data / seed-all (P37 dual program)")
     print(f"  Customer app: {os.environ.get('VITE_CUSTOMER_APP_URL', 'http://localhost:13001')}")
     print(f"  Kitchen app:  {os.environ.get('VITE_KITCHEN_APP_URL', 'http://localhost:13002')}/login")
     print()

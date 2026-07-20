@@ -12,8 +12,10 @@ type RegionBox = {
 };
 
 /**
- * Order matters — first match wins. Boxes are approximate administrative belts.
- * Pune/MH → Marathi; TN → Tamil; etc. Hindi belt covers large north/central area.
+ * Order matters — first match wins.
+ * Karnataka is listed before Tamil so Bengaluru → kn (not ta).
+ * Telugu west edge includes Hyderabad; Karnataka box stops south of Maharashtra
+ * so Pune/Mumbai/Kolhapur → Marathi.
  */
 export const INDIA_LANGUAGE_REGIONS: RegionBox[] = regionsJson as RegionBox[];
 
@@ -26,26 +28,42 @@ export function localeFromCoordinates(lat: number, lng: number): LocaleCode | nu
       return box.lang;
     }
   }
+  // Inside India but no specific belt — Hindi as last resort (not MH; MH is boxed as mr)
   return "hi";
 }
 
 /** Map BCP-47 / browser tags to our locale codes. */
 export function localeFromBrowserTag(tag: string | undefined | null): LocaleCode | null {
   if (!tag) return null;
-  const primary = tag.trim().toLowerCase().split("-")[0];
+  const normalized = tag.trim().toLowerCase().replace(/_/g, "-");
+  const primary = normalized.split("-")[0];
+  // Common aliases
+  if (primary === "mai" || normalized.startsWith("mai-")) return "mai";
+  if (primary === "bho" || normalized.startsWith("bho-")) return "bho";
   if (isLocaleCode(primary)) return primary;
   return null;
 }
 
+/**
+ * Browser language is a weak signal in India — many devices ship with hi-IN
+ * even in Maharashtra. Prefer non-Hindi regional tags first; treat hi as last.
+ */
 export function localeFromNavigator(
   languages: readonly string[] | undefined,
   language: string | undefined,
 ): LocaleCode | null {
   const tags = [...(languages ?? []), language ?? ""].filter(Boolean);
+  let hindi: LocaleCode | null = null;
   for (const tag of tags) {
     const hit = localeFromBrowserTag(tag);
-    if (hit && hit !== "en") return hit;
+    if (!hit || hit === "en") continue;
+    if (hit === "hi") {
+      hindi = hit;
+      continue;
+    }
+    return hit;
   }
+  if (hindi) return hindi;
   for (const tag of tags) {
     const hit = localeFromBrowserTag(tag);
     if (hit) return hit;
@@ -56,6 +74,8 @@ export function localeFromNavigator(
 export type DetectedLocale = {
   suggested: LocaleCode;
   source: "geo" | "browser" | "default";
+  /** Strong only when GPS matched a region box */
+  confidence: "high" | "low";
 };
 
 export function resolveSuggestedLocale(input: {
@@ -66,11 +86,11 @@ export function resolveSuggestedLocale(input: {
 }): DetectedLocale {
   if (input.lat != null && input.lng != null) {
     const geo = localeFromCoordinates(input.lat, input.lng);
-    if (geo) return { suggested: geo, source: "geo" };
+    if (geo) return { suggested: geo, source: "geo", confidence: "high" };
   }
   const browser = localeFromNavigator(input.languages, input.language);
-  if (browser) return { suggested: browser, source: "browser" };
-  return { suggested: DEFAULT_LOCALE, source: "default" };
+  if (browser) return { suggested: browser, source: "browser", confidence: "low" };
+  return { suggested: DEFAULT_LOCALE, source: "default", confidence: "low" };
 }
 
 export function readGeolocation(): Promise<{ lat: number; lng: number } | null> {
@@ -78,7 +98,7 @@ export function readGeolocation(): Promise<{ lat: number; lng: number } | null> 
     return Promise.resolve(null);
   }
   return new Promise((resolve) => {
-    const timer = window.setTimeout(() => resolve(null), 4000);
+    const timer = window.setTimeout(() => resolve(null), 6000);
     navigator.geolocation.getCurrentPosition(
       (pos) => {
         window.clearTimeout(timer);
@@ -88,7 +108,7 @@ export function readGeolocation(): Promise<{ lat: number; lng: number } | null> 
         window.clearTimeout(timer);
         resolve(null);
       },
-      { enableHighAccuracy: false, maximumAge: 600_000, timeout: 3500 },
+      { enableHighAccuracy: false, maximumAge: 600_000, timeout: 5500 },
     );
   });
 }

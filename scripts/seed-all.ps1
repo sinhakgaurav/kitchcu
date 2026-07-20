@@ -20,7 +20,7 @@ Write-Host "`n[1/2] Dev baseline (owner, kitchen, menu, sample orders)..."
 python "$PSScriptRoot\seed-dev-data.py"
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
-Write-Host "`n[2/2] Bulk data + platform extras (reports, CRM, ratings, recipes)..."
+Write-Host "`n[2/2] Bulk data + platform extras (reports, CRM, ratings, recipes, referrals)..."
 python "$PSScriptRoot\seed-bulk-data.py"
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 

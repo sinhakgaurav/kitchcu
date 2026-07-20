@@ -1,5 +1,6 @@
 import type { RefObject } from "react";
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useInView } from "../hooks/useParallax";
 import { supportChannels, supportFaqs } from "../data/content";
 import { ParallaxScene } from "./ParallaxScene";
@@ -7,6 +8,7 @@ import { ParallaxScene } from "./ParallaxScene";
 type Tab = "owner" | "customer";
 
 export function SupportSection() {
+  const { t } = useTranslation();
   const { ref, visible } = useInView();
   const [tab, setTab] = useState<Tab>("owner");
   const [openIdx, setOpenIdx] = useState<number | null>(0);
@@ -17,17 +19,14 @@ export function SupportSection() {
       <ParallaxScene variant="section" />
       <div className="container support-section__inner">
         <div className={`section__header reveal reveal--blur ${visible ? "reveal--visible" : ""}`}>
-          <span className="section__eyebrow">Support</span>
-          <h2>Help for owners &amp; customers</h2>
-          <p>
-            Browse FAQs below or chat with our AI assistant — choose owner or customer mode
-            using the chat button in the corner.
-          </p>
+          <span className="section__eyebrow">{t("portal.supportEyebrow")}</span>
+          <h2>{t("portal.supportTitle")}</h2>
+          <p>{t("portal.supportBody")}</p>
         </div>
 
         <div className={`support-section__grid reveal ${visible ? "reveal--visible" : ""}`}>
           <div className="glass support-section__channels">
-            <h3>Contact &amp; hours</h3>
+            <h3>{t("portal.supportChannels")}</h3>
             <ul>
               {supportChannels.map((c) => (
                 <li key={c.label}>
@@ -42,7 +41,7 @@ export function SupportSection() {
             </ul>
             <div className="support-section__ai-hint">
               <span className="support-section__ai-dot" />
-              AI chat available 24/7 for instant answers
+              {t("portal.supportBody")}
             </div>
           </div>
 
@@ -53,14 +52,14 @@ export function SupportSection() {
                 className={tab === "owner" ? "active" : ""}
                 onClick={() => { setTab("owner"); setOpenIdx(0); }}
               >
-                Owner FAQ
+                {t("portal.supportOwners")}
               </button>
               <button
                 type="button"
                 className={tab === "customer" ? "active" : ""}
                 onClick={() => { setTab("customer"); setOpenIdx(0); }}
               >
-                Customer FAQ
+                {t("portal.supportCustomers")}
               </button>
             </div>
 

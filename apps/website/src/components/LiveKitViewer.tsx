@@ -24,22 +24,27 @@ export function LiveKitViewer({ url, token, publish = false }: Props) {
     let localTrack: LocalVideoTrack | null = null;
     const room = new Room({ adaptiveStream: true, dynacast: true });
 
-    const attachRemote = (track: Track) => {
-      if (track.kind !== Track.Kind.Video || !videoRef.current) return;
-      track.attach(videoRef.current);
+    const attachToVideo = async (track: Track) => {
+      const el = videoRef.current;
+      if (track.kind !== Track.Kind.Video || !el) return;
+      track.attach(el);
+      try {
+        await el.play();
+      } catch {
+        /* muted autoplay should succeed */
+      }
       if (!cancelled) setStatus("live");
     };
 
-    room.on(RoomEvent.TrackSubscribed, (track) => attachRemote(track));
+    room.on(RoomEvent.TrackSubscribed, (track) => {
+      void attachToVideo(track);
+    });
     room.on(RoomEvent.TrackUnsubscribed, (track) => {
       if (videoRef.current) track.detach(videoRef.current);
       if (!cancelled) setStatus("waiting");
     });
     room.on(RoomEvent.LocalTrackPublished, (pub) => {
-      if (pub.track?.kind === Track.Kind.Video && videoRef.current) {
-        pub.track.attach(videoRef.current);
-        if (!cancelled) setStatus("live");
-      }
+      if (pub.track) void attachToVideo(pub.track);
     });
     room.on(RoomEvent.Disconnected, () => {
       if (!cancelled) setStatus("waiting");
@@ -55,17 +60,19 @@ export function LiveKitViewer({ url, token, publish = false }: Props) {
         if (publish) {
           try {
             localTrack = await createLocalVideoTrack({
-              facingMode: "user",
+              facingMode: "environment",
             });
             if (cancelled) {
               localTrack.stop();
               return;
             }
-            if (videoRef.current) {
-              localTrack.attach(videoRef.current);
-            }
+            await attachToVideo(localTrack);
             await room.localParticipant.publishTrack(localTrack);
-            await room.localParticipant.setMicrophoneEnabled(true);
+            try {
+              await room.localParticipant.setMicrophoneEnabled(true);
+            } catch {
+              /* mic optional — video preview still works */
+            }
             if (!cancelled) setStatus("live");
           } catch (camErr) {
             if (!cancelled) {
@@ -82,7 +89,7 @@ export function LiveKitViewer({ url, token, publish = false }: Props) {
           for (const participant of room.remoteParticipants.values()) {
             for (const pub of participant.trackPublications.values()) {
               if (pub.track) {
-                attachRemote(pub.track);
+                await attachToVideo(pub.track);
                 found = true;
               }
             }
@@ -115,14 +122,7 @@ export function LiveKitViewer({ url, token, publish = false }: Props) {
         autoPlay
         playsInline
         muted={publish}
-        style={{
-          width: "100%",
-          maxHeight: 420,
-          background: "#0b1f1c",
-          borderRadius: 8,
-          display: "block",
-          objectFit: "cover",
-        }}
+        className="livekit-viewer__video"
       />
       {status === "connecting" && <p className="report-hint">Connecting to live room…</p>}
       {status === "waiting" && (

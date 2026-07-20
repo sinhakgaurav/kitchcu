@@ -1,4 +1,6 @@
 import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
+import { RichHtml } from "./RichTextEditor";
 import {
   fetchLiveShowcase,
   type LiveShowcase,
@@ -129,9 +131,7 @@ export function LiveDishShowcase({
                     className={active ? "live-showcase__step--active" : undefined}
                   >
                     <strong>{step.title || `Step ${step.step_order}`}</strong>
-                    {step.body_html ? (
-                      <span dangerouslySetInnerHTML={{ __html: step.body_html }} />
-                    ) : null}
+                    {step.body_html ? <RichHtml html={step.body_html} /> : null}
                   </li>
                 );
               })}
@@ -151,6 +151,16 @@ export function LiveDishShowcase({
             .
           </p>
         </div>
+      )}
+
+      {showcase.dish_id && showcase.kitchen_id && (
+        <Link
+          className="btn btn--primary btn--sm"
+          to={`/kitchen/${showcase.kitchen_id}/menu`}
+          style={{ marginTop: "0.75rem" }}
+        >
+          Order {showcase.dish_name || "this dish"}
+        </Link>
       )}
     </section>
   );

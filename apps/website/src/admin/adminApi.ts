@@ -755,6 +755,46 @@ export async function fetchAdminKitchenTiffinSummary(kitchenId: string) {
   return adminFetch<AdminTiffinSummary>(`/api/v1/admin/kitchens/${kitchenId}/tiffin-summary`);
 }
 
+export type AdminTiffinSubscription = {
+  id: string;
+  kitchen_id: string;
+  plan_id: string;
+  plan_name: string | null;
+  plan_type: string | null;
+  price_monthly: number | null;
+  customer_id: string;
+  customer_phone: string;
+  customer_name: string | null;
+  status: string;
+  billing_status: string;
+  owner_note: string | null;
+  starts_on: string | null;
+  created_at: string;
+  decided_at: string | null;
+};
+
+export async function fetchAdminKitchenSubscriptions(
+  kitchenId: string,
+  status?: string,
+) {
+  const q = status ? `?status=${encodeURIComponent(status)}` : "";
+  return adminFetch<{ subscriptions: AdminTiffinSubscription[]; total: number }>(
+    `/api/v1/admin/kitchens/${kitchenId}/subscriptions${q}`,
+  );
+}
+
+export async function decideAdminKitchenSubscription(
+  kitchenId: string,
+  subId: string,
+  action: "accept" | "deny" | "activate" | "deactivate",
+  body: { owner_note?: string; starts_on?: string } = {},
+) {
+  return adminFetch<AdminTiffinSubscription>(
+    `/api/v1/admin/kitchens/${kitchenId}/subscriptions/${subId}/${action}`,
+    { method: "POST", body: JSON.stringify(body) },
+  );
+}
+
 export type AdminGstProfile = {
   id: string;
   kitchen_id: string;

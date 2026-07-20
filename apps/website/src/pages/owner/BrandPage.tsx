@@ -1,12 +1,14 @@
 import { Link } from "react-router-dom";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { OwnerPageShell, OwnerPanel } from "../../components/owner/OwnerPageShell";
-import { updateKitchenBrandedPage, uploadKitchenMedia } from "../../lib/api";
+import { updateKitchenBrandedPage, uploadKitchenBrandedMedia } from "../../lib/api";
 import { useKitchen } from "../../lib/kitchen";
 import { CUSTOMER_HOST } from "../../shared/brand";
 import { customerUrl } from "../../shared/urls";
 
 export function BrandPage() {
+  const { t } = useTranslation();
   const { kitchen, reloadKitchens } = useKitchen();
   const [tagline, setTagline] = useState("");
   const [accent, setAccent] = useState("#0F766E");
@@ -17,6 +19,8 @@ export function BrandPage() {
   const [msg, setMsg] = useState("");
   const [error, setError] = useState("");
   const [copied, setCopied] = useState(false);
+  const logoInputRef = useRef<HTMLInputElement>(null);
+  const bgInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (!kitchen) return;
@@ -71,22 +75,26 @@ export function BrandPage() {
 
   const onUpload = async (slot: "logo" | "background", file: File | null) => {
     if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      setError("Please choose a JPEG, PNG, or WebP image.");
+      return;
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      setError("Image must be 10MB or smaller.");
+      return;
+    }
     setUploading(slot);
     setError("");
     setMsg("");
     try {
-      const uploaded = await uploadKitchenMedia(kitchen.id, file, {
-        context: slot === "logo" ? "brand_logo" : "brand_background",
-        is_live_capture: false,
-        filename: file.name || `${slot}.jpg`,
-      });
-      const patch =
-        slot === "logo"
-          ? { logo_url: uploaded.url }
-          : { background_url: uploaded.url };
-      await updateKitchenBrandedPage(kitchen.id, patch);
-      if (slot === "logo") setLogoUrl(uploaded.url);
-      else setBackgroundUrl(uploaded.url);
+      const next = await uploadKitchenBrandedMedia(
+        kitchen.id,
+        file,
+        slot,
+        file.name || `${slot}.jpg`,
+      );
+      setLogoUrl(next.branded_page?.logo_url ?? null);
+      setBackgroundUrl(next.branded_page?.background_url ?? null);
       await reloadKitchens();
       setMsg(slot === "logo" ? "Logo uploaded." : "Background image uploaded.");
     } catch (e) {
@@ -105,13 +113,13 @@ export function BrandPage() {
 
   return (
     <OwnerPageShell
-      eyebrow="Growth · share"
-      title="Brand page"
+      eyebrow={t("owner.nav.growth")}
+      title={t("owner.pages.brand")}
       description={`Your kitchen-first storefront on ${CUSTOMER_HOST} — logo, hero, menu, cart, checkout. Powered by kitchCU at the foot.`}
       meta={
         <div className="od-board__pills">
           <span className={`od-pill ${enabled ? "od-pill--live" : "od-pill--sub"}`}>
-            {enabled ? "Published" : "Not published"}
+            {enabled ? t("owner.home.published") : t("owner.home.notPublished")}
           </span>
           <span className="od-board__code">{kitchen.code}</span>
         </div>
@@ -144,6 +152,130 @@ export function BrandPage() {
         </>
       }
     >
+      {error && <p className="auth-card__error">{error}</p>}
+      {msg && <p className="auth-card__success">{msg}</p>}
+
+      <OwnerPanel
+        title="Brand visuals"
+        description="Upload your kitchen logo and a hero background. Shown on the customer storefront at /k/{code}. JPEG, PNG, or WebP · max 10MB."
+      >
+        <div className="od-brand-media">
+          <div className="od-brand-media__slot">
+            <span className="kc-field__label">Logo</span>
+            <button
+              type="button"
+              className="od-brand-media__drop"
+              disabled={!!uploading || busy}
+              onClick={() => logoInputRef.current?.click()}
+              onDragOver={(e) => e.preventDefault()}
+              onDrop={(e) => {
+                e.preventDefault();
+                void onUpload("logo", e.dataTransfer.files?.[0] ?? null);
+              }}
+            >
+              {logoUrl ? (
+                <img src={logoUrl} alt="" className="od-brand-media__preview od-brand-media__preview--logo" />
+              ) : (
+                <span className="od-brand-media__empty-copy">
+                  {uploading === "logo" ? "Uploading…" : "Drop logo here or click to upload"}
+                </span>
+              )}
+            </button>
+            <input
+              ref={logoInputRef}
+              type="file"
+              accept="image/jpeg,image/png,image/webp"
+              className="visually-hidden"
+              disabled={!!uploading || busy}
+              onChange={(e) => {
+                void onUpload("logo", e.target.files?.[0] ?? null);
+                e.target.value = "";
+              }}
+            />
+            <div className="od-brand-media__actions">
+              <button
+                type="button"
+                className="btn btn--primary btn--sm"
+                disabled={!!uploading || busy}
+                onClick={() => logoInputRef.current?.click()}
+              >
+                {uploading === "logo" ? "Uploading…" : "Upload logo"}
+              </button>
+              {logoUrl && (
+                <button
+                  type="button"
+                  className="btn btn--ghost btn--sm"
+                  disabled={busy}
+                  onClick={() => void clearMedia("logo")}
+                >
+                  Remove
+                </button>
+              )}
+            </div>
+          </div>
+
+          <div className="od-brand-media__slot">
+            <span className="kc-field__label">Background / hero</span>
+            <button
+              type="button"
+              className="od-brand-media__drop od-brand-media__drop--bg"
+              disabled={!!uploading || busy}
+              onClick={() => bgInputRef.current?.click()}
+              onDragOver={(e) => e.preventDefault()}
+              onDrop={(e) => {
+                e.preventDefault();
+                void onUpload("background", e.dataTransfer.files?.[0] ?? null);
+              }}
+            >
+              {backgroundUrl ? (
+                <img
+                  src={backgroundUrl}
+                  alt=""
+                  className="od-brand-media__preview od-brand-media__preview--bg"
+                />
+              ) : (
+                <span className="od-brand-media__empty-copy">
+                  {uploading === "background"
+                    ? "Uploading…"
+                    : "Drop background here or click to upload"}
+                </span>
+              )}
+            </button>
+            <input
+              ref={bgInputRef}
+              type="file"
+              accept="image/jpeg,image/png,image/webp"
+              className="visually-hidden"
+              disabled={!!uploading || busy}
+              onChange={(e) => {
+                void onUpload("background", e.target.files?.[0] ?? null);
+                e.target.value = "";
+              }}
+            />
+            <div className="od-brand-media__actions">
+              <button
+                type="button"
+                className="btn btn--primary btn--sm"
+                disabled={!!uploading || busy}
+                onClick={() => bgInputRef.current?.click()}
+              >
+                {uploading === "background" ? "Uploading…" : "Upload background"}
+              </button>
+              {backgroundUrl && (
+                <button
+                  type="button"
+                  className="btn btn--ghost btn--sm"
+                  disabled={busy}
+                  onClick={() => void clearMedia("background")}
+                >
+                  Remove
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      </OwnerPanel>
+
       <OwnerPanel
         title="Share link"
         description="WhatsApp Status, Instagram bio, flyer QR — also injected as {{storefront_url}} in message templates."
@@ -164,80 +296,6 @@ export function BrandPage() {
         <p className="owner-muted" style={{ marginTop: "0.75rem" }}>
           Discover fallback: <code>{discoverLink}</code>
         </p>
-      </OwnerPanel>
-
-      <OwnerPanel
-        title="Brand visuals"
-        description="Shown on the customer storefront at /k/{code}. JPEG, PNG, or WebP · max 10MB."
-      >
-        <div className="od-brand-media">
-          <div className="od-brand-media__slot">
-            <span className="kc-field__label">Logo</span>
-            {logoUrl ? (
-              <img src={logoUrl} alt="" className="od-brand-media__preview od-brand-media__preview--logo" />
-            ) : (
-              <div className="od-brand-media__empty">No logo yet</div>
-            )}
-            <label className="btn btn--ghost btn--sm">
-              {uploading === "logo" ? "Uploading…" : "Upload logo"}
-              <input
-                type="file"
-                accept="image/jpeg,image/png,image/webp"
-                hidden
-                disabled={!!uploading || busy}
-                onChange={(e) => {
-                  void onUpload("logo", e.target.files?.[0] ?? null);
-                  e.target.value = "";
-                }}
-              />
-            </label>
-            {logoUrl && (
-              <button
-                type="button"
-                className="btn btn--ghost btn--sm"
-                disabled={busy}
-                onClick={() => void clearMedia("logo")}
-              >
-                Remove
-              </button>
-            )}
-          </div>
-          <div className="od-brand-media__slot">
-            <span className="kc-field__label">Background / hero</span>
-            {backgroundUrl ? (
-              <img
-                src={backgroundUrl}
-                alt=""
-                className="od-brand-media__preview od-brand-media__preview--bg"
-              />
-            ) : (
-              <div className="od-brand-media__empty">No background yet</div>
-            )}
-            <label className="btn btn--ghost btn--sm">
-              {uploading === "background" ? "Uploading…" : "Upload background"}
-              <input
-                type="file"
-                accept="image/jpeg,image/png,image/webp"
-                hidden
-                disabled={!!uploading || busy}
-                onChange={(e) => {
-                  void onUpload("background", e.target.files?.[0] ?? null);
-                  e.target.value = "";
-                }}
-              />
-            </label>
-            {backgroundUrl && (
-              <button
-                type="button"
-                className="btn btn--ghost btn--sm"
-                disabled={busy}
-                onClick={() => void clearMedia("background")}
-              >
-                Remove
-              </button>
-            )}
-          </div>
-        </div>
       </OwnerPanel>
 
       <OwnerPanel title="Page content" description="Tagline and accent colour on the storefront header.">
@@ -311,9 +369,6 @@ export function BrandPage() {
           </li>
         </ul>
       </OwnerPanel>
-
-      {error && <p className="auth-card__error">{error}</p>}
-      {msg && <p className="auth-card__success">{msg}</p>}
     </OwnerPageShell>
   );
 }

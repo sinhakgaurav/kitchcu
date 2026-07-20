@@ -1,6 +1,9 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { ListingToolbar } from "../../components/ListingToolbar";
+import { LiveCapturePhotoField } from "../../components/LiveCapturePhotoField";
+import { RichHtml, RichTextEditor } from "../../components/RichTextEditor";
 import { OwnerEmpty, OwnerPageShell } from "../../components/owner/OwnerPageShell";
 import {
   fetchGoldenRecipes,
@@ -20,6 +23,7 @@ import {
 } from "../../shared/listingControls";
 
 export function MenuPage() {
+  const { t } = useTranslation();
   const { kitchen } = useKitchen();
   const [dishes, setDishes] = useState<Dish[]>([]);
   const [goldenByDish, setGoldenByDish] = useState<Record<string, GrowthSuggestion | GoldenRecipePin>>({});
@@ -84,18 +88,18 @@ export function MenuPage() {
 
   return (
     <OwnerPageShell
-      eyebrow="Operations"
-      title="Menu"
-      description={`${dishes.length} live-capture dish${dishes.length !== 1 ? "es" : ""} · highlights, timing & filters${goldenCount ? ` · ${goldenCount} golden day signal${goldenCount !== 1 ? "s" : ""}` : ""}`}
-      actions={<Link to="/dashboard/menu/new" className="btn btn--primary">Add dish</Link>}
+      eyebrow={t("owner.nav.operations")}
+      title={t("owner.pages.menu")}
+      description={`${dishes.length} · ${t("owner.menu.liveCapture")}${goldenCount ? ` · ${goldenCount}` : ""}`}
+      actions={<Link to="/dashboard/menu/new" className="btn btn--primary">{t("owner.menu.addDish")}</Link>}
     >
       {error && <p className="auth-card__error">{error}</p>}
       {loading ? (
-        <p className="app-loading">Loading menu…</p>
+        <p className="app-loading">{t("common.loading")}</p>
       ) : dishes.length === 0 ? (
         <OwnerEmpty
-          message="No dishes yet. Add your first dish with a live-capture photo — that's how customers trust your kitchen."
-          action={<Link to="/dashboard/menu/new" className="btn btn--primary">Add dish</Link>}
+          message={t("owner.menu.empty")}
+          action={<Link to="/dashboard/menu/new" className="btn btn--primary">{t("owner.menu.addDish")}</Link>}
         />
       ) : (
         <>
@@ -120,9 +124,16 @@ export function MenuPage() {
               const badges = dishHighlightBadges(d);
               return (
                 <article key={d.id} className="dash-card owner-dish-card">
-                  {hero && <img src={hero.url} alt={d.name} loading="lazy" />}
+                  {hero ? (
+                    <img src={hero.url} alt={d.name} loading="lazy" />
+                  ) : (
+                    <div className="owner-dish-card__no-photo">Photo pending</div>
+                  )}
                   <div>
-                    <h3>{d.name}</h3>
+                    <h3>
+                      {d.name}
+                      {!d.is_active && <span className="owner-muted"> · off menu</span>}
+                    </h3>
                     <p>
                       ₹{d.price} · prep {d.prep_time_min}m
                       {d.delivery_time_min != null ? ` · delivery ${d.delivery_time_min}m` : ""}
@@ -138,7 +149,9 @@ export function MenuPage() {
                         ))}
                       </div>
                     )}
-                    {d.description && <p className="owner-dish-card__desc">{d.description}</p>}
+                    {d.description && (
+                      <RichHtml html={d.description} className="owner-dish-card__desc" />
+                    )}
                     {hero?.is_live_capture && <span className="live-badge">Live capture</span>}
                     {golden && (
                       <div className="owner-dish-card__golden">
@@ -161,7 +174,7 @@ export function MenuPage() {
                         className="btn btn--ghost btn--sm"
                         onClick={() => setEditingId(editingId === d.id ? null : d.id)}
                       >
-                        {editingId === d.id ? "Close edit" : "Edit highlights & timing"}
+                        {editingId === d.id ? "Close edit" : "Edit dish"}
                       </button>
                       <Link to={`/dashboard/ingredients?dish=${d.id}`} className="btn btn--ghost btn--sm">
                         Recipe & prep
@@ -205,10 +218,32 @@ function DishEditForm({
   onSaved: () => void | Promise<void>;
   onError: (msg: string) => void;
 }) {
+  const hero = dish.media.find((m) => m.is_hero) ?? dish.media[0];
   const [busy, setBusy] = useState(false);
+  const [name, setName] = useState(dish.name);
+  const [price, setPrice] = useState(dish.price);
+  const [isActive, setIsActive] = useState(dish.is_active);
+  const [heroUrl, setHeroUrl] = useState(hero?.url ?? "");
+  const [heroChanged, setHeroChanged] = useState(false);
   const [featured, setFeatured] = useState(!!dish.is_featured);
   const [chefs, setChefs] = useState(!!dish.is_chefs_special);
   const [unique, setUnique] = useState(!!dish.is_unique_recipe);
+  const [descriptionHtml, setDescriptionHtml] = useState(dish.description ?? "");
+  const [ingredientsHtml, setIngredientsHtml] = useState(dish.ingredients_description ?? "");
+
+  useEffect(() => {
+    const h = dish.media.find((m) => m.is_hero) ?? dish.media[0];
+    setName(dish.name);
+    setPrice(dish.price);
+    setIsActive(dish.is_active);
+    setHeroUrl(h?.url ?? "");
+    setHeroChanged(false);
+    setDescriptionHtml(dish.description ?? "");
+    setIngredientsHtml(dish.ingredients_description ?? "");
+    setFeatured(!!dish.is_featured);
+    setChefs(!!dish.is_chefs_special);
+    setUnique(!!dish.is_unique_recipe);
+  }, [dish]);
 
   const submit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -216,16 +251,36 @@ function DishEditForm({
     setBusy(true);
     onError("");
     try {
+      if (isActive && (!heroUrl || (heroChanged && !heroUrl))) {
+        onError("Active dishes need a live-capture hero photo.");
+        setBusy(false);
+        return;
+      }
       const prep = Number(fd.get("prep_time_min"));
       const delivery = Number(fd.get("delivery_time_min"));
       const maxTime = Number(fd.get("max_time_min"));
       await updateDish(kitchenId, dish.id, {
+        name: name.trim(),
+        price,
+        is_active: isActive,
         prep_time_min: prep,
         delivery_time_min: delivery,
         max_time_min: maxTime,
         is_featured: featured,
         is_chefs_special: chefs,
         is_unique_recipe: unique,
+        description: descriptionHtml.trim() || null,
+        ingredients_description: ingredientsHtml.trim() || null,
+        ...(heroChanged && heroUrl
+          ? {
+              media: {
+                url: heroUrl,
+                is_hero: true,
+                is_live_capture: true,
+                captured_at: new Date().toISOString(),
+              },
+            }
+          : {}),
       });
       await onSaved();
     } catch (err) {
@@ -236,45 +291,106 @@ function DishEditForm({
   };
 
   return (
-    <form className="owner-timing-form owner-timing-form--highlights" onSubmit={submit}>
+    <form className="owner-form owner-dish-edit" onSubmit={submit}>
+      <div className="form-row">
+        <label>
+          Name
+          <input value={name} onChange={(e) => setName(e.target.value)} required minLength={2} />
+        </label>
+        <label>
+          Price (₹)
+          <input
+            type="number"
+            min={1}
+            step={1}
+            value={price}
+            onChange={(e) => setPrice(Number(e.target.value))}
+            required
+          />
+        </label>
+      </div>
+
       <label className="dish-highlight-check">
-        <input type="checkbox" checked={featured} onChange={(e) => setFeatured(e.target.checked)} />
-        Featured
+        <input type="checkbox" checked={isActive} onChange={(e) => setIsActive(e.target.checked)} />
+        On menu (active)
       </label>
-      <label className="dish-highlight-check">
-        <input type="checkbox" checked={chefs} onChange={(e) => setChefs(e.target.checked)} />
-        Chef&apos;s special
-      </label>
-      <label className="dish-highlight-check">
-        <input type="checkbox" checked={unique} onChange={(e) => setUnique(e.target.checked)} />
-        Unique recipe
-      </label>
-      <label>
-        Prep
-        <input name="prep_time_min" type="number" min={5} defaultValue={dish.prep_time_min} required />
-      </label>
-      <label>
-        Delivery
-        <input
-          name="delivery_time_min"
-          type="number"
-          min={0}
-          defaultValue={dish.delivery_time_min ?? 0}
-          required
+
+      <LiveCapturePhotoField
+        kitchenId={kitchenId}
+        context="dish"
+        value={heroUrl}
+        requireLiveCapture
+        label="Hero photo (live capture)"
+        onChange={(url) => {
+          setHeroUrl(url);
+          setHeroChanged(true);
+        }}
+      />
+
+      <div className="kc-field">
+        <span className="kc-field__label">Description</span>
+        <RichTextEditor
+          value={descriptionHtml}
+          onChange={setDescriptionHtml}
+          kitchenId={kitchenId}
+          uploadContext="dish"
+          placeholder="What makes this dish special — texture, spice level, serving size…"
+          minHeight={100}
         />
-      </label>
-      <label>
-        Max (customer)
-        <input
-          name="max_time_min"
-          type="number"
-          min={5}
-          defaultValue={dish.max_time_min ?? dish.projected_ready_min}
-          required
+      </div>
+      <div className="kc-field">
+        <span className="kc-field__label">Ingredients & quality notes</span>
+        <RichTextEditor
+          value={ingredientsHtml}
+          onChange={setIngredientsHtml}
+          kitchenId={kitchenId}
+          uploadContext="dish"
+          placeholder="Key ingredients, allergens, quality notes — add photos inline if helpful"
+          minHeight={100}
         />
-      </label>
+      </div>
+      <div className="owner-dish-edit__checks">
+        <label className="dish-highlight-check">
+          <input type="checkbox" checked={featured} onChange={(e) => setFeatured(e.target.checked)} />
+          Featured
+        </label>
+        <label className="dish-highlight-check">
+          <input type="checkbox" checked={chefs} onChange={(e) => setChefs(e.target.checked)} />
+          Chef&apos;s special
+        </label>
+        <label className="dish-highlight-check">
+          <input type="checkbox" checked={unique} onChange={(e) => setUnique(e.target.checked)} />
+          Unique recipe
+        </label>
+      </div>
+      <div className="form-row">
+        <label>
+          Prep
+          <input name="prep_time_min" type="number" min={5} defaultValue={dish.prep_time_min} required />
+        </label>
+        <label>
+          Delivery
+          <input
+            name="delivery_time_min"
+            type="number"
+            min={0}
+            defaultValue={dish.delivery_time_min ?? 0}
+            required
+          />
+        </label>
+        <label>
+          Max (customer)
+          <input
+            name="max_time_min"
+            type="number"
+            min={5}
+            defaultValue={dish.max_time_min ?? dish.projected_ready_min}
+            required
+          />
+        </label>
+      </div>
       <button type="submit" className="btn btn--primary btn--sm" disabled={busy}>
-        {busy ? "Saving…" : "Save"}
+        {busy ? "Saving…" : "Save dish"}
       </button>
     </form>
   );

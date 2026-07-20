@@ -14,6 +14,8 @@ import ml from "./locales/ml.json";
 import bn from "./locales/bn.json";
 import gu from "./locales/gu.json";
 import pa from "./locales/pa.json";
+import bho from "./locales/bho.json";
+import mai from "./locales/mai.json";
 
 const resources = {
   en: { translation: en },
@@ -26,6 +28,8 @@ const resources = {
   bn: { translation: bn },
   gu: { translation: gu },
   pa: { translation: pa },
+  bho: { translation: bho },
+  mai: { translation: mai },
 } as const;
 
 let ready: Promise<typeof i18n> | null = null;

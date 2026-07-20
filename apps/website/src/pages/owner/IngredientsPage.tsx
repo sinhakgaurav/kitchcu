@@ -528,21 +528,24 @@ export function IngredientsPage() {
                           }}
                         />
                       </label>
-                      <label>Instructions</label>
-                      <RichTextEditor
-                        value={step.body_html}
-                        onChange={(html) => {
-                          setRecipe((prev) => {
-                            if (!prev) return prev;
-                            const prep_steps = [...prev.prep_steps];
-                            prep_steps[idx] = { ...prep_steps[idx], body_html: html };
-                            return { ...prev, prep_steps };
-                          });
-                        }}
-                        kitchenId={kitchen.id}
-                        uploadContext="prep_step"
-                        placeholder="Describe this step — quality notes, temperature, timing…"
-                      />
+                      <div className="kc-field">
+                        <span className="kc-field__label">Instructions (rich text)</span>
+                        <RichTextEditor
+                          value={step.body_html}
+                          onChange={(html) => {
+                            setRecipe((prev) => {
+                              if (!prev) return prev;
+                              const prep_steps = [...prev.prep_steps];
+                              prep_steps[idx] = { ...prep_steps[idx], body_html: html };
+                              return { ...prev, prep_steps };
+                            });
+                          }}
+                          kitchenId={kitchen.id}
+                          uploadContext="prep_step"
+                          placeholder="Describe this step — quality notes, temperature, timing…"
+                          minHeight={110}
+                        />
+                      </div>
                       <LiveCapturePhotoField
                         kitchenId={kitchen.id}
                         context="prep_step"

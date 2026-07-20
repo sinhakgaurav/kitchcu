@@ -188,6 +188,8 @@ export type Order = {
   master_order_id: string | null;
   bill_id: string;
   order_code: string;
+  coupon_code?: string | null;
+  discount_amount?: number;
   status: string;
   source: string;
   delivery_type: string;
@@ -446,6 +448,33 @@ export async function updateKitchenBrandedPage(
   });
 }
 
+/** Multipart logo / background upload — persists branded_page in one step. */
+export async function uploadKitchenBrandedMedia(
+  kitchenId: string,
+  file: Blob,
+  slot: "logo" | "background",
+  filename = "brand.jpg",
+): Promise<Kitchen> {
+  const form = new FormData();
+  form.append("file", file, filename);
+  form.append("slot", slot);
+
+  const token = getToken();
+  const headers = correlationHeaders(token ? { Authorization: `Bearer ${token}` } : undefined);
+
+  const res = await fetch(`/api/v1/kitchens/${kitchenId}/branded-page/upload`, {
+    method: "POST",
+    headers,
+    body: form,
+  });
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    const detail = typeof body.detail === "string" ? body.detail : "Brand image upload failed";
+    throw new Error(detail);
+  }
+  return body as Kitchen;
+}
+
 export async function updateKitchenDeliverySettings(
   kitchenId: string,
   data: {
@@ -573,7 +602,15 @@ export async function updateDish(
     is_featured?: boolean;
     is_chefs_special?: boolean;
     is_unique_recipe?: boolean;
-    description?: string;
+    description?: string | null;
+    ingredients_description?: string | null;
+    quality_measures?: string | null;
+    media?: {
+      url: string;
+      is_hero: boolean;
+      is_live_capture: boolean;
+      captured_at?: string;
+    };
   },
 ): Promise<Dish> {
   return apiFetch(`/api/v1/kitchens/${kitchenId}/dishes/${dishId}`, {
@@ -975,6 +1012,7 @@ export type KitchenMealPlan = {
     weekdays?: number[];
     meals_per_day?: number;
     notes?: string | null;
+    image_url?: string | null;
   };
   price_monthly: number;
   billing_cycle: string;
@@ -1141,6 +1179,17 @@ export async function createPromotion(
 ): Promise<Promotion> {
   return apiFetch(`/api/v1/kitchens/${kitchenId}/promotions`, {
     method: "POST",
+    body: JSON.stringify(data),
+  });
+}
+
+export async function updatePromotion(
+  kitchenId: string,
+  promotionId: string,
+  data: { is_active: boolean },
+): Promise<Promotion> {
+  return apiFetch(`/api/v1/kitchens/${kitchenId}/promotions/${promotionId}`, {
+    method: "PATCH",
     body: JSON.stringify(data),
   });
 }

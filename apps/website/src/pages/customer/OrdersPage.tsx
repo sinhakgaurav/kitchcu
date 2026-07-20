@@ -109,23 +109,26 @@ export function OrdersPage() {
                     )}
                   </ul>
                 </div>
-                <button
-                  type="button"
-                  className="btn btn--primary btn--sm"
-                  disabled={repeatingId === order.id || order.status === "cancelled"}
-                  onClick={() => onRepeat(order)}
-                >
-                  {repeatingId === order.id ? t("common.loading") : t("customer.orders.repeat")}
-                </button>
-                {order.status === "delivered" && (
-                  <Link
-                    to={`/orders/${order.id}/rate`}
-                    className="btn btn--ghost btn--sm"
-                    style={{ marginLeft: "0.5rem" }}
+                <div className="owner-actions">
+                  {order.tracking_token && (
+                    <Link to={`/t/${order.tracking_token}`} className="btn btn--ghost btn--sm">
+                      Track
+                    </Link>
+                  )}
+                  <button
+                    type="button"
+                    className="btn btn--primary btn--sm"
+                    disabled={repeatingId === order.id || order.status === "cancelled"}
+                    onClick={() => onRepeat(order)}
                   >
-                    Rate meal
-                  </Link>
-                )}
+                    {repeatingId === order.id ? t("common.loading") : t("customer.orders.repeat")}
+                  </button>
+                  {order.status === "delivered" && (
+                    <Link to={`/orders/${order.id}/rate`} className="btn btn--ghost btn--sm">
+                      Rate meal
+                    </Link>
+                  )}
+                </div>
               </article>
             </li>
           ))}

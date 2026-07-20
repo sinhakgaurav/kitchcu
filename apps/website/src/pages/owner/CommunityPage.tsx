@@ -147,14 +147,17 @@ export function CommunityPage() {
             Summary
             <input value={summary} onChange={(e) => setSummary(e.target.value)} placeholder="Short pitch for the community" />
           </label>
-          <label>Recipe</label>
-          <RichTextEditor
-            value={bodyHtml}
-            onChange={setBodyHtml}
-            kitchenId={kitchen.id}
-            uploadContext="general"
-            placeholder="Steps, quality notes, tips…"
-          />
+          <div className="kc-field">
+            <span className="kc-field__label">Recipe (rich text)</span>
+            <RichTextEditor
+              value={bodyHtml}
+              onChange={setBodyHtml}
+              kitchenId={kitchen.id}
+              uploadContext="general"
+              placeholder="Steps, quality notes, tips…"
+              minHeight={140}
+            />
+          </div>
           <button type="submit" className="btn btn--primary" disabled={busy}>
             Share to community
           </button>

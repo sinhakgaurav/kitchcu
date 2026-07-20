@@ -185,6 +185,12 @@ class PromotionCreateRequest(BaseModel):
         return ends_at
 
 
+class PromotionUpdateRequest(BaseModel):
+    """Owner request to pause/end a promotion without deleting history."""
+
+    is_active: bool = Field(..., description="Set false to end the promotion immediately.")
+
+
 class PromotionResponse(BaseModel):
     """A kitchen's targeted promotion (owner view — full detail)."""
 
@@ -655,6 +661,44 @@ async def create_promotion(
             "dish_id": str(body.dish_id),
             "segment": body.segment,
             "special_price": float(body.special_price),
+        },
+    )
+    await publisher.publish(stream_key("marketing", "promotion"), event, session=session)
+    return promo
+
+
+async def update_promotion(
+    session: AsyncSession,
+    kitchen_id: uuid.UUID,
+    promotion_id: uuid.UUID,
+    body: PromotionUpdateRequest,
+    publisher: EventPublisher,
+) -> Promotion:
+    promo = (
+        await session.execute(
+            select(Promotion).where(
+                Promotion.id == promotion_id,
+                Promotion.kitchen_id == kitchen_id,
+            )
+        )
+    ).scalar_one_or_none()
+    if not promo:
+        raise ValueError("Promotion not found")
+    promo.is_active = body.is_active
+    if not body.is_active:
+        now = datetime.now(UTC)
+        if promo.ends_at > now:
+            promo.ends_at = now
+    await session.flush()
+    event = EventPublisher.build(
+        event_type="promotion.updated",
+        aggregate_type="promotion",
+        aggregate_id=str(promo.id),
+        producer="marketing-service",
+        payload={
+            "kitchen_id": str(kitchen_id),
+            "promotion_id": str(promo.id),
+            "is_active": bool(promo.is_active),
         },
     )
     await publisher.publish(stream_key("marketing", "promotion"), event, session=session)

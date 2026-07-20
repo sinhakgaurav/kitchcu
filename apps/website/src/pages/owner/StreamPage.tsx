@@ -1,6 +1,7 @@
 import { FormEvent, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { LiveKitViewer } from "../../components/LiveKitViewer";
+import { LocalCameraPreview } from "../../components/LocalCameraPreview";
 import { OwnerPageShell, OwnerPanel } from "../../components/owner/OwnerPageShell";
 import {
   endKitchenStream,
@@ -20,6 +21,20 @@ import {
 } from "../../lib/api";
 import { useKitchen } from "../../lib/kitchen";
 
+type PublishCreds = { url: string; token: string };
+
+/** Keep publisher credentials stable — showcase PATCH re-issues a new JWT and remounting kills the camera. */
+function mergeSessionKeepPublish(
+  prev: LiveSession | null,
+  next: LiveSession,
+): LiveSession {
+  return {
+    ...next,
+    publisher_token: prev?.publisher_token ?? next.publisher_token,
+    livekit_url: prev?.livekit_url ?? next.livekit_url,
+  };
+}
+
 const PHASES: { id: ShowcasePhase; label: string; hint: string }[] = [
   { id: "ingredients", label: "Ingredients", hint: "Showcase what's going into the dish" },
   { id: "prep", label: "Prep", hint: "Walk customers through prep steps" },
@@ -38,6 +53,14 @@ export function StreamPage() {
   const [error, setError] = useState("");
   const [msg, setMsg] = useState("");
   const [busy, setBusy] = useState(false);
+  /** Stable LiveKit publish creds for the active session (do not refresh on phase changes). */
+  const [publishCreds, setPublishCreds] = useState<PublishCreds | null>(null);
+
+  const rememberPublishCreds = (s: LiveSession | null) => {
+    if (s?.status === "live" && s.publisher_token && s.livekit_url) {
+      setPublishCreds((prev) => prev ?? { url: s.livekit_url!, token: s.publisher_token! });
+    }
+  };
 
   const loadShowcase = async (sessionId: string) => {
     try {
@@ -61,9 +84,11 @@ export function StreamPage() {
       setLiveKitchens(liveRes.kitchens);
       setDishes(menu.dishes.filter((d) => d.is_active).map((d) => ({ id: d.id, name: d.name })));
       if (sessionRes?.status === "live") {
+        rememberPublishCreds(sessionRes);
         await loadShowcase(sessionRes.id);
         if (sessionRes.dish_id) setDishId(sessionRes.dish_id);
       } else {
+        setPublishCreds(null);
         setShowcase(null);
       }
       setError("");
@@ -104,13 +129,14 @@ export function StreamPage() {
         showcase_phase: dishId ? "ingredients" : undefined,
       });
       setSession(res);
+      rememberPublishCreds(res);
       if (res?.id) await loadShowcase(res.id);
       setMsg(
         dishId
           ? "You are live — camera preview below. Switch dish phases as you cook."
           : "You are live — allow camera when prompted. Feature a dish to show prep phases.",
       );
-      // Do not full reload — remounting LiveKit with a new token kills the camera preview mid-stream.
+      // Do not full reload / swap publisher token — remounting LiveKit kills the camera mid-stream.
     } catch (err) {
       setError(err instanceof Error ? err.message : "Go live failed");
     } finally {
@@ -126,6 +152,7 @@ export function StreamPage() {
       await endKitchenStream(kitchen.id);
       setSession(null);
       setShowcase(null);
+      setPublishCreds(null);
       setMsg("Stream ended.");
       await load();
     } catch (err) {
@@ -144,7 +171,7 @@ export function StreamPage() {
         dish_id: dishId,
         showcase_phase: "ingredients",
       });
-      setSession(res);
+      setSession((prev) => mergeSessionKeepPublish(prev, res));
       await loadShowcase(res.id);
       setMsg(`Featuring ${res.dish_name} — ingredients showcase.`);
     } catch (err) {
@@ -163,7 +190,7 @@ export function StreamPage() {
         showcase_phase: phase,
         active_prep_step_order: phase === "prep" ? 1 : undefined,
       });
-      setSession(res);
+      setSession((prev) => mergeSessionKeepPublish(prev, res));
       await loadShowcase(res.id);
       setMsg(`Showcase → ${phase}`);
     } catch (err) {
@@ -181,7 +208,7 @@ export function StreamPage() {
         showcase_phase: "prep",
         active_prep_step_order: stepOrder,
       });
-      setSession(res);
+      setSession((prev) => mergeSessionKeepPublish(prev, res));
       await loadShowcase(res.id);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not advance prep step");
@@ -261,18 +288,25 @@ export function StreamPage() {
                 </span>
               </p>
             )}
-            {session.publisher_token && session.livekit_url ? (
-              <div style={{ marginBottom: "1rem" }}>
-                <LiveKitViewer
-                  url={session.livekit_url}
-                  token={session.publisher_token}
-                  publish
-                />
-                <p className="stream-live__hint">Camera publishing to LiveKit — customers can Watch live.</p>
-              </div>
-            ) : session.publisher_token ? (
-              <p className="stream-live__hint">Publisher token issued — LiveKit URL not configured.</p>
-            ) : null}
+            <div className="stream-live__preview">
+              {publishCreds ? (
+                <>
+                  <LiveKitViewer url={publishCreds.url} token={publishCreds.token} publish />
+                  <p className="stream-live__hint">
+                    Camera publishing to LiveKit — customers can Watch live. Phase changes keep this preview
+                    running.
+                  </p>
+                </>
+              ) : (
+                <>
+                  <LocalCameraPreview />
+                  <p className="stream-live__hint">
+                    Local camera preview (LiveKit not configured). Dish showcase still updates for customers;
+                    wire LiveKit in admin Control to broadcast video.
+                  </p>
+                </>
+              )}
+            </div>
 
             <div className="stream-dish-pick">
               <label>

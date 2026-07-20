@@ -40,22 +40,39 @@ export function LiveCapturePhotoField({
 
   useEffect(() => () => stopCamera(), [stopCamera]);
 
+  // Attach stream only after the <video> mounts (phase === "camera").
+  useEffect(() => {
+    if (phase !== "camera") return;
+    const video = videoRef.current;
+    const stream = streamRef.current;
+    if (!video || !stream) return;
+    video.srcObject = stream;
+    void video.play().catch(() => {
+      /* muted + playsInline — ignore transient autoplay rejection */
+    });
+  }, [phase]);
+
   const startCamera = async () => {
     setError("");
     stopCamera();
     try {
+      if (!navigator.mediaDevices?.getUserMedia) {
+        throw new Error("Camera API not available");
+      }
       const stream = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: { ideal: "environment" }, width: { ideal: 1280 } },
         audio: false,
       });
       streamRef.current = stream;
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        await videoRef.current.play();
-      }
+      // Mount video first; effect above attaches the stream.
       setPhase("camera");
     } catch {
-      setError("Camera access denied or unavailable. Use upload instead.");
+      setError(
+        requireLiveCapture
+          ? "Camera access denied or unavailable. Dish photos require a live camera capture."
+          : "Camera access denied or unavailable. Use upload instead.",
+      );
+      setPhase("idle");
     }
   };
 
@@ -65,6 +82,10 @@ export function LiveCapturePhotoField({
     if (!video || !canvas) return;
     const w = video.videoWidth || 640;
     const h = video.videoHeight || 480;
+    if (!w || !h) {
+      setError("Camera still starting — wait a moment and capture again.");
+      return;
+    }
     canvas.width = w;
     canvas.height = h;
     const ctx = canvas.getContext("2d");
@@ -156,7 +177,7 @@ export function LiveCapturePhotoField({
 
       {phase === "camera" && (
         <div className="live-capture-field__camera">
-          <video ref={videoRef} playsInline muted className="live-capture-field__video" />
+          <video ref={videoRef} playsInline muted autoPlay className="live-capture-field__video" />
           <canvas ref={canvasRef} className="live-capture-field__canvas" />
           <div className="live-capture-field__actions">
             <button type="button" className="btn btn--primary btn--sm" onClick={captureFrame}>

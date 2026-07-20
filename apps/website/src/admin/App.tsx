@@ -12,6 +12,8 @@ import {
   fetchAdminKitchenPackage,
   fetchAdminKitchenTemplates,
   fetchAdminKitchenTiffinSummary,
+  fetchAdminKitchenSubscriptions,
+  decideAdminKitchenSubscription,
   fetchAdminKitchenGstMonthly,
   fetchAdminKitchenGstProfile,
   downloadAdminKitchenGstExcel,
@@ -60,6 +62,7 @@ import {
   type AdminGstProfile,
   type AdminReferralLead,
   type AdminReferralSettings,
+  type AdminTiffinSubscription,
   type AdminTiffinSummary,
   type PlatformStats,
 } from "./adminApi";
@@ -269,6 +272,23 @@ export default function AdminApp() {
     window.addEventListener("kitchcu-admin-nav", onNav);
     return () => window.removeEventListener("kitchcu-admin-nav", onNav);
   }, []);
+
+  // Deep-link: ?tab=kitchens&kitchen=<id>
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const qTab = params.get("tab");
+    const qKitchen = params.get("kitchen");
+    if (qTab) setTab(qTab as Tab);
+    if (qKitchen) setFocusKitchenId(qKitchen);
+  }, []);
+
+  useEffect(() => {
+    const url = new URL(window.location.href);
+    url.searchParams.set("tab", tab);
+    if (focusKitchenId) url.searchParams.set("kitchen", focusKitchenId);
+    else url.searchParams.delete("kitchen");
+    window.history.replaceState({}, "", `${url.pathname}${url.search}`);
+  }, [tab, focusKitchenId]);
 
   if (!token) {
     return <AdminLogin onSuccess={(t) => setToken(t)} />;
@@ -863,6 +883,7 @@ function AdminKitchens({
   const [porterAutoBook, setPorterAutoBook] = useState(true);
   const [porterDelayMin, setPorterDelayMin] = useState(15);
   const [tiffinSummary, setTiffinSummary] = useState<AdminTiffinSummary | null>(null);
+  const [tiffinSubs, setTiffinSubs] = useState<AdminTiffinSubscription[]>([]);
   const [gstProfile, setGstProfile] = useState<AdminGstProfile | null>(null);
   const [gstReport, setGstReport] = useState<AdminGstMonthlyReport | null>(null);
   const gstNow = useMemo(() => new Date(), []);
@@ -895,7 +916,7 @@ function AdminKitchens({
     setOk("");
     setPanelTab("profile");
     try {
-      const [d, w, p, m, pkg, pkgs, tmpl, tf] = await Promise.all([
+      const [d, w, p, m, pkg, pkgs, tmpl, tf, subs] = await Promise.all([
         fetchAdminKitchen(id),
         fetchAdminKitchenWhatsApp(id),
         fetchAdminKitchenPaymentGateway(id),
@@ -904,6 +925,10 @@ function AdminKitchens({
         fetchAdminPackages("owner").catch(() => [] as AdminPackage[]),
         fetchAdminKitchenTemplates(id).catch(() => []),
         fetchAdminKitchenTiffinSummary(id).catch(() => null),
+        fetchAdminKitchenSubscriptions(id, "pending").catch(() => ({
+          subscriptions: [] as AdminTiffinSubscription[],
+          total: 0,
+        })),
       ]);
       setDetail(d);
       setWa(w);
@@ -911,6 +936,7 @@ function AdminKitchens({
       setAllPackages(pkgs);
       setTemplates(tmpl);
       setTiffinSummary(tf);
+      setTiffinSubs(subs.subscriptions);
       setGstProfile(null);
       setGstReport(null);
       setKitchenOrders([]);
@@ -1795,7 +1821,8 @@ function AdminKitchens({
               <div className="admin-kitchen-panel__body">
                 <p className="report-hint">
                   Customer monthly thali/tiffin plans. Entitlement: Packages →{" "}
-                  <code>tiffin_plans</code> · Modules → <code>tiffin_plans</code>.
+                  <code>tiffin_plans</code> · Modules → <code>tiffin_plans</code>. Platform can accept
+                  or deny pending enrollments when owners need support.
                 </p>
                 {tiffinSummary ? (
                   <dl className="admin-kv">
@@ -1808,6 +1835,87 @@ function AdminKitchens({
                 ) : (
                   <p className="admin-panel__empty">No tiffin summary (module off or empty).</p>
                 )}
+                <h3 className="admin-panel__subhead">Pending requests</h3>
+                {tiffinSubs.length === 0 ? (
+                  <p className="admin-panel__empty">No pending subscriptions.</p>
+                ) : (
+                  <ul className="admin-list">
+                    {tiffinSubs.map((sub) => (
+                      <li key={sub.id} className="admin-list__row">
+                        <div>
+                          <strong>{sub.customer_name || sub.customer_phone}</strong>
+                          <span className="admin-muted">
+                            {" "}
+                            · {sub.plan_name || "Plan"} · ₹
+                            {Math.round(sub.price_monthly || 0).toLocaleString("en-IN")}/mo
+                          </span>
+                        </div>
+                        <div className="owner-actions">
+                          <button
+                            type="button"
+                            className="btn btn--sm btn--primary"
+                            disabled={busy}
+                            onClick={async () => {
+                              if (!selectedId) return;
+                              setBusy(true);
+                              setError("");
+                              try {
+                                await decideAdminKitchenSubscription(
+                                  selectedId,
+                                  sub.id,
+                                  "accept",
+                                  { owner_note: "Accepted by platform admin" },
+                                );
+                                setOk("Subscription accepted.");
+                                setTiffinSummary(await fetchAdminKitchenTiffinSummary(selectedId));
+                                setTiffinSubs(
+                                  (await fetchAdminKitchenSubscriptions(selectedId, "pending"))
+                                    .subscriptions,
+                                );
+                              } catch (e) {
+                                setError(e instanceof Error ? e.message : "Accept failed");
+                              } finally {
+                                setBusy(false);
+                              }
+                            }}
+                          >
+                            Accept
+                          </button>
+                          <button
+                            type="button"
+                            className="btn btn--sm btn--ghost"
+                            disabled={busy}
+                            onClick={async () => {
+                              if (!selectedId) return;
+                              setBusy(true);
+                              setError("");
+                              try {
+                                await decideAdminKitchenSubscription(
+                                  selectedId,
+                                  sub.id,
+                                  "deny",
+                                  { owner_note: "Denied by platform admin" },
+                                );
+                                setOk("Subscription denied.");
+                                setTiffinSummary(await fetchAdminKitchenTiffinSummary(selectedId));
+                                setTiffinSubs(
+                                  (await fetchAdminKitchenSubscriptions(selectedId, "pending"))
+                                    .subscriptions,
+                                );
+                              } catch (e) {
+                                setError(e instanceof Error ? e.message : "Deny failed");
+                              } finally {
+                                setBusy(false);
+                              }
+                            }}
+                          >
+                            Deny
+                          </button>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                )}
                 <button
                   type="button"
                   className="btn btn--sm btn--ghost"
@@ -1817,6 +1925,9 @@ function AdminKitchens({
                     setBusy(true);
                     try {
                       setTiffinSummary(await fetchAdminKitchenTiffinSummary(selectedId));
+                      setTiffinSubs(
+                        (await fetchAdminKitchenSubscriptions(selectedId, "pending")).subscriptions,
+                      );
                     } catch (e) {
                       setError(e instanceof Error ? e.message : "Refresh failed");
                     } finally {

@@ -32,10 +32,16 @@ import {
   uploadCustomerReferralCsv,
   type ReferralDashboard,
 } from "../../shared/referralApi";
+import {
+  cancelMySubscription,
+  fetchMySubscriptions,
+  type CustomerKitchenSubscription,
+} from "../../shared/api";
 
 type Tab =
   | "overview"
   | "orders"
+  | "plans"
   | "savings"
   | "referrals"
   | "health"
@@ -45,15 +51,16 @@ type Tab =
   | "account";
 
 const TABS: { id: Tab; labelKey: string }[] = [
-  { id: "overview", labelKey: "owner.nav.overview" },
-  { id: "orders", labelKey: "customer.nav.myOrders" },
-  { id: "savings", labelKey: "customer.dashboard.title" },
-  { id: "referrals", labelKey: "customer.dashboard.referrals" },
-  { id: "health", labelKey: "customer.dashboard.title" },
-  { id: "refunds", labelKey: "customer.account.payout" },
-  { id: "complaints", labelKey: "customer.dashboard.tickets" },
-  { id: "addresses", labelKey: "customer.account.addresses" },
-  { id: "account", labelKey: "customer.nav.account" },
+  { id: "overview", labelKey: "customer.dashboard.tabOverview" },
+  { id: "orders", labelKey: "customer.dashboard.tabOrders" },
+  { id: "plans", labelKey: "customer.dashboard.tabPlans" },
+  { id: "savings", labelKey: "customer.dashboard.tabSavings" },
+  { id: "referrals", labelKey: "customer.dashboard.tabReferrals" },
+  { id: "health", labelKey: "customer.dashboard.tabHealth" },
+  { id: "refunds", labelKey: "customer.dashboard.tabRefunds" },
+  { id: "complaints", labelKey: "customer.dashboard.tabComplaints" },
+  { id: "addresses", labelKey: "customer.dashboard.tabAddresses" },
+  { id: "account", labelKey: "customer.dashboard.tabAccount" },
 ];
 
 const inr = (n: number) => `₹${Math.round(n).toLocaleString("en-IN")}`;
@@ -82,6 +89,7 @@ export function CustomerDashboardPage() {
   const [tickets, setTickets] = useState<CustomerTicket[]>([]);
   const [addresses, setAddresses] = useState<CustomerAddress[]>([]);
   const [profile, setProfile] = useState<CustomerProfile | null>(null);
+  const [subs, setSubs] = useState<CustomerKitchenSubscription[]>([]);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -99,7 +107,7 @@ export function CustomerDashboardPage() {
     setLoading(true);
     setError("");
     try {
-      const [d, r, t, a, p] = await Promise.all([
+      const [d, r, t, a, p, s] = await Promise.all([
         fetchCustomerDashboard({
           diet: diet || undefined,
           cuisine: cuisine || undefined,
@@ -109,12 +117,14 @@ export function CustomerDashboardPage() {
         fetchMyTickets().catch(() => ({ tickets: [], total: 0 })),
         fetchMyAddresses().catch(() => []),
         fetchCustomerProfile().catch(() => null),
+        fetchMySubscriptions().catch(() => ({ subscriptions: [], total: 0 })),
       ]);
       setDash(d);
       setRefunds(r);
       setTickets(t.tickets);
       setAddresses(a);
       setProfile(p);
+      setSubs(s.subscriptions);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not load dashboard");
     } finally {
@@ -191,6 +201,18 @@ export function CustomerDashboardPage() {
           onRaiseIssue={(code) => {
             setTab("complaints");
             window.dispatchEvent(new CustomEvent("kitchcu-raise-issue", { detail: code }));
+          }}
+        />
+      )}
+      {!loading && tab === "plans" && (
+        <PlansPanel
+          subs={subs}
+          busy={busy}
+          setBusy={setBusy}
+          setError={setError}
+          onRefresh={async () => {
+            const s = await fetchMySubscriptions();
+            setSubs(s.subscriptions);
           }}
         />
       )}
@@ -627,6 +649,71 @@ function ReferralsPanel({
             ))}
           </ul>
         </>
+      )}
+    </section>
+  );
+}
+
+function PlansPanel({
+  subs,
+  busy,
+  setBusy,
+  setError,
+  onRefresh,
+}: {
+  subs: CustomerKitchenSubscription[];
+  busy: boolean;
+  setBusy: (v: boolean) => void;
+  setError: (v: string) => void;
+  onRefresh: () => Promise<void>;
+}) {
+  const cancel = async (id: string) => {
+    setBusy(true);
+    setError("");
+    try {
+      await cancelMySubscription(id);
+      await onRefresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not cancel plan");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <section className="glass customer-dash__card">
+      <h2>My thali / tiffin plans</h2>
+      <p className="owner-muted">
+        Request plans from a kitchen menu. The kitchen accepts or denies before billing starts.
+      </p>
+      {subs.length === 0 ? (
+        <p>
+          No plan requests yet.{" "}
+          <Link to="/#near-you">Find a kitchen</Link> and tap Request subscribe on their monthly plan.
+        </p>
+      ) : (
+        <ul className="customer-dash__tips">
+          {subs.map((s) => (
+            <li key={s.id}>
+              <strong>{s.plan_name || "Plan"}</strong>
+              <span>
+                {s.status}
+                {s.price_monthly != null ? ` · ${inr(s.price_monthly)}/mo` : ""}
+                {s.plan_type ? ` · ${s.plan_type}` : ""}
+              </span>
+              {(s.status === "pending" || s.status === "active" || s.status === "paused") && (
+                <button
+                  type="button"
+                  className="btn btn--ghost btn--sm"
+                  disabled={busy}
+                  onClick={() => cancel(s.id)}
+                >
+                  Cancel
+                </button>
+              )}
+            </li>
+          ))}
+        </ul>
       )}
     </section>
   );

@@ -1,15 +1,27 @@
 import { FormEvent, useEffect, useState } from "react";
+import { RichTextEditor } from "../../components/RichTextEditor";
 import { OwnerEmpty, OwnerPageShell, OwnerPanel } from "../../components/owner/OwnerPageShell";
 import {
   createMarketingTemplate,
   deleteMarketingTemplate,
   fetchMarketingTemplates,
+  fetchMenu,
   sendMarketingTemplate,
   updateMarketingTemplate,
   type MarketingTemplate,
 } from "../../lib/api";
 import { useKitchen } from "../../lib/kitchen";
 import { customerUrl } from "../../shared/urls";
+
+async function buildMenuLine(kitchenId: string): Promise<string> {
+  try {
+    const menu = await fetchMenu(kitchenId);
+    const names = menu.dishes.filter((d) => d.is_active).map((d) => d.name).slice(0, 8);
+    return names.length ? names.join(", ") : "today's specials";
+  } catch {
+    return "today's specials";
+  }
+}
 
 export function MarketingTemplatesPage() {
   const { kitchen } = useKitchen();
@@ -26,6 +38,7 @@ export function MarketingTemplatesPage() {
   );
   const [audience, setAudience] = useState("all");
   const [sendPreview, setSendPreview] = useState("");
+  const [editingId, setEditingId] = useState<string | null>(null);
 
   const load = async () => {
     if (!kitchen) return;
@@ -45,23 +58,50 @@ export function MarketingTemplatesPage() {
     load();
   }, [kitchen]);
 
-  const onCreate = async (e: FormEvent) => {
+  const resetForm = () => {
+    setEditingId(null);
+    setName("");
+    setSubject("");
+    setChannel("whatsapp");
+    setBody(
+      "Hi {{customer_name}} — today's specials from {{kitchen_name}}: {{menu_line}}. Order here: {{storefront_url}}",
+    );
+  };
+
+  const startEdit = (t: MarketingTemplate) => {
+    setEditingId(t.id);
+    setChannel(t.channel as "whatsapp" | "email");
+    setName(t.name);
+    setSubject(t.subject || "");
+    setBody(t.body);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  const onSave = async (e: FormEvent) => {
     e.preventDefault();
     if (!kitchen) return;
     setBusy(true);
     setError("");
     setOk("");
     try {
-      await createMarketingTemplate(kitchen.id, {
-        channel,
-        name,
-        subject: channel === "email" ? subject : null,
-        body,
-        is_active: true,
-      });
-      setName("");
-      setSubject("");
-      setOk("Template saved.");
+      if (editingId) {
+        await updateMarketingTemplate(kitchen.id, editingId, {
+          name,
+          subject: channel === "email" ? subject : null,
+          body,
+        });
+        setOk("Template updated.");
+      } else {
+        await createMarketingTemplate(kitchen.id, {
+          channel,
+          name,
+          subject: channel === "email" ? subject : null,
+          body,
+          is_active: true,
+        });
+        setOk("Template saved.");
+      }
+      resetForm();
       await load();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Save failed");
@@ -85,6 +125,7 @@ export function MarketingTemplatesPage() {
     if (!window.confirm("Delete this template?")) return;
     try {
       await deleteMarketingTemplate(kitchen.id, id);
+      if (editingId === id) resetForm();
       await load();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Delete failed");
@@ -97,12 +138,13 @@ export function MarketingTemplatesPage() {
     setError("");
     setOk("");
     try {
+      const menu_line = await buildMenuLine(kitchen.id);
       const res = await sendMarketingTemplate(kitchen.id, t.id, {
         audience,
         dry_run: dryRun,
         sample_vars: {
           kitchen_name: kitchen.name,
-          menu_line: "chef specials",
+          menu_line,
           storefront_url: customerUrl(`/k/${kitchen.code}`),
           tagline: kitchen.branded_page?.tagline || "",
         },
@@ -131,13 +173,17 @@ export function MarketingTemplatesPage() {
       {error && <p className="auth-card__error">{error}</p>}
       {ok && <p className="auth-card__success">{ok}</p>}
 
-      <OwnerPanel title="Create template" description="Saved per kitchen — not platform Meta templates">
-        <form className="owner-forms" onSubmit={onCreate}>
+      <OwnerPanel
+        title={editingId ? "Edit template" : "Create template"}
+        description="Saved per kitchen — not platform Meta templates"
+      >
+        <form className="owner-forms" onSubmit={onSave}>
           <label>
             Channel
             <select
               value={channel}
               onChange={(e) => setChannel(e.target.value as "whatsapp" | "email")}
+              disabled={Boolean(editingId)}
             >
               <option value="whatsapp">WhatsApp</option>
               <option value="email">Email</option>
@@ -153,17 +199,42 @@ export function MarketingTemplatesPage() {
               <input value={subject} onChange={(e) => setSubject(e.target.value)} required placeholder="Today at our kitchen" />
             </label>
           )}
-          <label>
-            Body
-            <textarea value={body} onChange={(e) => setBody(e.target.value)} required rows={5} />
-          </label>
+          <div className="kc-field">
+            <span className="kc-field__label">Body</span>
+            {channel === "email" ? (
+              <RichTextEditor
+                value={body}
+                onChange={setBody}
+                kitchenId={kitchen.id}
+                uploadContext="general"
+                placeholder="Email body — formatting and images supported"
+                minHeight={140}
+              />
+            ) : (
+              <textarea
+                className="kc-textarea"
+                value={body}
+                onChange={(e) => setBody(e.target.value)}
+                required
+                rows={5}
+                placeholder="WhatsApp body — plain text with {{variables}}"
+              />
+            )}
+          </div>
           <p className="owner-forms__hint">
-            Variables: {"{{customer_name}}"}, {"{{kitchen_name}}"}, {"{{menu_line}}"},{" "}
+            Variables: {"{{customer_name}}"}, {"{{kitchen_name}}"}, {"{{menu_line}}"} (live dishes),{" "}
             {"{{storefront_url}}"}, {"{{tagline}}"}
           </p>
-          <button type="submit" className="btn btn--primary" disabled={busy}>
-            {busy ? "Saving…" : "Save template"}
-          </button>
+          <div className="owner-actions">
+            <button type="submit" className="btn btn--primary" disabled={busy}>
+              {busy ? "Saving…" : editingId ? "Save changes" : "Save template"}
+            </button>
+            {editingId && (
+              <button type="button" className="btn btn--ghost" disabled={busy} onClick={resetForm}>
+                Cancel edit
+              </button>
+            )}
+          </div>
         </form>
       </OwnerPanel>
 
@@ -204,6 +275,9 @@ export function MarketingTemplatesPage() {
                     </span>
                   </span>
                   <div className="golden-day-card__actions">
+                    <button type="button" className="btn btn--ghost btn--sm" onClick={() => startEdit(t)}>
+                      Edit
+                    </button>
                     <button
                       type="button"
                       className="btn btn--ghost btn--sm"

@@ -87,6 +87,49 @@ DEMO_CUSTOMERS = [
     },
 ]
 
+# P37 dual referrals — reserved phones for seed states (not used as login personas).
+# OTP still DEMO_OTP when the onboard-convert customer is verified during seed.
+DEMO_REFERRAL = {
+    # Customer → kitchen: leave submitted for admin / customer dashboards
+    "pending_kitchen_leads": [
+        {
+            "kitchen_name": "Seed Spice House",
+            "contact_name": "Ravi Seed",
+            "contact_phone": "9110001001",
+            "city": "Pune",
+        },
+        {
+            "kitchen_name": "Seed Reject Kitchen",
+            "contact_name": "Neha Seed",
+            "contact_phone": "9110001002",
+            "city": "Mumbai",
+            "reject": True,
+        },
+    ],
+    # Customer → kitchen: admin-granted convert (₹ credit on primary customer)
+    "grant_kitchen_lead": {
+        "kitchen_name": "Seed Granted Kitchen",
+        "contact_name": "Asha Seed",
+        "contact_phone": "9110001003",
+        "city": "Pune",
+    },
+    # Owner → customer: leave submitted
+    "pending_customer_leads": [
+        {
+            "contact_name": "Pending Guest",
+            "contact_phone": "9110002001",
+            "city": "Pune",
+        },
+    ],
+    # Owner → customer: WhatsApp verify during seed → owner SaaS credit
+    "onboard_customer": {
+        "contact_name": "Referral Convert",
+        "contact_phone": "9110002003",
+        "phone_e164": "+919110002003",
+        "city": "Pune",
+    },
+}
+
 DEMO_KITCHEN = {
     "name": "Sharma Home Kitchen",
     "description": "Authentic Pune home-style cloud kitchen — live-capture menu, zero commission.",

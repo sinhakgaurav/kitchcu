@@ -112,10 +112,16 @@ export function SubscriptionPage() {
       {subscription && subscription.status !== "active" && (
         <OwnerPanel title="Complete payment">
           <p>
-            {TIER_LABELS[subscription.plan_tier]} plan · ₹{subscription.amount.toFixed(0)} / {subscription.billing_cycle}
+            {TIER_LABELS[subscription.plan_tier]} plan · ₹{subscription.amount.toFixed(0)} /{" "}
+            {subscription.billing_cycle}
+          </p>
+          <p className="owner-muted">
+            Dev / trial activate — marks the SaaS subscription active without Razorpay Checkout.
+            Production billing will open UPI/card collect here; referral credit still applies to the
+            listed amount above.
           </p>
           <button type="button" className="btn btn--primary" disabled={busy} onClick={activate}>
-            {t("owner.subscription.activate")}
+            {busy ? "Activating…" : "Activate (dev / trial)"}
           </button>
         </OwnerPanel>
       )}
