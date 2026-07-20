@@ -20,6 +20,16 @@
 4. **No food commission** — monthly fee is kitchen revenue (subscription SaaS for platform stays separate).
 5. MVP billing: enrollment + status machine; Razorpay recurring charge = follow-up (field `billing_status=manual`).
 
+### Dish selection rules (F35 — server-enforced 2026-07-20)
+
+| `plan_type` | `dishes_config.dish_ids` |
+|-------------|--------------------------|
+| `combo` | ≥ 2 |
+| `single_dish` | exactly 1 |
+| `thali` / `tiffin` | ≥ 1 |
+
+Enforced in `validate_plan_dish_selection` on create/update. See also `docs/design/DISH-BULK-IMPORT-AND-PLAN-MEDIA-DESIGN.md`.
+
 ## Schema (`ckac_marketing`)
 
 - `subscription_plans` — kitchen-scoped plan catalog

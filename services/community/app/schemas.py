@@ -207,7 +207,12 @@ async def share_recipe(
         aggregate_type="shared_recipe",
         aggregate_id=str(row.id),
         producer="community-service",
-        payload={"kitchen_id": str(kitchen_id), "recipe_id": str(row.id), "title": row.title},
+        payload={
+            "kitchen_id": str(kitchen_id),
+            "recipe_id": str(row.id),
+            "title": row.title,
+            "cover_url": row.cover_url,
+        },
     )
     await publisher.publish(stream_key("community", "recipe"), event, session=session)
     code, name, _, _ = await _kitchen_meta(session, kitchen_id)

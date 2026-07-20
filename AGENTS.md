@@ -57,7 +57,7 @@
 |-----------|----------|-------|
 | API Gateway | `services/gateway/` | Multi-service router (identity + catalog + order) |
 | Identity service | `services/identity/` | Owners, kitchens, OTP, JWT |
-| **Catalog service** | `services/catalog/` | **Sprint 2** — categories, dishes, menu, EDD |
+| **Catalog service** | `services/catalog/` | **Sprint 2** — categories, dishes, menu, EDD; **dish bulk Excel** (`GET/POST …/dishes/bulk`, `openpyxl`, `image_filename` map; inactive until live hero) |
 | **Order service** | `services/order/` | **Sprint 3** — manual orders, lifecycle, history |
 | **Billing service** | `services/billing/` | **Sprint 6** — payments, UPI intents, owner subscriptions; **GST**; **refunds**; **P25** package mapper (features→packages→plans→kitchen) |
 | **Marketing service** | `services/marketing/` | **Sprint 10** — CRM (F37), coupons (F36), promotions (F38) |
@@ -71,14 +71,14 @@
 | **Discovery + history** | `services/identity/`, `apps/website/` | **S7** — F32 nearby map/filters (diet, live-capture); F33 order history + repeat |
 | **Multi-kitchen checkout** | `services/order/`, `apps/website/` | **S8** — F06 grouped cart, master receipt, atomic sub-orders |
 | **Split payment** | `services/billing/` | **S9** — F44 aggregated payment + Route split settlements |
-| **Marketing / CRM** | `services/marketing/`, `apps/website/` | **S10** — F36 coupons, F37 CRM, F38 targeted promotions; **P26** WA/email message templates |
+| **Marketing / CRM** | `services/marketing/`, `apps/website/` | **S10** — F36 coupons, F37 CRM, F38 targeted promotions; **P26** WA/email message templates; **F34/F35** tiffin (combo ≥2 dishes, single_dish =1) |
 | **Ratings** | `services/ratings/`, `apps/website/` | **S11** — F16–F18 home taste ratings, aggregates, A/V reviews |
 | **Growth intelligence** | `services/growth/`, `apps/website/` | **S12** — F09 combos, F10 patterns, F11 suggestions, F39 daily menu WhatsApp |
 | **Delivery** | `services/delivery/`, `apps/website/` | **S13** — F27–F31 radius/fees/distance, F29 tracking links |
 | **Order notifications** | `services/notification/`, `services/order/` | **S14** — F29 tracking interval reminders, F45 WhatsApp order updates |
 | **Ingredient mapper** | `services/catalog/`, `apps/website/` | **S15** — F19 recipes, stock deduct on accept, low-stock warnings |
 | **Learning service** | `services/learning/`, `apps/website/` | **S16** — F21 curated portal, F22 dish trials + promote |
-| **Community service** | `services/community/`, `apps/website/` | **S17** — F23 recipe rewards, F24 chef rankings |
+| **Community service** | `services/community/`, `apps/website/` | **S17** — F23 recipe rewards (+ `cover_url`), F24 chef rankings |
 | **Streaming service** | `services/streaming/`, `apps/website/` | **S18** — F46 LiveKit sessions, F47 owner opt-in go-live, F48 customer live filter; **P22** per-dish showcase phases |
 | **Growth golden day** | `services/growth/` | **P20** — ML comment sentiment + golden performance day pins |
 | **Branded storefront** | `services/identity/`, `apps/website/` | **P19** — kitchen `branded_page` + customer `/k/:code` |
@@ -454,9 +454,11 @@ Delivered order only → home_taste (1–5) + quality (1–5) → optional anony
 | New service | `services/<name>/`, `docker-compose.yml`, `gateway/main.py`, CI workflow |
 | Shared util | `packages/ckac-common/ckac_common/` |
 | Env var | `.env.example` + document in README |
-| Owner UI | `apps/owner-pwa/` |
-| Customer UI | `apps/customer-pwa/` |
+| Owner UI | `apps/website/` (kitchen host) |
+| Customer UI | `apps/website/` (customer host) |
+| Dish bulk Excel | Design: `docs/design/DISH-BULK-IMPORT-AND-PLAN-MEDIA-DESIGN.md` · `catalog/app/dish_bulk.py` · owner `AddDishPage` |
+| Rebuild after catalog dep change | `docker compose build catalog` (needs `openpyxl`) |
 
 ---
 
-*Last updated: Phase 1 S1–S18 + P19–P40 (referrals, GST export, admin ops console, platform i18n + security harden). Tracker: `docs/ADVANCEMENT-TRACKER.md`. Guide: `docs/CKAC-COMPLETE-GUIDE.md` v3.2.3. Prod: `*.kitchcu.com`. Next: kitchen staff build · live Razorpay · E1–E2.*
+*Last updated: Phase 1 S1–S18 + P19–P40 + dish bulk Excel / recipe cover / tiffin dish rules. Tracker: `docs/ADVANCEMENT-TRACKER.md`. Guide: `docs/CKAC-COMPLETE-GUIDE.md` v3.2.3. Prod: `*.kitchcu.com`. Next: kitchen staff build · live Razorpay · E1–E2.*
