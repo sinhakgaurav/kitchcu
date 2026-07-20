@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { LiveCapturePhotoField } from "../../components/LiveCapturePhotoField";
 import { RichTextEditor } from "../../components/RichTextEditor";
 import { OwnerEmpty, OwnerPageShell, OwnerPanel } from "../../components/owner/OwnerPageShell";
 import {
@@ -22,6 +23,7 @@ export function CommunityPage() {
   const [title, setTitle] = useState("");
   const [summary, setSummary] = useState("");
   const [bodyHtml, setBodyHtml] = useState("");
+  const [coverUrl, setCoverUrl] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState("");
@@ -57,10 +59,12 @@ export function CommunityPage() {
         title: title.trim(),
         summary: summary.trim() || undefined,
         recipe_html: bodyHtml || "<p>Shared recipe</p>",
+        cover_url: coverUrl.trim() || undefined,
       });
       setTitle("");
       setSummary("");
       setBodyHtml("");
+      setCoverUrl("");
       setMsg("Recipe shared with the community.");
       await load();
     } catch (err) {
@@ -148,7 +152,17 @@ export function CommunityPage() {
             <input value={summary} onChange={(e) => setSummary(e.target.value)} placeholder="Short pitch for the community" />
           </label>
           <div className="kc-field">
-            <span className="kc-field__label">Recipe (rich text)</span>
+            <span className="kc-field__label">Cover photo</span>
+            <LiveCapturePhotoField
+              kitchenId={kitchen.id}
+              context="general"
+              value={coverUrl}
+              onChange={setCoverUrl}
+              label="Recipe cover"
+            />
+          </div>
+          <div className="kc-field">
+            <span className="kc-field__label">Recipe (rich text — inline images supported)</span>
             <RichTextEditor
               value={bodyHtml}
               onChange={setBodyHtml}
@@ -171,6 +185,9 @@ export function CommunityPage() {
           <ul className="owner-detail-items">
             {recipes.map((r) => (
               <li key={r.id}>
+                {r.cover_url ? (
+                  <img src={r.cover_url} alt="" className="owner-thumb" style={{ marginRight: "0.5rem" }} />
+                ) : null}
                 <strong>{r.title}</strong> — {r.appreciation_count} appreciations · {r.points_earned} pts earned
               </li>
             ))}

@@ -45,6 +45,21 @@ class DishesConfig(BaseModel):
         return cleaned
 
 
+def validate_plan_dish_selection(plan_type: str, dishes_config: DishesConfig | dict) -> None:
+    """F35 — combo = multi-dish pack; single_dish = one dish monthly subscription."""
+    if isinstance(dishes_config, DishesConfig):
+        dish_ids = dishes_config.dish_ids
+    else:
+        dish_ids = list(dishes_config.get("dish_ids") or [])
+    n = len(dish_ids)
+    if n == 0:
+        raise ValueError("Link at least one menu dish to this plan")
+    if plan_type == "single_dish" and n != 1:
+        raise ValueError("Single dish pack requires exactly one linked dish")
+    if plan_type == "combo" and n < 2:
+        raise ValueError("Combo plan requires at least two linked dishes")
+
+
 class SubscriptionPlanCreate(BaseModel):
     name: str = Field(..., min_length=2, max_length=255, examples=["Veg Thali Monthly"])
     description: str | None = Field(
@@ -230,6 +245,7 @@ async def create_plan(
 ) -> SubscriptionPlan:
     if data.plan_type not in PLAN_TYPES:
         raise ValueError("Invalid plan_type")
+    validate_plan_dish_selection(data.plan_type, data.dishes_config)
     plan = SubscriptionPlan(
         kitchen_id=kitchen_id,
         name=data.name.strip(),
@@ -276,6 +292,22 @@ async def update_plan(
         plan.plan_type = data.plan_type
     if data.dishes_config is not None:
         plan.dishes_config = _config_dict(data.dishes_config)
+    next_type = data.plan_type if data.plan_type is not None else plan.plan_type
+    next_cfg = data.dishes_config if data.dishes_config is not None else plan.dishes_config
+    if data.plan_type is not None or data.dishes_config is not None:
+        if isinstance(next_cfg, dict):
+            validate_plan_dish_selection(
+                next_type,
+                DishesConfig(
+                    dish_ids=[uuid.UUID(str(x)) for x in (next_cfg.get("dish_ids") or [])],
+                    weekdays=list(next_cfg.get("weekdays") or [0, 1, 2, 3, 4]),
+                    meals_per_day=int(next_cfg.get("meals_per_day") or 1),
+                    notes=next_cfg.get("notes"),
+                    image_url=next_cfg.get("image_url"),
+                ),
+            )
+        else:
+            validate_plan_dish_selection(next_type, next_cfg)
     if data.price_monthly is not None:
         plan.price_monthly = data.price_monthly
     if data.delivery_included is not None:

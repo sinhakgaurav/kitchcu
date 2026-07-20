@@ -59,7 +59,11 @@ async def test_admin_list_and_accept_pending_subscription(client: AsyncClient):
             "name": "Admin Ops Thali",
             "plan_type": "thali",
             "price_monthly": 1999,
-            "dishes_config": {"weekdays": [0, 1, 2, 3, 4], "meals_per_day": 1},
+            "dishes_config": {
+                "dish_ids": [str(ctx["dish_id"])],
+                "weekdays": [0, 1, 2, 3, 4],
+                "meals_per_day": 1,
+            },
         },
     )
     assert plan.status_code == 201, plan.text

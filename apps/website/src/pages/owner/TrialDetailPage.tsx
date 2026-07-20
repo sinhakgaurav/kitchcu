@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
+import { LiveCapturePhotoField } from "../../components/LiveCapturePhotoField";
 import { OwnerPageShell, OwnerPanel } from "../../components/owner/OwnerPageShell";
 import {
   fetchCrmCustomers,
@@ -8,6 +9,7 @@ import {
   recordTrialRating,
   sendTrialSamples,
   setTrialInvites,
+  updateDish,
   type CrmCustomer,
   type DishTrial,
 } from "../../lib/api";
@@ -19,6 +21,8 @@ export function TrialDetailPage() {
   const [trial, setTrial] = useState<DishTrial | null>(null);
   const [customers, setCustomers] = useState<CrmCustomer[]>([]);
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [heroUrl, setHeroUrl] = useState("");
+  const [heroLive, setHeroLive] = useState(false);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
 
@@ -102,8 +106,39 @@ export function TrialDetailPage() {
     }
   };
 
+  const onHeroCapture = async (url: string) => {
+    setHeroUrl(url);
+    if (!url) {
+      setHeroLive(false);
+      return;
+    }
+    setHeroLive(true);
+    if (!kitchen || !trial) return;
+    setBusy(true);
+    setError("");
+    try {
+      await updateDish(kitchen.id, trial.catalog_dish_id, {
+        media: {
+          url,
+          is_hero: true,
+          is_live_capture: true,
+          captured_at: new Date().toISOString(),
+        },
+      });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not save live hero photo");
+      setHeroLive(false);
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const promote = async () => {
     if (!kitchen || !trialId) return;
+    if (!heroLive) {
+      setError("Capture a live hero photo before promoting — stock images cannot go live.");
+      return;
+    }
     setBusy(true);
     setError("");
     try {
@@ -220,12 +255,30 @@ export function TrialDetailPage() {
         </OwnerPanel>
       )}
 
+      {trial.status !== "promoted" && (
+        <OwnerPanel
+          title="Live-capture dish hero"
+          description="Truth in media — replace the curated stock photo with a camera capture before promote."
+        >
+          <LiveCapturePhotoField
+            kitchenId={kitchen.id}
+            context="dish"
+            requireLiveCapture
+            value={heroUrl}
+            onChange={onHeroCapture}
+            label="Trial dish hero"
+          />
+          {heroLive && <p className="report-hint">Live hero saved on the trial dish.</p>}
+        </OwnerPanel>
+      )}
+
       {canPromote && (
         <OwnerPanel title="Promote to official menu">
           <p className="owner-muted">
             Average home-taste rating meets your threshold — activate this dish on your public menu.
+            {!heroLive && " Capture a live hero photo above first."}
           </p>
-          <button type="button" className="btn btn--primary" disabled={busy} onClick={promote}>
+          <button type="button" className="btn btn--primary" disabled={busy || !heroLive} onClick={promote}>
             Promote dish
           </button>
         </OwnerPanel>

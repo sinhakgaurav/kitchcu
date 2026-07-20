@@ -1,9 +1,18 @@
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { LiveCapturePhotoField } from "../../components/LiveCapturePhotoField";
 import { RichTextEditor } from "../../components/RichTextEditor";
-import { OwnerPageShell } from "../../components/owner/OwnerPageShell";
-import { createDish, fetchCategories, fetchCuisines, type Category, type Cuisine } from "../../lib/api";
+import { OwnerPageShell, OwnerPanel } from "../../components/owner/OwnerPageShell";
+import {
+  bulkImportDishes,
+  createDish,
+  downloadDishBulkTemplate,
+  fetchCategories,
+  fetchCuisines,
+  type BulkDishImportResult,
+  type Category,
+  type Cuisine,
+} from "../../lib/api";
 import { useKitchen } from "../../lib/kitchen";
 
 export function AddDishPage() {
@@ -19,6 +28,16 @@ export function AddDishPage() {
   const [isFeatured, setIsFeatured] = useState(false);
   const [isChefsSpecial, setIsChefsSpecial] = useState(false);
   const [isUniqueRecipe, setIsUniqueRecipe] = useState(false);
+
+  const [bulkSpreadsheet, setBulkSpreadsheet] = useState<File | null>(null);
+  const [bulkImages, setBulkImages] = useState<File[]>([]);
+  const [bulkZip, setBulkZip] = useState<File | null>(null);
+  const [bulkBusy, setBulkBusy] = useState(false);
+  const [bulkError, setBulkError] = useState("");
+  const [bulkResult, setBulkResult] = useState<BulkDishImportResult | null>(null);
+  const sheetRef = useRef<HTMLInputElement>(null);
+  const imagesRef = useRef<HTMLInputElement>(null);
+  const zipRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (!kitchen) return;
@@ -80,17 +99,159 @@ export function AddDishPage() {
     }
   };
 
+  const onDownloadTemplate = async () => {
+    if (!kitchen) return;
+    setBulkError("");
+    try {
+      await downloadDishBulkTemplate(kitchen.id);
+    } catch (err) {
+      setBulkError(err instanceof Error ? err.message : "Template download failed");
+    }
+  };
+
+  const onBulkImport = async () => {
+    if (!kitchen || !bulkSpreadsheet) {
+      setBulkError("Choose the filled Excel spreadsheet first.");
+      return;
+    }
+    setBulkBusy(true);
+    setBulkError("");
+    setBulkResult(null);
+    try {
+      const result = await bulkImportDishes(kitchen.id, {
+        spreadsheet: bulkSpreadsheet,
+        images: bulkImages,
+        imagesZip: bulkZip,
+      });
+      setBulkResult(result);
+      if (result.accepted > 0) {
+        setBulkSpreadsheet(null);
+        setBulkImages([]);
+        setBulkZip(null);
+        if (sheetRef.current) sheetRef.current.value = "";
+        if (imagesRef.current) imagesRef.current.value = "";
+        if (zipRef.current) zipRef.current.value = "";
+      }
+    } catch (err) {
+      setBulkError(err instanceof Error ? err.message : "Bulk import failed");
+    } finally {
+      setBulkBusy(false);
+    }
+  };
+
   if (!kitchen) return null;
 
   return (
     <OwnerPageShell
       eyebrow="Operations"
       title="Add dish"
-      description="Live-capture hero photo required — customers trust what they see"
+      description="Live-capture hero for single dishes — or bulk import from Excel with mapped photos"
       backTo="/dashboard/menu"
       backLabel="← Back to menu"
     >
+      <OwnerPanel
+        title="Bulk upload"
+        description="Download the sample Excel, fill rows, upload photos whose file names match the image_filename column."
+      >
+        {bulkError && <div className="auth-card__error">{bulkError}</div>}
+        <ol className="owner-steps" style={{ marginTop: 0 }}>
+          <li>Download the sample Excel (predefined column names + example rows).</li>
+          <li>
+            Fill dish details. Put the exact photo file name in <code>image_filename</code> (e.g.{" "}
+            <code>paneer_butter_masala.jpg</code>).
+          </li>
+          <li>Upload the Excel plus images (multi-select) and/or a ZIP of images.</li>
+          <li>
+            Imported dishes stay <strong>inactive</strong> until you replace the gallery photo with a
+            live-capture hero in Menu (truth in media).
+          </li>
+        </ol>
+        <div className="owner-actions" style={{ flexWrap: "wrap", gap: "0.5rem" }}>
+          <button type="button" className="btn btn--secondary" onClick={onDownloadTemplate}>
+            Download sample Excel
+          </button>
+          <label className="btn btn--ghost">
+            Choose Excel (.xlsx)
+            <input
+              ref={sheetRef}
+              type="file"
+              accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+              hidden
+              onChange={(e) => setBulkSpreadsheet(e.target.files?.[0] ?? null)}
+            />
+          </label>
+          <label className="btn btn--ghost">
+            Choose images
+            <input
+              ref={imagesRef}
+              type="file"
+              accept="image/jpeg,image/png,image/webp"
+              multiple
+              hidden
+              onChange={(e) => setBulkImages(Array.from(e.target.files || []))}
+            />
+          </label>
+          <label className="btn btn--ghost">
+            Choose images ZIP
+            <input
+              ref={zipRef}
+              type="file"
+              accept=".zip,application/zip"
+              hidden
+              onChange={(e) => setBulkZip(e.target.files?.[0] ?? null)}
+            />
+          </label>
+          <button
+            type="button"
+            className="btn btn--primary"
+            disabled={bulkBusy || !bulkSpreadsheet}
+            onClick={onBulkImport}
+          >
+            {bulkBusy ? "Importing…" : "Import dishes"}
+          </button>
+        </div>
+        <p className="report-hint" style={{ marginTop: "0.75rem" }}>
+          {bulkSpreadsheet ? `Sheet: ${bulkSpreadsheet.name}` : "No spreadsheet selected."}
+          {bulkImages.length > 0 ? ` · ${bulkImages.length} image(s)` : ""}
+          {bulkZip ? ` · ZIP: ${bulkZip.name}` : ""}
+        </p>
+        {bulkResult && (
+          <div className="auth-card__success" style={{ marginTop: "0.75rem" }}>
+            <p>
+              Accepted {bulkResult.accepted} · rejected {bulkResult.rejected} · images mapped{" "}
+              {bulkResult.images_mapped}
+            </p>
+            <p className="report-hint">{bulkResult.note}</p>
+            {bulkResult.results.some((r) => r.status === "rejected") && (
+              <ul className="owner-detail-items">
+                {bulkResult.results
+                  .filter((r) => r.status === "rejected")
+                  .slice(0, 20)
+                  .map((r) => (
+                    <li key={`${r.row}-${r.name}`}>
+                      Row {r.row}
+                      {r.name ? ` (${r.name})` : ""}: {r.detail}
+                    </li>
+                  ))}
+              </ul>
+            )}
+            {bulkResult.accepted > 0 && (
+              <button
+                type="button"
+                className="btn btn--ghost btn--sm"
+                onClick={() => navigate("/dashboard/menu")}
+              >
+                Open menu to add live heroes
+              </button>
+            )}
+          </div>
+        )}
+      </OwnerPanel>
+
       <form className="dash-card owner-form owner-form--narrow" onSubmit={handleSubmit}>
+        <h2 className="owner-panel__title" style={{ marginTop: 0 }}>
+          Add one dish
+        </h2>
         {error && <div className="auth-card__error">{error}</div>}
         <label>Dish name<input name="name" required placeholder="Butter Chicken" /></label>
         <div className="form-row">

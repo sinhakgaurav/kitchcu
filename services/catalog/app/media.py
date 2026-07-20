@@ -50,24 +50,22 @@ def _detect_image(data: bytes, declared: str | None) -> tuple[str, str]:
     raise ValueError("Unsupported image format — use JPEG, PNG, or WebP")
 
 
-async def upload_kitchen_media(
+def store_kitchen_media_bytes(
     *,
     kitchen_id: uuid.UUID,
-    file: UploadFile,
-    is_live_capture: bool,
+    data: bytes,
     context: str,
+    is_live_capture: bool = False,
+    declared_content_type: str | None = None,
     captured_at: str | None = None,
 ) -> MediaUploadResponse:
     if context not in ALLOWED_CONTEXTS:
         raise ValueError(f"context must be one of: {', '.join(sorted(ALLOWED_CONTEXTS))}")
-
-    data = await file.read()
     if not data:
         raise ValueError("Empty file")
     if len(data) > MAX_UPLOAD_BYTES:
         raise ValueError("File exceeds 10MB limit")
-
-    content_type, extension = _detect_image(data, file.content_type)
+    content_type, extension = _detect_image(data, declared_content_type)
     storage = get_media_storage()
     url = storage.upload(
         kitchen_id=str(kitchen_id),
@@ -83,4 +81,23 @@ async def upload_kitchen_media(
         content_type=content_type,
         is_live_capture=is_live_capture,
         captured_at=captured_at if is_live_capture else None,
+    )
+
+
+async def upload_kitchen_media(
+    *,
+    kitchen_id: uuid.UUID,
+    file: UploadFile,
+    is_live_capture: bool,
+    context: str,
+    captured_at: str | None = None,
+) -> MediaUploadResponse:
+    data = await file.read()
+    return store_kitchen_media_bytes(
+        kitchen_id=kitchen_id,
+        data=data,
+        context=context,
+        is_live_capture=is_live_capture,
+        declared_content_type=file.content_type,
+        captured_at=captured_at,
     )

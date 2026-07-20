@@ -18,7 +18,22 @@ async def test_share_and_appreciate_recipe(client: AsyncClient, community_ctx):
         headers=owner_headers,
     )
     assert shared.status_code == 201
-    recipe_id = shared.json()["id"]
+    body = shared.json()
+    recipe_id = body["id"]
+    assert body.get("cover_url") is None
+
+    with_cover = await client.post(
+        f"/api/v1/kitchens/{kid}/community/recipes",
+        json={
+            "title": "Covered Dal Tadka",
+            "summary": "With photo",
+            "recipe_html": "<p>Temper with jeera.</p>",
+            "cover_url": "https://cdn.example/recipes/dal.jpg",
+        },
+        headers=owner_headers,
+    )
+    assert with_cover.status_code == 201
+    assert with_cover.json()["cover_url"] == "https://cdn.example/recipes/dal.jpg"
 
     appreciated = await client.post(
         f"/api/v1/community/recipes/{recipe_id}/appreciate",

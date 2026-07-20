@@ -22,6 +22,7 @@ class SharedRecipe(Base):
     title: Mapped[str] = mapped_column(String(255), nullable=False)
     summary: Mapped[str | None] = mapped_column(Text)
     recipe_html: Mapped[str] = mapped_column(Text, nullable=False)
+    cover_url: Mapped[str | None] = mapped_column(String(2000), nullable=True)
     dish_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
     status: Mapped[str] = mapped_column(String(20), default="published")
     appreciation_count: Mapped[int] = mapped_column(Integer, default=0)

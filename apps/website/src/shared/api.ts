@@ -589,6 +589,68 @@ export async function createDish(
   });
 }
 
+export type BulkDishImportResult = {
+  accepted: number;
+  rejected: number;
+  images_mapped: number;
+  images_unused: string[];
+  note: string;
+  results: {
+    row: number;
+    name: string | null;
+    status: string;
+    dish_id: string | null;
+    detail: string | null;
+  }[];
+};
+
+export async function downloadDishBulkTemplate(kitchenId: string): Promise<void> {
+  const token = getToken();
+  if (!token) throw new Error("Sign in required");
+  const res = await fetch(`/api/v1/kitchens/${kitchenId}/dishes/bulk/template.xlsx`, {
+    headers: correlationHeaders({ Authorization: `Bearer ${token}` }),
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(typeof body.detail === "string" ? body.detail : "Could not download template");
+  }
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "kitchcu_dishes_bulk_template.xlsx";
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
+export async function bulkImportDishes(
+  kitchenId: string,
+  data: { spreadsheet: File; images?: File[]; imagesZip?: File | null },
+): Promise<BulkDishImportResult> {
+  const token = getToken();
+  if (!token) throw new Error("Sign in required");
+  const form = new FormData();
+  form.append("spreadsheet", data.spreadsheet);
+  for (const img of data.images || []) {
+    form.append("images", img);
+  }
+  if (data.imagesZip) {
+    form.append("images_zip", data.imagesZip);
+  }
+  const res = await fetch(`/api/v1/kitchens/${kitchenId}/dishes/bulk`, {
+    method: "POST",
+    headers: correlationHeaders({ Authorization: `Bearer ${token}` }),
+    body: form,
+  });
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(typeof body.detail === "string" ? body.detail : "Bulk import failed");
+  }
+  return body as BulkDishImportResult;
+}
+
 export async function updateDish(
   kitchenId: string,
   dishId: string,
@@ -1797,6 +1859,7 @@ export type SharedRecipe = {
   title: string;
   summary: string | null;
   recipe_html: string;
+  cover_url: string | null;
   dish_id: string | null;
   appreciation_count: number;
   points_earned: number;
@@ -1827,7 +1890,13 @@ export async function fetchSharedRecipes(kitchenId?: string): Promise<{ recipes:
 
 export async function shareCommunityRecipe(
   kitchenId: string,
-  data: { title: string; recipe_html: string; summary?: string; dish_id?: string },
+  data: {
+    title: string;
+    recipe_html: string;
+    summary?: string;
+    cover_url?: string;
+    dish_id?: string;
+  },
 ): Promise<SharedRecipe> {
   return apiFetch(`/api/v1/kitchens/${kitchenId}/community/recipes`, {
     method: "POST",

@@ -36,6 +36,11 @@ class ShareRecipeRequest(BaseModel):
     title: str = Field(min_length=3, max_length=255, description="Recipe title.", examples=["My Grandmother's Dal Makhani"])
     summary: str | None = Field(default=None, max_length=500, description="Short teaser shown in recipe lists.")
     recipe_html: str = Field(min_length=10, max_length=20000, description="Full recipe body HTML (script tags and inline event handlers are stripped server-side).")
+    cover_url: str | None = Field(
+        default=None,
+        max_length=2000,
+        description="Optional cover photo URL from kitchen media upload (live-capture preferred).",
+    )
     dish_id: uuid.UUID | None = Field(default=None, description="Optional linked catalog dish this recipe is based on.")
 
     @field_validator("recipe_html")
@@ -55,6 +60,7 @@ class SharedRecipeResponse(BaseModel):
     title: str = Field(..., description="Recipe title.")
     summary: str | None = Field(default=None, description="Short teaser text.")
     recipe_html: str = Field(..., description="Sanitized recipe body HTML.")
+    cover_url: str | None = Field(default=None, description="Cover photo URL, if uploaded.")
     dish_id: uuid.UUID | None = Field(default=None, description="Linked catalog dish, if any.")
     appreciation_count: int = Field(..., description="Number of unique customers who appreciated this recipe.")
     points_earned: int = Field(..., description=f"Total reward points this recipe has earned its kitchen ({POINTS_PER_APPRECIATION} per appreciation).")
@@ -189,6 +195,7 @@ async def share_recipe(
         title=data.title.strip(),
         summary=data.summary,
         recipe_html=data.recipe_html,
+        cover_url=data.cover_url,
         dish_id=data.dish_id,
         status="published",
     )
@@ -210,6 +217,7 @@ async def share_recipe(
         title=row.title,
         summary=row.summary,
         recipe_html=row.recipe_html,
+        cover_url=row.cover_url,
         dish_id=row.dish_id,
         appreciation_count=row.appreciation_count,
         points_earned=row.points_earned,
@@ -240,6 +248,7 @@ async def list_shared_recipes(
                 title=row.title,
                 summary=row.summary,
                 recipe_html=row.recipe_html,
+                cover_url=getattr(row, "cover_url", None),
                 dish_id=row.dish_id,
                 appreciation_count=row.appreciation_count,
                 points_earned=row.points_earned,
@@ -309,6 +318,7 @@ async def appreciate_recipe(
         title=recipe.title,
         summary=recipe.summary,
         recipe_html=recipe.recipe_html,
+        cover_url=getattr(recipe, "cover_url", None),
         dish_id=recipe.dish_id,
         appreciation_count=recipe.appreciation_count,
         points_earned=recipe.points_earned,

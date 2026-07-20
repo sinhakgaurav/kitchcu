@@ -37,11 +37,17 @@ from app.ingredients import (
     set_dish_recipe,
     update_ingredient,
 )
+from app.dish_bulk import (
+    BulkDishImportResponse,
+    build_dish_bulk_template_xlsx,
+    import_dishes_bulk,
+)
 from app.media import MediaUploadResponse, upload_kitchen_media
 from ckac_common.cache import get_cached_menu, invalidate_menu_cache, set_cached_menu
 from ckac_common.database import get_db
 from ckac_common.event_bus import EventPublisher
 from ckac_common.openapi import RESP_400, RESP_422, auth_errors
+from fastapi.responses import Response
 
 router = APIRouter()
 
@@ -218,6 +224,74 @@ async def dish_create(
 
     await invalidate_menu_cache(redis_client, kitchen_id)
     return await dish_with_media(session, dish)
+
+
+@router.get(
+    "/kitchens/{kitchen_id}/dishes/bulk/template.xlsx",
+    tags=[TAG_DISHES],
+    summary="Download sample Excel for bulk dish import",
+    description=(
+        "Owner-only — `.xlsx` template with predefined column names and two sample rows. "
+        "Fill `image_filename` to map each row to a photo uploaded with the bulk import."
+    ),
+    responses=auth_errors(include_403=True),
+)
+async def dish_bulk_template(
+    kitchen_id: uuid.UUID,
+    owner_id: Annotated[uuid.UUID, Depends(get_current_owner_id)],
+    session: Annotated[AsyncSession, Depends(get_db)],
+) -> Response:
+    await verify_kitchen_owner(kitchen_id, owner_id, session)
+    content = build_dish_bulk_template_xlsx()
+    return Response(
+        content=content,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={
+            "Content-Disposition": 'attachment; filename="kitchcu_dishes_bulk_template.xlsx"',
+        },
+    )
+
+
+@router.post(
+    "/kitchens/{kitchen_id}/dishes/bulk",
+    response_model=BulkDishImportResponse,
+    tags=[TAG_DISHES],
+    summary="Bulk import dishes from Excel + images",
+    description=(
+        "Owner-only — multipart: `spreadsheet` (.xlsx) and optional `images` (repeatable) "
+        "and/or `images_zip`. Rows map photos via the `image_filename` column. "
+        "Imported dishes are inactive until a live-capture hero is set (truth in media)."
+    ),
+    responses={**auth_errors(include_403=True), 400: RESP_400},
+)
+async def dish_bulk_import(
+    kitchen_id: uuid.UUID,
+    owner_id: Annotated[uuid.UUID, Depends(get_current_owner_id)],
+    session: Annotated[AsyncSession, Depends(get_db)],
+    publisher: Annotated[EventPublisher, Depends(get_publisher)],
+    spreadsheet: Annotated[UploadFile, File(...)],
+    images: Annotated[list[UploadFile] | None, File()] = None,
+    images_zip: Annotated[UploadFile | None, File()] = None,
+) -> BulkDishImportResponse:
+    await verify_kitchen_owner(kitchen_id, owner_id, session)
+    try:
+        result = await import_dishes_bulk(
+            session,
+            kitchen_id,
+            spreadsheet=spreadsheet,
+            images=images,
+            images_zip=images_zip,
+            publisher=publisher,
+        )
+        await session.commit()
+    except ValueError as exc:
+        await session.rollback()
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    if result.accepted:
+        from app.main import redis_client
+
+        await invalidate_menu_cache(redis_client, kitchen_id)
+    return result
 
 
 @router.patch(

@@ -25,6 +25,21 @@ def _extra_customer(phone: str) -> uuid.UUID:
     return cid
 
 
+def _plan_body(ctx: dict, **overrides) -> dict:
+    body = {
+        "name": "Veg Thali Monthly",
+        "plan_type": "thali",
+        "price_monthly": 2499,
+        "dishes_config": {
+            "dish_ids": [str(ctx["dish_id"])],
+            "weekdays": [0, 1, 2, 3, 4],
+            "meals_per_day": 1,
+        },
+    }
+    body.update(overrides)
+    return body
+
+
 @pytest.mark.asyncio
 async def test_owner_plan_crud_and_accept_deny_flow(client: AsyncClient):
     ctx = _seed_marketing_ctx()
@@ -35,12 +50,7 @@ async def test_owner_plan_crud_and_accept_deny_flow(client: AsyncClient):
     create = await client.post(
         f"/api/v1/kitchens/{kitchen_id}/subscription-plans",
         headers=owner_headers,
-        json={
-            "name": "Veg Thali Monthly",
-            "plan_type": "thali",
-            "price_monthly": 2499,
-            "dishes_config": {"weekdays": [0, 1, 2, 3, 4], "meals_per_day": 1},
-        },
+        json=_plan_body(ctx),
     )
     assert create.status_code == 201, create.text
     plan = create.json()
@@ -112,6 +122,68 @@ async def test_owner_plan_crud_and_accept_deny_flow(client: AsyncClient):
 
 
 @pytest.mark.asyncio
+async def test_combo_and_single_dish_plan_rules(client: AsyncClient):
+    ctx = _seed_marketing_ctx()
+    kitchen_id = ctx["kitchen_id"]
+    owner_headers = {"Authorization": f"Bearer {ctx['owner_token']}"}
+
+    bad_combo = await client.post(
+        f"/api/v1/kitchens/{kitchen_id}/subscription-plans",
+        headers=owner_headers,
+        json=_plan_body(ctx, name="Tiny Combo", plan_type="combo"),
+    )
+    assert bad_combo.status_code == 400
+    assert "two" in bad_combo.json()["detail"].lower()
+
+    combo = await client.post(
+        f"/api/v1/kitchens/{kitchen_id}/subscription-plans",
+        headers=owner_headers,
+        json=_plan_body(
+            ctx,
+            name="Lunch Combo",
+            plan_type="combo",
+            price_monthly=2999,
+            dishes_config={
+                "dish_ids": [str(ctx["dish_id"]), str(ctx["dish_id_2"])],
+                "weekdays": [0, 1, 2, 3, 4],
+                "meals_per_day": 1,
+            },
+        ),
+    )
+    assert combo.status_code == 201, combo.text
+    assert len(combo.json()["dishes_config"]["dish_ids"]) == 2
+
+    bad_single = await client.post(
+        f"/api/v1/kitchens/{kitchen_id}/subscription-plans",
+        headers=owner_headers,
+        json=_plan_body(
+            ctx,
+            name="Bad Single",
+            plan_type="single_dish",
+            dishes_config={
+                "dish_ids": [str(ctx["dish_id"]), str(ctx["dish_id_2"])],
+                "weekdays": [0, 1, 2, 3, 4],
+                "meals_per_day": 1,
+            },
+        ),
+    )
+    assert bad_single.status_code == 400
+
+    single = await client.post(
+        f"/api/v1/kitchens/{kitchen_id}/subscription-plans",
+        headers=owner_headers,
+        json=_plan_body(
+            ctx,
+            name="Paneer Monthly",
+            plan_type="single_dish",
+            price_monthly=999,
+        ),
+    )
+    assert single.status_code == 201, single.text
+    assert single.json()["plan_type"] == "single_dish"
+
+
+@pytest.mark.asyncio
 async def test_owner_deny_pending_subscription(client: AsyncClient):
     ctx = _seed_marketing_ctx()
     kitchen_id = ctx["kitchen_id"]
@@ -122,7 +194,7 @@ async def test_owner_deny_pending_subscription(client: AsyncClient):
         await client.post(
             f"/api/v1/kitchens/{kitchen_id}/subscription-plans",
             headers=owner_headers,
-            json={"name": "Lunch Tiffin", "plan_type": "tiffin", "price_monthly": 1999},
+            json=_plan_body(ctx, name="Lunch Tiffin", plan_type="tiffin", price_monthly=1999),
         )
     ).json()
     sub = (
@@ -153,7 +225,17 @@ async def test_customer_cancel_subscription(client: AsyncClient):
         await client.post(
             f"/api/v1/kitchens/{kitchen_id}/subscription-plans",
             headers=owner_headers,
-            json={"name": "Combo Box", "plan_type": "combo", "price_monthly": 2999},
+            json=_plan_body(
+                ctx,
+                name="Combo Box",
+                plan_type="combo",
+                price_monthly=2999,
+                dishes_config={
+                    "dish_ids": [str(ctx["dish_id"]), str(ctx["dish_id_2"])],
+                    "weekdays": [0, 1, 2, 3, 4],
+                    "meals_per_day": 1,
+                },
+            ),
         )
     ).json()
     sub = (
@@ -192,7 +274,12 @@ async def test_duplicate_open_subscription_rejected(client: AsyncClient):
         await client.post(
             f"/api/v1/kitchens/{kitchen_id}/subscription-plans",
             headers=owner_headers,
-            json={"name": "Single Dish Pack", "plan_type": "single_dish", "price_monthly": 999},
+            json=_plan_body(
+                ctx,
+                name="Single Dish Pack",
+                plan_type="single_dish",
+                price_monthly=999,
+            ),
         )
     ).json()
     first = await client.post(

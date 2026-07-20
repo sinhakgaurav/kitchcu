@@ -128,6 +128,7 @@ def _seed_marketing_ctx() -> dict:
     kitchen_id = uuid.uuid4()
     customer_id = uuid.uuid4()
     dish_id = uuid.uuid4()
+    dish_id_2 = uuid.uuid4()
     category_id = uuid.uuid4()
     order_id = uuid.uuid4()
     phone = f"+919{owner_id.int % 900000000 + 100000000}"
@@ -180,6 +181,14 @@ def _seed_marketing_ctx() -> dict:
         )
         cur.execute(
             """
+            INSERT INTO ckac_catalog.dishes
+            (id, kitchen_id, category_id, name, price, prep_time_min, delivery_time_min, max_time_min, is_active)
+            VALUES (%s::uuid, %s::uuid, %s::uuid, 'Dal Fry', 129.00, 15, 15, 30, true)
+            """,
+            (str(dish_id_2), str(kitchen_id), str(category_id)),
+        )
+        cur.execute(
+            """
             INSERT INTO ckac_orders.orders
             (id, kitchen_id, bill_id, order_code, status, source, delivery_type,
              payment_method, customer_phone, customer_name, subtotal, delivery_fee, total)
@@ -205,6 +214,7 @@ def _seed_marketing_ctx() -> dict:
         "kitchen_id": kitchen_id,
         "customer_id": customer_id,
         "dish_id": dish_id,
+        "dish_id_2": dish_id_2,
         "customer_phone": customer_phone,
         "owner_token": _make_owner_token(owner_id),
         "customer_token": _make_customer_token(customer_id),

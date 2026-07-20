@@ -152,7 +152,13 @@ class DishCreateRequest(BaseModel):
     is_featured: bool = Field(default=False, description="Show in Featured section / filter.")
     is_chefs_special: bool = Field(default=False, description="Show in Chef's special section / filter.")
     is_unique_recipe: bool = Field(default=False, description="Show in Unique recipe section / filter.")
-    media: DishMediaInput = Field(..., description="Hero image — see truth-in-media requirement above.")
+    media: DishMediaInput | None = Field(
+        default=None,
+        description=(
+            "Hero image — required for active dishes with live-capture. "
+            "Optional for inactive drafts (e.g. bulk Excel import)."
+        ),
+    )
 
     @field_validator("description", "ingredients_description", "quality_measures")
     @classmethod
@@ -160,12 +166,17 @@ class DishCreateRequest(BaseModel):
         return _sanitize_optional_html(value)
 
     @model_validator(mode="after")
-    def _timing(self):
+    def _timing_and_media(self):
         max_time = self.max_time_min
         if max_time is None:
             max_time = default_max_time_min(self.prep_time_min, self.delivery_time_min)
             object.__setattr__(self, "max_time_min", max_time)
         validate_timing(self.prep_time_min, self.delivery_time_min, max_time)
+        if self.is_active:
+            if not self.media or not self.media.is_hero or not self.media.is_live_capture:
+                raise ValueError(
+                    "Active dishes require a live-capture hero image (truth in media)"
+                )
         return self
 
 
@@ -369,7 +380,12 @@ async def create_dish(
     data: DishCreateRequest,
     publisher: EventPublisher | None,
 ) -> Dish:
-    if data.media.is_hero and not data.media.is_live_capture and data.is_active:
+    if (
+        data.media
+        and data.media.is_hero
+        and not data.media.is_live_capture
+        and data.is_active
+    ):
         raise ValueError("Hero image must be live capture for active menu dishes")
 
     cr = await session.execute(
@@ -404,15 +420,16 @@ async def create_dish(
     session.add(dish)
     await session.flush()
 
-    media = DishMedia(
-        dish_id=dish.id,
-        url=data.media.url,
-        is_hero=data.media.is_hero,
-        is_live_capture=data.media.is_live_capture,
-        captured_at=data.media.captured_at or datetime.now(UTC),
-    )
-    session.add(media)
-    await session.flush()
+    if data.media:
+        media = DishMedia(
+            dish_id=dish.id,
+            url=data.media.url,
+            is_hero=data.media.is_hero,
+            is_live_capture=data.media.is_live_capture,
+            captured_at=data.media.captured_at or datetime.now(UTC),
+        )
+        session.add(media)
+        await session.flush()
 
     if publisher:
         event = EventPublisher.build(

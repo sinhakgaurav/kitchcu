@@ -5,7 +5,12 @@ import uuid
 import pytest
 from pydantic import ValidationError
 
-from app.subscriptions import DishesConfig, SubscriptionPlanCreate, _config_dict
+from app.subscriptions import (
+    DishesConfig,
+    SubscriptionPlanCreate,
+    _config_dict,
+    validate_plan_dish_selection,
+)
 
 
 def test_dishes_config_requires_weekday():
@@ -51,3 +56,31 @@ def test_plan_create_allows_rich_description_and_linked_dishes():
 def test_plan_create_price_positive():
     with pytest.raises(ValidationError):
         SubscriptionPlanCreate(name="X", price_monthly=0)
+
+
+def test_single_dish_requires_exactly_one():
+    with pytest.raises(ValueError, match="at least one"):
+        validate_plan_dish_selection("single_dish", DishesConfig(dish_ids=[]))
+    with pytest.raises(ValueError, match="exactly one"):
+        validate_plan_dish_selection(
+            "single_dish",
+            DishesConfig(dish_ids=[uuid.uuid4(), uuid.uuid4()]),
+        )
+    validate_plan_dish_selection("single_dish", DishesConfig(dish_ids=[uuid.uuid4()]))
+
+
+def test_combo_requires_at_least_two():
+    with pytest.raises(ValueError, match="at least two"):
+        validate_plan_dish_selection("combo", DishesConfig(dish_ids=[uuid.uuid4()]))
+    validate_plan_dish_selection(
+        "combo",
+        DishesConfig(dish_ids=[uuid.uuid4(), uuid.uuid4()]),
+    )
+
+
+def test_thali_allows_one_or_more():
+    validate_plan_dish_selection("thali", DishesConfig(dish_ids=[uuid.uuid4()]))
+    validate_plan_dish_selection(
+        "tiffin",
+        DishesConfig(dish_ids=[uuid.uuid4(), uuid.uuid4()]),
+    )

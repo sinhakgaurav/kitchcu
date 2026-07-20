@@ -163,6 +163,10 @@ export function TiffinSubscriptionsPage() {
       setError("Single dish pack needs exactly one linked dish.");
       return;
     }
+    if (planType === "combo" && selectedDishIds.length < 2) {
+      setError("Combo plan needs at least two dishes from your menu.");
+      return;
+    }
     setBusy(true);
     setError("");
     const dishes_config = {
@@ -234,7 +238,7 @@ export function TiffinSubscriptionsPage() {
     <OwnerPageShell
       eyebrow="Growth"
       title="Tiffin & monthly plans"
-      description="Thali/tiffin subscriptions — customers request, you accept or deny. No food commission."
+      description="Combo packs (2+ dishes) or a single-dish monthly subscription. Customers request — you accept or deny. No food commission."
     >
       {error && <div className="auth-card__error">{error}</div>}
 
@@ -261,7 +265,7 @@ export function TiffinSubscriptionsPage() {
 
       <OwnerPanel
         title={editingPlanId ? "Edit plan" : "Create plan"}
-        description="Link menu dishes, add a cover photo, and describe the plan for customers."
+        description="Combo = multiple dishes as one monthly pack. Single dish pack = one menu dish with a monthly subscription."
       >
         <form className="owner-form owner-form--wide" onSubmit={onCreatePlan}>
           <div className="form-row">
@@ -323,8 +327,10 @@ export function TiffinSubscriptionsPage() {
             </legend>
             <p className="owner-muted" style={{ marginTop: 0 }}>
               {planType === "single_dish"
-                ? "Pick exactly one dish for this pack."
-                : "Select the dishes included in this monthly plan."}
+                ? "Pick exactly one dish — customers subscribe to this dish monthly."
+                : planType === "combo"
+                  ? "Pick at least two dishes for this combo pack."
+                  : "Select one or more dishes included in this monthly plan."}
             </p>
             {dishes.length === 0 ? (
               <p className="owner-muted">No available dishes — add dishes in Menu first.</p>
@@ -338,9 +344,16 @@ export function TiffinSubscriptionsPage() {
                     onClick={() => toggleDish(d.id)}
                   >
                     {d.name}
+                    {planType === "single_dish" && selectedDishIds.includes(d.id) ? " · monthly" : ""}
                   </button>
                 ))}
               </div>
+            )}
+            {planType !== "combo" && planType !== "single_dish" && dishes.length > 0 && (
+              <p className="report-hint" style={{ marginTop: "0.5rem" }}>
+                Tip: switch Type to <strong>Combo</strong> for a multi-dish pack, or{" "}
+                <strong>Single dish pack</strong> for one dish with a monthly subscription.
+              </p>
             )}
           </fieldset>
 
