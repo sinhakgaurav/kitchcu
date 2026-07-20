@@ -10,7 +10,7 @@ function GalleryItem({
   item: (typeof customerGallery)[number];
   index: number;
 }) {
-  const ref = useRef<figure>(null);
+  const ref = useRef<HTMLElement>(null);
   const staticMotion = useStaticMotion();
   const offset = useItemParallax(ref, staticMotion ? 0 : 0.1 + (index % 3) * 0.06);
 

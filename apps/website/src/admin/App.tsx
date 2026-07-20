@@ -2843,7 +2843,6 @@ function AdminReferralsPanel() {
             r.kitchen_name,
             r.status,
             r.city,
-            r.notes,
           ]
             .filter(Boolean)
             .join(" ")

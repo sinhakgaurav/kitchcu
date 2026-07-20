@@ -41,7 +41,7 @@ const STORY_PANELS = [
 
 export function ParallaxStickyStory() {
   const { t } = useTranslation();
-  const wrapRef = useRef<HTMLElement>(null);
+  const wrapRef = useRef<HTMLElement | null>(null);
   const progress = useSectionScrollProgress(wrapRef);
   const { ref: inViewRef, visible } = useInView(0.05);
 

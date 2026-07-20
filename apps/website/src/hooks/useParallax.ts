@@ -84,7 +84,7 @@ export function useSectionParallax(ref: RefObject<HTMLElement | null>) {
 }
 
 export function useInView(threshold = 0.15) {
-  const ref = useRef<HTMLElement>(null);
+  const ref = useRef<HTMLElement | null>(null);
   const [visible, setVisible] = useState(false);
 
   useEffect(() => {

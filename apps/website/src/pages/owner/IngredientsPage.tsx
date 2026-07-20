@@ -185,7 +185,7 @@ export function IngredientsPage() {
           title: s.title || undefined,
           body_html: s.body_html,
           photo_url: s.photo_url || undefined,
-          duration_min: s.duration_min,
+          duration_min: s.duration_min ?? undefined,
         })),
       });
       setRecipe(saved);

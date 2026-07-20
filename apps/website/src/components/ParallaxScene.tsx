@@ -75,10 +75,11 @@ export function ParallaxScene({ variant = "hero" }: Props) {
                   "--i": i,
                   top: photo.top,
                   left: photo.left,
-                  right: photo.right,
                   width: photo.width,
-                  ...(t ? { transform: `${t} rotate(${photo.rotate})` } : { transform: `rotate(${photo.rotate})` }),
-                } as CSSProperties
+                  transform: t
+                    ? `${t} rotate(${photo.rotate})`
+                    : `rotate(${photo.rotate})`,
+                } as unknown as CSSProperties
               }
             >
               <img src={photo.src} alt="" loading="eager" draggable={false} />

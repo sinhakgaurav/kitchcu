@@ -151,7 +151,7 @@ export function TrialDetailPage() {
     }
   };
 
-  if (!trial) {
+  if (!kitchen || !trial) {
     return (
       <OwnerPageShell
         eyebrow="Growth"

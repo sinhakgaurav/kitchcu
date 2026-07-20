@@ -16,7 +16,8 @@ function viteEnv(): Record<string, string | undefined> {
       ? (import.meta as ImportMeta & { env?: Record<string, string | undefined> }).env
       : undefined;
   if (meta && typeof meta === "object") return meta;
-  if (typeof process !== "undefined" && process.env) return process.env as Record<string, string | undefined>;
+  const nodeProcess = (globalThis as { process?: { env?: Record<string, string | undefined> } }).process;
+  if (nodeProcess?.env) return nodeProcess.env;
   return {};
 }
 

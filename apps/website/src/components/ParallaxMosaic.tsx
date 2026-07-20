@@ -31,7 +31,7 @@ function MosaicTile({
   item: (typeof mosaicItems)[number];
   index: number;
 }) {
-  const ref = useRef<figure>(null);
+  const ref = useRef<HTMLElement>(null);
   const offset = useItemParallax(ref, item.speed);
 
   return (
