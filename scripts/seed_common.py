@@ -208,7 +208,11 @@ def login_admin(email: str, password: str) -> str:
 
 
 def log(msg: str) -> None:
-    print(msg, flush=True)
+    try:
+        print(msg, flush=True)
+    except UnicodeEncodeError:
+        # Windows consoles often default to cp1252; keep seed running.
+        print(msg.encode("ascii", errors="replace").decode("ascii"), flush=True)
 
 
 def cuisine_map(token: str, kitchen_id: str) -> dict[str, str]:

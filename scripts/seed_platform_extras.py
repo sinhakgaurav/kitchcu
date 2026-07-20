@@ -286,6 +286,90 @@ def ensure_enterprise_subscription(owner_token: str) -> None:
             log(f"  ! subscription: {exc}")
 
 
+# Demo cover for community recipe seed (HTTPS placeholder — owners replace via live-capture upload).
+COMMUNITY_RECIPE_COVER_URL = (
+    "https://images.unsplash.com/photo-1546833999-b9f581a1996d?w=800&q=85&auto=format&fit=crop"
+)
+
+
+def ensure_tiffin_plans(owner_token: str, kitchen_id: str, dish_ids: dict[str, str]) -> None:
+    """F34/F35 — seed thali, combo (≥2 dishes), and single_dish plans (idempotent by name)."""
+    ids = [str(v) for v in dish_ids.values() if v]
+    if not ids:
+        return
+    try:
+        listed = request(
+            "GET",
+            f"/api/v1/kitchens/{kitchen_id}/subscription-plans",
+            token=owner_token,
+        )
+        plans = listed.get("plans") if isinstance(listed, dict) else listed
+        existing_names = {str(p.get("name") or "") for p in (plans or [])}
+    except ApiError as exc:
+        log(f"  ! tiffin plans list: {exc}")
+        return
+
+    specs: list[dict] = [
+        {
+            "name": "Demo Veg Thali Monthly",
+            "description": "Weekday thali — seed plan for owner + admin tiffin flows.",
+            "plan_type": "thali",
+            "price_monthly": 2499.0,
+            "dishes_config": {
+                "dish_ids": [ids[0]],
+                "weekdays": [0, 1, 2, 3, 4],
+                "meals_per_day": 1,
+            },
+        },
+        {
+            "name": "Demo Single Dish Monthly",
+            "description": "One-dish monthly pack (F35 single_dish rule).",
+            "plan_type": "single_dish",
+            "price_monthly": 1499.0,
+            "dishes_config": {
+                "dish_ids": [ids[0]],
+                "weekdays": [0, 1, 2, 3, 4, 5],
+                "meals_per_day": 1,
+            },
+        },
+    ]
+    if len(ids) >= 2:
+        specs.append(
+            {
+                "name": "Demo Combo Lunch Pack",
+                "description": "Multi-dish combo pack (F35 combo ≥2 dishes).",
+                "plan_type": "combo",
+                "price_monthly": 2999.0,
+                "dishes_config": {
+                    "dish_ids": ids[:2],
+                    "weekdays": [0, 1, 2, 3, 4],
+                    "meals_per_day": 1,
+                },
+            }
+        )
+
+    created = 0
+    for body in specs:
+        if body["name"] in existing_names:
+            continue
+        try:
+            request(
+                "POST",
+                f"/api/v1/kitchens/{kitchen_id}/subscription-plans",
+                body,
+                token=owner_token,
+            )
+            created += 1
+        except ApiError as exc:
+            if "409" in str(exc) or "already" in str(exc).lower():
+                continue
+            log(f"  ! tiffin plan {body['name']}: {exc}")
+    if created:
+        log(f"  Tiffin plans created: {created} (thali / single_dish / combo)")
+    else:
+        log("  Tiffin plans already present — skipped")
+
+
 def ensure_community_recipe(owner_token: str, kitchen_id: str, dish_id: str) -> dict | None:
     try:
         existing = request("GET", f"/api/v1/community/recipes?kitchen_id={kitchen_id}", token=owner_token)
@@ -301,10 +385,11 @@ def ensure_community_recipe(owner_token: str, kitchen_id: str, dish_id: str) -> 
                 "summary": "Home-style tempering technique",
                 "recipe_html": "<p>Soak dal, pressure cook, temper with ghee and spices.</p>",
                 "dish_id": dish_id,
+                "cover_url": COMMUNITY_RECIPE_COVER_URL,
             },
             token=owner_token,
         )
-        log("  Community recipe published")
+        log("  Community recipe published (with cover_url)")
         return recipe
     except ApiError as exc:
         log(f"  ! community recipe: {exc}")
@@ -624,7 +709,7 @@ def ensure_streaming(
                 log(f"  ! stream showcase phases: {phase_exc}")
         request("POST", f"/api/v1/kitchens/{kitchen_id}/stream/end", token=owner_token)
         if dish_id:
-            log("  Streaming go-live with dish showcase (ingredients→prep→prepared) recorded")
+            log("  Streaming go-live with dish showcase (ingredients->prep->prepared) recorded")
         else:
             log("  Streaming go-live opt-in + one completed session recorded")
     except ApiError as exc:
@@ -923,6 +1008,7 @@ def seed_kitchen_modules(owner_token: str, kitchen_id: str, dish_ids: dict[str, 
         return
     first_dish = next(iter(dish_ids.values()))
     ensure_marketing(owner_token, kitchen_id, first_dish)
+    ensure_tiffin_plans(owner_token, kitchen_id, dish_ids)
     ensure_growth_suggestions(owner_token, kitchen_id)
 
 
@@ -952,6 +1038,7 @@ def seed_platform_extras(
         first_dish = next(iter(dish_ids.values()))
         ensure_marketing(owner_token, kitchen_id, first_dish)
         ensure_enterprise_subscription(owner_token)
+        ensure_tiffin_plans(owner_token, kitchen_id, dish_ids)
         recipe = ensure_community_recipe(owner_token, kitchen_id, first_dish)
         ensure_community_extras(customers, owner_token, kitchen_id, recipe)
         ensure_growth_blast(owner_token, kitchen_id, list(dish_ids.values())[:5])

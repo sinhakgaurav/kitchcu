@@ -131,7 +131,8 @@ Run `.\scripts\seed-all.ps1` (or GCP `run-seed=1`) after migrations.
 | Streaming + dish showcase | `ensure_streaming(..., dish_id=)` | ✅ |
 | Growth suggestions (incl. golden day when data qualifies) | `ensure_growth_suggestions` | ✅ |
 | Platform features / seed packages | billing migration `008` seed | ✅ |
-| Learning trials / community | extras | ✅ |
+| Learning trials / community | extras (`cover_url` on community recipe) | ✅ |
+| Tiffin plans (thali / single_dish / combo) | `ensure_tiffin_plans` | ✅ |
 
 ---
 

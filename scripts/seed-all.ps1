@@ -5,6 +5,8 @@
 $ErrorActionPreference = "Stop"
 $root = Split-Path -Parent $PSScriptRoot
 Set-Location $root
+# Avoid Windows cp1252 crashes on seed log lines (arrows / en-dashes).
+$env:PYTHONIOENCODING = "utf-8"
 
 if (-not $env:CKAC_GATEWAY_URL) {
     $env:CKAC_GATEWAY_URL = "http://localhost:18000"
