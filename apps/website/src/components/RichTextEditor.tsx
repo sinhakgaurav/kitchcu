@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { uploadKitchenMedia, type MediaUploadContext } from "../lib/api";
+import { sanitizeHtml } from "../shared/sanitizeHtml";
 
 type Props = {
   value: string;
@@ -19,10 +20,12 @@ export function RichHtml({ html, className = "" }: { html: string; className?: s
   if (!isHtml) {
     return <p className={className}>{trimmed}</p>;
   }
+  const safe = sanitizeHtml(trimmed);
+  if (!safe) return null;
   return (
     <div
       className={`rich-content${className ? ` ${className}` : ""}`}
-      dangerouslySetInnerHTML={{ __html: trimmed }}
+      dangerouslySetInnerHTML={{ __html: safe }}
     />
   );
 }

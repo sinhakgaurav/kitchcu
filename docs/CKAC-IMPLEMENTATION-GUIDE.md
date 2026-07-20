@@ -135,7 +135,7 @@ Legend: ✅ Done · 🟡 Partial · ⏳ Not started
 
 F19–F24, F46–F48 — **shipped** in S15–S18 (see [ADVANCEMENT-TRACKER.md](./ADVANCEMENT-TRACKER.md)). Per-dish go-live showcase = **P22**.
 
-### Post-S18 platform ops (P19–P28)
+### Post-S18 platform ops (P19–P40)
 
 | ID | Feature | Status | Code / notes |
 |----|---------|--------|--------------|
@@ -143,6 +143,10 @@ F19–F24, F46–F48 — **shipped** in S15–S18 (see [ADVANCEMENT-TRACKER.md](
 | P26 | WA/email templates | ✅ | `services/marketing/app/templates.py` · Owner Templates · `002_message_templates` |
 | P27 | Employees + RBAC | ✅ | `services/identity/app/rbac.py` · Admin → Employees · `013_admin_rbac_employees` |
 | P28 | Super-admin kitchen workspace gate | ✅ | Admin kitchen tabs + `.cursor/rules/kitchcu-superadmin-integration.mdc` |
+| P37 | Dual referral program | ✅ | `services/identity/app/referral.py` · `021_referral_program` · owner/customer/admin UI |
+| P38 | GST monthly Excel/PDF | ✅ | `services/billing/app/gst_export.py` · owner GstFinance + admin kitchen GST |
+| P39 | Super-admin ops console | ✅ | Admin orders filters · ticket triage · settlements · kitchen Care/Orders |
+| P40 | Platform i18n + security harden | ✅ | `apps/website/src/i18n/` · sanitize HTML · API-key mask · login-hint flag |
 
 **Maps to:** Planning Benchmark [§11 Feature Index](./CKAC-COMPLETE-PLANNING-BENCHMARK.md#11-feature-index-all-45-features) · [ADVANCEMENT-TRACKER.md](./ADVANCEMENT-TRACKER.md) · DEVELOPMENT-PHASES.md
 

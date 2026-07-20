@@ -9,6 +9,7 @@ import {
   type MarketingTemplate,
 } from "../../lib/api";
 import { useKitchen } from "../../lib/kitchen";
+import { customerUrl } from "../../shared/urls";
 
 export function MarketingTemplatesPage() {
   const { kitchen } = useKitchen();
@@ -21,7 +22,7 @@ export function MarketingTemplatesPage() {
   const [name, setName] = useState("");
   const [subject, setSubject] = useState("");
   const [body, setBody] = useState(
-    "Hi {{customer_name}} — today's specials from {{kitchen_name}}: {{menu_line}}. Order on kitchCU!",
+    "Hi {{customer_name}} — today's specials from {{kitchen_name}}: {{menu_line}}. Order here: {{storefront_url}}",
   );
   const [audience, setAudience] = useState("all");
   const [sendPreview, setSendPreview] = useState("");
@@ -99,7 +100,12 @@ export function MarketingTemplatesPage() {
       const res = await sendMarketingTemplate(kitchen.id, t.id, {
         audience,
         dry_run: dryRun,
-        sample_vars: { kitchen_name: kitchen.name, menu_line: "chef specials" },
+        sample_vars: {
+          kitchen_name: kitchen.name,
+          menu_line: "chef specials",
+          storefront_url: customerUrl(`/k/${kitchen.code}`),
+          tagline: kitchen.branded_page?.tagline || "",
+        },
       });
       setSendPreview(res.preview);
       setOk(
@@ -152,7 +158,8 @@ export function MarketingTemplatesPage() {
             <textarea value={body} onChange={(e) => setBody(e.target.value)} required rows={5} />
           </label>
           <p className="owner-forms__hint">
-            Variables: {"{{customer_name}}"}, {"{{kitchen_name}}"}, {"{{menu_line}}"}
+            Variables: {"{{customer_name}}"}, {"{{kitchen_name}}"}, {"{{menu_line}}"},{" "}
+            {"{{storefront_url}}"}, {"{{tagline}}"}
           </p>
           <button type="submit" className="btn btn--primary" disabled={busy}>
             {busy ? "Saving…" : "Save template"}

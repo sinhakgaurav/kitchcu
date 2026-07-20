@@ -1,6 +1,7 @@
+import { Link } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { OwnerPageShell, OwnerPanel } from "../../components/owner/OwnerPageShell";
-import { updateKitchenBrandedPage } from "../../lib/api";
+import { updateKitchenBrandedPage, uploadKitchenMedia } from "../../lib/api";
 import { useKitchen } from "../../lib/kitchen";
 import { CUSTOMER_HOST } from "../../shared/brand";
 import { customerUrl } from "../../shared/urls";
@@ -9,7 +10,10 @@ export function BrandPage() {
   const { kitchen, reloadKitchens } = useKitchen();
   const [tagline, setTagline] = useState("");
   const [accent, setAccent] = useState("#0F766E");
+  const [logoUrl, setLogoUrl] = useState<string | null>(null);
+  const [backgroundUrl, setBackgroundUrl] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [uploading, setUploading] = useState<"logo" | "background" | null>(null);
   const [msg, setMsg] = useState("");
   const [error, setError] = useState("");
   const [copied, setCopied] = useState(false);
@@ -18,13 +22,23 @@ export function BrandPage() {
     if (!kitchen) return;
     setTagline(kitchen.branded_page?.tagline ?? "");
     setAccent(kitchen.branded_page?.accent_color ?? "#0F766E");
-  }, [kitchen?.id, kitchen?.branded_page?.tagline, kitchen?.branded_page?.accent_color]);
+    setLogoUrl(kitchen.branded_page?.logo_url ?? null);
+    setBackgroundUrl(kitchen.branded_page?.background_url ?? null);
+  }, [
+    kitchen?.id,
+    kitchen?.branded_page?.tagline,
+    kitchen?.branded_page?.accent_color,
+    kitchen?.branded_page?.logo_url,
+    kitchen?.branded_page?.background_url,
+  ]);
 
   if (!kitchen) return null;
 
   const enabled = kitchen.branded_page?.enabled ?? false;
   const brandedLink = customerUrl(`/k/${kitchen.code}`);
   const discoverLink = customerUrl(`/kitchen/${kitchen.id}/menu`);
+  const templateHint =
+    `Hi {{customer_name}} — order from {{kitchen_name}} (${kitchen.code}): {{storefront_url}}. {{tagline}}`;
 
   const copyLink = async () => {
     await navigator.clipboard.writeText(brandedLink);
@@ -36,6 +50,8 @@ export function BrandPage() {
     enabled?: boolean;
     tagline?: string | null;
     accent_color?: string | null;
+    logo_url?: string | null;
+    background_url?: string | null;
   }) => {
     setBusy(true);
     setError("");
@@ -53,11 +69,45 @@ export function BrandPage() {
     }
   };
 
+  const onUpload = async (slot: "logo" | "background", file: File | null) => {
+    if (!file) return;
+    setUploading(slot);
+    setError("");
+    setMsg("");
+    try {
+      const uploaded = await uploadKitchenMedia(kitchen.id, file, {
+        context: slot === "logo" ? "brand_logo" : "brand_background",
+        is_live_capture: false,
+        filename: file.name || `${slot}.jpg`,
+      });
+      const patch =
+        slot === "logo"
+          ? { logo_url: uploaded.url }
+          : { background_url: uploaded.url };
+      await updateKitchenBrandedPage(kitchen.id, patch);
+      if (slot === "logo") setLogoUrl(uploaded.url);
+      else setBackgroundUrl(uploaded.url);
+      await reloadKitchens();
+      setMsg(slot === "logo" ? "Logo uploaded." : "Background image uploaded.");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Upload failed");
+    } finally {
+      setUploading(null);
+    }
+  };
+
+  const clearMedia = async (slot: "logo" | "background") => {
+    const patch = slot === "logo" ? { logo_url: "" } : { background_url: "" };
+    await save(patch);
+    if (slot === "logo") setLogoUrl(null);
+    else setBackgroundUrl(null);
+  };
+
   return (
     <OwnerPageShell
       eyebrow="Growth · share"
       title="Brand page"
-      description={`Your kitchen-first storefront on ${CUSTOMER_HOST} — menu, cart, checkout, bill. Powered by kitchCU at the foot.`}
+      description={`Your kitchen-first storefront on ${CUSTOMER_HOST} — logo, hero, menu, cart, checkout. Powered by kitchCU at the foot.`}
       meta={
         <div className="od-board__pills">
           <span className={`od-pill ${enabled ? "od-pill--live" : "od-pill--sub"}`}>
@@ -72,7 +122,15 @@ export function BrandPage() {
             type="button"
             className="btn btn--primary"
             disabled={busy}
-            onClick={() => save({ enabled: !enabled, tagline: tagline.trim() || null, accent_color: accent })}
+            onClick={() =>
+              save({
+                enabled: !enabled,
+                tagline: tagline.trim() || null,
+                accent_color: accent,
+                logo_url: logoUrl,
+                background_url: backgroundUrl,
+              })
+            }
           >
             {enabled ? "Unpublish" : "Publish page"}
           </button>
@@ -88,7 +146,7 @@ export function BrandPage() {
     >
       <OwnerPanel
         title="Share link"
-        description="This is what you put on WhatsApp Status, Instagram bio, and flyer QR codes."
+        description="WhatsApp Status, Instagram bio, flyer QR — also injected as {{storefront_url}} in message templates."
       >
         <div className="kc-copy-field owner-share__row">
           <code>{brandedLink}</code>
@@ -104,11 +162,85 @@ export function BrandPage() {
           </button>
         </div>
         <p className="owner-muted" style={{ marginTop: "0.75rem" }}>
-          Discover fallback (marketplace tab): <code>{discoverLink}</code>
+          Discover fallback: <code>{discoverLink}</code>
         </p>
       </OwnerPanel>
 
-      <OwnerPanel title="Page content" description="Shown above the menu on /k/{code}.">
+      <OwnerPanel
+        title="Brand visuals"
+        description="Shown on the customer storefront at /k/{code}. JPEG, PNG, or WebP · max 10MB."
+      >
+        <div className="od-brand-media">
+          <div className="od-brand-media__slot">
+            <span className="kc-field__label">Logo</span>
+            {logoUrl ? (
+              <img src={logoUrl} alt="" className="od-brand-media__preview od-brand-media__preview--logo" />
+            ) : (
+              <div className="od-brand-media__empty">No logo yet</div>
+            )}
+            <label className="btn btn--ghost btn--sm">
+              {uploading === "logo" ? "Uploading…" : "Upload logo"}
+              <input
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                hidden
+                disabled={!!uploading || busy}
+                onChange={(e) => {
+                  void onUpload("logo", e.target.files?.[0] ?? null);
+                  e.target.value = "";
+                }}
+              />
+            </label>
+            {logoUrl && (
+              <button
+                type="button"
+                className="btn btn--ghost btn--sm"
+                disabled={busy}
+                onClick={() => void clearMedia("logo")}
+              >
+                Remove
+              </button>
+            )}
+          </div>
+          <div className="od-brand-media__slot">
+            <span className="kc-field__label">Background / hero</span>
+            {backgroundUrl ? (
+              <img
+                src={backgroundUrl}
+                alt=""
+                className="od-brand-media__preview od-brand-media__preview--bg"
+              />
+            ) : (
+              <div className="od-brand-media__empty">No background yet</div>
+            )}
+            <label className="btn btn--ghost btn--sm">
+              {uploading === "background" ? "Uploading…" : "Upload background"}
+              <input
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                hidden
+                disabled={!!uploading || busy}
+                onChange={(e) => {
+                  void onUpload("background", e.target.files?.[0] ?? null);
+                  e.target.value = "";
+                }}
+              />
+            </label>
+            {backgroundUrl && (
+              <button
+                type="button"
+                className="btn btn--ghost btn--sm"
+                disabled={busy}
+                onClick={() => void clearMedia("background")}
+              >
+                Remove
+              </button>
+            )}
+          </div>
+        </div>
+      </OwnerPanel>
+
+      <OwnerPanel title="Page content" description="Tagline and accent colour on the storefront header.">
         <label className="kc-field">
           <span className="kc-field__label">Tagline</span>
           <input
@@ -157,9 +289,22 @@ export function BrandPage() {
         </div>
       </OwnerPanel>
 
+      <OwnerPanel
+        title="Message templates"
+        description="WhatsApp / email blasts can include {{storefront_url}} and {{tagline}} so customers land on this brand page."
+      >
+        <p className="owner-muted">Suggested body:</p>
+        <code className="od-brand-template-hint">{templateHint}</code>
+        <div style={{ marginTop: "0.75rem" }}>
+          <Link to="/dashboard/templates" className="btn btn--ghost btn--sm">
+            Open message templates →
+          </Link>
+        </div>
+      </OwnerPanel>
+
       <OwnerPanel title="What customers see">
         <ul className="od-share__tips">
-          <li>Your kitchen name &amp; tagline — not the kitchCU discover home</li>
+          <li>Your logo, hero background, name &amp; tagline — not the kitchCU discover home</li>
           <li>Your live-capture menu → cart → checkout → PDF bill</li>
           <li>
             Kitchen code <strong className="od-board__code">{kitchen.code}</strong> for repeat orders

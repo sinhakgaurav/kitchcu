@@ -50,6 +50,7 @@ function LanguageChooser({
 }
 
 function LanguageGateInner({ children }: { children: ReactNode }) {
+  const { t } = useTranslation();
   const [state, setState] = useState<GateState>({ phase: "boot" });
 
   useEffect(() => {
@@ -90,7 +91,7 @@ function LanguageGateInner({ children }: { children: ReactNode }) {
   if (state.phase === "boot") {
     return (
       <div className="lang-gate lang-gate--boot" aria-busy="true">
-        <p className="lang-gate__boot">Detecting your location…</p>
+        <p className="lang-gate__boot">{t("lang.detecting")}</p>
       </div>
     );
   }

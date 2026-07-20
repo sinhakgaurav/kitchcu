@@ -41,6 +41,54 @@ async def sync_owner_subscription(
         response.raise_for_status()
 
 
+async def apply_owner_referral_credit(
+    owner_id: uuid.UUID,
+    *,
+    charge_amount_inr: float,
+) -> dict[str, float]:
+    """Apply referral credit against SaaS charge; returns applied/remaining amounts."""
+    url = (
+        f"{settings.identity_service_url.rstrip('/')}"
+        f"/api/v1/internal/referrals/apply-owner-credit"
+    )
+    try:
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            response = await client.post(
+                url,
+                json={
+                    "owner_id": str(owner_id),
+                    "charge_amount_inr": charge_amount_inr,
+                },
+                headers={"X-Internal-Key": resolve_internal_api_key()},
+            )
+            if response.status_code >= 400:
+                logger.warning(
+                    "referral credit apply failed status=%s body=%s",
+                    response.status_code,
+                    response.text[:200],
+                )
+                return {
+                    "applied_inr": 0.0,
+                    "remaining_charge_inr": float(charge_amount_inr),
+                    "balance_after_inr": 0.0,
+                }
+            data = response.json()
+            return {
+                "applied_inr": float(data.get("applied_inr") or 0),
+                "remaining_charge_inr": float(
+                    data.get("remaining_charge_inr") or charge_amount_inr
+                ),
+                "balance_after_inr": float(data.get("balance_after_inr") or 0),
+            }
+    except Exception as exc:
+        logger.warning("billing→identity referral credit failed: %s", exc)
+        return {
+            "applied_inr": 0.0,
+            "remaining_charge_inr": float(charge_amount_inr),
+            "balance_after_inr": 0.0,
+        }
+
+
 async def record_remote_admin_audit(
     *,
     actor_admin_id: uuid.UUID | None,

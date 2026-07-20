@@ -40,6 +40,8 @@ export type KitchenBrandedPage = {
   enabled: boolean;
   tagline: string | null;
   accent_color: string | null;
+  logo_url?: string | null;
+  background_url?: string | null;
 };
 
 export type Kitchen = {
@@ -369,7 +371,8 @@ export function normalizePhone(phone: string): string {
   return `+${digits}`;
 }
 
-async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
+/** Authenticated owner API fetch — used by feature modules (referrals, etc.). */
+export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
   const token = getToken();
   const headers = apiHeaders({
     ...(init?.headers as Record<string, string> | undefined),
@@ -433,6 +436,8 @@ export async function updateKitchenBrandedPage(
     enabled?: boolean;
     tagline?: string | null;
     accent_color?: string | null;
+    logo_url?: string | null;
+    background_url?: string | null;
   },
 ): Promise<Kitchen> {
   return apiFetch(`/api/v1/kitchens/${kitchenId}/branded-page`, {
@@ -1499,7 +1504,13 @@ export type OrderStockWarnings = {
   has_shortfall: boolean;
 };
 
-export type MediaUploadContext = "dish" | "ingredient" | "prep_step" | "general";
+export type MediaUploadContext =
+  | "dish"
+  | "ingredient"
+  | "prep_step"
+  | "general"
+  | "brand_logo"
+  | "brand_background";
 
 export type MediaUploadResult = {
   url: string;
@@ -2096,6 +2107,28 @@ export async function fetchGstMonthlyReport(
 ): Promise<GstMonthlyReport> {
   return apiFetch(
     `/api/v1/kitchens/${kitchenId}/gst/reports/monthly?year=${year}&month=${month}`,
+  );
+}
+
+export async function downloadGstMonthlyExcel(
+  kitchenId: string,
+  year: number,
+  month: number,
+): Promise<void> {
+  return downloadPdf(
+    `/api/v1/kitchens/${kitchenId}/gst/reports/monthly/export.xlsx?year=${year}&month=${month}`,
+    `kitchcu-gst-${year}-${String(month).padStart(2, "0")}.xlsx`,
+  );
+}
+
+export async function downloadGstMonthlyPdf(
+  kitchenId: string,
+  year: number,
+  month: number,
+): Promise<void> {
+  return downloadPdf(
+    `/api/v1/kitchens/${kitchenId}/gst/reports/monthly/export.pdf?year=${year}&month=${month}`,
+    `kitchcu-gst-${year}-${String(month).padStart(2, "0")}.pdf`,
   );
 }
 

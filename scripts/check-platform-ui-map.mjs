@@ -51,6 +51,9 @@ const apiBundle = [
   exists("apps/website/src/shared/customerDashboardApi.ts")
     ? read("apps/website/src/shared/customerDashboardApi.ts")
     : "",
+  exists("apps/website/src/shared/referralApi.ts")
+    ? read("apps/website/src/shared/referralApi.ts")
+    : "",
   exists("apps/website/src/lib/supportApi.ts") ? read("apps/website/src/lib/supportApi.ts") : "",
 ].join("\n");
 
@@ -203,9 +206,11 @@ const features = [
     id: "P28",
     name: "Super-admin kitchen workspace",
     checks: () => {
-      for (const t of ["profile", "brand", "whatsapp", "payments", "package", "marketing", "modules", "streaming", "delivery", "tiffin"]) {
+      for (const t of ["profile", "brand", "whatsapp", "payments", "package", "marketing", "modules", "orders", "streaming", "delivery", "tiffin", "gst"]) {
         ok(adminApp.includes(`"${t}"`) || adminApp.includes(`"${t}",`), `Admin kitchen tab: ${t}`);
       }
+      soft(adminApp.includes("open_ticket_count") || adminApp.includes("Care"), "Kitchen care/health strip");
+      soft(adminApi.includes("kitchen_id") && adminApi.includes("customer_id"), "Admin orders filter params");
     },
   },
   {
@@ -291,8 +296,14 @@ const features = [
     name: "Customer discovery nearby",
     checks: () => {
       ok(hasCustomerRoute('path="/"') || customerApp.includes('path="/"'), "Customer home");
+      ok(
+        customerApp.includes("CustomerDiscoveryHome") ||
+          exists("apps/website/src/customer/pages/CustomerDiscoveryHome.tsx"),
+        "Customer discovery hub page",
+      );
       soft(exists("apps/website/src/components/NearbyKitchensList.tsx"), "NearbyKitchensList component");
       soft(hasApi("nearby") || hasApi("/public/nearby"), "Nearby kitchens API");
+      ok(hasApi("/discovery/home") || hasApi("discovery/home"), "Discovery home API client");
     },
   },
   {
@@ -323,11 +334,34 @@ const features = [
     },
   },
   {
+    id: "Referrals",
+    name: "Dual referral program",
+    checks: () => {
+      ok(hasNav("/dashboard/referrals") && hasRoute("referrals"), "Owner Referrals nav+route");
+      soft(
+        hasApi("/owners/me/referrals") || hasApi("/customers/me/referrals"),
+        "Referrals API client",
+      );
+      soft(hasAdminTab("referrals"), "Admin Referrals tab");
+      soft(
+        read("apps/website/src/pages/customer/CustomerDashboardPage.tsx").includes('"referrals"'),
+        "Customer referrals tab",
+      );
+    },
+  },
+  {
     id: "GST",
     name: "GST & finance",
     checks: () => {
       ok(hasNav("/dashboard/gst") && hasRoute("gst"), "GST nav+route");
       ok(pageCalls("apps/website/src/pages/owner/GstFinancePage.tsx", "fetchGstProfile") || pageCalls("apps/website/src/pages/owner/GstFinancePage.tsx", "Gst"), "GST page wired");
+      soft(
+        pageCalls("apps/website/src/pages/owner/GstFinancePage.tsx", "downloadGstMonthlyExcel") &&
+          pageCalls("apps/website/src/pages/owner/GstFinancePage.tsx", "downloadGstMonthlyPdf"),
+        "Owner GST Excel/PDF downloads",
+      );
+      soft(adminApp.includes('"gst"') || adminApp.includes("panelTab === \"gst\""), "Admin kitchen GST tab");
+      soft(adminApi.includes("/gst/reports/monthly"), "Admin GST API client");
     },
   },
   {
@@ -336,6 +370,8 @@ const features = [
     checks: () => {
       ok(hasAdminTab("tickets"), "Admin Tickets tab");
       ok(adminApi.includes("/tickets") || adminApi.includes("tickets"), "Tickets API");
+      soft(adminApp.includes("handleAssigneeChange") || adminApp.includes("assigned_admin_id"), "Ticket assignee triage");
+      soft(adminApp.includes("adminNavigate") || adminApi.includes("adminNavigate"), "Ticket→kitchen/refunds deep-link");
       soft(hasCustomerRoute("/dashboard"), "Customer dashboard (tickets)");
     },
   },
@@ -346,6 +382,8 @@ const features = [
       ok(hasAdminTab("refunds"), "Admin Refunds tab");
       ok(adminApi.includes("refunds"), "Refunds API");
       ok(pageCalls("apps/website/src/pages/owner/OrderDetailPage.tsx", "createRefund"), "Owner order refunds");
+      soft(adminPanels.includes("Settlements") || adminApi.includes("settlements"), "Admin settlements list");
+      soft(adminPanels.includes("Recent orders") || adminPanels.includes("fetchAdminOrders"), "Customer order history in admin");
     },
   },
   {

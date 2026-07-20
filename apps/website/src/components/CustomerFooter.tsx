@@ -13,9 +13,10 @@ export function CustomerFooter() {
           <span className="footer__host">{CUSTOMER_HOST}</span>
         </div>
         <div className="footer__links">
-          <Link to="/">Home</Link>
-          <a href="/#nearby">Nearby</a>
-          <Link to="/browse">Find by code</Link>
+          <Link to="/">Order home</Link>
+          <a href="/#near-you">Near you</a>
+          <a href="/#featured">Featured</a>
+          <a href="/#by-code">Kitchen code</a>
           <Link to="/login">Customer sign in</Link>
           <a href={kitchenUrl("/login")} target="_blank" rel="noopener noreferrer">Kitchen owner login</a>
         </div>

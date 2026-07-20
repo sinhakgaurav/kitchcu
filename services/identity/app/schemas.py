@@ -227,6 +227,20 @@ class KitchenWhatsAppIntegrationUpdate(BaseModel):
         return cleaned
 
 
+def _normalize_brand_media_url(value: str | None, *, allow_clear_empty: bool) -> str | None:
+    """Persist http(s)/relative media URLs; empty string clears when allow_clear_empty."""
+    if value is None:
+        return None
+    cleaned = value.strip()
+    if not cleaned:
+        return "" if allow_clear_empty else None
+    if len(cleaned) > 2048:
+        raise ValueError("media URL must be at most 2048 characters")
+    if cleaned.startswith(("https://", "http://", "file://", "/")):
+        return cleaned
+    raise ValueError("media URL must be an http(s) URL or site-relative path")
+
+
 class KitchenBrandedPageSettings(BaseModel):
     """Owner-controlled kitchen-first storefront (menu → order → bill) with Powered-by kitchCU."""
 
@@ -245,6 +259,16 @@ class KitchenBrandedPageSettings(BaseModel):
         max_length=7,
         description="Optional hex accent for the branded header (e.g. `#0F766E`).",
         examples=["#0F766E"],
+    )
+    logo_url: str | None = Field(
+        default=None,
+        max_length=2048,
+        description="Public URL for the kitchen logo on the branded storefront header.",
+    )
+    background_url: str | None = Field(
+        default=None,
+        max_length=2048,
+        description="Public URL for the branded storefront background / hero image.",
     )
 
     @field_validator("tagline")
@@ -267,6 +291,11 @@ class KitchenBrandedPageSettings(BaseModel):
             raise ValueError("accent_color must be a 6-digit hex color like #0F766E")
         return cleaned.upper()
 
+    @field_validator("logo_url", "background_url")
+    @classmethod
+    def normalize_media_urls(cls, value: str | None) -> str | None:
+        return _normalize_brand_media_url(value, allow_clear_empty=False)
+
 
 class KitchenBrandedPageUpdate(BaseModel):
     """Partial update for `PATCH /kitchens/{kitchen_id}/branded-page`."""
@@ -284,6 +313,16 @@ class KitchenBrandedPageUpdate(BaseModel):
         default=None,
         max_length=7,
         description="Hex accent. Pass empty string to clear.",
+    )
+    logo_url: str | None = Field(
+        default=None,
+        max_length=2048,
+        description="Logo image URL. Pass empty string to clear.",
+    )
+    background_url: str | None = Field(
+        default=None,
+        max_length=2048,
+        description="Background/hero image URL. Pass empty string to clear.",
     )
 
     @field_validator("tagline")
@@ -304,6 +343,11 @@ class KitchenBrandedPageUpdate(BaseModel):
         if not re.fullmatch(r"#[0-9A-Fa-f]{6}", cleaned):
             raise ValueError("accent_color must be a 6-digit hex color like #0F766E")
         return cleaned.upper()
+
+    @field_validator("logo_url", "background_url")
+    @classmethod
+    def normalize_media_urls(cls, value: str | None) -> str | None:
+        return _normalize_brand_media_url(value, allow_clear_empty=True)
 
 
 class KitchenResponse(BaseModel):
@@ -596,6 +640,10 @@ async def update_kitchen_branded_page(
         current["tagline"] = data.tagline or None
     if "accent_color" in data.model_fields_set:
         current["accent_color"] = data.accent_color or None
+    if "logo_url" in data.model_fields_set:
+        current["logo_url"] = data.logo_url or None
+    if "background_url" in data.model_fields_set:
+        current["background_url"] = data.background_url or None
 
     settings_blob["branded_page"] = KitchenBrandedPageSettings.model_validate(current).model_dump()
     kitchen.settings = settings_blob
@@ -612,6 +660,8 @@ async def update_kitchen_branded_page(
                 "kitchen_id": str(kitchen.id),
                 "kitchen_code": kitchen.code,
                 "enabled": bool(current["enabled"]),
+                "has_logo": bool(current.get("logo_url")),
+                "has_background": bool(current.get("background_url")),
             },
         )
         await publisher.publish(stream_key("identity", "kitchen"), event, session=session)

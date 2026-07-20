@@ -1,16 +1,232 @@
 {
   "lang": {
-    "title": "Choose your language",
-    "detected": "We think your local language is {{language}}.",
-    "ask": "Would you like to continue in English or {{language}}?",
-    "continueEn": "Continue in English",
-    "continueLocal": "Continue in {{language}}",
-    "detecting": "Detecting your location…",
-    "change": "Language"
+    "title": "ನಿಮ್ಮ ಭಾಷೆಯನ್ನು ಆರಿಸಿ",
+    "detected": "ನಿಮ್ಮ ಸ್ಥಳೀಯ ಭಾಷೆ {{language}} ಎಂದು ನಾವು ಭಾವಿಸುತ್ತೇವೆ.",
+    "ask": "ಇಂಗ್ಲಿಷ್‌ನಲ್ಲಿ ಅಥವಾ {{language}}ನಲ್ಲಿ ಮುಂದುವರಿಯಲು ಬಯಸುವಿರಾ?",
+    "continueEn": "ಇಂಗ್ಲಿಷ್‌ನಲ್ಲಿ ಮುಂದುವರಿಸಿ",
+    "continueLocal": "{{language}}ನಲ್ಲಿ ಮುಂದುವರಿಸಿ",
+    "detecting": "ನಿಮ್ಮ ಸ್ಥಳವನ್ನು ಪತ್ತೆಹಚ್ಚಲಾಗುತ್ತಿದೆ…",
+    "change": "ಭಾಷೆ (ಕನ್ನಡ)"
   },
   "common": {
-    "continue": "Continue",
-    "cancel": "Cancel",
-    "loading": "Loading…"
+    "continue": "ಮುಂದುವರಿಸಿ",
+    "cancel": "ರದ್ದು",
+    "loading": "ಲೋಡ್‌ ಆಗುತ್ತಿದೆ…",
+    "save": "ಉಳಿಸಿ",
+    "close": "ಮುಚ್ಚಿ",
+    "search": "ಶೋಧ",
+    "back": "ಹಿಂದೆ",
+    "retry": "ಪುನಃ ಪ್ರಯತ್ನಿಸು",
+    "yes": "ಹೌದು",
+    "no": "ಇಲ್ಲ",
+    "error": "ಏನೋ ತಪ್ಪಾಗಿದೆ",
+    "signOut": "ಸೈನ್ ಔಟ್ ಮಾಡಿ",
+    "openMenu": "ಮೆನು ತೆರೆಯಿರಿ",
+    "closeMenu": "ಮೆನು ಮುಚ್ಚಿ",
+    "toggleMenu": "ಮೆನು ಟಾಗಲ್ ಮಾಡಿ",
+    "dashboard": "ಡಾಶ್ ಬೋರ್ಡ್",
+    "customerApp": "ಗ್ರಾಹಕ ಆ್ಯಪ್",
+    "kitchenOwner": "ಕಿಚನ್ ಮಾಲೀಕರು →",
+    "ownerLogin": "ಮಾಲೀಕರ ಲಾಗಿನ್"
+  },
+  "status": {
+    "received": "ಸ್ವೀಕರಿಸಲಾಗಿರುವುದು",
+    "accepted": "ಸ್ವೀಕರಿಸಲಾಗಿದೆ",
+    "preparing": "ಸಿದ್ಧಪಡಿಸಲಾಗುತ್ತಿದೆ",
+    "ready": "ಸಿದ್ಧವಾಗಿದೆ",
+    "out_for_delivery": "ವಿತರಣೆಯಿಂದ ಹೊರಗಿದೆ",
+    "delivered": "ವಿತರಿಸಲಾಗಿದೆ",
+    "cancelled": "ರದ್ದುಮಾಡಲಾಗಿದೆ",
+    "active": "ಸಕ್ರಿಯ",
+    "suspended": "ಅಮಾನತುಗೊಳಿಸಲಾಗಿದೆ",
+    "trial": "ಪ್ರಯೋಗ",
+    "open": "ತೆರೆ",
+    "closed": "ಮುಚ್ಚಲಾಗಿದೆ"
+  },
+  "portal": {
+    "heroSubtitle": "ಮನೆ ಬಾಣಸಿಗರು, ಟಿಫಿನ್ ಸೇವೆಗಳು ಮತ್ತು ಡೆಲಿವರಿ-ಮಾತ್ರ ಅಡಿಗೆಮನೆಗಳಿಗೆ ಬೆಳವಣಿಗೆ OS — WhatsApp ಆರ್ಡರ್‌ಗಳು, ಲೈವ್ ಕ್ಯಾಪ್ಚರ್ ಮೆನುಗಳು, ಶೂನ್ಯ ಆಹಾರ ಆಯೋಗ.",
+    "ctaOwner": "ಕಿಚನ್ ಮಾಲೀಕರಾಗಿ ಪ್ರಾರಂಭಿಸಿ",
+    "ctaCustomer": "ಗ್ರಾಹಕರಂತೆ ಬ್ರೌಸ್ ಮಾಡಿ →",
+    "trustCommission": "ಶೂನ್ಯ ಆಹಾರ ಆಯೋಗ",
+    "trustCrm": "ಮಾಲೀಕ-ಮಾಲೀಕತ್ವದ CRM",
+    "trustHonest": "ಪ್ರಾಮಾಣಿಕ ಸಿದ್ಧತೆ ಮತ್ತು ಡೆಲಿವರಿ ಸಮಯಗಳು",
+    "navApps": "ಅಪ್ಲಿಕೇಶನ್‌ಗಳು",
+    "navFeatures": "ವೈಶಿಷ್ಟ್ಯಗಳು",
+    "navPricing": "ಬೆಲೆ",
+    "navSupport": "ಬೆಂಬಲ",
+    "navContact": "ಸಂಪರ್ಕ"
+  },
+  "owner": {
+    "nav": {
+      "operations": "ಕಾರ್ಯಾಚರಣೆಗಳು",
+      "overview": "ಅವಲೋಕನ",
+      "orders": "ಆರ್ಡರ್‌ಗಳು",
+      "menu": "ಮೆನು (ಪಟ್ಟಿ)",
+      "brand": "ಬ್ರ್ಯಾಂಡ್ ಪುಟ",
+      "ingredients": "ಪದಾರ್ಥಗಳು",
+      "growth": "ಬೆಳವಣಿಗೆ",
+      "reports": "ವರದಿಗಳು",
+      "intelligence": "ಬುದ್ಧಿಮತ್ತೆ",
+      "crm": "CRM",
+      "coupons": "ಕೂಪನ್‌ಗಳು",
+      "tiffin": "ಟಿಫಿನ್ ಯೋಜನೆಗಳು",
+      "templates": "ಸಿದ್ಧವಿನ್ಯಾಸಗಳು",
+      "stream": "ಲೈವ್ ಸ್ಟ್ರೀಮ್",
+      "learn": "ಕಲಿಯಿರಿ ಮತ್ತು ಸಂಪರ್ಕಿಸಿ",
+      "learning": "ಕಲಿಕೆ",
+      "community": "ಟಿಪ್ಪಣಿ",
+      "account": "ಖಾತೆ",
+      "subscription": "ಚಂದಾದಾರಿಕೆ",
+      "referrals": "ರೆಫರಲ್‍‌ಗಳು",
+      "whatsapp": "WhatsApp",
+      "paymentGateway": "ಪಾವತಿ ಗೇಟ್‌ವೇ",
+      "gst": "ಜಿಎಸ್‌ಟಿ ಮತ್ತು ಹಣಕಾಸು",
+      "setup": "ಕಿಚನ್ ಸೆಟಪ್"
+    },
+    "shell": {
+      "activeKitchen": "ಸಕ್ರಿಯ ಅಡುಗೆಮನೆ",
+      "loadingKitchen": "ಅಡುಗೆಮನೆಯನ್ನು ಲೋಡ್ ಮಾಡಲಾಗುತ್ತಿದೆ…",
+      "loadingAuth": "ಲೋಡ್‌ ಆಗುತ್ತಿದೆ…"
+    },
+    "auth": {
+      "titleLogin": "ಮಾಲೀಕರ ಸೈನ್ ಇನ್",
+      "titleRegister": "ಮಾಲೀಕರ ಖಾತೆಯನ್ನು ರಚಿಸಿ",
+      "phone": "ದೂರವಾಣಿ",
+      "name": "ಹೆಸರು",
+      "email": "ಇಮೇಲ್ (ಐಚ್ಛಿಕ)",
+      "otp": "OTP",
+      "sendOtp": "ಒಟಿಪಿ ಕಳುಹಿಸಿ",
+      "verify": "ಪರಿಶೀಲಿಸಿ ಮತ್ತು ಮುಂದುವರಿಸಿ",
+      "register": "ನೋಂದಾಯಿಸು",
+      "haveAccount": "ಈಗಾಗಲೇ ಖಾತೆಯನ್ನು ಹೊಂದಿದ್ದೀರಾ? ಸೈನ್ ಇನ್ ಮಾಡಿ",
+      "needAccount": "ಹೊಸ ಅಡುಗೆಮನೆ? ನೋಂದಾಯಿಸಿ",
+      "sessionExpired": "ನಿಮ್ಮ ಸೆಷನ್ ಅವಧಿ ಮೀರಿದೆ. ದಯವಿಟ್ಟು ಮತ್ತೆ ಸೈನ್ ಇನ್ ಮಾಡಿ.",
+      "agreePolicies": "ನೋಂದಾಯಿಸಲು ದಯವಿಟ್ಟು ನಿಯಮಗಳು, ಗೌಪ್ಯತೆ ಮತ್ತು ಮರುಪಾವತಿ ನೀತಿಗಳನ್ನು ಒಪ್ಪಿಕೊಳ್ಳಿ.",
+      "demoHint": "ಡೆಮೊ OTP ಎಂದರೆ {{otp}}"
+    },
+    "home": {
+      "greetingMorning": "ಶುಭಲ್ಹಾ ಮುಂಜಾನೆ",
+      "greetingAfternoon": "ಶುಭ ಅಪರಾಹ್ನ.",
+      "greetingEvening": "ಶುಭ ಸಂಜೆ",
+      "quickNewOrder": "ಹೊಸ ಆರ್ಡರ್",
+      "quickNewOrderDesc": "ಹಸ್ತಚಾಲಿತ ಅಥವಾ ವಾಕ್-ಇನ್",
+      "quickBrand": "ಬ್ರ್ಯಾಂಡ್ ಪುಟ",
+      "quickBrandDesc": "ಪ್ರಕಟಿಸಿ ಮತ್ತು ಹಂಚಿಕೊಳ್ಳಿ /k/ಕೋಡ್",
+      "quickDrafts": "WhatsApp ಡ್ರಾಫ್ಟ್‌ಗಳು",
+      "quickDraftsDesc": "ಪಾರ್ಸ್ ಮಾಡಿದ ಆರ್ಡರ್‌ಗಳನ್ನು ಪರಿಶೀಲಿಸಿ",
+      "quickAddDish": "ಖಾದ್ಯವನ್ನು ಸೇರಿಸಿ",
+      "quickAddDishDesc": "ಚಿತ್ರಗಳನ್ನು ಸೆರೆಹಿಡಿ",
+      "quickReports": "ಬೆಳವಣಿಗೆಯ ವರದಿಗಳು",
+      "quickReportsDesc": "ಆದಾಯ ಮತ್ತು ಧಾರಣ",
+      "quickStream": "ಲೈವ್ ಸ್ಟ್ರೀಮ್",
+      "quickStreamDesc": "ಗ್ರಾಹಕರಿಗೆ ಲೈವ್ ಆಗಿ ಹೋಗಿ",
+      "quickCoupons": "ಕೂಪನ್‌ಗಳು",
+      "quickCouponsDesc": "ಪ್ರಮೋಷನ್‌ಗಳನ್ನು ರನ್ ಮಾಡಿ",
+      "quickTiffin": "ಟಿಫಿನ್ ಯೋಜನೆಗಳು",
+      "quickTiffinDesc": "ಮಾಸಿಕ ಥಾಲಿ ಚಂದಾದಾರರು",
+      "recentOrders": "ಇತ್ತೀಚಿನ ಆರ್ಡರ್‌ಗಳು",
+      "noOrders": "ಇನ್ನೂ ಯಾವುದೇ ಆರ್ಡರ್‌ಗಳಿಲ್ಲ",
+      "viewAllOrders": "ಎಲ್ಲಾ ಆರ್ಡರ್‌ಗಳನ್ನು ವೀಕ್ಷಿಸಿ"
+    },
+    "orders": {
+      "title": "ಆರ್ಡರ್‌ಗಳು",
+      "newOrder": "ಹೊಸ ಆರ್ಡರ್",
+      "drafts": "ಡ್ರಾಫ್ಟ್‌ಗಳು",
+      "empty": "ಇನ್ನೂ ಯಾವುದೇ ಆರ್ಡರ್‌ಗಳಿಲ್ಲ",
+      "searchPlaceholder": "ಆರ್ಡರ್ ಕೋಡ್ ಹುಡುಕಿ, ಗ್ರಾಹಕರು…",
+      "detail": "ಆರ್ಡರ್ ವಿವರ",
+      "accept": "ಒಪ್ಪಿಕೋ",
+      "reject": "ಆರ್ಡರ್ ರದ್ದುಗೊಳಿಸಿ",
+      "updateStatus": "ಸ್ಟೇಟಸ್ ಅಪ್‌ಡೇಟ್ ಮಾಡಿ"
+    },
+    "menu": {
+      "title": "ಮೆನು (ಪಟ್ಟಿ)",
+      "addDish": "ಖಾದ್ಯವನ್ನು ಸೇರಿಸಿ",
+      "empty": "ಇನ್ನೂ ಯಾವುದೇ ಭಕ್ಷ್ಯಗಳಿಲ್ಲ",
+      "liveCapture": "ಹೀರೋ ಫೋಟೋಗೆ ಲೈವ್ ಕ್ಯಾಪ್ಚರ್ ಅಗತ್ಯವಿದೆ",
+      "price": "ಬೆಲೆ",
+      "prepTime": "ಸಿದ್ಧತೆ ಸಮಯ (ನಿಮಿಷ)",
+      "active": "ಮೆನುವಿನಲ್ಲಿ"
+    },
+    "subscription": {
+      "title": "ಚಂದಾದಾರಿಕೆ",
+      "loading": "ಯೋಜನೆಗಳನ್ನು ಲೋಡ್ ಮಾಡಲಾಗುತ್ತಿದೆ…",
+      "monthly": "ಮಾಸಿಕ",
+      "yearly": "ವಾರ್ಷಿಕ",
+      "subscribe": "ಚಂದಾದಾರರಾಗಿ",
+      "activate": "ಸಕ್ರಿಯಗೊಳಿಸಿ (dev)",
+      "current": "ಪ್ರಸ್ತುತ ಯೋಜನೆ",
+      "referralCredit": "ರೆಫರಲ್ ಕ್ರೆಡಿಟ್: ₹{{amount}}",
+      "referralNote": "ನಿಮ್ಮ ಮುಂದಿನ ಚಂದಾದಾರಿಕೆ ಶುಲ್ಕದಲ್ಲಿ ಕ್ರೆಡಿಟ್‌ಗಳು ಸ್ವಯಂಚಾಲಿತವಾಗಿ ಅನ್ವಯಿಸುತ್ತವೆ.",
+      "loadError": "ಚಂದಾದಾರಿಕೆ ಡೇಟಾವನ್ನು ಲೋಡ್ ಮಾಡಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ"
+    },
+    "setup": {
+      "title": "ಕಿಚನ್ ಸೆಟಪ್",
+      "save": "ಸೆಟ್ಟಿಂಗ್‌ಗಳನ್ನು ಉಳಿಸಿ"
+    },
+    "referrals": {
+      "title": "ರೆಫರಲ್‍‌ಗಳು",
+      "creditBalance": "ಕ್ರೆಡಿಟ್ ಬ್ಯಾಲೆನ್ಸ್",
+      "submitLead": "ಗ್ರಾಹಕರನ್ನು ರೆಫರ್ ಮಾಡಿ",
+      "empty": "ಇನ್ನೂ ಯಾವುದೇ ರೆಫರಲ್ ಲೀಡ್‌ಗಳು ಇಲ್ಲ"
+    }
+  },
+  "customer": {
+    "nav": {
+      "nearYou": "ನಿಮ್ಮ ಹತ್ತಿರ",
+      "featured": "ವೈಶಿಷ್ಟ್ಯ ಹೊಂದಿದ",
+      "bestPrices": "ಉತ್ತಮ ಬೆಲೆಗಳು",
+      "kitchenCode": "ಕಿಚನ್ ಕೋಡ್",
+      "myOrders": "ನನ್ನ ಆರ್ಡರ್‌ಗಳು",
+      "dashboard": "ಡಾಶ್ ಬೋರ್ಡ್",
+      "account": "ಖಾತೆ",
+      "signIn": "ಗ್ರಾಹಕರು ಸೈನ್ ಇನ್ ಮಾಡಿ"
+    },
+    "auth": {
+      "title": "ಗ್ರಾಹಕರು ಸೈನ್ ಇನ್ ಮಾಡಿ",
+      "whatsappOtp": "WhatsApp OTP",
+      "socialContinue": "ಸಾಮಾಜಿಕವಾಗಿ ಮುಂದುವರಿಯಿರಿ",
+      "phone": "ದೂರವಾಣಿ",
+      "sendOtp": "ಒಟಿಪಿ ಕಳುಹಿಸಿ",
+      "verify": "ಪರಿಶೀಲಿಸಿ"
+    },
+    "discovery": {
+      "title": "ನಿಮ್ಮ ಹತ್ತಿರವಿರುವ ಮನೆಯ ಅಡುಗೆಮನೆಗಳನ್ನು ಹುಡುಕಿ",
+      "searchPlaceholder": "ಅಡುಗೆಮನೆ, ಪಾಕಪದ್ಧತಿ, ಖಾದ್ಯವನ್ನು ಹುಡುಕಿ …",
+      "useLocation": "ನನ್ನ ಸ್ಥಾನ",
+      "noResults": "ಯಾವುದೇ ಅಡಿಗೆಮನೆಗಳು ನಿಮ್ಮ ಫಿಲ್ಟರ್‌ಗಳಿಗೆ ಹೊಂದಿಕೆಯಾಗುವುದಿಲ್ಲ"
+    },
+    "checkout": {
+      "title": "ಚೆಕ್ಟ್",
+      "placeOrder": "ಆರ್ಡರ್ ಮಾಡಿ",
+      "cartEmpty": "ನಿಮ್ಮ ಕಾರ್ಟ್ ಖಾಲಿಯಾಗಿದೆ",
+      "deliveryAddress": "ಡೆಲಿವರಿ ವಿಳಾಸ",
+      "payment": "ಪಾವತಿ",
+      "total": "ಒಟ್ಟು"
+    },
+    "orders": {
+      "title": "ನನ್ನ ಆರ್ಡರ್‌ಗಳು",
+      "empty": "ಇನ್ನೂ ಯಾವುದೇ ಆರ್ಡರ್‌ಗಳಿಲ್ಲ",
+      "track": "ಹಾಡು",
+      "repeat": "ರೆಕಾರ್ಡರ್",
+      "history": "ಆರ್ಡರ್ ಇತಿಹಾಸ"
+    },
+    "track": {
+      "title": "ನನ್ನ ಆರ್ಡರ್ ಅನ್ನು ಟ್ರ್ಯಾಕ್ ಮಾಡಿ",
+      "eta": "ಅಂದಾಜು ಸಮಯ",
+      "status": "ಸ್ಥಿತಿ"
+    },
+    "dashboard": {
+      "title": "ನಿಮ್ಮ ಡ್ಯಾಶ್‌ಬೋರ್ಡ್",
+      "savedKitchens": "ಉಳಿಸಿದ ಅಡಿಗೆಮನೆಗಳು",
+      "referrals": "ರೆಫರಲ್‍‌ಗಳು",
+      "tickets": "ಬೆಂಬಲ"
+    },
+    "account": {
+      "title": "ಖಾತೆ",
+      "addresses": "ವಿಳಾಸಗಳು",
+      "payout": "ಮರುಪಾವತಿ ಪಾವತಿ",
+      "save": "ಪ್ರೊಫೈಲ್ ಉಳಿಸಿ"
+    }
   }
 }

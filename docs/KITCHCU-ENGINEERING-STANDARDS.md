@@ -336,7 +336,7 @@ Use: connection pooling · async I/O · indexed queries · Redis cache · no N+1
 
 ### Phase 2 target (document before migration)
 
-TanStack Query · React Hook Form · PWA Workbox offline · push notifications · i18n (hi/en) · a11y WCAG AA
+TanStack Query · React Hook Form · PWA Workbox offline · push notifications · i18n (10 IN locales via react-i18next; admin EN) · a11y WCAG AA
 
 ### UX rules
 

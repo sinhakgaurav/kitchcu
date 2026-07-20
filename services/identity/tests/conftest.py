@@ -60,6 +60,25 @@ def _truncate_tables() -> None:
                 "ckac_identity.customers, ckac_identity.kitchens, ckac_identity.owners "
                 "RESTART IDENTITY CASCADE"
             )
+            try:
+                cur.execute(
+                    "TRUNCATE TABLE ckac_identity.referral_credit_ledger, "
+                    "ckac_identity.referral_credits, ckac_identity.referral_leads "
+                    "RESTART IDENTITY CASCADE"
+                )
+                cur.execute(
+                    """
+                    INSERT INTO ckac_identity.referral_settings (id)
+                    VALUES (1)
+                    ON CONFLICT (id) DO UPDATE SET
+                      enabled = true,
+                      customer_to_kitchen_reward_inr = 10,
+                      kitchen_to_customer_reward_inr = 10,
+                      kitchen_reward_trigger = 'first_order_or_onboard'
+                    """
+                )
+            except Exception:
+                pass
             cur.execute("TRUNCATE TABLE ckac_events.outbox")
     finally:
         conn.close()

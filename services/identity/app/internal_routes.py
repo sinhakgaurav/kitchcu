@@ -88,3 +88,55 @@ async def internal_admin_audit(
     )
     await session.commit()
     return {"id": str(row.id)}
+
+
+class ReferralFirstOrderRequest(BaseModel):
+    customer_id: uuid.UUID
+    customer_phone: str | None = None
+
+
+class ReferralApplyCreditRequest(BaseModel):
+    owner_id: uuid.UUID
+    charge_amount_inr: float = Field(..., ge=0)
+
+
+@router.post(
+    "/referrals/customer-first-order",
+    summary="Reward kitchen referrer when a referred customer places first order",
+)
+async def internal_referral_first_order(
+    body: ReferralFirstOrderRequest,
+    session: Annotated[AsyncSession, Depends(get_db)],
+) -> dict[str, Any]:
+    from app.main import event_publisher
+    from app.referral import try_reward_customer_first_order
+
+    lead = await try_reward_customer_first_order(
+        session,
+        customer_id=body.customer_id,
+        phone=body.customer_phone,
+        publisher=event_publisher,
+    )
+    await session.commit()
+    return {"rewarded": lead is not None, "lead_id": str(lead.id) if lead else None}
+
+
+@router.post(
+    "/referrals/apply-owner-credit",
+    summary="Apply owner referral credit against a SaaS charge",
+)
+async def internal_apply_owner_credit(
+    body: ReferralApplyCreditRequest,
+    session: Annotated[AsyncSession, Depends(get_db)],
+) -> dict[str, Any]:
+    from app.main import event_publisher
+    from app.referral import apply_owner_credit
+
+    result = await apply_owner_credit(
+        session,
+        owner_id=body.owner_id,
+        charge_amount_inr=body.charge_amount_inr,
+        publisher=event_publisher,
+    )
+    await session.commit()
+    return result.model_dump()

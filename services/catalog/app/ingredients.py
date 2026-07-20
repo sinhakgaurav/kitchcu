@@ -19,20 +19,31 @@ ALLOWED_HTML_TAGS = frozenset({"p", "strong", "em", "b", "i", "ul", "ol", "li", 
 
 
 def sanitize_html(value: str) -> str:
-    """Strip dangerous markup; allow basic formatting for prep steps."""
+    """Strip dangerous markup; allow basic formatting for prep steps / dish copy."""
     if not value or not value.strip():
         return ""
-    cleaned = re.sub(r"(?is)<(script|style)[^>]*>.*?</\1>", "", value)
+    cleaned = re.sub(r"(?is)<(script|style|iframe|object|embed)[^>]*>.*?</\1>", "", value)
+    cleaned = re.sub(r"(?is)<(script|style|iframe|object|embed)[^>]*/?>", "", cleaned)
     cleaned = re.sub(r'(?is)\s(on\w+|style)\s*=\s*"[^"]*"', "", cleaned)
     cleaned = re.sub(r"(?is)\s(on\w+|style)\s*=\s*'[^']*'", "", cleaned)
+    cleaned = re.sub(r"(?is)\s(on\w+|style)\s*=\s*[^\s>]+", "", cleaned)
 
-    def _strip_tag(match: re.Match[str]) -> str:
+    def _rewrite_tag(match: re.Match[str]) -> str:
+        raw = match.group(0)
+        closing = raw.startswith("</")
         tag = match.group(1).lower().split()[0]
-        if tag in ALLOWED_HTML_TAGS:
-            return match.group(0)
-        return ""
+        if tag not in ALLOWED_HTML_TAGS:
+            return ""
+        if closing or tag != "a":
+            return f"</{tag}>" if closing else f"<{tag}>" if tag == "br" else f"<{tag}>"
+        href_m = re.search(r'''href\s*=\s*["']([^"']+)["']''', raw, flags=re.I)
+        href = (href_m.group(1) if href_m else "").strip()
+        if not re.match(r"^https?://", href, flags=re.I):
+            return "<a>"
+        safe = href.replace('"', "")
+        return f'<a href="{safe}" rel="noopener noreferrer" target="_blank">'
 
-    cleaned = re.sub(r"(?is)<\/?([a-z0-9]+)([^>]*)>", _strip_tag, cleaned)
+    cleaned = re.sub(r"(?is)<\/?([a-z0-9]+)([^>]*)>", _rewrite_tag, cleaned)
     return cleaned.strip()
 
 

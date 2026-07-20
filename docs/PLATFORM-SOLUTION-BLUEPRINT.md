@@ -43,7 +43,7 @@ Status tags: ✅ Done well · 🟡 Partial · 🔴 Gap / not built · 📋 Desig
 | **Solution** | Nearby map/list + filters; `/k/{code}` branded storefront; live-capture as trust signal; optional live_only badge. |
 | **Implementation (CTO)** | Identity `GET /kitchens/public/nearby` (PostGIS distance); public by-code; catalog menu; customer PWA `NearbyKitchensList`, `BrandedStorefront`. Cache `menu:{kitchen_id}` TTL 5m. |
 | **Achievements / done well** | ✅ Nearby + diet/live-capture/live filters · ✅ Branded `/k/:code` (P19) · ✅ Live-capture enforcement on dish heroes |
-| **Gaps** | 🔴 Weak personalization/ranking · 🟡 Favourites missing · 🟡 Hindi UI missing |
+| **Gaps** | 🔴 Weak personalization/ranking · 🟡 Favourites missing · 🟡 i18n page-body depth (chrome ✅ P40) |
 | **Architecture enhancements** | Projection `kitchen_discovery_cards` (denormalized: open, live, rating_avg, has_live_capture) refreshed on events; avoid N+1 menu fetches on list. |
 | **DB enhancements** | Indexes `(status, city)` + GiST on location (exists pattern); materialize `avg_home_taste` on kitchen or dish aggregate table for sort; `customer_favourite_kitchens(customer_id, kitchen_id)`. |
 | **UX enhancements** | Skeleton loaders; “Open now” chip; save kitchen; share branded link sheet. |

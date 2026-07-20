@@ -7,7 +7,7 @@
 | Baseline | Phase 1 **S1–S18** complete (gateway + 13 domain services + 4 PWAs + GST) |
 | Production | `*.kitchcu.com` (GCP VM + Caddy) |
 | Local demo | `*.kitchcu.in` / `admin@kitchcu.dev` |
-| Last updated | 2026-07-19 |
+| Last updated | 2026-07-20 |
 | Architecture flows | [PLATFORM-ARCHITECTURE-FLOWS.md](./PLATFORM-ARCHITECTURE-FLOWS.md) |
 
 ---
@@ -31,16 +31,18 @@ For **architecture + end-to-end flows** see [PLATFORM-ARCHITECTURE-FLOWS.md](./P
 
 ---
 
-## Platform snapshot (2026-07-19)
+## Platform snapshot (2026-07-20)
 
 | Layer | State |
 |-------|-------|
 | Edge | Gateway `:18000` — CORS, correlation ID, OTP rate limits |
 | Domains | 13 services (identity→streaming) — schema-per-domain + outbox EDD |
 | PWAs | portal / customer / kitchen / admin under `apps/website/` |
+| i18n | 10 IN locales (en/hi/mr/ta/te/kn/ml/bn/gu/pa) — dashboard chrome wired; admin stays EN |
 | Delivery | Cost-share + Self/Porter modes; book on accept (P32/P32.1) |
-| Trust | Admin RBAC + audit · hard package entitlements · LiveKit Watch |
-| Open | Kitchen staff · live Razorpay / prod OTP · Porter webhooks · Wave C/D |
+| Trust | Admin RBAC + audit · HTML sanitize · API-key mask · login-hint flag-gated |
+| Growth | Dual referral program + GST monthly Excel/PDF |
+| Open | Kitchen staff build · live Razorpay · Wave C/D |
 
 ---
 
@@ -92,6 +94,10 @@ For **architecture + end-to-end flows** see [PLATFORM-ARCHITECTURE-FLOWS.md](./P
 | P34 | **Delivery fee collection rules** | Shared → prepaid only; customer-only → pay-first or pay-on-delivery; Porter gated on prepaid capture | ✅ | Order `009` |
 | P35 | **Porter auto-book + prep+delivery ETA** | Customer ETA = prep + delivery; auto-book Porter after accept delay (default 15m) + retry; owner toggle; admin Delivery tab + module/feature | ✅ | Order `010`; identity `018`; billing `009`; design `docs/design/PORTER-AUTO-BOOK-ETA-DESIGN.md` |
 | P36 | **Tiffin / monthly subscriptions (F34/F35)** | Owner plans; customer request; accept/deny/activate/deactivate; Reports + Intelligence KPIs; admin Tiffin tab + `tiffin_plans` feature/module | ✅ | Marketing `003`; billing `010`; identity `019`; design `docs/design/TIFFIN-MONTHLY-SUBSCRIPTION-DESIGN.md` |
+| P37 | **Dual referral program** | Customer→kitchen + kitchen→customer leads; ₹ rewards (default 10); credit ledger; owner/customer/admin UI; bulk CSV | ✅ | Identity `021`; design `docs/design/REFERRAL-PROGRAM-DESIGN.md`; stream `ckac:identity:referral` |
+| P38 | **GST monthly Excel/PDF** | Owner GST finance downloads; admin kitchen GST tab (profile/report/export) | ✅ | `services/billing/app/gst_export.py` (xlsx + fpdf2) |
+| P39 | **Super-admin ops console fill** | Kitchen Orders + Care/health strip; ticket triage (assignee/priority/resolution); customer order/ticket history; settlements under Refunds; deep-links | ✅ | Identity admin orders filters; notify ticket filters; `test_admin_ops_controls.py` |
+| P40 | **Platform i18n + security harden** | Location language gate; 184-key catalogs × 10 locales; owner/customer/portal chrome on `t()`; dish HTML sanitize; API keys never echo full value; `ADMIN_LOGIN_REVEAL_PASSWORD` only | ✅ | `docs/design/PLATFORM-I18N-DESIGN.md`; `scripts/check-i18n-locale-parity.py` |
 
 ---
 
@@ -120,6 +126,7 @@ Run `.\scripts\seed-all.ps1` (or GCP `run-seed=1`) after migrations.
 | Customers + orders + ratings | `seed_platform_extras` | ✅ |
 | WhatsApp + payment gateway per kitchen | `ensure_whatsapp_integration` / `ensure_payment_gateway` | ✅ |
 | GST / refunds / delivery quote | extras | ✅ |
+| Referral settings + demo leads | identity referral seed (extras/bulk) | 🟡 | Settings table seeded by migration; leads via UI or API |
 | Branded storefront | `ensure_branded_page` | ✅ |
 | Streaming + dish showcase | `ensure_streaming(..., dish_id=)` | ✅ |
 | Growth suggestions (incl. golden day when data qualifies) | `ensure_growth_suggestions` | ✅ |

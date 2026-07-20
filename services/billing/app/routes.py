@@ -58,6 +58,12 @@ from app.gst import (
     upsert_gst_profile,
     build_balance_sheet,
 )
+from app.gst_export import (
+    export_filename,
+    render_monthly_gst_excel,
+    render_monthly_gst_pdf,
+)
+from sqlalchemy import text
 from app.refunds import (
     RefundCreateRequest,
     RefundResponse,
@@ -987,6 +993,103 @@ async def gst_monthly_report(
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
     return report
+
+
+async def _kitchen_code(session: AsyncSession, kitchen_id: uuid.UUID) -> str | None:
+    row = (
+        await session.execute(
+            text("SELECT code FROM ckac_identity.kitchens WHERE id = :kid LIMIT 1"),
+            {"kid": kitchen_id},
+        )
+    ).scalar_one_or_none()
+    return str(row) if row else None
+
+
+async def _monthly_export_bundle(
+    session: AsyncSession,
+    kitchen_id: uuid.UUID,
+    year: int,
+    month: int,
+) -> tuple[GstMonthlyReportResponse, GstBalanceSheetResponse | None]:
+    report = await get_monthly_gst_report(session, kitchen_id, year, month)
+    audit = await get_monthly_audit(session, kitchen_id, year, month)
+    sheet = audit.balance_sheet
+    if sheet is None:
+        sheet = await build_balance_sheet(
+            session,
+            kitchen_id,
+            year,
+            month,
+            gst_payable=audit.total_tax,
+            gross_sales=audit.total_gross_sales,
+        )
+    return report, sheet
+
+
+@router.get(
+    "/kitchens/{kitchen_id}/gst/reports/monthly/export.xlsx",
+    tags=[TAG_GST],
+    summary="Download monthly GST calculation as Excel",
+    description=(
+        "Owner-only — Excel workbook (.xlsx) with monthly GST summary, invoice lines, and balance sheet."
+    ),
+    responses={**auth_errors(include_403=True), 400: RESP_400},
+)
+async def gst_monthly_export_excel(
+    kitchen_id: uuid.UUID,
+    owner_id: Annotated[uuid.UUID, Depends(get_current_owner_id)],
+    session: Annotated[AsyncSession, Depends(get_db)],
+    year: Annotated[int, Query(description="Report year.")],
+    month: Annotated[int, Query(description="Report month, 1-12.")],
+) -> Response:
+    await verify_kitchen_owner(kitchen_id, owner_id, session)
+    if month < 1 or month > 12:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid month")
+    try:
+        report, sheet = await _monthly_export_bundle(session, kitchen_id, year, month)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    code = await _kitchen_code(session, kitchen_id)
+    body = render_monthly_gst_excel(report, sheet)
+    filename = export_filename(code, year, month, "xlsx")
+    return Response(
+        content=body,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+@router.get(
+    "/kitchens/{kitchen_id}/gst/reports/monthly/export.pdf",
+    tags=[TAG_GST],
+    summary="Download monthly GST calculation as PDF",
+    description=(
+        "Owner-only — PDF summary of monthly GST calculations for accountant handoff."
+    ),
+    responses={**auth_errors(include_403=True), 400: RESP_400},
+)
+async def gst_monthly_export_pdf(
+    kitchen_id: uuid.UUID,
+    owner_id: Annotated[uuid.UUID, Depends(get_current_owner_id)],
+    session: Annotated[AsyncSession, Depends(get_db)],
+    year: Annotated[int, Query(description="Report year.")],
+    month: Annotated[int, Query(description="Report month, 1-12.")],
+) -> Response:
+    await verify_kitchen_owner(kitchen_id, owner_id, session)
+    if month < 1 or month > 12:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid month")
+    try:
+        report, sheet = await _monthly_export_bundle(session, kitchen_id, year, month)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    code = await _kitchen_code(session, kitchen_id)
+    body = render_monthly_gst_pdf(report, sheet)
+    filename = export_filename(code, year, month, "pdf")
+    return Response(
+        content=body,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
 
 
 @router.get(

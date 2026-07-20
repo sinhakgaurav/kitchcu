@@ -1,14 +1,22 @@
 import uuid
 from datetime import UTC, datetime
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.ingredients import sanitize_html
 from app.models import DEFAULT_CATEGORY_SLUGS, DEFAULT_CUISINES, Category, Cuisine, Dish, DishMedia
 from ckac_common.auth import stream_key
 from ckac_common.event_bus import EventPublisher
+
+
+def _sanitize_optional_html(value: str | None) -> str | None:
+    if value is None:
+        return None
+    cleaned = sanitize_html(value)
+    return cleaned or None
 
 
 def projected_ready_min(
@@ -145,6 +153,11 @@ class DishCreateRequest(BaseModel):
     is_chefs_special: bool = Field(default=False, description="Show in Chef's special section / filter.")
     is_unique_recipe: bool = Field(default=False, description="Show in Unique recipe section / filter.")
     media: DishMediaInput = Field(..., description="Hero image — see truth-in-media requirement above.")
+
+    @field_validator("description", "ingredients_description", "quality_measures")
+    @classmethod
+    def _sanitize_html_fields(cls, value: str | None) -> str | None:
+        return _sanitize_optional_html(value)
 
     @model_validator(mode="after")
     def _timing(self):
@@ -434,6 +447,13 @@ class DishUpdateRequest(BaseModel):
     delivery_time_min: int | None = Field(default=None, ge=0, description="New delivery time in minutes.")
     max_time_min: int | None = Field(default=None, gt=0, description="New max readiness minutes for customers.")
     description: str | None = Field(default=None, description="New customer-facing description.")
+    ingredients_description: str | None = Field(default=None, description="New ingredient list for customers.")
+    quality_measures: str | None = Field(default=None, description="New hygiene/quality notes.")
+
+    @field_validator("description", "ingredients_description", "quality_measures")
+    @classmethod
+    def _sanitize_html_fields(cls, value: str | None) -> str | None:
+        return _sanitize_optional_html(value)
 
     @model_validator(mode="after")
     def _timing_pair(self):

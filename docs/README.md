@@ -8,8 +8,10 @@
 | **[PLATFORM-SOLUTION-BLUEPRINT.md](./PLATFORM-SOLUTION-BLUEPRINT.md)** | **Solution blueprint** — every journey: expectations, CEO/CPO problem→solution, CTO impl, achievements, gaps, arch/DB/UX; admin multilevel + package planner | CEO, CPO, CTO, Ops, Support, Finance, AI agents |
 | **[PLATFORM-STRATEGIC-ANALYSIS.md](./PLATFORM-STRATEGIC-ANALYSIS.md)** | **Strategic brief** — competitive honesty, gaps, Waves A–D | CEO, CPO, CTO, Investors, AI agents |
 | **[PLATFORM-PERSONA-DEEP-DIVE.md](./PLATFORM-PERSONA-DEEP-DIVE.md)** | **Persona lived experience** — friction, scorecards, RBAC reality | CEO, CPO, CTO, Ops, Support, Finance, AI agents |
-| **[CKAC-COMPLETE-GUIDE.md](./CKAC-COMPLETE-GUIDE.md)** | **Master guide v3.2.2 — modules through P28 (packages, templates, employees RBAC, kitchen workspace), flows §17.9–17.10, UI Catalog, OpenAPI** | CEO, CPO, CTO, DBA, QA, Investors, AI agents |
-| **[CKAC-COMPLETE-GUIDE.pdf](./CKAC-COMPLETE-GUIDE.pdf)** | Complete Executive Guide PDF v3.2.2 (portrait; UI Catalog figures) | CEO, CPO, CTO, Investors |
+| **[CKAC-COMPLETE-GUIDE.md](./CKAC-COMPLETE-GUIDE.md)** | **Master guide v3.2.3 — modules through P40 (referrals, GST export, admin ops, i18n), flows §17.9–17.10, UI Catalog, OpenAPI** | CEO, CPO, CTO, DBA, QA, Investors, AI agents |
+| **[CKAC-COMPLETE-GUIDE.pdf](./CKAC-COMPLETE-GUIDE.pdf)** | Complete Executive Guide PDF v3.2.3 (portrait; UI Catalog figures) | CEO, CPO, CTO, Investors |
+| **[design/PLATFORM-I18N-DESIGN.md](./design/PLATFORM-I18N-DESIGN.md)** | Platform i18n — 10 locales, gate, parity checker | Engineering, Product |
+| **[design/REFERRAL-PROGRAM-DESIGN.md](./design/REFERRAL-PROGRAM-DESIGN.md)** | Dual referral program design pack | Engineering, Product |
 | **[CKAC-USERFLOWS.md](./CKAC-USERFLOWS.md)** | **Full user journey pack** — every persona, every screen, every API call, step-by-step | Product, Design, Engineering, QA |
 | **[CKAC-USERFLOWS.pdf](./CKAC-USERFLOWS.pdf)** | User journey pack PDF | Product, Design, Investors |
 | **[assets/ui/](./assets/ui/)** | **Reference UI screenshots** (8 surfaces: portal, customer home/login, kitchen login, owner dashboard, admin login/overview/Control) — Complete Guide §18 | Product, Design, Engineering |
@@ -48,7 +50,8 @@ python scripts/generate_pitch_pdf.py
 
 ## Quick Stats
 
-- **S1–S18 + P19–P28 shipped** — track progress in [ADVANCEMENT-TRACKER.md](./ADVANCEMENT-TRACKER.md); encyclopedia [Complete Guide v3.2.2](./CKAC-COMPLETE-GUIDE.md)
+- **S1–S18 + P19–P40 shipped** — track progress in [ADVANCEMENT-TRACKER.md](./ADVANCEMENT-TRACKER.md); encyclopedia [Complete Guide v3.2.3](./CKAC-COMPLETE-GUIDE.md)
+- **i18n:** 10 IN locales — `python scripts/check-i18n-locale-parity.py`
 - **Prod:** `https://kitchcu.com` · `customer` / `kitchen` / `admin` / `api` / `media`.kitchcu.com
 - **Local apps:** Portal :13000 · customer.kitchcu.in :13001 · kitchen.kitchcu.in :13002 · admin.kitchcu.in :13003
 - **Stack:** React PWAs + Python FastAPI + PostgreSQL/PostGIS + Redis + Docker

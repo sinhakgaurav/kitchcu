@@ -222,6 +222,14 @@ async def oauth_complete(
             },
         )
         await publisher.publish(stream_key("identity", "customer"), event, session=session)
+        from app.referral import try_reward_customer_onboard
+
+        await try_reward_customer_onboard(
+            session,
+            customer_id=customer.id,
+            phone=customer.phone,
+            publisher=publisher,
+        )
 
     return customer_auth_response(customer)
 
@@ -322,6 +330,14 @@ async def customer_whatsapp_verify(
             payload={"customer_id": str(customer.id), "provider": "whatsapp", "phone": body.phone},
         )
         await publisher.publish(stream_key("identity", "customer"), event, session=session)
+        from app.referral import try_reward_customer_onboard
+
+        await try_reward_customer_onboard(
+            session,
+            customer_id=customer.id,
+            phone=body.phone,
+            publisher=publisher,
+        )
 
     return customer_auth_response(customer)
 

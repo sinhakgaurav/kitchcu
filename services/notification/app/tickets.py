@@ -162,15 +162,19 @@ class TicketUpdateRequest(BaseModel):
 
     status: Status | None = Field(default=None, description="New status.")
     priority: Priority | None = Field(default=None, description="New priority.")
-    assigned_admin_id: uuid.UUID | None = Field(default=None, description="Reassign to a different admin. Auto-assigned to the caller when status moves to 'in_progress' without an explicit value.")
+    assigned_admin_id: uuid.UUID | None = Field(
+        default=None,
+        description=(
+            "Reassign to a different admin, or null to unassign. "
+            "Auto-assigned to the caller when status moves to 'in_progress' without an explicit value."
+        ),
+    )
     resolution_note: str | None = Field(None, max_length=2000, description="Resolution note, typically set alongside `status='resolved'`.")
 
     @model_validator(mode="after")
     def at_least_one_field(self) -> TicketUpdateRequest:
-        if not any(
-            v is not None
-            for v in (self.status, self.priority, self.assigned_admin_id, self.resolution_note)
-        ):
+        # Allow explicit null for assigned_admin_id (unassign) via model_fields_set
+        if not self.model_fields_set:
             raise ValueError("At least one field required")
         return self
 
@@ -332,6 +336,8 @@ async def list_tickets(
     *,
     status: str | None = None,
     audience: str | None = None,
+    kitchen_id: uuid.UUID | None = None,
+    customer_id: uuid.UUID | None = None,
     limit: int = 100,
 ) -> TicketListResponse:
     query = select(SupportTicket).order_by(SupportTicket.created_at.desc())
@@ -339,6 +345,10 @@ async def list_tickets(
         query = query.where(SupportTicket.status == status)
     if audience:
         query = query.where(SupportTicket.audience == audience)
+    if kitchen_id is not None:
+        query = query.where(SupportTicket.kitchen_id == kitchen_id)
+    if customer_id is not None:
+        query = query.where(SupportTicket.customer_id == customer_id)
     query = query.limit(min(limit, 500))
     tickets = list((await session.execute(query)).scalars().all())
     return TicketListResponse(
@@ -382,7 +392,7 @@ async def update_ticket(
         ticket.status = body.status
     if body.priority is not None:
         ticket.priority = body.priority
-    if body.assigned_admin_id is not None:
+    if "assigned_admin_id" in body.model_fields_set:
         ticket.assigned_admin_id = body.assigned_admin_id
     elif body.status == "in_progress" and not ticket.assigned_admin_id:
         ticket.assigned_admin_id = admin_id

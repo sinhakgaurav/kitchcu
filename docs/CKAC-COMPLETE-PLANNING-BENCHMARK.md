@@ -287,7 +287,7 @@ Backend rejects dish publish if hero image lacks `live_capture` flag (owner can 
 
 ### 3.5 Accessibility & Localization
 
-- Hindi + English at launch (i18n via react-i18next)
+- Hindi + English + major IN regional languages at launch (i18n via react-i18next; 10 locales shipped — see `docs/design/PLATFORM-I18N-DESIGN.md`)
 - Minimum touch target 44px
 - High contrast mode for kitchen (greasy hands, bright light)
 

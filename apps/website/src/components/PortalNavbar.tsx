@@ -1,18 +1,12 @@
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { BrandNavMark } from "./BrandNavMark";
 import { LanguageSwitcher } from "../i18n/LanguageSwitcher";
 import { APP_TAGLINE } from "../shared/brand";
 import { customerUrl, kitchenUrl } from "../shared/urls";
 
-const links = [
-  { href: "#apps", label: "Apps" },
-  { href: "#features", label: "Features" },
-  { href: "#pricing", label: "Pricing" },
-  { href: "#support", label: "Support" },
-  { href: "#contact", label: "Contact" },
-];
-
 export function PortalNavbar() {
+  const { t } = useTranslation();
   const [scrolled, setScrolled] = useState(false);
   const [open, setOpen] = useState(false);
 
@@ -22,6 +16,14 @@ export function PortalNavbar() {
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
+
+  const links = [
+    { href: "#apps", label: t("portal.navApps") },
+    { href: "#features", label: t("portal.navFeatures") },
+    { href: "#pricing", label: t("portal.navPricing") },
+    { href: "#support", label: t("portal.navSupport") },
+    { href: "#contact", label: t("portal.navContact") },
+  ];
 
   return (
     <header className={`nav ${scrolled ? "nav--scrolled" : ""}`}>
@@ -44,7 +46,7 @@ export function PortalNavbar() {
             rel="noopener noreferrer"
             onClick={() => setOpen(false)}
           >
-            Customer app
+            {t("common.customerApp")}
           </a>
           <a
             href={kitchenUrl("/login")}
@@ -53,7 +55,7 @@ export function PortalNavbar() {
             rel="noopener noreferrer"
             onClick={() => setOpen(false)}
           >
-            Owner login
+            {t("common.ownerLogin")}
           </a>
           <LanguageSwitcher />
         </nav>
@@ -61,7 +63,7 @@ export function PortalNavbar() {
         <button
           type="button"
           className="nav__toggle"
-          aria-label="Toggle menu"
+          aria-label={t("common.toggleMenu")}
           aria-expanded={open}
           onClick={() => setOpen(!open)}
         >

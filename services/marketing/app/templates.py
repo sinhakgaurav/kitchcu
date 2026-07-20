@@ -313,6 +313,9 @@ async def send_template(
         "dish_name": "today's special",
         "kitchen_name": "our kitchen",
         "order_code": "",
+        "menu_line": "chef specials",
+        "storefront_url": "",
+        "tagline": "",
     }
     defaults.update({k: str(v) for k, v in body.sample_vars.items()})
     preview = _render_template(row.body, defaults)

@@ -109,7 +109,7 @@ Discover (nearby | code | /k/:code | live_only filter)
 
 1. **Cart dies when I switch phones** — cart is local storage, not server-persisted.  
 2. **Payment failure is scary** — order may sit `received` / pending; weak “retry pay” story; mock PG risk in demo.  
-3. **English only** — Hindi promised in charter; not in UI.  
+3. ~~**English only**~~ — **P40:** language gate + 10 IN locales on dashboard chrome (auth/nav/home/checkout/orders); long-form page bodies still expanding.  
 4. **Deep-link reload** — bookmark `/dashboard/...` can bounce depending on nginx history fallback.  
 5. **No offline** — weak for flaky mobile networks.  
 6. **Entitlement empty states** — why a kitchen can’t go live / take online pay still thin.  
@@ -120,7 +120,7 @@ Discover (nearby | code | /k/:code | live_only filter)
 | Flow stage | Achievement | Gap | How to improve |
 |------------|-------------|-----|----------------|
 | Discover | Nearby + filters + branded entry | Weak personalization / ranking | Rank by distance + taste + live; save favourites |
-| Auth | OTP + OAuth | Dev OTP in demo; Hindi copy | Prod OTP; i18n |
+| Auth | OTP + OAuth | Dev OTP in demo; i18n chrome ✅ | Prod OTP; deepen page-body translations |
 | Menu | Live-capture + timing | Media CDN latency unknown | CDN + skeleton; signed URLs |
 | Checkout | Idempotent place + modes + cost-share | Address UX; coupon clarity | Default last address; clearer coupon errors |
 | Pay | Domain complete | Mock Razorpay risk; retry UX | Live PG; “Complete payment” CTA |
@@ -616,9 +616,10 @@ Canonical scorecard also in [`PLATFORM-ARCHITECTURE-FLOWS.md`](./PLATFORM-ARCHIT
 1. ~~Watch Live~~ ✅ · harden prod LiveKit.  
 2. Server-side cart optional sync for logged-in users.  
 3. Payment pending recovery + live Razorpay.  
-4. Hindi strings for auth/checkout/track.  
+4. ~~Hindi / regional UI~~ ✅ (P40 chrome) — deepen track/account body copy.  
 5. Favourites + better ranking.  
 6. Porter tracking UX after book (webhooks).  
+7. Referrals tab ✅ (P37) — polish conversion UX.  
 
 ### Owner
 1. Day-1 checklist wizard.  
@@ -626,14 +627,16 @@ Canonical scorecard also in [`PLATFORM-ARCHITECTURE-FLOWS.md`](./PLATFORM-ARCHIT
 3. Design pack: kitchen staff RBAC.  
 4. Inbox urgency UX.  
 5. Porter webhook status on order detail.  
+6. ~~GST Excel/PDF~~ ✅ (P38) · ~~Referrals + subscription credit~~ ✅ (P37).  
 
 ### Superadmin
 1. ~~Permission-filtered tabs + audit~~ ✅ — broaden audit coverage.  
-2. Kitchen health strip.  
+2. ~~Kitchen health strip + Orders tab + ticket triage~~ ✅ (P39).  
+3. Impersonate / view-as-kitchen (deferred).  
 
 ### Ops / Support / Finance
-1. Assignee + SLA on tickets.  
-2. Settlements + GST rollups + CSV exports.  
+1. ~~Assignee on tickets~~ ✅ (P39) — SLA timers next.  
+2. ~~Settlements list + GST admin export~~ ✅ (P38/P39).  
 
 ### Platform (CTO)
 1. Live Razorpay + prod OTP.  

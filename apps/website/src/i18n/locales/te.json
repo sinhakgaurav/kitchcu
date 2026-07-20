@@ -1,16 +1,232 @@
 {
   "lang": {
-    "title": "Choose your language",
-    "detected": "We think your local language is {{language}}.",
-    "ask": "Would you like to continue in English or {{language}}?",
-    "continueEn": "Continue in English",
-    "continueLocal": "Continue in {{language}}",
-    "detecting": "Detecting your location…",
-    "change": "Language"
+    "title": "మీ భాష ఎంచుకోండి",
+    "detected": "మీ స్థానిక భాష {{language}} అని మేము భావిస్తున్నాము.",
+    "ask": "మీరు ఆంగ్లంలోనా లేదా {{language}}లోనా కొనసాగాలనుకుంటున్నారు?",
+    "continueEn": "ఆంగ్లంలో కొనసాగించండి",
+    "continueLocal": "{{language}}లో కొనసాగించండి",
+    "detecting": "మీ లొకేషన్ ‌ ను గుర్తించడం…",
+    "change": "భాష"
   },
   "common": {
-    "continue": "Continue",
-    "cancel": "Cancel",
-    "loading": "Loading…"
+    "continue": "కొనసాగించు",
+    "cancel": "రద్దు",
+    "loading": "లోడ్ అవుతోంది…",
+    "save": "భద్రపరచు",
+    "close": "మూయండి",
+    "search": "శోధన",
+    "back": "వెనుకకు",
+    "retry": "తిరిగి ప్రయత్నించండి",
+    "yes": "అవును",
+    "no": "కాదు",
+    "error": "ఏదో సమస్య ఏర్పడింది",
+    "signOut": "సైన్ అవుట్",
+    "openMenu": "మెనూను తెరవండి",
+    "closeMenu": "మెనూను మూసివేయండి",
+    "toggleMenu": "మెనూను టోగుల్ చేయండి",
+    "dashboard": "డాష్‌బోర్డ్",
+    "customerApp": "కస్టమర్ యాప్",
+    "kitchenOwner": "కిచెన్ యజమాని →",
+    "ownerLogin": "యజమాని లాగిన్"
+  },
+  "status": {
+    "received": "అందుకుంది",
+    "accepted": "అంగీకరించబడింది",
+    "preparing": "సిద్ధంచేస్తున్నది…",
+    "ready": "సిద్దం",
+    "out_for_delivery": "అందచెయుటకు తీసుకువస్తున్నారు",
+    "delivered": "పంపిణీ",
+    "cancelled": "రద్దు చేయండి",
+    "active": "క్రియాశీల",
+    "suspended": "సస్పెండ్ చేయబడింది",
+    "trial": "ట్రయల్",
+    "open": "తెరువు",
+    "closed": "మూసివేయబడింది"
+  },
+  "portal": {
+    "heroSubtitle": "హోమ్ చెఫ్ ‌ లు, టిఫిన్ సేవలు మరియు డెలివరీ-మాత్రమే వంటశాలల కోసం గ్రోత్ OS — WhatsApp ఆర్డర్ ‌ లు, లైవ్-క్యాప్చర్ మెనూలు, జీరో ఫుడ్ కమిషన్.",
+    "ctaOwner": "కిచెన్ యజమానిగా ప్రారంభించండి",
+    "ctaCustomer": "కస్టమర్ ‌ గా బ్రౌజ్ చేయండి →",
+    "trustCommission": "జీరో ఫుడ్ కమిషన్",
+    "trustCrm": "యజమాని యాజమాన్యంలోని CRM",
+    "trustHonest": "నిజాయితీతో కూడిన ప్రిపరేషన్ & డెలివరీ సమయాలు",
+    "navApps": "అనువర్తనాలు",
+    "navFeatures": "ఫీచర్లు",
+    "navPricing": "ధర నిర్ణయించడం",
+    "navSupport": "సహాయం",
+    "navContact": "మమ్మల్ని సంప్రదించండి"
+  },
+  "owner": {
+    "nav": {
+      "operations": "ఆపరేషన్స్",
+      "overview": "అవలోకనం",
+      "orders": "నా ఆర్డర్లు",
+      "menu": "జాబితా",
+      "brand": "బ్రాండ్ పేజీ",
+      "ingredients": "కావలసిన పదార్థాలు",
+      "growth": "పెరుగుదల",
+      "reports": "రిపోర్టులు",
+      "intelligence": "మేధస్సు",
+      "crm": "CRM",
+      "coupons": "కూపన్లు",
+      "tiffin": "టిఫిన్ ప్రణాళికలు",
+      "templates": "మూస",
+      "stream": "లైవ్ స్ట్రీమ్",
+      "learn": "తెలుసుకోండి & కనెక్ట్ చేయండి",
+      "learning": "నేర్చుకోవడం",
+      "community": "సంఘం",
+      "account": "ఖాతా",
+      "subscription": "చందా",
+      "referrals": "రెఫరల్ ‌ లు",
+      "whatsapp": "WhatsApp",
+      "paymentGateway": "చెల్లింపు గేట్ ‌ వే",
+      "gst": "GST & ఫైనాన్స్",
+      "setup": "కిచెన్ సెటప్"
+    },
+    "shell": {
+      "activeKitchen": "చురుకైన వంటగది",
+      "loadingKitchen": "కిచెన్ లోడ్ అవుతోంది…",
+      "loadingAuth": "లోడ్ అవుతోంది…"
+    },
+    "auth": {
+      "titleLogin": "యజమాని సైన్ ఇన్",
+      "titleRegister": "యజమాని ఖాతాను సృష్టించండి",
+      "phone": "టెలీఫోను",
+      "name": "నామం",
+      "email": "ఇమెయిల్ (ఐచ్ఛికం)",
+      "otp": "OTP",
+      "sendOtp": "OTP పంపండి",
+      "verify": "ధృవీకరించండి &amp; కొనసాగించండి",
+      "register": "రిజిస్టర్ చేసుకోండి",
+      "haveAccount": "ఇప్పటికే ఖాతా ఉందా? సైన్ ఇన్ చేయండి",
+      "needAccount": "కొత్త వంటగది? నమోదు చేసుకోండి",
+      "sessionExpired": "మీ సెషన్ గడువు ముగిసింది. దయచేసి మళ్లీ సైన్ ఇన్ చేయండి.",
+      "agreePolicies": "రిజిస్టర్ చేసుకోవడానికి దయచేసి నిబంధనలు, గోప్యత మరియు రీఫండ్ విధానాలను అంగీకరించండి.",
+      "demoHint": "డెమో OTP {{otp}}"
+    },
+    "home": {
+      "greetingMorning": "హాయ్ ఆండీ",
+      "greetingAfternoon": "గుడ్ ఆఫ్టర్‌నూన్!",
+      "greetingEvening": "శుభసాయంత్రం!",
+      "quickNewOrder": "కొత్త ఆర్డర్",
+      "quickNewOrderDesc": "మాన్యువల్ లేదా వాక్-ఇన్",
+      "quickBrand": "బ్రాండ్ పేజీ",
+      "quickBrandDesc": "ప్రచురించండి & షేర్ చేయండి/k/కోడ్",
+      "quickDrafts": "WhatsApp డ్రాఫ్ట్‌లు",
+      "quickDraftsDesc": "పార్స్ చేసిన ఆర్డర్ ‌ లను సమీక్షించండి",
+      "quickAddDish": "డిష్ జోడించండి",
+      "quickAddDishDesc": "లైవ్-క్యాప్చర్ ఫోటో",
+      "quickReports": "వృద్ధి నివేదికలు",
+      "quickReportsDesc": "రెవెన్యూ & నిలుపుదల",
+      "quickStream": "లైవ్ స్ట్రీమ్",
+      "quickStreamDesc": "కస్టమర్ ‌ లకు లైవ్ ‌ గా వెళ్లండి",
+      "quickCoupons": "కూపన్లు",
+      "quickCouponsDesc": "ప్రమోషన్ ‌ లను అమలు చేయండి",
+      "quickTiffin": "టిఫిన్ ప్రణాళికలు",
+      "quickTiffinDesc": "నెలవారీ థాలి చందాదారులు",
+      "recentOrders": "మీ ఇటీవలి ఆర్డర్‌లు",
+      "noOrders": "ఇంకా ఆర్డర్ ‌ లు లేవు",
+      "viewAllOrders": "అన్ని ఆర్డర్‌లను వీక్షించండి"
+    },
+    "orders": {
+      "title": "నా ఆర్డర్లు",
+      "newOrder": "కొత్త ఆర్డర్",
+      "drafts": "డ్రాఫ్ట్ ‌ లు",
+      "empty": "ఇంకా ఆర్డర్ ‌ లు లేవు",
+      "searchPlaceholder": "ఆర్డర్ కోడ్ ‌ ను శోధించండి, కస్టమర్…",
+      "detail": "ఆర్డర్ వివరాలు",
+      "accept": "అంగీకరించు",
+      "reject": "ఆర్డర్‌ను రద్దు చేయండి",
+      "updateStatus": "స్టేటస్ ‌ ను అప్ ‌ డేట్ చేయండి"
+    },
+    "menu": {
+      "title": "జాబితా",
+      "addDish": "డిష్ జోడించండి",
+      "empty": "ఇంకా వంటకాలు లేవు",
+      "liveCapture": "హీరో ఫోటో కోసం లైవ్-క్యాప్చర్ అవసరం",
+      "price": "ధర",
+      "prepTime": "సన్నాహక సమయం (నిమి)",
+      "active": "మెనూలో"
+    },
+    "subscription": {
+      "title": "చందా",
+      "loading": "ప్లాన్ ‌ లను లోడ్ చేస్తోంది…",
+      "monthly": "నెలవారీ",
+      "yearly": "/ప్రతిసంవత్సరం",
+      "subscribe": "చందా చేయి",
+      "activate": "యాక్టివేట్ చేయండి (dev)",
+      "current": "ప్రస్తుత ప్లాన్",
+      "referralCredit": "రెఫరల్ క్రెడిట్: ₹{{amount}}",
+      "referralNote": "మీ తదుపరి సబ్ ‌ స్క్రిప్షన్ ఛార్జీపై క్రెడిట్ ‌ లు ఆటోమేటిక్ ‌ గా వర్తిస్తాయి.",
+      "loadError": "సబ్ ‌ స్క్రిప్షన్ డేటాను లోడ్ చేయడం సాధ్యం కాలేదు"
+    },
+    "setup": {
+      "title": "కిచెన్ సెటప్",
+      "save": "(S) అమరికలు దాచు"
+    },
+    "referrals": {
+      "title": "రెఫరల్ ‌ లు",
+      "creditBalance": "క్రెడిట్ సంతులనం",
+      "submitLead": "కస్టమర్ ‌ ను రెఫర్ చేయండి",
+      "empty": "ఇంకా రిఫరల్ లీడ్ ‌ లు లేవు"
+    }
+  },
+  "customer": {
+    "nav": {
+      "nearYou": "మీ దగ్గర",
+      "featured": "లక్షణం చేయబడింది",
+      "bestPrices": "ఉత్తమ ధరలు",
+      "kitchenCode": "కిచెన్ కోడ్",
+      "myOrders": "నా ఆర్డర్లు",
+      "dashboard": "డాష్‌బోర్డ్",
+      "account": "ఖాతా",
+      "signIn": "కస్టమర్ సైన్ ఇన్ చేయండి"
+    },
+    "auth": {
+      "title": "కస్టమర్ సైన్ ఇన్ చేయండి",
+      "whatsappOtp": "WhatsApp OTP",
+      "socialContinue": "సామాజికంగా కొనసాగండి",
+      "phone": "టెలీఫోను",
+      "sendOtp": "OTP పంపండి",
+      "verify": "రూఢిపరుచుకోండి"
+    },
+    "discovery": {
+      "title": "మీకు సమీపంలో ఉన్న ఇంటి వంటశాలలను కనుగొనండి",
+      "searchPlaceholder": "వంటగది, వంటకాలు, డిష్ ‌ ని శోధించండి…",
+      "useLocation": "నా స్థానం",
+      "noResults": "కిచెన్ ‌ లు మీ ఫిల్టర్ ‌ లతో సరిపోలడం లేదు"
+    },
+    "checkout": {
+      "title": "చెక్అవుట్",
+      "placeOrder": "ప్లేస్ ఆర్డర్",
+      "cartEmpty": "మీ కార్ట్ ఖాళీగా ఉంది",
+      "deliveryAddress": "డెలివరీ చిరునామా",
+      "payment": "చెల్లింపు",
+      "total": "మొత్తం"
+    },
+    "orders": {
+      "title": "నా ఆర్డర్లు",
+      "empty": "ఇంకా ఆర్డర్ ‌ లు లేవు",
+      "track": "ట్రాక్",
+      "repeat": "మళ్లీ ఆర్డర్ చేయండి",
+      "history": "ఆర్డర్ చరిత్ర"
+    },
+    "track": {
+      "title": "నా ఆర్డర్‌ను ట్రాక్ చేయండి",
+      "eta": "అంచనా వేసిన సమయం",
+      "status": "స్థితి"
+    },
+    "dashboard": {
+      "title": "మీ డ్యాష్ ‌ బోర్డ్",
+      "savedKitchens": "సేవ్ చేసిన వంటశాలలు",
+      "referrals": "రెఫరల్ ‌ లు",
+      "tickets": "సహాయం"
+    },
+    "account": {
+      "title": "ఖాతా",
+      "addresses": "చిరునామాలు",
+      "payout": "రీఫండ్ చెల్లింపు",
+      "save": "ప్రొఫైల్ సేవ్ చేయి"
+    }
   }
 }

@@ -1,5 +1,6 @@
 import { FormEvent, useState } from "react";
 import { Link, Navigate, useNavigate, useSearchParams } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { AnimatedMesh } from "../components/AnimatedMesh";
 import { AuthLoginHighlights } from "../components/AuthLoginHighlights";
 import { BrandAuthArt, BrandLogo } from "../components/BrandLogo";
@@ -13,6 +14,7 @@ import { customerUrl } from "../shared/urls";
 type Mode = "login" | "register";
 
 export function LoginPage() {
+  const { t } = useTranslation();
   const { token, login } = useKitchenAuth();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -34,7 +36,7 @@ export function LoginPage() {
   const handleRegister = async (e: FormEvent) => {
     e.preventDefault();
     if (!policiesAgreed) {
-      setError("Please agree to the Terms, Privacy, and Refund Policies to register.");
+      setError(t("owner.auth.agreePolicies"));
       return;
     }
     setError("");
@@ -178,7 +180,7 @@ export function LoginPage() {
 
           {sessionExpired && (
             <div className="auth-card__hint auth-card__error">
-              Your session expired. Sign in again to view reports and dashboard data.
+              {t("owner.auth.sessionExpired")}
             </div>
           )}
 
@@ -186,18 +188,18 @@ export function LoginPage() {
 
           {mode === "register" ? (
             <form onSubmit={handleRegister}>
-              <h2>Create owner account</h2>
+              <h2>{t("owner.auth.titleRegister")}</h2>
               <p className="auth-card__hint">Owner accounts are only for {KITCHEN_HOST} — not customer sign-in.</p>
               <label>
-                Full name
+                {t("owner.auth.name")}
                 <input value={name} onChange={(e) => setName(e.target.value)} required placeholder="Raj Sharma" />
               </label>
               <label>
-                Phone
+                {t("owner.auth.phone")}
                 <input value={phone} onChange={(e) => setPhone(e.target.value)} required placeholder={DEMO.phone} />
               </label>
               <label>
-                Email (optional)
+                {t("owner.auth.email")}
                 <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder={DEMO.email} />
               </label>
               <PolicyAgreement
@@ -210,31 +212,31 @@ export function LoginPage() {
                 className="btn btn--primary btn--lg"
                 disabled={busy || !policiesAgreed}
               >
-                {busy ? "Creating..." : "Register & Send OTP"}
+                {busy ? t("common.loading") : t("owner.auth.register")}
               </button>
             </form>
           ) : (
             <form onSubmit={otpSent ? handleVerify : handleRequestOtp}>
-              <h2>Owner sign in (OTP)</h2>
+              <h2>{t("owner.auth.titleLogin")}</h2>
               <p className="auth-card__hint">
-                Dev OTP: <strong>{DEMO.otp}</strong>. Backend on port 18000.
+                {t("owner.auth.demoHint", { otp: DEMO.otp })}
               </p>
               <label>
-                Phone
+                {t("owner.auth.phone")}
                 <input value={phone} onChange={(e) => setPhone(e.target.value)} required placeholder={DEMO.phone} />
               </label>
               {otpSent && (
                 <label>
-                  OTP code
+                  {t("owner.auth.otp")}
                   <input value={otp} onChange={(e) => setOtp(e.target.value)} required placeholder={DEMO.otp} maxLength={6} />
                 </label>
               )}
               <button type="submit" className="btn btn--primary btn--lg" disabled={busy}>
-                {busy ? "Please wait..." : otpSent ? "Sign In" : "Send OTP"}
+                {busy ? t("common.loading") : otpSent ? t("owner.auth.verify") : t("owner.auth.sendOtp")}
               </button>
               {otpSent && (
                 <button type="button" className="btn btn--ghost auth-card__resend" onClick={() => setOtpSent(false)}>
-                  Change phone number
+                  {t("owner.auth.phone")}
                 </button>
               )}
             </form>

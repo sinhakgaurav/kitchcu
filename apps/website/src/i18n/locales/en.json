@@ -8,17 +8,225 @@
     "detecting": "Detecting your location…",
     "change": "Language"
   },
+  "common": {
+    "continue": "Continue",
+    "cancel": "Cancel",
+    "loading": "Loading…",
+    "save": "Save",
+    "close": "Close",
+    "search": "Search",
+    "back": "Back",
+    "retry": "Retry",
+    "yes": "Yes",
+    "no": "No",
+    "error": "Something went wrong",
+    "signOut": "Sign out",
+    "openMenu": "Open menu",
+    "closeMenu": "Close menu",
+    "toggleMenu": "Toggle menu",
+    "dashboard": "Dashboard",
+    "customerApp": "Customer app",
+    "kitchenOwner": "Kitchen owner →",
+    "ownerLogin": "Owner login"
+  },
+  "status": {
+    "received": "Received",
+    "accepted": "Accepted",
+    "preparing": "Preparing",
+    "ready": "Ready",
+    "out_for_delivery": "Out for delivery",
+    "delivered": "Delivered",
+    "cancelled": "Cancelled",
+    "active": "Active",
+    "suspended": "Suspended",
+    "trial": "Trial",
+    "open": "Open",
+    "closed": "Closed"
+  },
   "portal": {
     "heroSubtitle": "Growth OS for home chefs, tiffin services, and delivery-only kitchens — WhatsApp orders, live-capture menus, zero food commission.",
     "ctaOwner": "Start as kitchen owner",
     "ctaCustomer": "Browse as customer →",
     "trustCommission": "Zero food commission",
     "trustCrm": "Owner-owned CRM",
-    "trustHonest": "Honest prep & delivery times"
+    "trustHonest": "Honest prep & delivery times",
+    "navApps": "Apps",
+    "navFeatures": "Features",
+    "navPricing": "Pricing",
+    "navSupport": "Support",
+    "navContact": "Contact"
   },
-  "common": {
-    "continue": "Continue",
-    "cancel": "Cancel",
-    "loading": "Loading…"
+  "owner": {
+    "nav": {
+      "operations": "Operations",
+      "overview": "Overview",
+      "orders": "Orders",
+      "menu": "Menu",
+      "brand": "Brand page",
+      "ingredients": "Ingredients",
+      "growth": "Growth",
+      "reports": "Reports",
+      "intelligence": "Intelligence",
+      "crm": "CRM",
+      "coupons": "Coupons",
+      "tiffin": "Tiffin plans",
+      "templates": "Templates",
+      "stream": "Live stream",
+      "learn": "Learn & connect",
+      "learning": "Learning",
+      "community": "Community",
+      "account": "Account",
+      "subscription": "Subscription",
+      "referrals": "Referrals",
+      "whatsapp": "WhatsApp",
+      "paymentGateway": "Payment gateway",
+      "gst": "GST & finance",
+      "setup": "Kitchen setup"
+    },
+    "shell": {
+      "activeKitchen": "Active kitchen",
+      "loadingKitchen": "Loading kitchen…",
+      "loadingAuth": "Loading…"
+    },
+    "auth": {
+      "titleLogin": "Owner sign in",
+      "titleRegister": "Create owner account",
+      "phone": "Phone",
+      "name": "Name",
+      "email": "Email (optional)",
+      "otp": "OTP",
+      "sendOtp": "Send OTP",
+      "verify": "Verify & continue",
+      "register": "Register",
+      "haveAccount": "Already have an account? Sign in",
+      "needAccount": "New kitchen? Register",
+      "sessionExpired": "Your session expired. Please sign in again.",
+      "agreePolicies": "Please agree to the Terms, Privacy, and Refund Policies to register.",
+      "demoHint": "Demo OTP is {{otp}}"
+    },
+    "home": {
+      "greetingMorning": "Good morning",
+      "greetingAfternoon": "Good afternoon",
+      "greetingEvening": "Good evening",
+      "quickNewOrder": "New order",
+      "quickNewOrderDesc": "Manual or walk-in",
+      "quickBrand": "Brand page",
+      "quickBrandDesc": "Publish & share /k/code",
+      "quickDrafts": "WhatsApp drafts",
+      "quickDraftsDesc": "Review parsed orders",
+      "quickAddDish": "Add dish",
+      "quickAddDishDesc": "Live-capture photo",
+      "quickReports": "Growth reports",
+      "quickReportsDesc": "Revenue & retention",
+      "quickStream": "Live stream",
+      "quickStreamDesc": "Go live to customers",
+      "quickCoupons": "Coupons",
+      "quickCouponsDesc": "Run promotions",
+      "quickTiffin": "Tiffin plans",
+      "quickTiffinDesc": "Monthly thali subscribers",
+      "recentOrders": "Recent orders",
+      "noOrders": "No orders yet",
+      "viewAllOrders": "View all orders"
+    },
+    "orders": {
+      "title": "Orders",
+      "newOrder": "New order",
+      "drafts": "Drafts",
+      "empty": "No orders yet",
+      "searchPlaceholder": "Search order code, customer…",
+      "detail": "Order detail",
+      "accept": "Accept",
+      "reject": "Cancel order",
+      "updateStatus": "Update status"
+    },
+    "menu": {
+      "title": "Menu",
+      "addDish": "Add dish",
+      "empty": "No dishes yet",
+      "liveCapture": "Live-capture required for hero photo",
+      "price": "Price",
+      "prepTime": "Prep time (min)",
+      "active": "On menu"
+    },
+    "subscription": {
+      "title": "Subscription",
+      "loading": "Loading plans…",
+      "monthly": "Monthly",
+      "yearly": "Yearly",
+      "subscribe": "Subscribe",
+      "activate": "Activate (dev)",
+      "current": "Current plan",
+      "referralCredit": "Referral credit: ₹{{amount}}",
+      "referralNote": "Credits apply automatically on your next subscription charge.",
+      "loadError": "Could not load subscription data"
+    },
+    "setup": {
+      "title": "Kitchen setup",
+      "save": "Save settings"
+    },
+    "referrals": {
+      "title": "Referrals",
+      "creditBalance": "Credit balance",
+      "submitLead": "Refer a customer",
+      "empty": "No referral leads yet"
+    }
+  },
+  "customer": {
+    "nav": {
+      "nearYou": "Near you",
+      "featured": "Featured",
+      "bestPrices": "Best prices",
+      "kitchenCode": "Kitchen code",
+      "myOrders": "My orders",
+      "dashboard": "Dashboard",
+      "account": "Account",
+      "signIn": "Customer sign in"
+    },
+    "auth": {
+      "title": "Customer sign in",
+      "whatsappOtp": "WhatsApp OTP",
+      "socialContinue": "Continue with social",
+      "phone": "Phone",
+      "sendOtp": "Send OTP",
+      "verify": "Verify"
+    },
+    "discovery": {
+      "title": "Find home kitchens near you",
+      "searchPlaceholder": "Search kitchen, cuisine, dish…",
+      "useLocation": "Use my location",
+      "noResults": "No kitchens match your filters"
+    },
+    "checkout": {
+      "title": "Checkout",
+      "placeOrder": "Place order",
+      "cartEmpty": "Your cart is empty",
+      "deliveryAddress": "Delivery address",
+      "payment": "Payment",
+      "total": "Total"
+    },
+    "orders": {
+      "title": "My orders",
+      "empty": "No orders yet",
+      "track": "Track",
+      "repeat": "Reorder",
+      "history": "Order history"
+    },
+    "track": {
+      "title": "Track order",
+      "eta": "Estimated time",
+      "status": "Status"
+    },
+    "dashboard": {
+      "title": "Your dashboard",
+      "savedKitchens": "Saved kitchens",
+      "referrals": "Referrals",
+      "tickets": "Support"
+    },
+    "account": {
+      "title": "Account",
+      "addresses": "Addresses",
+      "payout": "Refund payout",
+      "save": "Save profile"
+    }
   }
 }

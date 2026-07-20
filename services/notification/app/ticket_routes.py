@@ -169,12 +169,21 @@ async def admin_tickets_list(
     session: Annotated[AsyncSession, Depends(get_db)],
     status_filter: Annotated[str | None, Query(alias="status", description="Filter by ticket status.")] = None,
     audience: Annotated[str | None, Query(description="Filter by 'owner' or 'customer'.")] = None,
+    kitchen_id: Annotated[uuid.UUID | None, Query(description="Filter by kitchen UUID.")] = None,
+    customer_id: Annotated[uuid.UUID | None, Query(description="Filter by customer UUID.")] = None,
     limit: Annotated[int, Query(ge=1, le=500, description="Max tickets to return (1-500).")] = 100,
 ) -> TicketListResponse:
     from ckac_common.admin_rbac import assert_admin_permission
 
     await assert_admin_permission(session, role=admin.role, permission="tickets:write")
-    return await list_tickets(session, status=status_filter, audience=audience, limit=limit)
+    return await list_tickets(
+        session,
+        status=status_filter,
+        audience=audience,
+        kitchen_id=kitchen_id,
+        customer_id=customer_id,
+        limit=limit,
+    )
 
 
 @admin_router.get(

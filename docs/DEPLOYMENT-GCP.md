@@ -168,9 +168,14 @@ service re-syncs the password hash from env on every login bootstrap — do **no
 - OAuth client id/secrets — for customer social login
 
 These are DB-backed (encrypted with `JWT_SECRET`) and take effect immediately, no
-redeploy needed. The Terraform-managed `WHATSAPP_VERIFY_TOKEN` env var is a
-throwaway bootstrap placeholder — the DB value above takes precedence per
+redeploy needed. After save, admin API Keys UI shows **masked** values only (`••••` for
+secrets) — never re-echo the full secret. The Terraform-managed `WHATSAPP_VERIFY_TOKEN`
+env var is a throwaway bootstrap placeholder — the DB value above takes precedence per
 `get_platform_secret()`.
+
+**Admin login hint:** `GET /api/v1/admin/auth/login-hint` returns plaintext
+`ADMIN_PASSWORD` **only** when `ADMIN_LOGIN_REVEAL_PASSWORD=1` is set explicitly.
+Do **not** set that flag on public demo VMs; never infer reveal from `APP_ENV` alone.
 
 **Change the default admin password and demo OTP behavior before real traffic**:
 `allows_fixed_dev_otp()` is already gated to `development`/`test` — confirm

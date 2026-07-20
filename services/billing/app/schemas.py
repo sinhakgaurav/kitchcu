@@ -675,7 +675,18 @@ async def create_owner_subscription(
         return found, False
 
     require_dev_payment_mocks("Subscription create")
-    amount = SUBSCRIPTION_PLANS[data.plan_tier][data.billing_cycle]
+    amount = float(SUBSCRIPTION_PLANS[data.plan_tier][data.billing_cycle])
+    referral_applied = 0.0
+    try:
+        from app.identity_client import apply_owner_referral_credit
+
+        credit_result = await apply_owner_referral_credit(
+            owner_id, charge_amount_inr=amount
+        )
+        referral_applied = float(credit_result.get("applied_inr") or 0)
+        amount = max(0.0, float(credit_result.get("remaining_charge_inr") or amount))
+    except Exception:
+        referral_applied = 0.0
     sub = OwnerSubscription(
         owner_id=owner_id,
         plan_tier=data.plan_tier,
@@ -699,6 +710,7 @@ async def create_owner_subscription(
                 "plan_tier": data.plan_tier,
                 "billing_cycle": data.billing_cycle,
                 "amount": amount,
+                "referral_credit_applied_inr": referral_applied,
             },
         )
         await publisher.publish(stream_key("billing", "subscription"), event, session=session)

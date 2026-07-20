@@ -2,7 +2,7 @@ import uuid
 from datetime import UTC, datetime
 
 from geoalchemy2 import Geography
-from sqlalchemy import Boolean, DateTime, Numeric, String, Text
+from sqlalchemy import Boolean, DateTime, Integer, Numeric, String, Text
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -165,6 +165,83 @@ class Kitchen(Base):
     status: Mapped[str] = mapped_column(String(20), default="pending_verification")
     whatsapp_phone_id: Mapped[str | None] = mapped_column(String(100), nullable=True, index=True)
     settings: Mapped[dict] = mapped_column(JSONB, default=dict)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(UTC)
+    )
+
+
+class ReferralSettings(Base):
+    __tablename__ = "referral_settings"
+    __table_args__ = {"schema": "ckac_identity"}
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, default=1)
+    enabled: Mapped[bool] = mapped_column(Boolean, default=True)
+    customer_to_kitchen_reward_inr: Mapped[float] = mapped_column(Numeric(10, 2), default=10)
+    kitchen_to_customer_reward_inr: Mapped[float] = mapped_column(Numeric(10, 2), default=10)
+    kitchen_reward_trigger: Mapped[str] = mapped_column(String(32), default="first_order_or_onboard")
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(UTC)
+    )
+    updated_by: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
+
+
+class ReferralLead(Base):
+    __tablename__ = "referral_leads"
+    __table_args__ = {"schema": "ckac_identity"}
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    direction: Mapped[str] = mapped_column(String(32), nullable=False)
+    status: Mapped[str] = mapped_column(String(32), default="submitted")
+    referrer_customer_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
+    referrer_kitchen_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
+    referrer_owner_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
+    kitchen_name: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    contact_name: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    contact_phone: Mapped[str] = mapped_column(String(20), nullable=False)
+    contact_email: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    city: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    extra: Mapped[dict] = mapped_column(JSONB, default=dict)
+    matched_kitchen_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
+    matched_customer_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
+    reward_inr: Mapped[float | None] = mapped_column(Numeric(10, 2), nullable=True)
+    credit_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
+    rejection_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(UTC)
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(UTC)
+    )
+    converted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class ReferralCredit(Base):
+    __tablename__ = "referral_credits"
+    __table_args__ = {"schema": "ckac_identity"}
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    beneficiary_type: Mapped[str] = mapped_column(String(16), nullable=False)
+    beneficiary_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
+    balance_inr: Mapped[float] = mapped_column(Numeric(12, 2), default=0)
+    lifetime_earned_inr: Mapped[float] = mapped_column(Numeric(12, 2), default=0)
+    lifetime_applied_inr: Mapped[float] = mapped_column(Numeric(12, 2), default=0)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(UTC)
+    )
+
+
+class ReferralCreditLedger(Base):
+    __tablename__ = "referral_credit_ledger"
+    __table_args__ = {"schema": "ckac_identity"}
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    credit_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False, index=True)
+    entry_type: Mapped[str] = mapped_column(String(32), nullable=False)
+    amount_inr: Mapped[float] = mapped_column(Numeric(12, 2), nullable=False)
+    balance_after_inr: Mapped[float] = mapped_column(Numeric(12, 2), nullable=False)
+    lead_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
+    note: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(UTC)
     )

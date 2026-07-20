@@ -1,9 +1,20 @@
-import { createContext, useContext, useEffect, useMemo, useState } from "react";
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+  type CSSProperties,
+} from "react";
 import { Link, Navigate, Outlet, useParams } from "react-router-dom";
 import { APP_NAME } from "../shared/brand";
 import { fetchKitchenByCode, type KitchenPublic } from "../shared/api";
 import { saveKitchenToSession } from "../shared/customerSession";
 import { portalUrl } from "../shared/urls";
+
+function cssUrl(url: string): string {
+  return `url("${url.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}")`;
+}
 
 type BrandedCtx = {
   kitchen: KitchenPublic;
@@ -46,6 +57,8 @@ export function BrandedStorefrontLayout() {
     kitchen?.branded_page?.tagline ||
     kitchen?.description ||
     "Live-capture menu · order · bill";
+  const logoUrl = kitchen?.branded_page?.logo_url || null;
+  const backgroundUrl = kitchen?.branded_page?.background_url || null;
 
   const ctx = useMemo(
     () =>
@@ -77,14 +90,29 @@ export function BrandedStorefrontLayout() {
     );
   }
 
+  const shellStyle: CSSProperties = {
+    ["--branded-accent" as string]: accent,
+    ...(backgroundUrl
+      ? {
+          backgroundImage: `linear-gradient(180deg, rgba(250,248,245,0.9) 0%, rgba(243,240,234,0.94) 55%, rgba(243,240,234,0.98) 100%), ${cssUrl(backgroundUrl)}`,
+          backgroundSize: "cover",
+          backgroundPosition: "center top",
+          backgroundRepeat: "no-repeat",
+        }
+      : {}),
+  };
+
   return (
     <BrandedStorefrontContext.Provider value={ctx}>
       <div
-        className="branded-store"
-        style={{ ["--branded-accent" as string]: accent }}
+        className={`branded-store${backgroundUrl ? " branded-store--has-bg" : ""}`}
+        style={shellStyle}
       >
         <header className="branded-store__header">
           <div className="branded-store__brand">
+            {logoUrl ? (
+              <img src={logoUrl} alt="" className="branded-store__logo" />
+            ) : null}
             <p className="branded-store__code">{kitchen.code}</p>
             <h1>{kitchen.name}</h1>
             <p className="branded-store__tagline">{tagline}</p>

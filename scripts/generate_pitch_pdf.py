@@ -996,7 +996,7 @@ Customer cart:
         "Data: PostgreSQL schema-per-domain + PostGIS; Redis Streams + transactional outbox",
         "Writes never cross schemas; Growth/Ratings read orders cross-schema for evidence only",
         "PWAs: portal, customer.kitchcu.in, kitchen.kitchcu.in, admin.kitchcu.in",
-        "Full diagrams (architecture, flows, ER, UI anatomy): CKAC-COMPLETE-GUIDE.pdf v3.2",
+        "Full diagrams (architecture, flows, ER, UI anatomy): CKAC-COMPLETE-GUIDE.pdf v3.2.3",
     ], size=10)
     pdf.mono(
         "PWAs -> Gateway -> Identity|Catalog|Order|Billing|Marketing|Ratings|\n"
@@ -1060,7 +1060,7 @@ Customer cart:
     pdf.set_text_color(*GRAY)
     pdf.multi_cell(
         257, 6,
-        "Full guide: CKAC-COMPLETE-GUIDE.md / .pdf (v3.2) | CPO blueprint v4.2 | "
+        "Full guide: CKAC-COMPLETE-GUIDE.md / .pdf (v3.2.3) | CPO blueprint v4.2 | "
         "User journeys: CKAC-USERFLOWS.md / .pdf | API: docs/API.md + gateway /docs "
         "(aggregated OpenAPI) | UI shots: docs/assets/ui/ | E1-E2 quality-loop design pack",
     )

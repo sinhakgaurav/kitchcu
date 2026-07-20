@@ -1,5 +1,5 @@
 import { APP_STORAGE_PREFIX } from "../shared/brand";
-import { apiHeaders } from "../shared/http";
+import { apiHeaders, correlationHeaders } from "../shared/http";
 
 const TOKEN_KEY = `${APP_STORAGE_PREFIX}_admin_token`;
 
@@ -297,6 +297,8 @@ export type AdminKitchenBrandedPage = {
   enabled: boolean;
   tagline: string | null;
   accent_color: string | null;
+  logo_url?: string | null;
+  background_url?: string | null;
 };
 
 export type AdminKitchen = {
@@ -310,6 +312,9 @@ export type AdminKitchen = {
   whatsapp_connected: boolean;
   payment_gateway_configured: boolean;
   branded_page_enabled?: boolean;
+  last_order_at?: string | null;
+  open_ticket_count?: number;
+  open_refund_count?: number;
 };
 
 export type AdminKitchenDetail = AdminKitchen & {
@@ -366,12 +371,39 @@ export async function updateAdminKitchenBrandedPage(
     enabled?: boolean;
     tagline?: string | null;
     accent_color?: string | null;
+    logo_url?: string | null;
+    background_url?: string | null;
   },
 ) {
   return adminFetch<AdminKitchenDetail>(`/api/v1/admin/kitchens/${kitchenId}/branded-page`, {
     method: "PATCH",
     body: JSON.stringify(data),
   });
+}
+
+export async function uploadAdminKitchenBrandMedia(
+  kitchenId: string,
+  file: Blob,
+  slot: "logo" | "background",
+  filename = "brand.jpg",
+) {
+  const form = new FormData();
+  form.append("file", file, filename);
+  form.append("slot", slot);
+  const token = getAdminToken();
+  const headers: Record<string, string> = {};
+  if (token) headers.Authorization = `Bearer ${token}`;
+  const res = await fetch(`/api/v1/admin/kitchens/${kitchenId}/branded-page/media`, {
+    method: "POST",
+    headers,
+    body: form,
+  });
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    const detail = typeof body.detail === "string" ? body.detail : "Brand media upload failed";
+    throw new Error(detail);
+  }
+  return body as AdminKitchenDetail;
 }
 
 export async function fetchAdminKitchenWhatsApp(kitchenId: string) {
@@ -453,18 +485,47 @@ export async function updateAdminKitchenDeliverySettings(
   );
 }
 
-export async function fetchAdminOrders(limit = 100) {
-  return adminFetch<
-    {
-      id: string;
-      order_code: string;
-      kitchen_name: string;
-      status: string;
-      total: number;
-      customer_name: string | null;
-      created_at: string;
-    }[]
-  >(`/api/v1/admin/orders?limit=${limit}`);
+export type AdminOrder = {
+  id: string;
+  order_code: string;
+  kitchen_id: string;
+  kitchen_name: string;
+  customer_id: string | null;
+  status: string;
+  total: number;
+  customer_name: string | null;
+  customer_phone: string | null;
+  created_at: string;
+};
+
+export async function fetchAdminOrders(
+  limit = 100,
+  params?: { kitchen_id?: string; customer_id?: string; status?: string },
+) {
+  const qs = new URLSearchParams();
+  qs.set("limit", String(limit));
+  if (params?.kitchen_id) qs.set("kitchen_id", params.kitchen_id);
+  if (params?.customer_id) qs.set("customer_id", params.customer_id);
+  if (params?.status) qs.set("status", params.status);
+  return adminFetch<AdminOrder[]>(`/api/v1/admin/orders?${qs}`);
+}
+
+export type AdminSettlement = {
+  id: string;
+  kitchen_id: string;
+  order_id: string;
+  gross_amount: number;
+  platform_fee: number;
+  net_to_owner: number;
+  settlement_status: string;
+  settled_at: string | null;
+};
+
+export async function fetchAdminSettlements(params?: { kitchen_id?: string; limit?: number }) {
+  const qs = new URLSearchParams();
+  if (params?.kitchen_id) qs.set("kitchen_id", params.kitchen_id);
+  qs.set("limit", String(params?.limit ?? 200));
+  return adminFetch<AdminSettlement[]>(`/api/v1/admin/settlements?${qs}`);
 }
 
 export async function updateKitchenStatus(kitchenId: string, status: string) {
@@ -500,17 +561,27 @@ export type AdminTicket = {
   customer_name: string | null;
   customer_phone: string | null;
   customer_email: string | null;
+  customer_id: string | null;
   order_code: string | null;
+  kitchen_id: string | null;
+  assigned_admin_id: string | null;
   resolution_note: string | null;
   created_at: string;
   updated_at: string;
   messages: { id: string; author_type: string; message: string; created_at: string }[];
 };
 
-export async function fetchAdminTickets(params?: { status?: string; audience?: string }) {
+export async function fetchAdminTickets(params?: {
+  status?: string;
+  audience?: string;
+  kitchen_id?: string;
+  customer_id?: string;
+}) {
   const qs = new URLSearchParams();
   if (params?.status) qs.set("status", params.status);
   if (params?.audience) qs.set("audience", params.audience);
+  if (params?.kitchen_id) qs.set("kitchen_id", params.kitchen_id);
+  if (params?.customer_id) qs.set("customer_id", params.customer_id);
   const q = qs.toString();
   return adminFetch<{ tickets: AdminTicket[]; total: number }>(
     `/api/v1/admin/tickets${q ? `?${q}` : ""}`,
@@ -523,12 +594,29 @@ export async function fetchAdminTicket(id: string) {
 
 export async function updateAdminTicket(
   id: string,
-  data: { status?: string; priority?: string; resolution_note?: string },
+  data: {
+    status?: string;
+    priority?: string;
+    assigned_admin_id?: string | null;
+    resolution_note?: string;
+  },
 ) {
   return adminFetch<AdminTicket>(`/api/v1/admin/tickets/${id}`, {
     method: "PATCH",
     body: JSON.stringify(data),
   });
+}
+
+/** Cross-tab navigation inside the admin shell (kitchen/refunds/tickets deep-links). */
+export type AdminNavDetail = {
+  tab: string;
+  kitchenId?: string;
+  refundSearch?: string;
+  customerId?: string;
+};
+
+export function adminNavigate(detail: AdminNavDetail) {
+  window.dispatchEvent(new CustomEvent("kitchcu-admin-nav", { detail }));
 }
 
 export async function replyAdminTicket(id: string, message: string) {
@@ -667,6 +755,98 @@ export async function fetchAdminKitchenTiffinSummary(kitchenId: string) {
   return adminFetch<AdminTiffinSummary>(`/api/v1/admin/kitchens/${kitchenId}/tiffin-summary`);
 }
 
+export type AdminGstProfile = {
+  id: string;
+  kitchen_id: string;
+  gstin: string;
+  legal_name: string;
+  trade_name: string | null;
+  state_code: string;
+  registered_address: string;
+  default_tax_rate: number;
+  is_active: boolean;
+};
+
+export type AdminGstMonthlyReport = {
+  kitchen_id: string;
+  period_year: number;
+  period_month: number;
+  gstin: string;
+  legal_name: string;
+  invoice_count: number;
+  total_taxable: number;
+  total_cgst: number;
+  total_sgst: number;
+  total_igst: number;
+  total_tax: number;
+  total_gross_sales: number;
+  audit_status: string;
+  invoices: Array<{
+    id: string;
+    invoice_number: string;
+    order_code: string;
+    invoice_date: string;
+    taxable_value: number;
+    cgst_amount: number;
+    sgst_amount: number;
+    gross_total: number;
+  }>;
+};
+
+export async function fetchAdminKitchenGstProfile(kitchenId: string) {
+  return adminFetch<AdminGstProfile>(`/api/v1/admin/kitchens/${kitchenId}/gst/profile`);
+}
+
+export async function fetchAdminKitchenGstMonthly(
+  kitchenId: string,
+  year: number,
+  month: number,
+) {
+  return adminFetch<AdminGstMonthlyReport>(
+    `/api/v1/admin/kitchens/${kitchenId}/gst/reports/monthly?year=${year}&month=${month}`,
+  );
+}
+
+async function adminDownloadBlob(path: string, filename: string): Promise<void> {
+  const token = getAdminToken();
+  const res = await fetch(path, {
+    headers: correlationHeaders(token ? { Authorization: `Bearer ${token}` } : undefined),
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(typeof body.detail === "string" ? body.detail : "Download failed");
+  }
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+export async function downloadAdminKitchenGstExcel(
+  kitchenId: string,
+  year: number,
+  month: number,
+) {
+  return adminDownloadBlob(
+    `/api/v1/admin/kitchens/${kitchenId}/gst/reports/monthly/export.xlsx?year=${year}&month=${month}`,
+    `kitchcu-gst-${year}-${String(month).padStart(2, "0")}.xlsx`,
+  );
+}
+
+export async function downloadAdminKitchenGstPdf(
+  kitchenId: string,
+  year: number,
+  month: number,
+) {
+  return adminDownloadBlob(
+    `/api/v1/admin/kitchens/${kitchenId}/gst/reports/monthly/export.pdf?year=${year}&month=${month}`,
+    `kitchcu-gst-${year}-${String(month).padStart(2, "0")}.pdf`,
+  );
+}
+
 export async function fetchAdminKitchenTemplates(kitchenId: string) {
   return adminFetch<
     {
@@ -677,4 +857,62 @@ export async function fetchAdminKitchenTemplates(kitchenId: string) {
       body: string;
     }[]
   >(`/api/v1/admin/kitchens/${kitchenId}/templates`);
+}
+
+export type AdminReferralSettings = {
+  enabled: boolean;
+  customer_to_kitchen_reward_inr: number;
+  kitchen_to_customer_reward_inr: number;
+  kitchen_reward_trigger: string;
+};
+
+export type AdminReferralLead = {
+  id: string;
+  direction: string;
+  status: string;
+  kitchen_name: string | null;
+  contact_name: string | null;
+  contact_phone: string;
+  contact_email: string | null;
+  city: string | null;
+  reward_inr: number | null;
+  created_at: string;
+  converted_at: string | null;
+  rejection_reason: string | null;
+};
+
+export async function fetchReferralSettings() {
+  return adminFetch<AdminReferralSettings>("/api/v1/admin/referrals/settings");
+}
+
+export async function patchReferralSettings(patch: Partial<AdminReferralSettings>) {
+  return adminFetch<AdminReferralSettings>("/api/v1/admin/referrals/settings", {
+    method: "PATCH",
+    body: JSON.stringify(patch),
+  });
+}
+
+export async function fetchReferralLeads(params?: {
+  direction?: string;
+  status_filter?: string;
+}) {
+  const qs = new URLSearchParams();
+  if (params?.direction) qs.set("direction", params.direction);
+  if (params?.status_filter) qs.set("status_filter", params.status_filter);
+  const q = qs.toString() ? `?${qs}` : "";
+  return adminFetch<{ leads: AdminReferralLead[] }>(`/api/v1/admin/referrals/leads${q}`);
+}
+
+export async function rejectReferralLead(id: string, reason: string) {
+  return adminFetch<AdminReferralLead>(`/api/v1/admin/referrals/leads/${id}/reject`, {
+    method: "POST",
+    body: JSON.stringify({ reason }),
+  });
+}
+
+export async function grantReferralLead(id: string, note?: string) {
+  return adminFetch<AdminReferralLead>(`/api/v1/admin/referrals/leads/${id}/grant`, {
+    method: "POST",
+    body: JSON.stringify({ note }),
+  });
 }

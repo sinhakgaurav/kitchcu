@@ -1,5 +1,6 @@
 import { Link, Navigate } from "react-router-dom";
 import { useEffect, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useKitchen } from "../../lib/kitchen";
 import { useKitchenAuth } from "../../shared/kitchenAuth";
 import {
@@ -27,43 +28,44 @@ import { customerUrl } from "../../shared/urls";
 const inr = (n: number) => `₹${Math.round(n).toLocaleString("en-IN")}`;
 const pct = (n: number) => `${(n * 100).toFixed(0)}%`;
 
-function greeting(): string {
-  const h = new Date().getHours();
-  if (h < 12) return "Good morning";
-  if (h < 17) return "Good afternoon";
-  return "Good evening";
-}
-
-function formatWhen(iso: string): string {
+function formatWhen(iso: string, locale: string): string {
   const d = new Date(iso);
   const now = new Date();
   const sameDay = d.toDateString() === now.toDateString();
   if (sameDay) {
-    return d.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" });
+    return d.toLocaleTimeString(locale, { hour: "2-digit", minute: "2-digit" });
   }
-  return d.toLocaleDateString("en-IN", { day: "numeric", month: "short" });
+  return d.toLocaleDateString(locale, { day: "numeric", month: "short" });
 }
 
-function chartDayLabel(isoDate: string): string {
+function chartDayLabel(isoDate: string, locale: string): string {
   const d = new Date(isoDate);
   if (Number.isNaN(d.getTime())) return "";
-  return d.toLocaleDateString("en-IN", { weekday: "short" });
+  return d.toLocaleDateString(locale, { weekday: "short" });
 }
 
 const QUICK_ACTIONS = [
-  { to: "/dashboard/orders/new", title: "New order", desc: "Manual or walk-in", accent: "orange" },
-  { to: "/dashboard/brand", title: "Brand page", desc: "Publish & share /k/code", accent: "teal" },
-  { to: "/dashboard/orders?tab=drafts", title: "WhatsApp drafts", desc: "Review parsed orders", accent: "teal" },
-  { to: "/dashboard/menu/new", title: "Add dish", desc: "Live-capture photo", accent: "orange" },
-  { to: "/dashboard/reports", title: "Growth reports", desc: "Revenue & retention", accent: "teal" },
-  { to: "/dashboard/stream", title: "Live stream", desc: "Go live to customers", accent: "orange" },
-  { to: "/dashboard/coupons", title: "Coupons", desc: "Run promotions", accent: "teal" },
-  { to: "/dashboard/tiffin", title: "Tiffin plans", desc: "Monthly thali subscribers", accent: "orange" },
+  { to: "/dashboard/orders/new", titleKey: "owner.home.quickNewOrder", descKey: "owner.home.quickNewOrderDesc", accent: "orange" },
+  { to: "/dashboard/brand", titleKey: "owner.home.quickBrand", descKey: "owner.home.quickBrandDesc", accent: "teal" },
+  { to: "/dashboard/orders?tab=drafts", titleKey: "owner.home.quickDrafts", descKey: "owner.home.quickDraftsDesc", accent: "teal" },
+  { to: "/dashboard/menu/new", titleKey: "owner.home.quickAddDish", descKey: "owner.home.quickAddDishDesc", accent: "orange" },
+  { to: "/dashboard/reports", titleKey: "owner.home.quickReports", descKey: "owner.home.quickReportsDesc", accent: "teal" },
+  { to: "/dashboard/stream", titleKey: "owner.home.quickStream", descKey: "owner.home.quickStreamDesc", accent: "orange" },
+  { to: "/dashboard/coupons", titleKey: "owner.home.quickCoupons", descKey: "owner.home.quickCouponsDesc", accent: "teal" },
+  { to: "/dashboard/tiffin", titleKey: "owner.home.quickTiffin", descKey: "owner.home.quickTiffinDesc", accent: "orange" },
 ] as const;
 
 export function OwnerHomePage() {
+  const { t, i18n } = useTranslation();
+  const locale = i18n.language?.startsWith("en") ? "en-IN" : i18n.language || "en-IN";
   const { kitchen, kitchens, loading } = useKitchen();
   const { owner } = useKitchenAuth();
+  const greeting = () => {
+    const h = new Date().getHours();
+    if (h < 12) return t("owner.home.greetingMorning");
+    if (h < 17) return t("owner.home.greetingAfternoon");
+    return t("owner.home.greetingEvening");
+  };
   const [orders, setOrders] = useState<Order[]>([]);
   const [draftCount, setDraftCount] = useState(0);
   const [dishCount, setDishCount] = useState(0);
@@ -185,8 +187,8 @@ export function OwnerHomePage() {
           </div>
         </div>
         <div className="od-board__hero-actions">
-          <Link to="/dashboard/orders/new" className="btn btn--primary">New order</Link>
-          <Link to="/dashboard/brand" className="btn btn--ghost">Brand page</Link>
+          <Link to="/dashboard/orders/new" className="btn btn--primary">{t("owner.home.quickNewOrder")}</Link>
+          <Link to="/dashboard/brand" className="btn btn--ghost">{t("owner.home.quickBrand")}</Link>
         </div>
       </section>
 
@@ -342,7 +344,7 @@ export function OwnerHomePage() {
                         className="report-bars__fill"
                         style={{ height: `${(p.revenue / maxRevenue) * 100}%` }}
                       />
-                      <span className="report-bars__label">{chartDayLabel(p.date)}</span>
+                      <span className="report-bars__label">{chartDayLabel(p.date, locale)}</span>
                     </div>
                   ))}
                 </div>
@@ -368,8 +370,8 @@ export function OwnerHomePage() {
               <div className="od-actions">
                 {QUICK_ACTIONS.map((a) => (
                   <Link key={a.to} to={a.to} className={`od-action od-action--${a.accent}`}>
-                    <strong>{a.title}</strong>
-                    <span>{a.desc}</span>
+                    <strong>{t(a.titleKey)}</strong>
+                    <span>{t(a.descKey)}</span>
                   </Link>
                 ))}
               </div>
@@ -379,15 +381,13 @@ export function OwnerHomePage() {
           <section className="dash-card od-panel">
             <header className="od-panel__head">
               <div>
-                <h2>Recent orders</h2>
+                <h2>{t("owner.home.recentOrders")}</h2>
                 <p>Latest activity across all channels</p>
               </div>
-              <Link to="/dashboard/orders" className="od-panel__link">All orders →</Link>
+              <Link to="/dashboard/orders" className="od-panel__link">{t("owner.home.viewAllOrders")}</Link>
             </header>
             {recentOrders.length === 0 ? (
-              <p className="od-panel__empty">
-                No orders yet. Create a <Link to="/dashboard/orders/new">manual order</Link> or paste a WhatsApp message on the Orders page.
-              </p>
+              <p className="od-panel__empty">{t("owner.home.noOrders")}</p>
             ) : (
               <ul className="od-recent">
                 {recentOrders.map((o) => (
@@ -399,9 +399,9 @@ export function OwnerHomePage() {
                       </div>
                       <div className="od-recent__end">
                         <span className={`status-badge status-badge--${o.status}`}>
-                          {STATUS_LABELS[o.status] ?? o.status}
+                          {t(`status.${o.status}`, { defaultValue: STATUS_LABELS[o.status] ?? o.status })}
                         </span>
-                        <span className="od-recent__meta">{inr(o.total)} · {formatWhen(o.created_at)}</span>
+                        <span className="od-recent__meta">{inr(o.total)} · {formatWhen(o.created_at, locale)}</span>
                       </div>
                     </Link>
                   </li>

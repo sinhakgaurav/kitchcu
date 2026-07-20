@@ -92,7 +92,7 @@ export function MasterOrderConfirmPage() {
         {busy ? "Preparing PDF…" : "Download master PDF bill"}
       </button>
       <Link to="/orders" className="btn btn--primary">Track sub-orders</Link>
-      <Link to="/#nearby" className="btn btn--ghost">Discover more kitchens</Link>
+      <Link to="/#near-you" className="btn btn--ghost">Discover more kitchens</Link>
     </div>
   );
 }

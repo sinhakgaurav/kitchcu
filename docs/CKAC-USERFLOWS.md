@@ -4,10 +4,10 @@
 
 | Field | Value |
 |-------|-------|
-| Version | **1.2** |
-| Date | July 2026 |
+| Version | **1.3** |
+| Date | 2026-07-20 |
 | Audience | CPO, Product, Engineering, QA, Investors |
-| Status | Traces to code shipped through **S1–S18 + P19–P28** (packages, templates, employees RBAC, kitchen workspace) |
+| Status | Traces to code shipped through **S1–S18 + P19–P40** (referrals, GST export, admin ops console, i18n) |
 | Companion PDF | [`docs/CKAC-USERFLOWS.pdf`](./CKAC-USERFLOWS.pdf) (generate with `scripts/generate_userflows_pdf.py`) |
 
 ---
@@ -477,47 +477,46 @@ flowchart LR
 
 ## 9. Flow 6 — Admin Login -> Overview -> Customers / Refunds / Control / Tickets
 
-**Goal:** Full super-admin control plane — platform health, customer/refund oversight, packages & employees RBAC, feature flags & journeys, per-kitchen workspace — never owner-scope menu/order mutation.
+**Goal:** Full super-admin control plane — platform health, customer/refund oversight, packages & employees RBAC, referrals, feature flags & journeys, per-kitchen workspace (incl. Orders/GST) — never owner-scope menu/order mutation.
 **Persona:** Platform admin (roles: superadmin / ops / support / finance)
 **Entry URL:** `admin.kitchcu.in` (13003) · prod `admin.kitchcu.com`
 **Screenshots:** [`07-admin-login.png`](./assets/ui/07-admin-login.png) · [`05-admin-overview.png`](./assets/ui/05-admin-overview.png) · [`08-admin-control.png`](./assets/ui/08-admin-control.png)
 
 ### Preconditions
 - Admin account: local `admin@kitchcu.dev` / `admin123456`; production `admin@kitchcu.com` + VM `ADMIN_PASSWORD` (see [ADVANCEMENT-TRACKER.md](./ADVANCEMENT-TRACKER.md)).
+- Optional local only: `ADMIN_LOGIN_REVEAL_PASSWORD=1` exposes password via `GET /admin/auth/login-hint` — **never** enable on public demo VMs.
 - RBAC: mutations require permissions such as `employees:write`, `packages:write`, `kitchens:write` (superadmin = `*`).
 
 ### Step-by-step UI actions
 
 1. Admin opens login — left panel **AuthLoginHighlights**; signs in with email + password.
 2. Lands on **Overview** — attention tiles, platform health, charts, Quick actions.
-3. **Customers** — suspend accounts, reset passwords, view payout details.
-4. **Refunds** — escalate gateway vs direct refunds with evidence; money-stats.
-5. **Packages** — list platform features; create/edit packages (feature keys + plan tiers); assign from kitchen workspace.
-6. **Employees** — create/update/deactivate platform staff; assign roles (superadmin/ops/support/finance).
-7. **Control** — journeys grid; feature flags; owner subscription overrides; **API Keys** (platform Meta/Razorpay SaaS secrets only).
-8. **Tickets** — support queue; reply and resolve.
-9. **Kitchens / Owners** — activate/suspend; override SaaS tier when needed.
-10. **Kitchen workspace** — Profile / WhatsApp / Payments / **Package** / **Marketing** / Modules / **Streaming**; kitchen WhatsApp phone ID + kitchen Razorpay keys (not platform secrets).
+3. **Customers** — server search; open profile for addresses, **recent orders**, **tickets**; suspend / clear password.
+4. **Refunds** — escalate gateway vs direct refunds; **settlements** table; deep-link search from tickets.
+5. **Packages** — list platform features; create/edit packages; assign from kitchen workspace.
+6. **Referrals** — reward ₹ config; lead queue by direction/status.
+7. **Employees** — create/update/deactivate platform staff; assign roles.
+8. **Control** — journeys; feature flags; subscription overrides; **API Keys** (masked only after save).
+9. **Tickets** — triage: status, priority, assignee, resolution note; **Open kitchen** / **Open refunds**.
+10. **Kitchens** — Care column (open tickets/refunds) + last order; workspace tabs including **Orders**, **GST**, Brand, WhatsApp, Payments, Package, Marketing, Modules, Streaming, Delivery, Tiffin.
 
 ### API calls
 
 | Step | Method + Path | Auth | Notes |
 |------|----------------|------|-------|
 | 1 | `POST /api/v1/admin/auth/login` | none | Bootstraps/syncs default admin from `ADMIN_EMAIL`/`ADMIN_PASSWORD`; returns JWT `type:"admin"` |
-| 2 | `GET /api/v1/admin/me` | admin | Profile |
+| 2 | `GET /api/v1/admin/me` | admin | Profile + `allowed_tabs` |
 | 2 | `GET /api/v1/admin/stats` | admin | `PlatformStats` |
-| 3 | `GET /api/v1/admin/customers` (+ suspend/reset) | admin | Identity customer control |
-| 3 | `GET /api/v1/admin/owners` / `kitchens` / `orders` | admin | Platform-wide lists |
-| 3 | `PATCH /api/v1/admin/kitchens/{kitchen_id}/status` | admin | needs `kitchens:write` |
-| 4 | `GET /api/v1/admin/refunds` / `payments` / `money-stats` | admin | Billing admin |
-| 5 | `GET /api/v1/admin/features` · `GET/POST/PUT /api/v1/admin/packages` · `PUT /plan-packages` | admin | Package mapper (`packages:read/write`) |
-| 5 | `GET/PUT /api/v1/admin/kitchens/{id}/package` | admin | Kitchen package assignment |
-| 6 | `GET/POST /api/v1/admin/employees` · `PATCH .../employees/{id}` · `POST .../deactivate` · `GET .../roles` | admin | `employees:read/write` |
-| 7 | `GET/PATCH /api/v1/admin/feature-flags` · journeys · API keys | admin | Kill-switches + platform secrets |
-| 10 | `GET/PUT /api/v1/admin/kitchens/{id}/whatsapp-integration` | admin | Kitchen WhatsApp phone id |
-| 10 | `GET/PUT/DELETE /api/v1/admin/kitchens/{id}/payment-gateway` | admin | Kitchen Razorpay (billing) |
-| 10 | `GET /api/v1/admin/kitchens/{id}/templates` | admin | Marketing templates inventory |
-| 8 | `GET /api/v1/admin/tickets` (+ detail / reply) | admin | Notification support |
+| 3 | `GET /api/v1/admin/customers?q=` · detail · status | admin | Identity customer control |
+| 3 | `GET /api/v1/admin/orders?customer_id=` | admin | Customer order history (via master/phone) |
+| 3 | `GET /api/v1/admin/tickets?customer_id=` | admin | Customer tickets |
+| 4 | `GET /api/v1/admin/refunds` / `settlements` / `money-stats` | admin | Billing admin |
+| 5 | `GET /api/v1/admin/features` · packages · plan-packages | admin | Package mapper |
+| 6 | `GET/PATCH /api/v1/admin/referrals/settings` · `GET .../leads` | admin | Dual referral program |
+| 7 | `GET/POST /api/v1/admin/employees` · deactivate · roles | admin | `employees:read/write` |
+| 8 | Feature flags · journeys · API keys | admin | Secrets never returned in full |
+| 9 | `GET/PATCH /api/v1/admin/tickets/{id}` · reply | admin | Assignee / priority / resolution |
+| 10 | `GET /api/v1/admin/orders?kitchen_id=` · kitchen GST export paths | admin | Ops + finance |
 
 ### Domain events published
 
@@ -818,4 +817,4 @@ Gateway-owned (not forwarded): `GET /`, `GET /health/live`, `GET /health/ready`,
 | Traceability | Every route/event cited here was read directly from `services/*/app/routes.py`, `schemas.py`, and `main.py` in this repository as of July 2026 — not inferred from memory |
 | Companion | `docs/CKAC-USERFLOWS.pdf` — generate/refresh via `python scripts/generate_userflows_pdf.py` |
 | Change policy | Update this file whenever a route, event name, or status transition changes; regenerate the PDF in the same change |
-| Supersedes | v1.1; aligned with Complete Guide v3.2.2 (P25–P28 packages, templates, employees RBAC, dish showcase) |
+| Supersedes | v1.2; aligned with Complete Guide v3.2.3 (P37–P40 referrals, GST export, admin ops, i18n) |

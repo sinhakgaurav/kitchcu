@@ -1,16 +1,232 @@
 {
   "lang": {
     "title": "আপনার ভাষা বেছে নিন",
-    "detected": "আমরা মনে করি আপনার স্থানীয় ভাষা {{language}}।",
-    "ask": "আপনি কি ইংরেজিতে চালিয়ে যেতে চান, নাকি {{language}}-তে?",
+    "detected": "আমরা মনে করি {{language}} আপনার স্থানীয় ভাষা।",
+    "ask": "আপনি কি ইংরেজিতে না {{language}}-ে চালিয়ে যেতে চান?",
     "continueEn": "ইংরেজিতে চালিয়ে যান",
-    "continueLocal": "{{language}}-তে চালিয়ে যান",
+    "continueLocal": "{{language}}-ে চালিয়ে যান",
     "detecting": "আপনার অবস্থান শনাক্ত করা হচ্ছে…",
     "change": "ভাষা"
   },
   "common": {
-    "continue": "চালিয়ে যান",
-    "cancel": "বাতিল",
-    "loading": "লোড হচ্ছে…"
+    "continue": "এগিয়ে যান",
+    "cancel": "বাতিল করুন",
+    "loading": "লোড হচ্ছে…",
+    "save": "সংরক্ষণ করুন",
+    "close": "বন্ধ করুন",
+    "search": "অনুসন্ধান করুন",
+    "back": "পিছনে",
+    "retry": "পুনরায় চেষ্টা করুন",
+    "yes": "হ্যাঁ",
+    "no": "না",
+    "error": "কিছু একটা সমস্যা হয়েছিল",
+    "signOut": "সাইন আউট",
+    "openMenu": "মেনু খুলুন",
+    "closeMenu": "মেনু বন্ধ করুন",
+    "toggleMenu": "মেনু টগল করুন",
+    "dashboard": "ড্যাশবোর্ড",
+    "customerApp": "গ্রাহক অ্যাপ",
+    "kitchenOwner": "রান্নাঘরের মালিক →",
+    "ownerLogin": "মালিক লগইন"
+  },
+  "status": {
+    "received": "গৃহীত",
+    "accepted": "গৃহীত",
+    "preparing": "প্রস্তুত করা হচ্ছে",
+    "ready": "প্রস্তুত",
+    "out_for_delivery": "ডেলিভারির জন্য বাইরে",
+    "delivered": "প্রেরিত হয়েছে",
+    "cancelled": "বাতিল করা হয়েছে",
+    "active": "সক্রিয়",
+    "suspended": "স্থগিত",
+    "trial": "বিচার",
+    "open": "খুলুন",
+    "closed": "বন্ধ আছে"
+  },
+  "portal": {
+    "heroSubtitle": "হোম শেফ, টিফিন পরিষেবা এবং ডেলিভারি-কেবল রান্নাঘরগুলির জন্য গ্রোথ ওএস — হোয়াটসঅ্যাপ অর্ডার, লাইভ-ক্যাপচার মেনু, জিরো ফুড কমিশন ।",
+    "ctaOwner": "রান্নাঘরের মালিক হিসাবে শুরু করুন",
+    "ctaCustomer": "গ্রাহক হিসাবে ব্রাউজ করুন →",
+    "trustCommission": "জিরো ফুড কমিশন",
+    "trustCrm": "মালিক-মালিকানাধীন CRM",
+    "trustHonest": "সৎ প্রস্তুতি এবং ডেলিভারির সময়",
+    "navApps": "অ্যাপ্লিকেশান",
+    "navFeatures": "বৈশিষ্ট্যগুলি",
+    "navPricing": "মূল্য নির্ধারণ",
+    "navSupport": "সহায়তা",
+    "navContact": "যোগাযোগ"
+  },
+  "owner": {
+    "nav": {
+      "operations": "ক্রিয়াপ্রণালীসমূহ …………………………………………………………………………………………………………………………",
+      "overview": "সংক্ষিপ্ত বিবরণ",
+      "orders": "অর্ডারগুলি",
+      "menu": "মেনু",
+      "brand": "ব্র্যান্ড পৃষ্ঠা",
+      "ingredients": "উপাদান",
+      "growth": "বৃদ্ধি",
+      "reports": "রিপোর্ট সমূহ",
+      "intelligence": "বুদ্ধিমত্তা",
+      "crm": "CRM",
+      "coupons": "কুপন সমূহ",
+      "tiffin": "টিফিন পরিকল্পনা",
+      "templates": "টেমপ্লেট",
+      "stream": "সরাসরি সম্প্রচার",
+      "learn": "শিখুন এবং সংযুক্ত করুন",
+      "learning": "শিখন",
+      "community": "কমিউনিটি",
+      "account": "অ্যাকাউন্ট",
+      "subscription": "সাবস্ক্রিপশন",
+      "referrals": "রেফারাল:",
+      "whatsapp": "WhatsApp",
+      "paymentGateway": "পেমেন্ট গেটওয়ে",
+      "gst": "GST এবং ফাইন্যান্স",
+      "setup": "রান্নাঘর সেটআপ"
+    },
+    "shell": {
+      "activeKitchen": "সক্রিয় রান্নাঘর",
+      "loadingKitchen": "রান্নাঘর লোড হচ্ছে…",
+      "loadingAuth": "লোড হচ্ছে…"
+    },
+    "auth": {
+      "titleLogin": "মালিক সাইন ইন করুন",
+      "titleRegister": "মালিকের অ্যাকাউন্ট তৈরি করুন",
+      "phone": "ফোন",
+      "name": "নাম",
+      "email": "ইমেইল (ঐচ্ছিক)",
+      "otp": "OTP",
+      "sendOtp": "OTP পাঠান",
+      "verify": "যাচাই করুন এবং চালিয়ে যান",
+      "register": "নিবন্ধন করুন",
+      "haveAccount": "ইতিমধ্যে একটি অ্যাকাউন্ট আছে? সাইন ইন করুন",
+      "needAccount": "নতুন রান্নাঘর? নিবন্ধন করুন",
+      "sessionExpired": "আপনার সেশনের মেয়াদ শেষ হয়ে গেছে । অনুগ্রহ করে আবার সাইন ইন করুন ।",
+      "agreePolicies": "নিবন্ধনের জন্য অনুগ্রহ করে শর্তাবলী, গোপনীয়তা এবং রিফান্ড নীতিতে সম্মত হন ।",
+      "demoHint": "ডেমো ওটিপি হল {{otp}}"
+    },
+    "home": {
+      "greetingMorning": "ব্যাগোবো ভাষা",
+      "greetingAfternoon": "শুভ সন্ধ্যা",
+      "greetingEvening": "শুভ সন্ধা",
+      "quickNewOrder": "নতুন আদেশ",
+      "quickNewOrderDesc": "ম্যানুয়াল বা ওয়াক-ইন",
+      "quickBrand": "ব্র্যান্ড পৃষ্ঠা",
+      "quickBrandDesc": "প্রকাশ করুন এবং ভাগ করুন/কে/কোড",
+      "quickDrafts": "হোয়াটসঅ্যাপ ড্রাফ্ট",
+      "quickDraftsDesc": "পার্স করা অর্ডারগুলি পর্যালোচনা করুন",
+      "quickAddDish": "থালা যোগ করুন",
+      "quickAddDishDesc": "ছবি তুলুন",
+      "quickReports": "প্রবৃদ্ধির রিপোর্ট",
+      "quickReportsDesc": "রাজস্ব এবং ধরে রাখা",
+      "quickStream": "সরাসরি সম্প্রচার",
+      "quickStreamDesc": "গ্রাহকদের সাথে সরাসরি দেখা করুন",
+      "quickCoupons": "কুপন সমূহ",
+      "quickCouponsDesc": "প্রোমোশন চালান",
+      "quickTiffin": "টিফিন পরিকল্পনা",
+      "quickTiffinDesc": "মাসিক থালি গ্রাহকগণ",
+      "recentOrders": "সাম্প্রতিক অর্ডারগুলি",
+      "noOrders": "কোন আদেশ নেই",
+      "viewAllOrders": "সমস্ত অর্ডার দেখুন"
+    },
+    "orders": {
+      "title": "অর্ডারগুলি",
+      "newOrder": "নতুন আদেশ",
+      "drafts": "খসড়া",
+      "empty": "কোন আদেশ নেই",
+      "searchPlaceholder": "অর্ডার কোড অনুসন্ধান করুন, গ্রাহক…",
+      "detail": "আদেশ বিবরণী",
+      "accept": "গ্রহণ করুন",
+      "reject": "অর্ডার বাতিল করুন",
+      "updateStatus": "আপডেট স্থিতি"
+    },
+    "menu": {
+      "title": "মেনু",
+      "addDish": "থালা যোগ করুন",
+      "empty": "এখনও কোনও খাবার নেই",
+      "liveCapture": "নায়কের ছবির জন্য লাইভ-ক্যাপচার প্রয়োজন",
+      "price": "দাম",
+      "prepTime": "প্রস্তুতির সময় (মিনিট)",
+      "active": "মেনুতে"
+    },
+    "subscription": {
+      "title": "সাবস্ক্রিপশন",
+      "loading": "পরিকল্পনা লোড হচ্ছে…",
+      "monthly": "মাসিক",
+      "yearly": "বাত্সরিক",
+      "subscribe": "সাবস্ক্রাইব করুন",
+      "activate": "সক্রিয় করুন (dev)",
+      "current": "বর্তমান পরিকল্পনা",
+      "referralCredit": "রেফারেল ক্রেডিট: ₹{{amount}}",
+      "referralNote": "আপনার পরবর্তী সাবস্ক্রিপশন চার্জে ক্রেডিটগুলি স্বয়ংক্রিয়ভাবে প্রযোজ্য হবে ।",
+      "loadError": "সাবস্ক্রিপশনের ডেটা লোড করা যায়নি"
+    },
+    "setup": {
+      "title": "রান্নাঘর সেটআপ",
+      "save": "&amp; পছন্দ সংরক্ষণ করো"
+    },
+    "referrals": {
+      "title": "রেফারাল:",
+      "creditBalance": "ক্রেডিট ব্যালেন্স",
+      "submitLead": "একজন গ্রাহককে রেফার করুন",
+      "empty": "এখনও কোনও রেফারেল লিড নেই"
+    }
+  },
+  "customer": {
+    "nav": {
+      "nearYou": "আপনার কাছাকাছি",
+      "featured": "আদর্শ কর্ম পদ্ধতি",
+      "bestPrices": "সেরা মূল্য",
+      "kitchenCode": "কিচেন কোড",
+      "myOrders": "আমার নির্দেশনা",
+      "dashboard": "ড্যাশবোর্ড",
+      "account": "অ্যাকাউন্ট",
+      "signIn": "গ্রাহক সাইন ইন করুন"
+    },
+    "auth": {
+      "title": "গ্রাহক সাইন ইন করুন",
+      "whatsappOtp": "WhatsApp OTP",
+      "socialContinue": "সামাজিকতা বজায় রাখুন",
+      "phone": "ফোন",
+      "sendOtp": "OTP পাঠান",
+      "verify": "যাচাই"
+    },
+    "discovery": {
+      "title": "আপনার কাছাকাছি বাড়ির রান্নাঘর খুঁজুন",
+      "searchPlaceholder": "রান্নাঘর, রন্ধনপ্রণালী, থালা অনুসন্ধান করুন…",
+      "useLocation": "আমার অবস্থান",
+      "noResults": "কোনও রান্নাঘর আপনার ফিল্টারের সাথে মেলে না"
+    },
+    "checkout": {
+      "title": "চেকআউট",
+      "placeOrder": "অর্ডার দিন",
+      "cartEmpty": "তোমার থলে তো খালি",
+      "deliveryAddress": "ডেলিভারির নতুন ঠিকানা",
+      "payment": "পেমেন্ট",
+      "total": "মোট"
+    },
+    "orders": {
+      "title": "আমার নির্দেশনা",
+      "empty": "কোন আদেশ নেই",
+      "track": "ট্র্যাক করুন",
+      "repeat": "রিঅর্ডার",
+      "history": "সময় অনুসারে ক্রম"
+    },
+    "track": {
+      "title": "ট্র্যাক আদেশ",
+      "eta": "আনুমানিক সময়:",
+      "status": "স্ট্যাটাস"
+    },
+    "dashboard": {
+      "title": "আপনার ড্যাশবোর্ড",
+      "savedKitchens": "সেভ করা রান্নাঘর",
+      "referrals": "রেফারাল:",
+      "tickets": "সহায়তা"
+    },
+    "account": {
+      "title": "অ্যাকাউন্ট",
+      "addresses": "ঠিকানাগুলি",
+      "payout": "পেমেন্ট রিফান্ড করুন",
+      "save": "প্রোফাইল সেভ করুন"
+    }
   }
 }

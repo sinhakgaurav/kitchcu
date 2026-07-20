@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Navigate, Outlet, Link, useLocation } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { BrandNavMark } from "../components/BrandNavMark";
 import { LanguageSwitcher } from "../i18n/LanguageSwitcher";
 import { KITCHEN_HOST } from "../shared/brand";
@@ -8,58 +9,61 @@ import { useKitchenAuth } from "../shared/kitchenAuth";
 import { useKitchen } from "../shared/kitchenContext";
 import { customerUrl } from "../shared/urls";
 
-type NavItem = { to: string; label: string; end?: boolean; module?: string };
+type NavItem = { to: string; labelKey: string; end?: boolean; module?: string };
 
-const NAV_SECTIONS: { label: string; items: NavItem[] }[] = [
+const NAV_SECTIONS: { labelKey: string; items: NavItem[] }[] = [
   {
-    label: "Operations",
+    labelKey: "owner.nav.operations",
     items: [
-      { to: "/dashboard", label: "Overview", end: true },
-      { to: "/dashboard/orders", label: "Orders" },
-      { to: "/dashboard/menu", label: "Menu" },
-      { to: "/dashboard/brand", label: "Brand page" },
-      { to: "/dashboard/ingredients", label: "Ingredients" },
+      { to: "/dashboard", labelKey: "owner.nav.overview", end: true },
+      { to: "/dashboard/orders", labelKey: "owner.nav.orders" },
+      { to: "/dashboard/menu", labelKey: "owner.nav.menu" },
+      { to: "/dashboard/brand", labelKey: "owner.nav.brand" },
+      { to: "/dashboard/ingredients", labelKey: "owner.nav.ingredients" },
     ],
   },
   {
-    label: "Growth",
+    labelKey: "owner.nav.growth",
     items: [
-      { to: "/dashboard/reports", label: "Reports" },
-      { to: "/dashboard/growth", label: "Intelligence" },
-      { to: "/dashboard/crm", label: "CRM" },
-      { to: "/dashboard/coupons", label: "Coupons" },
-      { to: "/dashboard/tiffin", label: "Tiffin plans", module: "tiffin_plans" },
-      { to: "/dashboard/templates", label: "Templates", module: "marketing_broadcast" },
-      { to: "/dashboard/stream", label: "Live stream", module: "streaming" },
+      { to: "/dashboard/reports", labelKey: "owner.nav.reports" },
+      { to: "/dashboard/growth", labelKey: "owner.nav.intelligence" },
+      { to: "/dashboard/crm", labelKey: "owner.nav.crm" },
+      { to: "/dashboard/coupons", labelKey: "owner.nav.coupons" },
+      { to: "/dashboard/tiffin", labelKey: "owner.nav.tiffin", module: "tiffin_plans" },
+      { to: "/dashboard/templates", labelKey: "owner.nav.templates", module: "marketing_broadcast" },
+      { to: "/dashboard/stream", labelKey: "owner.nav.stream", module: "streaming" },
     ],
   },
   {
-    label: "Learn & connect",
+    labelKey: "owner.nav.learn",
     items: [
-      { to: "/dashboard/learning", label: "Learning" },
-      { to: "/dashboard/community", label: "Community" },
+      { to: "/dashboard/learning", labelKey: "owner.nav.learning" },
+      { to: "/dashboard/community", labelKey: "owner.nav.community" },
     ],
   },
   {
-    label: "Account",
+    labelKey: "owner.nav.account",
     items: [
-      { to: "/dashboard/subscription", label: "Subscription" },
-      { to: "/dashboard/whatsapp", label: "WhatsApp", module: "whatsapp" },
-      { to: "/dashboard/payment-gateway", label: "Payment gateway", module: "razorpay" },
-      { to: "/dashboard/gst", label: "GST & finance" },
-      { to: "/dashboard/setup", label: "Kitchen setup" },
+      { to: "/dashboard/subscription", labelKey: "owner.nav.subscription" },
+      { to: "/dashboard/referrals", labelKey: "owner.nav.referrals" },
+      { to: "/dashboard/whatsapp", labelKey: "owner.nav.whatsapp", module: "whatsapp" },
+      { to: "/dashboard/payment-gateway", labelKey: "owner.nav.paymentGateway", module: "razorpay" },
+      { to: "/dashboard/gst", labelKey: "owner.nav.gst" },
+      { to: "/dashboard/setup", labelKey: "owner.nav.setup" },
     ],
   },
 ];
 
 export function RequireAuth({ children }: { children: React.ReactNode }) {
   const { token, loading } = useKitchenAuth();
-  if (loading) return <div className="app-loading">Loading...</div>;
+  const { t } = useTranslation();
+  if (loading) return <div className="app-loading">{t("owner.shell.loadingAuth")}</div>;
   if (!token) return <Navigate to="/login" replace />;
   return <>{children}</>;
 }
 
 export function OwnerLayout() {
+  const { t } = useTranslation();
   const { owner, logout, token } = useKitchenAuth();
   const { kitchen, kitchens, setKitchenId, loading } = useKitchen();
   const location = useLocation();
@@ -88,7 +92,6 @@ export function OwnerLayout() {
         if (!cancelled) setModules(ent.modules || {});
       })
       .catch(() => {
-        // Soft-fail: show all nav if entitlements unavailable (legacy kitchens).
         if (!cancelled) setModules(null);
       });
     return () => {
@@ -99,12 +102,15 @@ export function OwnerLayout() {
   const visibleSections = useMemo(() => {
     return NAV_SECTIONS.map((section) => ({
       ...section,
-      items: section.items.filter((item) => {
-        if (!item.module || modules == null) return true;
-        return modules[item.module] !== false;
-      }),
+      label: t(section.labelKey),
+      items: section.items
+        .filter((item) => {
+          if (!item.module || modules == null) return true;
+          return modules[item.module] !== false;
+        })
+        .map((item) => ({ ...item, label: t(item.labelKey) })),
     })).filter((section) => section.items.length > 0);
-  }, [modules]);
+  }, [modules, t]);
 
   const currentSection = visibleSections.flatMap((s) => s.items).find((item) =>
     item.end ? location.pathname === item.to : location.pathname.startsWith(item.to),
@@ -130,7 +136,7 @@ export function OwnerLayout() {
       <button
         type="button"
         className="owner-app__backdrop"
-        aria-label="Close menu"
+        aria-label={t("common.closeMenu")}
         onClick={() => setNavOpen(false)}
       />
 
@@ -142,7 +148,7 @@ export function OwnerLayout() {
           <button
             type="button"
             className="owner-app__nav-close"
-            aria-label="Close menu"
+            aria-label={t("common.closeMenu")}
             onClick={() => setNavOpen(false)}
           >
             ×
@@ -151,7 +157,7 @@ export function OwnerLayout() {
 
         {kitchens.length > 1 && (
           <label className="kc-field owner-app__kitchen-field">
-            <span className="kc-field__label">Active kitchen</span>
+            <span className="kc-field__label">{t("owner.shell.activeKitchen")}</span>
             <select
               className="kc-select owner-app__kitchen-select"
               value={kitchen?.id ?? ""}
@@ -166,7 +172,7 @@ export function OwnerLayout() {
 
         <nav className="owner-app__nav">
           {visibleSections.map((section) => (
-            <div key={section.label} className="owner-app__nav-group">
+            <div key={section.labelKey} className="owner-app__nav-group">
               <span className="owner-app__nav-label">{section.label}</span>
               {section.items.map((item) => {
                 const active = item.end
@@ -185,9 +191,11 @@ export function OwnerLayout() {
         <div className="owner-app__sidebar-foot">
           <LanguageSwitcher />
           <span>{owner?.name}</span>
-          <a href={customerUrl("/")} className="owner-app__customer-link" target="_blank" rel="noopener noreferrer">Customer app</a>
+          <a href={customerUrl("/")} className="owner-app__customer-link" target="_blank" rel="noopener noreferrer">
+            {t("common.customerApp")}
+          </a>
           <button type="button" className="owner-app__signout btn btn--ghost btn--sm" onClick={logout}>
-            Sign out
+            {t("common.signOut")}
           </button>
         </div>
       </aside>
@@ -198,20 +206,20 @@ export function OwnerLayout() {
             type="button"
             className="owner-app__menu-btn"
             aria-expanded={navOpen}
-            aria-label="Open menu"
+            aria-label={t("common.openMenu")}
             onClick={() => setNavOpen(true)}
           >
             <span /><span /><span />
           </button>
           <div className="owner-app__topbar-text">
-            <strong>{currentSection?.label ?? "Dashboard"}</strong>
+            <strong>{currentSection?.label ?? t("common.dashboard")}</strong>
             {kitchen && <span>{kitchen.name}</span>}
           </div>
         </header>
 
         <div className="owner-app__main">
           {loading ? (
-            <div className="app-loading">Loading kitchen...</div>
+            <div className="app-loading">{t("owner.shell.loadingKitchen")}</div>
           ) : (
             <Outlet context={{ kitchen }} />
           )}

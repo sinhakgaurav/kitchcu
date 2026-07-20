@@ -52,7 +52,12 @@ assert(ownerLayout.includes('label: "Brand page"'), "Owner nav label Brand page"
 assert(kitchenApp.includes('path="brand"'), "Kitchen router registers brand route");
 assert(kitchenApp.includes("BrandPage"), "Kitchen router imports BrandPage");
 assert(brandPage.includes("updateKitchenBrandedPage"), "BrandPage calls updateKitchenBrandedPage");
+assert(brandPage.includes("uploadKitchenMedia"), "BrandPage uploads logo/background via media API");
+assert(brandPage.includes("brand_logo"), "BrandPage uses brand_logo context");
+assert(brandPage.includes("brand_background"), "BrandPage uses brand_background context");
+assert(brandPage.includes("/dashboard/templates"), "BrandPage links to message templates");
 assert(ownerApi.includes("/branded-page"), "shared/api has owner branded-page PATCH");
+assert(ownerApi.includes("logo_url"), "shared/api branded page includes logo_url");
 assert(ownerHome.includes("/dashboard/brand"), "Overview links to Brand page");
 assert(ownerHome.includes("od-branded--teaser") || ownerHome.includes("Manage brand page"), "Overview shows brand teaser");
 assertWarn(
@@ -66,6 +71,11 @@ const brandedStore = read("apps/website/src/customer/BrandedStorefront.tsx");
 assert(customerApp.includes('path="/k/:code"'), "Customer app has /k/:code route");
 assert(brandedStore.includes("fetchKitchenByCode"), "BrandedStorefront loads kitchen by code");
 assert(brandedStore.includes("branded_page"), "BrandedStorefront reads branded_page settings");
+assert(brandedStore.includes("logo_url") || brandedStore.includes("logoUrl"), "BrandedStorefront renders logo");
+assert(
+  brandedStore.includes("background_url") || brandedStore.includes("backgroundUrl"),
+  "BrandedStorefront uses background image",
+);
 assert(ownerApi.includes("public/by-code"), "Public by-code API client exists");
 
 // ── Admin Brand workspace ─────────────────────────────────────────
@@ -76,12 +86,15 @@ const identityRoutes = read("services/identity/app/routes.py");
 const gateway = read("services/gateway/app/main.py");
 
 assert(adminApi.includes("updateAdminKitchenBrandedPage"), "adminApi has updateAdminKitchenBrandedPage");
+assert(adminApi.includes("uploadAdminKitchenBrandMedia"), "adminApi uploads brand media");
 assert(adminApi.includes("branded_page_enabled"), "adminApi types branded_page_enabled");
 assert(adminApi.includes("/branded-page"), "adminApi PATCH path branded-page");
 assert(adminApp.includes('"brand"'), "Admin kitchen panelTab includes brand");
 assert(adminApp.includes("saveBrandedPage") || adminApp.includes("updateAdminKitchenBrandedPage"), "Admin UI calls brand save");
+assert(adminApp.includes("uploadBrandMedia") || adminApp.includes("uploadAdminKitchenBrandMedia"), "Admin UI uploads brand media");
 assert(adminApp.includes('header: "Brand"'), "Admin kitchens DataTable has Brand column");
 assert(adminRoutes.includes('"/kitchens/{kitchen_id}/branded-page"'), "Identity admin route branded-page");
+assert(adminRoutes.includes("branded-page/media"), "Identity admin brand media upload route");
 assert(adminRoutes.includes("branded_page_enabled"), "AdminKitchenRow exposes branded_page_enabled");
 assert(identityRoutes.includes('"/kitchens/{kitchen_id}/branded-page"'), "Owner identity route branded-page");
 assert(gateway.includes('"/api/v1/admin"'), "Gateway IDENTITY_PREFIXES includes /api/v1/admin");

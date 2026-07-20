@@ -944,7 +944,7 @@ async def create_customer_order(
         delivery_mode=data.delivery_mode,
         delivery_fee_payment=data.delivery_fee_payment,
     )
-    return await create_manual_order(
+    order, created = await create_manual_order(
         session,
         kitchen_id,
         customer_id,
@@ -955,6 +955,13 @@ async def create_customer_order(
         status_note="Customer checkout order placed",
         idempotency_key=idempotency_key,
     )
+    if created:
+        from app.identity_referral_client import notify_customer_first_order
+
+        await notify_customer_first_order(
+            customer_id=customer_id, customer_phone=customer_phone
+        )
+    return order, created
 
 
 async def create_master_order(

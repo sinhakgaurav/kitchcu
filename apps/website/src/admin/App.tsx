@@ -12,17 +12,33 @@ import {
   fetchAdminKitchenPackage,
   fetchAdminKitchenTemplates,
   fetchAdminKitchenTiffinSummary,
+  fetchAdminKitchenGstMonthly,
+  fetchAdminKitchenGstProfile,
+  downloadAdminKitchenGstExcel,
+  downloadAdminKitchenGstPdf,
   fetchAdminKitchenWhatsApp,
   updateAdminKitchenDeliverySettings,
   updateAdminKitchenBrandedPage,
+  uploadAdminKitchenBrandMedia,
   fetchAdminMe,
+  fetchAdminEmployees,
   fetchAdminOrders,
   fetchAdminOwners,
   fetchAdminPackages,
   fetchAdminStats,
   fetchAdminTicket,
   fetchAdminTickets,
+  fetchReferralLeads,
+  fetchReferralSettings,
+  grantReferralLead,
+  patchReferralSettings,
+  rejectReferralLead,
   getAdminToken,
+  type AdminNavDetail,
+  type AdminOrder,
+  type AdminEmployee,
+  type AdminTicket,
+  adminNavigate,
   replyAdminTicket,
   setAdminToken,
   assignAdminKitchenPackage,
@@ -40,7 +56,10 @@ import {
   type AdminKitchenWhatsApp,
   type AdminPackage,
   type AdminMe,
-  type AdminTicket,
+  type AdminGstMonthlyReport,
+  type AdminGstProfile,
+  type AdminReferralLead,
+  type AdminReferralSettings,
   type AdminTiffinSummary,
   type PlatformStats,
 } from "./adminApi";
@@ -79,7 +98,8 @@ type Tab =
   | "employees"
   | "api-keys"
   | "control"
-  | "audit";
+  | "audit"
+  | "referrals";
 
 const TABS: { id: Tab; label: string }[] = [
   { id: "overview", label: "Overview" },
@@ -92,6 +112,7 @@ const TABS: { id: Tab; label: string }[] = [
   { id: "packages", label: "Packages" },
   { id: "employees", label: "Employees" },
   { id: "api-keys", label: "API Keys" },
+  { id: "referrals", label: "Referrals" },
   { id: "control", label: "Control" },
   { id: "audit", label: "Audit" },
 ];
@@ -109,7 +130,7 @@ const TAB_META: Record<Tab, { title: string; desc: string }> = {
   },
   kitchens: {
     title: "Kitchens",
-    desc: "Kitchen workspace — brand page, WhatsApp, payments, package, marketing, modules, streaming",
+    desc: "Kitchen workspace — brand, WhatsApp, payments, GST, package, marketing, modules, streaming",
   },
   owners: { title: "Owners", desc: "Subscription tiers and kitchen counts — force plan changes" },
   customers: {
@@ -142,6 +163,10 @@ const TAB_META: Record<Tab, { title: string; desc: string }> = {
     title: "Audit log",
     desc: "Who changed kitchens, flags, API keys, employees, and subscriptions",
   },
+  referrals: {
+    title: "Referrals",
+    desc: "Configure dual referral rewards and manage kitchen / customer leads",
+  },
 };
 
 const STAT_CARDS: {
@@ -172,6 +197,8 @@ export default function AdminApp() {
   const [openTickets, setOpenTickets] = useState(0);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
+  const [focusKitchenId, setFocusKitchenId] = useState<string | null>(null);
+  const [refundSearch, setRefundSearch] = useState("");
 
   const visibleTabs =
     me?.allowed_tabs?.length
@@ -230,6 +257,18 @@ export default function AdminApp() {
       cancelled = true;
     };
   }, [token]);
+
+  useEffect(() => {
+    const onNav = (ev: Event) => {
+      const detail = (ev as CustomEvent<AdminNavDetail>).detail;
+      if (!detail?.tab) return;
+      setTab(detail.tab as Tab);
+      if (detail.kitchenId) setFocusKitchenId(detail.kitchenId);
+      if (detail.refundSearch) setRefundSearch(detail.refundSearch);
+    };
+    window.addEventListener("kitchcu-admin-nav", onNav);
+    return () => window.removeEventListener("kitchcu-admin-nav", onNav);
+  }, []);
 
   if (!token) {
     return <AdminLogin onSuccess={(t) => setToken(t)} />;
@@ -307,15 +346,21 @@ export default function AdminApp() {
             />
           )}
 
-          {tab === "kitchens" && <AdminKitchens />}
+          {tab === "kitchens" && (
+            <AdminKitchens
+              focusKitchenId={focusKitchenId}
+              onFocusConsumed={() => setFocusKitchenId(null)}
+            />
+          )}
           {tab === "owners" && <AdminOwners />}
           {tab === "customers" && <AdminCustomers />}
           {tab === "orders" && <AdminOrders />}
-          {tab === "refunds" && <AdminRefunds />}
+          {tab === "refunds" && <AdminRefunds initialSearch={refundSearch} />}
           {tab === "tickets" && <AdminTickets />}
           {tab === "packages" && <AdminPackagesPanel />}
           {tab === "employees" && <AdminEmployeesPanel />}
           {tab === "api-keys" && <AdminApiKeysPanel />}
+          {tab === "referrals" && <AdminReferralsPanel />}
           {tab === "control" && <AdminControlPlane />}
           {tab === "audit" && <AdminAuditPanel />}
         </div>
@@ -783,10 +828,17 @@ function AdminLogin({ onSuccess }: { onSuccess: (token: string) => void }) {
   );
 }
 
-function AdminKitchens() {
+function AdminKitchens({
+  focusKitchenId,
+  onFocusConsumed,
+}: {
+  focusKitchenId?: string | null;
+  onFocusConsumed?: () => void;
+} = {}) {
   const [rows, setRows] = useState<AdminKitchen[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [kitchenOrders, setKitchenOrders] = useState<AdminOrder[]>([]);
   const [detail, setDetail] = useState<AdminKitchenDetail | null>(null);
   const [wa, setWa] = useState<AdminKitchenWhatsApp | null>(null);
   const [pgw, setPgw] = useState<AdminKitchenPaymentGateway | null>(null);
@@ -805,10 +857,17 @@ function AdminKitchens() {
     | "streaming"
     | "delivery"
     | "tiffin"
+    | "gst"
+    | "orders"
   >("profile");
   const [porterAutoBook, setPorterAutoBook] = useState(true);
   const [porterDelayMin, setPorterDelayMin] = useState(15);
   const [tiffinSummary, setTiffinSummary] = useState<AdminTiffinSummary | null>(null);
+  const [gstProfile, setGstProfile] = useState<AdminGstProfile | null>(null);
+  const [gstReport, setGstReport] = useState<AdminGstMonthlyReport | null>(null);
+  const gstNow = useMemo(() => new Date(), []);
+  const [gstYear, setGstYear] = useState(gstNow.getFullYear());
+  const [gstMonth, setGstMonth] = useState(gstNow.getMonth() + 1);
   const [error, setError] = useState("");
   const [ok, setOk] = useState("");
   const [busy, setBusy] = useState(false);
@@ -816,6 +875,9 @@ function AdminKitchens() {
   const [displayPhone, setDisplayPhone] = useState("");
   const [brandTagline, setBrandTagline] = useState("");
   const [brandAccent, setBrandAccent] = useState("#0F766E");
+  const [brandLogoUrl, setBrandLogoUrl] = useState<string | null>(null);
+  const [brandBackgroundUrl, setBrandBackgroundUrl] = useState<string | null>(null);
+  const [brandUploading, setBrandUploading] = useState<"logo" | "background" | null>(null);
   const [keyId, setKeyId] = useState("");
   const [keySecret, setKeySecret] = useState("");
   const [webhookSecret, setWebhookSecret] = useState("");
@@ -826,12 +888,6 @@ function AdminKitchens() {
   const reloadList = async () => {
     setRows(await fetchAdminKitchens());
   };
-
-  useEffect(() => {
-    reloadList()
-      .catch(() => {})
-      .finally(() => setLoading(false));
-  }, []);
 
   const openKitchen = async (id: string) => {
     setSelectedId(id);
@@ -855,7 +911,13 @@ function AdminKitchens() {
       setAllPackages(pkgs);
       setTemplates(tmpl);
       setTiffinSummary(tf);
+      setGstProfile(null);
+      setGstReport(null);
+      setKitchenOrders([]);
       setAssignPackageId(pkg?.package?.id ?? pkgs[0]?.id ?? "");
+      void fetchAdminOrders(50, { kitchen_id: id })
+        .then(setKitchenOrders)
+        .catch(() => setKitchenOrders([]));
       setPgw(p);
       setModules(m);
       setPorterAutoBook(d.porter_auto_book_enabled !== false);
@@ -864,6 +926,8 @@ function AdminKitchens() {
       setDisplayPhone(w.whatsapp_display_phone ?? "");
       setBrandTagline(d.branded_page?.tagline ?? "");
       setBrandAccent(d.branded_page?.accent_color ?? "#0F766E");
+      setBrandLogoUrl(d.branded_page?.logo_url ?? null);
+      setBrandBackgroundUrl(d.branded_page?.background_url ?? null);
       setKeyId(p.key_id ?? "");
       setLinkedAccountId(p.linked_account_id ?? "");
       setPgwActive(p.is_active);
@@ -873,6 +937,19 @@ function AdminKitchens() {
       setError(e instanceof Error ? e.message : "Failed to load kitchen workspace");
     }
   };
+
+  useEffect(() => {
+    reloadList()
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, []);
+
+  useEffect(() => {
+    if (focusKitchenId) {
+      void openKitchen(focusKitchenId).finally(() => onFocusConsumed?.());
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- open on focus prop only
+  }, [focusKitchenId]);
 
   const active = rows.filter((k) => k.status === "active").length;
   const suspended = rows.filter((k) => k.status === "suspended").length;
@@ -924,6 +1001,32 @@ function AdminKitchens() {
         cell: (k) => (k.branded_page_enabled ? "●" : "○"),
       },
       {
+        id: "health",
+        header: "Care",
+        sortable: true,
+        sortValue: (k) => (k.open_ticket_count ?? 0) + (k.open_refund_count ?? 0),
+        cell: (k) => {
+          const t = k.open_ticket_count ?? 0;
+          const r = k.open_refund_count ?? 0;
+          if (!t && !r) return "—";
+          return (
+            <span title="Open tickets / open refunds">
+              {t ? `${t} tix` : ""}
+              {t && r ? " · " : ""}
+              {r ? `${r} ref` : ""}
+            </span>
+          );
+        },
+      },
+      {
+        id: "last_order",
+        header: "Last order",
+        sortable: true,
+        sortValue: (k) => k.last_order_at ?? "",
+        cell: (k) =>
+          k.last_order_at ? new Date(k.last_order_at).toLocaleDateString("en-IN") : "—",
+      },
+      {
         id: "status",
         header: "Status",
         sortable: true,
@@ -954,10 +1057,14 @@ function AdminKitchens() {
         enabled,
         tagline: brandTagline.trim() || null,
         accent_color: brandAccent.trim() || null,
+        logo_url: brandLogoUrl,
+        background_url: brandBackgroundUrl,
       });
       setDetail(next);
       setBrandTagline(next.branded_page?.tagline ?? "");
       setBrandAccent(next.branded_page?.accent_color ?? "#0F766E");
+      setBrandLogoUrl(next.branded_page?.logo_url ?? null);
+      setBrandBackgroundUrl(next.branded_page?.background_url ?? null);
       await reloadList();
       setOk(
         enabled === true
@@ -970,6 +1077,23 @@ function AdminKitchens() {
       setError(err instanceof Error ? err.message : "Brand page update failed");
     } finally {
       setBusy(false);
+    }
+  };
+
+  const uploadBrandMedia = async (slot: "logo" | "background", file: File | null) => {
+    if (!selectedId || !file) return;
+    setBrandUploading(slot);
+    setError("");
+    try {
+      const next = await uploadAdminKitchenBrandMedia(selectedId, file, slot, file.name || `${slot}.jpg`);
+      setDetail(next);
+      setBrandLogoUrl(next.branded_page?.logo_url ?? null);
+      setBrandBackgroundUrl(next.branded_page?.background_url ?? null);
+      setOk(slot === "logo" ? "Logo uploaded." : "Background uploaded.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Brand media upload failed");
+    } finally {
+      setBrandUploading(null);
     }
   };
 
@@ -1170,25 +1294,92 @@ function AdminKitchens() {
                   "package",
                   "marketing",
                   "modules",
+                  "orders",
                   "streaming",
                   "delivery",
                   "tiffin",
+                  "gst",
                 ] as const
               ).map((t) => (
                 <button
                   key={t}
                   type="button"
                   className={panelTab === t ? "active" : ""}
-                  onClick={() => setPanelTab(t)}
+                  onClick={() => {
+                    setPanelTab(t);
+                    if (t === "orders" && selectedId) {
+                      void fetchAdminOrders(50, { kitchen_id: selectedId })
+                        .then(setKitchenOrders)
+                        .catch(() => setKitchenOrders([]));
+                    }
+                    if (t === "gst" && selectedId) {
+                      void (async () => {
+                        setError("");
+                        try {
+                          const [prof, rep] = await Promise.all([
+                            fetchAdminKitchenGstProfile(selectedId).catch(() => null),
+                            fetchAdminKitchenGstMonthly(selectedId, gstYear, gstMonth).catch(
+                              () => null,
+                            ),
+                          ]);
+                          setGstProfile(prof);
+                          setGstReport(rep);
+                        } catch (e) {
+                          setError(e instanceof Error ? e.message : "GST load failed");
+                        }
+                      })();
+                    }
+                  }}
                 >
                   {t === "whatsapp"
                     ? "WhatsApp"
                     : t === "payments"
                       ? "Payments"
-                      : t[0].toUpperCase() + t.slice(1)}
+                      : t === "gst"
+                        ? "GST"
+                        : t[0].toUpperCase() + t.slice(1)}
                 </button>
               ))}
             </div>
+
+            {panelTab === "orders" && (
+              <div className="admin-kitchen-panel__body">
+                <p className="report-hint">
+                  Last {kitchenOrders.length} orders for this kitchen (platform read). Open Tickets /
+                  Refunds tabs for care actions.
+                </p>
+                {kitchenOrders.length === 0 ? (
+                  <p className="admin-panel__empty">No orders yet for this kitchen.</p>
+                ) : (
+                  <div className="owner-table-wrap">
+                    <table className="owner-table">
+                      <thead>
+                        <tr>
+                          <th>Order</th>
+                          <th>Status</th>
+                          <th>Customer</th>
+                          <th>Total</th>
+                          <th>When</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {kitchenOrders.map((o) => (
+                          <tr key={o.id}>
+                            <td><code>{o.order_code}</code></td>
+                            <td>
+                              <span className={`status-badge status-badge--${o.status}`}>{o.status}</span>
+                            </td>
+                            <td>{o.customer_name || o.customer_phone || "—"}</td>
+                            <td>₹{o.total.toFixed(0)}</td>
+                            <td>{new Date(o.created_at).toLocaleString("en-IN")}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            )}
 
             {panelTab === "profile" && (
               <div className="admin-kitchen-panel__body">
@@ -1203,6 +1394,22 @@ function AdminKitchens() {
                     <dt>Brand page</dt>
                     <dd>{detail.branded_page?.enabled || detail.branded_page_enabled ? "Published" : "Not published"}</dd>
                   </div>
+                  <div>
+                    <dt>Last order</dt>
+                    <dd>
+                      {detail.last_order_at
+                        ? new Date(detail.last_order_at).toLocaleString("en-IN")
+                        : "—"}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>Open tickets</dt>
+                    <dd>{detail.open_ticket_count ?? 0}</dd>
+                  </div>
+                  <div>
+                    <dt>Open refunds</dt>
+                    <dd>{detail.open_refund_count ?? 0}</dd>
+                  </div>
                 </dl>
               </div>
             )}
@@ -1210,8 +1417,8 @@ function AdminKitchens() {
             {panelTab === "brand" && (
               <div className="admin-kitchen-panel__body owner-forms">
                 <p className="report-hint">
-                  Customer storefront at <code>/k/{detail.code}</code>. Owners manage this from kitchen → Brand page;
-                  ops can publish/unpublish here for support.
+                  Customer storefront at <code>/k/{detail.code}</code>. Same fields as owner Brand page — logo,
+                  background, tagline, accent. Message templates use <code>{"{{storefront_url}}"}</code>.
                 </p>
                 <dl className="admin-kv">
                   <div>
@@ -1231,6 +1438,86 @@ function AdminKitchens() {
                     <dd>{detail.branded_page?.enabled ? "Published" : "Not published"}</dd>
                   </div>
                 </dl>
+                <div className="od-brand-media" style={{ marginBottom: "1rem" }}>
+                  <div className="od-brand-media__slot">
+                    <span>Logo</span>
+                    {brandLogoUrl ? (
+                      <img src={brandLogoUrl} alt="" className="od-brand-media__preview od-brand-media__preview--logo" />
+                    ) : (
+                      <div className="od-brand-media__empty">No logo</div>
+                    )}
+                    <label className="btn btn--ghost btn--sm">
+                      {brandUploading === "logo" ? "Uploading…" : "Upload logo"}
+                      <input
+                        type="file"
+                        accept="image/jpeg,image/png,image/webp"
+                        hidden
+                        disabled={!!brandUploading || busy}
+                        onChange={(e) => {
+                          void uploadBrandMedia("logo", e.target.files?.[0] ?? null);
+                          e.target.value = "";
+                        }}
+                      />
+                    </label>
+                    {brandLogoUrl && (
+                      <button
+                        type="button"
+                        className="btn btn--ghost btn--sm"
+                        disabled={busy}
+                        onClick={() => {
+                          setBrandLogoUrl(null);
+                          void updateAdminKitchenBrandedPage(selectedId!, { logo_url: "" }).then((next) => {
+                            setDetail(next);
+                            setBrandLogoUrl(next.branded_page?.logo_url ?? null);
+                          });
+                        }}
+                      >
+                        Remove
+                      </button>
+                    )}
+                  </div>
+                  <div className="od-brand-media__slot">
+                    <span>Background</span>
+                    {brandBackgroundUrl ? (
+                      <img
+                        src={brandBackgroundUrl}
+                        alt=""
+                        className="od-brand-media__preview od-brand-media__preview--bg"
+                      />
+                    ) : (
+                      <div className="od-brand-media__empty">No background</div>
+                    )}
+                    <label className="btn btn--ghost btn--sm">
+                      {brandUploading === "background" ? "Uploading…" : "Upload background"}
+                      <input
+                        type="file"
+                        accept="image/jpeg,image/png,image/webp"
+                        hidden
+                        disabled={!!brandUploading || busy}
+                        onChange={(e) => {
+                          void uploadBrandMedia("background", e.target.files?.[0] ?? null);
+                          e.target.value = "";
+                        }}
+                      />
+                    </label>
+                    {brandBackgroundUrl && (
+                      <button
+                        type="button"
+                        className="btn btn--ghost btn--sm"
+                        disabled={busy}
+                        onClick={() => {
+                          setBrandBackgroundUrl(null);
+                          void updateAdminKitchenBrandedPage(selectedId!, { background_url: "" }).then((next) => {
+                            setDetail(next);
+                            setBrandBackgroundUrl(next.branded_page?.background_url ?? null);
+                          });
+                        }}
+                      >
+                        Remove
+                      </button>
+                    )}
+                  </div>
+                </div>
                 <label>
                   Tagline
                   <input
@@ -1542,6 +1829,150 @@ function AdminKitchens() {
               </div>
             )}
 
+            {panelTab === "gst" && (
+              <div className="admin-kitchen-panel__body">
+                <p className="report-hint">
+                  Monthly GST calculation for this kitchen — same figures the owner closes for
+                  accountant handoff. Download Excel / PDF exports below.
+                </p>
+                <div className="admin-toolbar" style={{ marginBottom: "1rem", display: "flex", gap: "0.75rem", flexWrap: "wrap" }}>
+                  <label>
+                    Year{" "}
+                    <select
+                      value={gstYear}
+                      onChange={async (e) => {
+                        const y = Number(e.target.value);
+                        setGstYear(y);
+                        if (!selectedId) return;
+                        const [prof, rep] = await Promise.all([
+                          fetchAdminKitchenGstProfile(selectedId).catch(() => null),
+                          fetchAdminKitchenGstMonthly(selectedId, y, gstMonth).catch(() => null),
+                        ]);
+                        setGstProfile(prof);
+                        setGstReport(rep);
+                      }}
+                    >
+                      {[gstYear - 1, gstYear, gstYear + 1].map((y) => (
+                        <option key={y} value={y}>{y}</option>
+                      ))}
+                    </select>
+                  </label>
+                  <label>
+                    Month{" "}
+                    <select
+                      value={gstMonth}
+                      onChange={async (e) => {
+                        const m = Number(e.target.value);
+                        setGstMonth(m);
+                        if (!selectedId) return;
+                        const rep = await fetchAdminKitchenGstMonthly(selectedId, gstYear, m).catch(
+                          () => null,
+                        );
+                        setGstReport(rep);
+                      }}
+                    >
+                      {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => (
+                        <option key={m} value={m}>{m}</option>
+                      ))}
+                    </select>
+                  </label>
+                  {gstReport && (
+                    <>
+                      <button
+                        type="button"
+                        className="btn btn--primary btn--sm"
+                        disabled={busy}
+                        onClick={async () => {
+                          if (!selectedId) return;
+                          setBusy(true);
+                          setError("");
+                          try {
+                            await downloadAdminKitchenGstExcel(selectedId, gstYear, gstMonth);
+                          } catch (e) {
+                            setError(e instanceof Error ? e.message : "Excel download failed");
+                          } finally {
+                            setBusy(false);
+                          }
+                        }}
+                      >
+                        Download Excel
+                      </button>
+                      <button
+                        type="button"
+                        className="btn btn--ghost btn--sm"
+                        disabled={busy}
+                        onClick={async () => {
+                          if (!selectedId) return;
+                          setBusy(true);
+                          setError("");
+                          try {
+                            await downloadAdminKitchenGstPdf(selectedId, gstYear, gstMonth);
+                          } catch (e) {
+                            setError(e instanceof Error ? e.message : "PDF download failed");
+                          } finally {
+                            setBusy(false);
+                          }
+                        }}
+                      >
+                        Download PDF
+                      </button>
+                    </>
+                  )}
+                </div>
+                {gstProfile ? (
+                  <dl className="admin-kv">
+                    <div><dt>GSTIN</dt><dd>{gstProfile.gstin}</dd></div>
+                    <div><dt>Legal name</dt><dd>{gstProfile.legal_name}</dd></div>
+                    <div><dt>State</dt><dd>{gstProfile.state_code}</dd></div>
+                    <div><dt>Tax rate</dt><dd>{gstProfile.default_tax_rate}%</dd></div>
+                    <div><dt>Active</dt><dd>{gstProfile.is_active ? "Yes" : "No"}</dd></div>
+                  </dl>
+                ) : (
+                  <p className="admin-panel__empty">No GST profile registered for this kitchen.</p>
+                )}
+                {gstReport && (
+                  <>
+                    <dl className="admin-kv" style={{ marginTop: "1rem" }}>
+                      <div><dt>Taxable</dt><dd>₹{gstReport.total_taxable.toLocaleString("en-IN")}</dd></div>
+                      <div><dt>Output tax</dt><dd>₹{gstReport.total_tax.toLocaleString("en-IN")}</dd></div>
+                      <div><dt>Gross sales</dt><dd>₹{gstReport.total_gross_sales.toLocaleString("en-IN")}</dd></div>
+                      <div><dt>Invoices</dt><dd>{gstReport.invoice_count} · {gstReport.audit_status}</dd></div>
+                    </dl>
+                    <div className="owner-table-wrap" style={{ marginTop: "1rem" }}>
+                      <table className="owner-table">
+                        <thead>
+                          <tr>
+                            <th>Invoice</th>
+                            <th>Order</th>
+                            <th>Taxable</th>
+                            <th>CGST</th>
+                            <th>SGST</th>
+                            <th>Gross</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {gstReport.invoices.length === 0 ? (
+                            <tr><td colSpan={6}>No invoices in this period</td></tr>
+                          ) : (
+                            gstReport.invoices.map((inv) => (
+                              <tr key={inv.id}>
+                                <td>{inv.invoice_number}</td>
+                                <td>{inv.order_code}</td>
+                                <td>₹{inv.taxable_value.toFixed(2)}</td>
+                                <td>₹{inv.cgst_amount.toFixed(2)}</td>
+                                <td>₹{inv.sgst_amount.toFixed(2)}</td>
+                                <td>₹{inv.gross_total.toFixed(2)}</td>
+                              </tr>
+                            ))
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
+
             {panelTab === "delivery" && detail && (
               <div className="admin-kitchen-panel__body">
                 <p className="report-hint">
@@ -1839,23 +2270,33 @@ function AdminOrders() {
 
 function AdminTickets() {
   const [tickets, setTickets] = useState<AdminTicket[]>([]);
+  const [employees, setEmployees] = useState<AdminEmployee[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [detail, setDetail] = useState<AdminTicket | null>(null);
   const [reply, setReply] = useState("");
+  const [resolutionNote, setResolutionNote] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [audienceFilter, setAudienceFilter] = useState("");
 
   const loadTickets = async () => {
-    const res = await fetchAdminTickets();
+    const res = await fetchAdminTickets({
+      audience: audienceFilter || undefined,
+    });
     setTickets(res.tickets);
   };
 
   useEffect(() => {
-    loadTickets()
-      .catch((e) => setError(e.message))
+    Promise.all([loadTickets(), fetchAdminEmployees().catch(() => [] as AdminEmployee[])])
+      .then(([, emps]) => setEmployees(emps.filter((e) => e.is_active)))
+      .catch((e) => setError(e instanceof Error ? e.message : "Load failed"))
       .finally(() => setLoading(false));
   }, []);
+
+  useEffect(() => {
+    void loadTickets().catch((e) => setError(e instanceof Error ? e.message : "Load failed"));
+  }, [audienceFilter]);
 
   useEffect(() => {
     if (!selectedId) {
@@ -1863,7 +2304,10 @@ function AdminTickets() {
       return;
     }
     fetchAdminTicket(selectedId)
-      .then(setDetail)
+      .then((t) => {
+        setDetail(t);
+        setResolutionNote(t.resolution_note || "");
+      })
       .catch((e) => setError(e.message));
   }, [selectedId]);
 
@@ -1871,6 +2315,7 @@ function AdminTickets() {
     if (!selectedId) return;
     const t = await fetchAdminTicket(selectedId);
     setDetail(t);
+    setResolutionNote(t.resolution_note || "");
     await loadTickets();
   };
 
@@ -1878,10 +2323,44 @@ function AdminTickets() {
     if (!selectedId) return;
     setBusy(true);
     try {
-      await updateAdminTicket(selectedId, { status });
+      await updateAdminTicket(selectedId, {
+        status,
+        resolution_note:
+          status === "resolved" || status === "closed"
+            ? resolutionNote || undefined
+            : undefined,
+      });
       await refreshDetail();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Update failed");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handlePriorityChange = async (priority: string) => {
+    if (!selectedId) return;
+    setBusy(true);
+    try {
+      await updateAdminTicket(selectedId, { priority });
+      await refreshDetail();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Priority update failed");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleAssigneeChange = async (adminId: string) => {
+    if (!selectedId) return;
+    setBusy(true);
+    try {
+      await updateAdminTicket(selectedId, {
+        assigned_admin_id: adminId || null,
+      });
+      await refreshDetail();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Assign failed");
     } finally {
       setBusy(false);
     }
@@ -1940,6 +2419,17 @@ function AdminTickets() {
         cell: (t) => t.priority,
       },
       {
+        id: "assignee",
+        header: "Assignee",
+        sortable: true,
+        sortValue: (t) => t.assigned_admin_id ?? "",
+        cell: (t) => {
+          if (!t.assigned_admin_id) return "—";
+          const emp = employees.find((e) => e.id === t.assigned_admin_id);
+          return emp?.name ?? t.assigned_admin_id.slice(0, 8);
+        },
+      },
+      {
         id: "open",
         header: "",
         cell: (t) => (
@@ -1949,12 +2439,20 @@ function AdminTickets() {
         ),
       },
     ],
-    [],
+    [employees],
   );
 
   return (
     <div className="admin-tickets">
       {error && <p className="auth-card__error">{error}</p>}
+
+      <div className="admin-toolbar" style={{ marginBottom: "0.75rem" }}>
+        <select value={audienceFilter} onChange={(e) => setAudienceFilter(e.target.value)}>
+          <option value="">All audiences</option>
+          <option value="customer">Customer</option>
+          <option value="owner">Owner</option>
+        </select>
+      </div>
 
       <div className={`admin-tickets__grid${detail ? "" : " admin-tickets__grid--list-only"}`}>
         <DataTable
@@ -1963,7 +2461,7 @@ function AdminTickets() {
           emptyMessage="No tickets yet — customers can raise them via AI chat on the portal."
           searchPlaceholder="Search ticket, subject, audience…"
           getSearchText={(t) =>
-            `${t.ticket_number} ${t.subject} ${t.status} ${t.priority} ${t.audience} ${t.category} ${t.customer_name ?? ""}`
+            `${t.ticket_number} ${t.subject} ${t.status} ${t.priority} ${t.audience} ${t.category} ${t.customer_name ?? ""} ${t.order_code ?? ""}`
           }
           filterChips={[
             { id: "", label: "All" },
@@ -1996,10 +2494,26 @@ function AdminTickets() {
               <div><dt>From</dt><dd>{detail.customer_name ?? "—"} ({detail.audience})</dd></div>
               <div><dt>Contact</dt><dd>{detail.customer_phone ?? detail.customer_email ?? "—"}</dd></div>
               {detail.order_code && <div><dt>Order</dt><dd>{detail.order_code}</dd></div>}
+              {detail.kitchen_id && (
+                <div>
+                  <dt>Kitchen</dt>
+                  <dd>
+                    <button
+                      type="button"
+                      className="btn btn--ghost btn--sm"
+                      onClick={() =>
+                        adminNavigate({ tab: "kitchens", kitchenId: detail.kitchen_id! })
+                      }
+                    >
+                      Open kitchen workspace
+                    </button>
+                  </dd>
+                </div>
+              )}
             </dl>
             <p className="admin-tickets__desc">{detail.description}</p>
 
-            <div className="admin-tickets__actions">
+            <div className="admin-tickets__actions" style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem" }}>
               <select
                 value={detail.status}
                 disabled={busy}
@@ -2011,7 +2525,50 @@ function AdminTickets() {
                 <option value="resolved">Resolved</option>
                 <option value="closed">Closed</option>
               </select>
+              <select
+                value={detail.priority}
+                disabled={busy}
+                onChange={(e) => handlePriorityChange(e.target.value)}
+              >
+                <option value="low">Low</option>
+                <option value="normal">Normal</option>
+                <option value="high">High</option>
+                <option value="urgent">Urgent</option>
+              </select>
+              <select
+                value={detail.assigned_admin_id ?? ""}
+                disabled={busy}
+                onChange={(e) => handleAssigneeChange(e.target.value)}
+              >
+                <option value="">Unassigned</option>
+                {employees.map((e) => (
+                  <option key={e.id} value={e.id}>
+                    {e.name} ({e.role})
+                  </option>
+                ))}
+              </select>
+              {detail.order_code && (
+                <button
+                  type="button"
+                  className="btn btn--ghost btn--sm"
+                  onClick={() =>
+                    adminNavigate({ tab: "refunds", refundSearch: detail.order_code || "" })
+                  }
+                >
+                  Open refunds
+                </button>
+              )}
             </div>
+            <label style={{ display: "block", marginTop: "0.75rem" }}>
+              Resolution note
+              <textarea
+                value={resolutionNote}
+                onChange={(e) => setResolutionNote(e.target.value)}
+                rows={2}
+                disabled={busy}
+                placeholder="Required when resolving…"
+              />
+            </label>
 
             <div className="admin-tickets__thread">
               {detail.messages.map((m) => (
@@ -2037,6 +2594,197 @@ function AdminTickets() {
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+function AdminReferralsPanel() {
+  const [settings, setSettings] = useState<AdminReferralSettings | null>(null);
+  const [leads, setLeads] = useState<AdminReferralLead[]>([]);
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [filterDir, setFilterDir] = useState("");
+  const [filterStatus, setFilterStatus] = useState("");
+
+  const reload = async () => {
+    try {
+      const [s, l] = await Promise.all([
+        fetchReferralSettings(),
+        fetchReferralLeads({
+          direction: filterDir || undefined,
+          status_filter: filterStatus || undefined,
+        }),
+      ]);
+      setSettings(s);
+      setLeads(l.leads);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to load referrals");
+    }
+  };
+
+  useEffect(() => {
+    void reload();
+  }, [filterDir, filterStatus]);
+
+  const save = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!settings) return;
+    setBusy(true);
+    setError("");
+    try {
+      const next = await patchReferralSettings(settings);
+      setSettings(next);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Save failed");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="admin-panel">
+      {error && <p className="auth-card__error">{error}</p>}
+      {settings && (
+        <form className="admin-form" onSubmit={save}>
+          <h2>Reward configuration</h2>
+          <label className="admin-check">
+            <input
+              type="checkbox"
+              checked={settings.enabled}
+              onChange={(e) => setSettings({ ...settings, enabled: e.target.checked })}
+            />
+            Program enabled
+          </label>
+          <label>
+            Customer → kitchen reward (₹)
+            <input
+              type="number"
+              min={0}
+              step={1}
+              value={settings.customer_to_kitchen_reward_inr}
+              onChange={(e) =>
+                setSettings({
+                  ...settings,
+                  customer_to_kitchen_reward_inr: Number(e.target.value),
+                })
+              }
+            />
+          </label>
+          <label>
+            Kitchen → customer reward (₹)
+            <input
+              type="number"
+              min={0}
+              step={1}
+              value={settings.kitchen_to_customer_reward_inr}
+              onChange={(e) =>
+                setSettings({
+                  ...settings,
+                  kitchen_to_customer_reward_inr: Number(e.target.value),
+                })
+              }
+            />
+          </label>
+          <label>
+            Kitchen reward trigger
+            <select
+              value={settings.kitchen_reward_trigger}
+              onChange={(e) =>
+                setSettings({ ...settings, kitchen_reward_trigger: e.target.value })
+              }
+            >
+              <option value="first_order_or_onboard">First order or onboard</option>
+              <option value="onboard">Onboard only</option>
+              <option value="first_order">First order only</option>
+            </select>
+          </label>
+          <button type="submit" className="btn btn--primary" disabled={busy}>
+            Save settings
+          </button>
+        </form>
+      )}
+
+      <div className="admin-toolbar" style={{ marginTop: "1.5rem" }}>
+        <select value={filterDir} onChange={(e) => setFilterDir(e.target.value)}>
+          <option value="">All directions</option>
+          <option value="customer_to_kitchen">Customer → kitchen</option>
+          <option value="kitchen_to_customer">Kitchen → customer</option>
+        </select>
+        <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)}>
+          <option value="">All statuses</option>
+          <option value="submitted">Submitted</option>
+          <option value="converted">Converted</option>
+          <option value="rejected">Rejected</option>
+        </select>
+      </div>
+
+      <DataTable
+        rows={leads}
+        rowKey={(r) => r.id}
+        emptyMessage="No referral leads yet"
+        searchPlaceholder="Search contact, phone, kitchen, status…"
+        getSearchText={(r) =>
+          [
+            r.direction,
+            r.contact_name,
+            r.contact_phone,
+            r.contact_email,
+            r.kitchen_name,
+            r.status,
+            r.city,
+            r.notes,
+          ]
+            .filter(Boolean)
+            .join(" ")
+        }
+        columns={[
+          {
+            id: "direction",
+            header: "Direction",
+            cell: (r) => r.direction.replaceAll("_", " "),
+          },
+          { id: "contact", header: "Contact", cell: (r) => r.contact_name || "—" },
+          { id: "phone", header: "Phone", cell: (r) => r.contact_phone },
+          { id: "kitchen", header: "Kitchen", cell: (r) => r.kitchen_name || "—" },
+          { id: "status", header: "Status", cell: (r) => r.status },
+          {
+            id: "reward",
+            header: "Reward",
+            cell: (r) => (r.reward_inr != null ? `₹${r.reward_inr}` : "—"),
+          },
+          {
+            id: "actions",
+            header: "",
+            cell: (r) =>
+              r.status === "submitted" ? (
+                <span style={{ display: "flex", gap: "0.35rem" }}>
+                  <button
+                    type="button"
+                    className="btn btn--primary btn--sm"
+                    onClick={async () => {
+                      await grantReferralLead(r.id);
+                      await reload();
+                    }}
+                  >
+                    Grant
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn--ghost btn--sm"
+                    onClick={async () => {
+                      const reason = window.prompt("Rejection reason");
+                      if (!reason) return;
+                      await rejectReferralLead(r.id, reason);
+                      await reload();
+                    }}
+                  >
+                    Reject
+                  </button>
+                </span>
+              ) : null,
+          },
+        ]}
+      />
     </div>
   );
 }

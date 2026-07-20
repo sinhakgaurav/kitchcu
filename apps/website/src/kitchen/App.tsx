@@ -22,6 +22,7 @@ import { CrmPage } from "../pages/owner/CrmPage";
 import { CouponsPage } from "../pages/owner/CouponsPage";
 import { MarketingTemplatesPage } from "../pages/owner/MarketingTemplatesPage";
 import { TiffinSubscriptionsPage } from "../pages/owner/TiffinSubscriptionsPage";
+import { ReferralsPage } from "../pages/owner/ReferralsPage";
 import { SubscriptionPage } from "../pages/owner/SubscriptionPage";
 import { PaymentGatewayPage } from "../pages/owner/PaymentGatewayPage";
 import { WhatsAppIntegrationPage } from "../pages/owner/WhatsAppIntegrationPage";
@@ -66,6 +67,7 @@ export default function KitchenApp() {
             <Route path="tiffin" element={<TiffinSubscriptionsPage />} />
             <Route path="templates" element={<MarketingTemplatesPage />} />
             <Route path="subscription" element={<SubscriptionPage />} />
+            <Route path="referrals" element={<ReferralsPage />} />
             <Route path="whatsapp" element={<WhatsAppIntegrationPage />} />
             <Route path="payment-gateway" element={<PaymentGatewayPage />} />
             <Route path="gst" element={<GstFinancePage />} />

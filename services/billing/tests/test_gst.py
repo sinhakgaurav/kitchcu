@@ -166,6 +166,40 @@ async def test_close_monthly_audit(client: AsyncClient, billing_ctx):
 
 
 @pytest.mark.asyncio
+async def test_monthly_gst_excel_and_pdf_exports(client: AsyncClient, billing_ctx):
+    _, kitchen_id, order_id, _, token = billing_ctx
+    headers = {"Authorization": f"Bearer {token}"}
+
+    await client.put(
+        f"/api/v1/kitchens/{kitchen_id}/gst/profile",
+        json=_profile_payload(),
+        headers=headers,
+    )
+    _mark_order_delivered(order_id)
+    await client.post(f"/api/v1/kitchens/{kitchen_id}/gst/sync", headers=headers)
+
+    xlsx = await client.get(
+        f"/api/v1/kitchens/{kitchen_id}/gst/reports/monthly/export.xlsx?year=2026&month=7",
+        headers=headers,
+    )
+    assert xlsx.status_code == 200, xlsx.text
+    assert (
+        "spreadsheetml" in xlsx.headers.get("content-type", "")
+        or xlsx.headers.get("content-type", "").endswith("sheet")
+    )
+    assert xlsx.content[:2] == b"PK"  # zip/xlsx magic
+    assert "attachment" in xlsx.headers.get("content-disposition", "")
+
+    pdf = await client.get(
+        f"/api/v1/kitchens/{kitchen_id}/gst/reports/monthly/export.pdf?year=2026&month=7",
+        headers=headers,
+    )
+    assert pdf.status_code == 200, pdf.text
+    assert pdf.headers.get("content-type", "").startswith("application/pdf")
+    assert pdf.content[:4] == b"%PDF"
+
+
+@pytest.mark.asyncio
 async def test_gst_sync_publishes_event(client: AsyncClient, billing_ctx):
     _, kitchen_id, order_id, _, token = billing_ctx
     headers = {"Authorization": f"Bearer {token}"}

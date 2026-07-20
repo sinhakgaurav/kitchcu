@@ -1,5 +1,6 @@
 import { Link, useLocation } from "react-router-dom";
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { BrandNavMark } from "./BrandNavMark";
 import { LanguageSwitcher } from "../i18n/LanguageSwitcher";
 import { CUSTOMER_HOST } from "../shared/brand";
@@ -7,6 +8,7 @@ import { useCustomerAuth } from "../shared/customerAuth";
 import { kitchenUrl } from "../shared/urls";
 
 export function CustomerNavbar() {
+  const { t } = useTranslation();
   const [scrolled, setScrolled] = useState(false);
   const [open, setOpen] = useState(false);
   const { session } = useCustomerAuth();
@@ -27,14 +29,15 @@ export function CustomerNavbar() {
         <BrandNavMark to="/" subtitle={CUSTOMER_HOST} height={44} />
 
         <nav className={`nav__links ${open ? "nav__links--open" : ""}`}>
-          <a href={hashLink("/#nearby")} onClick={() => setOpen(false)}>Nearby</a>
-          <Link to="/browse" onClick={() => setOpen(false)}>Find by code</Link>
-          <Link to="/orders" onClick={() => setOpen(false)}>My orders</Link>
-          <Link to="/dashboard" onClick={() => setOpen(false)}>Dashboard</Link>
-          <Link to="/account" onClick={() => setOpen(false)}>Payout details</Link>
-          <a href={hashLink("/#how")} onClick={() => setOpen(false)}>How it works</a>
+          <a href={hashLink("/#near-you")} onClick={() => setOpen(false)}>{t("customer.nav.nearYou")}</a>
+          <a href={hashLink("/#featured")} onClick={() => setOpen(false)}>{t("customer.nav.featured")}</a>
+          <a href={hashLink("/#cheapest")} onClick={() => setOpen(false)}>{t("customer.nav.bestPrices")}</a>
+          <a href={hashLink("/#by-code")} onClick={() => setOpen(false)}>{t("customer.nav.kitchenCode")}</a>
+          <Link to="/orders" onClick={() => setOpen(false)}>{t("customer.nav.myOrders")}</Link>
+          <Link to="/dashboard" onClick={() => setOpen(false)}>{t("customer.nav.dashboard")}</Link>
+          <Link to="/account" onClick={() => setOpen(false)}>{t("customer.nav.account")}</Link>
           <Link to="/login" className="btn btn--ghost btn--sm" onClick={() => setOpen(false)}>
-            {session ? session.name : "Customer sign in"}
+            {session ? session.name : t("customer.nav.signIn")}
           </Link>
           <a
             href={kitchenUrl("/login")}
@@ -43,7 +46,7 @@ export function CustomerNavbar() {
             rel="noopener noreferrer"
             onClick={() => setOpen(false)}
           >
-            Kitchen owner →
+            {t("common.kitchenOwner")}
           </a>
           <LanguageSwitcher />
         </nav>
@@ -51,7 +54,7 @@ export function CustomerNavbar() {
         <button
           type="button"
           className="nav__toggle"
-          aria-label="Toggle menu"
+          aria-label={t("common.toggleMenu")}
           aria-expanded={open}
           onClick={() => setOpen(!open)}
         >

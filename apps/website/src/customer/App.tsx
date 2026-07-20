@@ -2,12 +2,8 @@ import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { CustomerAuthProvider } from "../shared/customerAuth";
 import { CustomerNavbar } from "../components/CustomerNavbar";
 import { CustomerFooter } from "../components/CustomerFooter";
-import { Hero } from "../components/Hero";
-import { ParallaxDivider } from "../components/ParallaxDivider";
-import { FloatingGallery } from "../components/FloatingGallery";
-import { CustomerShowcase } from "../components/CustomerShowcase";
-import { NearbyKitchensList } from "../components/NearbyKitchensList";
-import { CustomerHomePage, CustomerLoginPage } from "./pages/CustomerPages";
+import { CustomerLoginPage } from "./pages/CustomerPages";
+import { CustomerDiscoveryHome } from "./pages/CustomerDiscoveryHome";
 import { CustomerOAuthCallbackPage } from "./pages/CustomerOAuthCallbackPage";
 import { KitchenMenuPage } from "../pages/customer/KitchenMenuPage";
 import { CheckoutPage } from "../pages/customer/CheckoutPage";
@@ -41,14 +37,9 @@ export default function CustomerApp() {
             path="/"
             element={
               <CustomerShell>
-                <Hero variant="customer" />
-                <ParallaxDivider />
-                <CustomerHomePage />
-                <NearbyKitchensList />
-                <FloatingGallery />
-                <ParallaxDivider reverse />
-                <CustomerShowcase />
-              </CustomerShell>            }
+                <CustomerDiscoveryHome />
+              </CustomerShell>
+            }
           />
           <Route path="/login" element={<CustomerLoginPage />} />
           <Route path="/browse" element={<CustomerBrowsePage />} />

@@ -8,6 +8,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import Kitchen, Owner
+from app.discovery import DiscoveryHomeResponse, build_discovery_home
 from app.schemas import (
     KitchenCreateRequest,
     KitchenDeliverySettingsUpdate,
@@ -242,6 +243,11 @@ async def kitchen_create(
         },
     )
     await publisher.publish(stream_key("identity", "kitchen"), event, session=session)
+    from app.referral import try_reward_kitchen_onboard
+
+    await try_reward_kitchen_onboard(
+        session, kitchen=kitchen, owner=owner, publisher=publisher
+    )
     return await kitchen_to_response(session, kitchen)
 
 
@@ -394,6 +400,34 @@ async def kitchen_whatsapp_put(
         raise HTTPException(status_code=code, detail=str(exc)) from exc
     await session.commit()
     return out
+
+
+@router.get(
+    "/discovery/home",
+    response_model=DiscoveryHomeResponse,
+    summary="Customer discovery home feed",
+    description=(
+        "Public geo-scoped order pathways for the customer app: near you, featured, "
+        "most liked, live now, and cheapest dishes in range. Single round-trip — "
+        "no client N+1 across menus/ratings."
+    ),
+    responses={422: RESP_422},
+    tags=["Discovery"],
+)
+async def discovery_home(
+    session: Annotated[AsyncSession, Depends(get_db)],
+    latitude: float = Query(..., ge=-90, le=90, examples=[18.5204]),
+    longitude: float = Query(..., ge=-180, le=180, examples=[73.8567]),
+    max_km: float = Query(25.0, gt=0, le=200, examples=[25.0]),
+    section_limit: int = Query(12, ge=1, le=30, examples=[12]),
+) -> DiscoveryHomeResponse:
+    return await build_discovery_home(
+        session,
+        latitude=latitude,
+        longitude=longitude,
+        max_km=max_km,
+        section_limit=section_limit,
+    )
 
 
 @router.get(

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""Generate Kitchcu Complete Executive Guide PDF v3.2 — deep encyclopedia (CEO + CPO + CTO).
+"""Generate Kitchcu Complete Executive Guide PDF v3.2.3 — deep encyclopedia (CEO + CPO + CTO).
 
-Source of truth: docs/CKAC-COMPLETE-GUIDE.md v3.2 (July 2026).
+Source of truth: docs/CKAC-COMPLETE-GUIDE.md v3.2.3 (July 2026).
 Shared layout: scripts/pdf_guide.py (GuidePDF) — header clearance, caption-above figures.
 """
 
@@ -1208,7 +1208,7 @@ def build() -> GuidePDF:
     pdf.table(
         ["Document", "Role"],
         [
-            ["CKAC-COMPLETE-GUIDE.md/.pdf v3.2", "This CEO/CPO/CTO encyclopedia"],
+            ["CKAC-COMPLETE-GUIDE.md/.pdf v3.2.3", "This CEO/CPO/CTO encyclopedia"],
             ["CKAC-USERFLOWS.md/.pdf", "Full step-by-step user journey pack"],
             ["API.md", "Public API reference + OpenAPI URLs"],
             ["E1-E2-*-DESIGN.md", "S19 quality-loop design pack"],
@@ -1228,13 +1228,13 @@ def build() -> GuidePDF:
 
     pdf.chapter("Document control")
     pdf.body(
-        "v3.2 July 2026 — Super-admin Control plane; dish ready-within / max_time; delivery "
-        "payer modes + Maps tracking; login AuthLoginHighlights; expanded UI Catalog "
-        "(8 surfaces); flows 17.9-17.10; PDF layout fix (header clearance, caption above "
-        "figures). Supersedes v3.1 (OpenAPI aggregation + form spacing + USERFLOWS pack)."
+        "v3.2.3 July 2026 — P37-P40 dual referrals; GST Excel/PDF + admin GST; super-admin "
+        "ops console (orders/tickets/settlements/health); platform i18n (10 locales) + "
+        "HTML/API-key/login-hint harden. Builds on v3.2 Control plane, ready-within, Maps, "
+        "UI Catalog (8 surfaces), flows 17.9-17.10."
     )
     pdf.quote(
-        "KitchCu Complete Executive & Engineering Guide v3.2 — Confidential — July 2026. "
+        "KitchCu Complete Executive & Engineering Guide v3.2.3 — Confidential — July 2026. "
         "India's first — and the world's third — platform with this feature stack."
     )
 

@@ -19,7 +19,7 @@
 | `docs/PLATFORM-SOLUTION-BLUEPRINT.md` | **Solution blueprint** — expectations → CEO/CPO solution → CTO impl → arch/DB/UX per journey & admin controls |
 | `docs/PLATFORM-STRATEGIC-ANALYSIS.md` | **Strategic analysis** — competitive, gaps, Waves A–D |
 | `docs/PLATFORM-PERSONA-DEEP-DIVE.md` | **Persona deep dive** — lived experience, scorecards, RBAC reality |
-| `docs/CKAC-COMPLETE-GUIDE.md` | **Master guide v3.2** — CEO + CPO + CTO encyclopedia (definitions, how/why, flows, UI Catalog, aggregated OpenAPI reference + PDF) |
+| `docs/CKAC-COMPLETE-GUIDE.md` | **Master guide v3.2.3** — CEO + CPO + CTO encyclopedia (definitions, how/why, flows, UI Catalog, aggregated OpenAPI reference + PDF) |
 | `docs/CKAC-USERFLOWS.md` | **Full user journey pack** — every persona, every screen, every API call, step-by-step (+ PDF) |
 | `docs/API.md` | **Public API reference** — auth, body/response examples; live aggregated OpenAPI at gateway `/openapi.json`/`/docs`/`/redoc` + portal `/openapi` |
 | `docs/CKAC-ARCHITECTURE-CTO.md` | **CTO layers + CPO product ↔ code map** |
@@ -84,9 +84,11 @@
 | **Branded storefront** | `services/identity/`, `apps/website/` | **P19** — kitchen `branded_page` + customer `/k/:code` |
 | **Kitchen integrations admin** | identity + billing admin APIs, admin PWA | **P21** — WhatsApp / Razorpay per kitchen (platform keys stay Admin API Keys) |
 | **Package mapper + employees RBAC** | billing packages · identity employees · admin PWA | **P25–P28** — Admin Packages/Employees; kitchen Package/Marketing/Streaming tabs; Cursor super-admin gate |
+| **Dual referrals + GST export + admin ops** | identity referrals · billing GST export · admin PWA | **P37–P39** — customer↔kitchen referrals; GST Excel/PDF; kitchen Orders/Care, ticket triage, settlements |
+| **Platform i18n** | `apps/website/src/i18n/` | **P40** — 10 locales; gate + dashboard chrome; admin stays English |
 | **Owner analytics** | `services/order/app/analytics.py` | F07–F08 revenue, top dishes, peak hours, customer segments |
 | Shared lib | `packages/ckac-common/` | Config, DB, auth, `EventPublisher`, cache, health, internal auth |
-| Event bus | Redis Streams | `ckac:catalog:dish`, `ckac:catalog:ingredient`, `ckac:orders:order`, `ckac:orders:draft`, `ckac:orders:master_order`, `ckac:billing:payment`, `ckac:billing:settlement`, `ckac:billing:subscription`, `ckac:billing:wallet`, `ckac:billing:gst`, `ckac:billing:refund`, `ckac:billing:package`, `ckac:identity:kitchen`, `ckac:marketing:coupon`, `ckac:marketing:promotion`, `ckac:marketing:crm`, `ckac:marketing:template`, `ckac:marketing:subscription`, `ckac:ratings:rating`, `ckac:ratings:dish`, `ckac:growth:suggestion`, `ckac:growth:daily_menu`, `ckac:delivery:quote`, `ckac:delivery:tracking`, `ckac:learning:trial`, `ckac:community:recipe`, `ckac:community:reward`, `ckac:community:ranking`, `ckac:streaming:session`, `ckac:notify:whatsapp`, `ckac:notify:dispatch`, `ckac:notify:tracking` |
+| Event bus | Redis Streams | `ckac:catalog:dish`, `ckac:catalog:ingredient`, `ckac:orders:order`, `ckac:orders:draft`, `ckac:orders:master_order`, `ckac:billing:payment`, `ckac:billing:settlement`, `ckac:billing:subscription`, `ckac:billing:wallet`, `ckac:billing:gst`, `ckac:billing:refund`, `ckac:billing:package`, `ckac:identity:kitchen`, `ckac:identity:referral`, `ckac:marketing:coupon`, `ckac:marketing:promotion`, `ckac:marketing:crm`, `ckac:marketing:template`, `ckac:marketing:subscription`, `ckac:ratings:rating`, `ckac:ratings:dish`, `ckac:growth:suggestion`, `ckac:growth:daily_menu`, `ckac:delivery:quote`, `ckac:delivery:tracking`, `ckac:learning:trial`, `ckac:community:recipe`, `ckac:community:reward`, `ckac:community:ranking`, `ckac:streaming:session`, `ckac:notify:whatsapp`, `ckac:notify:dispatch`, `ckac:notify:tracking` |
 | PostgreSQL + PostGIS | `infra/postgres/init/` | Schema-per-domain |
 | Docker stack | `docker-compose.yml` | postgres, redis, minio, gateway, identity, catalog, order, billing, marketing, ratings, growth, delivery, learning, community, streaming, notification |
 | Tests | `services/*/tests/` | TDD — run `scripts/run-tests.ps1` |
@@ -296,7 +298,7 @@ Invalidate on domain events (`DishUpdated`, `OrderPlaced`, etc.)
 | Customer PWA | `apps/customer-pwa/` |
 | Offline | Workbox — cache menu, order history |
 | Live photo | `getUserMedia` — enforce `is_live_capture: true` on dish hero upload |
-| i18n | Hindi + English at launch |
+| i18n | 10 IN locales (`en hi mr ta te kn ml bn gu pa`); dashboard chrome wired; catalogs in `apps/website/src/i18n/locales/`; parity via `scripts/check-i18n-locale-parity.py`; admin ops stays English |
 | API base | Gateway at `/api/v1/` |
 
 ---
@@ -457,4 +459,4 @@ Delivered order only → home_taste (1–5) + quality (1–5) → optional anony
 
 ---
 
-*Last updated: Phase 1 S1–S18 + P19–P32.1 (RBAC, hard entitlements, LiveKit Watch, templates+wallet, Porter cost-share). Tracker: `docs/ADVANCEMENT-TRACKER.md`. Flows: `docs/PLATFORM-ARCHITECTURE-FLOWS.md`. Prod: `*.kitchcu.com`. Next: kitchen staff · live Razorpay/prod OTP · Porter webhooks · E1–E2.*
+*Last updated: Phase 1 S1–S18 + P19–P40 (referrals, GST export, admin ops console, platform i18n + security harden). Tracker: `docs/ADVANCEMENT-TRACKER.md`. Guide: `docs/CKAC-COMPLETE-GUIDE.md` v3.2.3. Prod: `*.kitchcu.com`. Next: kitchen staff build · live Razorpay · E1–E2.*

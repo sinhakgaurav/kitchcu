@@ -3,6 +3,8 @@ import { OwnerPageShell, OwnerPanel, OwnerEmpty } from "../../components/owner/O
 import { useKitchen } from "../../lib/kitchen";
 import {
   closeGstAudit,
+  downloadGstMonthlyExcel,
+  downloadGstMonthlyPdf,
   fetchGstAudit,
   fetchGstBalanceSheet,
   fetchGstMonthlyReport,
@@ -183,6 +185,32 @@ export function GstFinancePage() {
     }
   };
 
+  const downloadExcel = async () => {
+    if (!kitchen) return;
+    setBusy(true);
+    setError("");
+    try {
+      await downloadGstMonthlyExcel(kitchen.id, year, month);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Excel download failed");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const downloadPdf = async () => {
+    if (!kitchen) return;
+    setBusy(true);
+    setError("");
+    try {
+      await downloadGstMonthlyPdf(kitchen.id, year, month);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "PDF download failed");
+    } finally {
+      setBusy(false);
+    }
+  };
+
   if (!kitchen) return <div className="owner-screen app-loading">Loading kitchen…</div>;
   if (loading) return <div className="owner-screen app-loading">Loading GST & finance…</div>;
 
@@ -323,6 +351,12 @@ export function GstFinancePage() {
             action={
               <div className="gst-panel-head">
                 <span className="gst-meta">{report.gstin} · {report.legal_name}</span>
+                <button type="button" className="btn btn--ghost btn--sm" onClick={downloadExcel} disabled={busy}>
+                  Download Excel
+                </button>
+                <button type="button" className="btn btn--ghost btn--sm" onClick={downloadPdf} disabled={busy}>
+                  Download PDF
+                </button>
                 {audit?.status === "open" ? (
                   <button type="button" className="btn btn--ghost btn--sm" onClick={closeMonth} disabled={busy}>
                     Close monthly audit

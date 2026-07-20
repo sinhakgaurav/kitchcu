@@ -36,6 +36,8 @@ type Props<T> = {
   emptyMessage?: string;
   rowClassName?: (row: T) => string | undefined;
   className?: string;
+  /** Seed the search box (e.g. deep-link from tickets → refunds). */
+  initialSearch?: string;
 };
 
 const PAGE_SIZE_OPTIONS = [10, 25, 50, 100];
@@ -53,13 +55,21 @@ export function DataTable<T>({
   emptyMessage = "No rows yet.",
   rowClassName,
   className = "",
+  initialSearch = "",
 }: Props<T>) {
-  const [search, setSearch] = useState("");
+  const [search, setSearch] = useState(initialSearch);
   const [activeFilter, setActiveFilter] = useState("");
   const [sortKey, setSortKey] = useState(() => columns.find((c) => c.sortable)?.id ?? "");
   const [sortDir, setSortDir] = useState<SortDir>("asc");
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState(defaultPageSize);
+
+  useEffect(() => {
+    if (initialSearch) {
+      setSearch(initialSearch);
+      setPage(0);
+    }
+  }, [initialSearch]);
 
   const sortOptions = useMemo(
     () => [

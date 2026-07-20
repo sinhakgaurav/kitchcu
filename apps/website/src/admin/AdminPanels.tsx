@@ -6,6 +6,7 @@ import {
   createAdminEmployee,
   fetchAdminApiKeys,
   fetchAdminAuditEvents,
+  adminNavigate,
   fetchAdminCustomer,
   fetchAdminCustomers,
   fetchAdminEmployeeRoles,
@@ -14,10 +15,13 @@ import {
   fetchAdminFeatures,
   fetchAdminJourneys,
   fetchAdminMoneyStats,
+  fetchAdminOrders,
   fetchAdminOwners,
   fetchAdminPackages,
   fetchAdminPayments,
   fetchAdminRefunds,
+  fetchAdminSettlements,
+  fetchAdminTickets,
   patchAdminRefund,
   updateAdminApiKey,
   updateAdminCustomerStatus,
@@ -30,8 +34,11 @@ import {
   type AdminCustomerDetail,
   type AdminEmployee,
   type AdminFeature,
+  type AdminOrder,
   type AdminPackage,
   type AdminRefund,
+  type AdminSettlement,
+  type AdminTicket,
   type FeatureFlag,
   type PlatformApiKey,
 } from "./adminApi";
@@ -225,13 +232,16 @@ export function AdminCustomers() {
   const [rows, setRows] = useState<AdminCustomer[]>([]);
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<AdminCustomerDetail | null>(null);
+  const [orders, setOrders] = useState<AdminOrder[]>([]);
+  const [tickets, setTickets] = useState<AdminTicket[]>([]);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [searchQ, setSearchQ] = useState("");
 
-  const load = async () => {
+  const load = async (q?: string) => {
     setError("");
     try {
-      setRows(await fetchAdminCustomers());
+      setRows(await fetchAdminCustomers(q));
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to load customers");
     }
@@ -288,7 +298,14 @@ export function AdminCustomers() {
             className="btn btn--ghost btn--sm"
             onClick={async () => {
               try {
-                setSelected(await fetchAdminCustomer(c.id));
+                const detail = await fetchAdminCustomer(c.id);
+                setSelected(detail);
+                const [ord, tix] = await Promise.all([
+                  fetchAdminOrders(20, { customer_id: c.id }).catch(() => [] as AdminOrder[]),
+                  fetchAdminTickets({ customer_id: c.id }).catch(() => ({ tickets: [] as AdminTicket[], total: 0 })),
+                ]);
+                setOrders(ord);
+                setTickets(tix.tickets);
               } catch (e) {
                 setError(e instanceof Error ? e.message : "Load failed");
               }
@@ -305,12 +322,30 @@ export function AdminCustomers() {
   return (
     <div className={`admin-panel admin-panel--bleed${selected ? "" : " admin-panel--list-only"}`}>
       {error && <p className="auth-card__error">{error}</p>}
+      <div className="admin-toolbar" style={{ marginBottom: "0.75rem", display: "flex", gap: "0.5rem" }}>
+        <input
+          className="kc-input"
+          placeholder="Server search name / phone / email…"
+          value={searchQ}
+          onChange={(e) => setSearchQ(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") void load(searchQ.trim() || undefined).then(() => setLoading(false));
+          }}
+        />
+        <button
+          type="button"
+          className="btn btn--ghost btn--sm"
+          onClick={() => void load(searchQ.trim() || undefined)}
+        >
+          Search
+        </button>
+      </div>
       <div className={`admin-split${selected ? "" : " admin-split--list-only"}`}>
         <DataTable
           rows={rows}
           loading={loading}
           emptyMessage="No customers yet."
-          searchPlaceholder="Search name, phone, email…"
+          searchPlaceholder="Filter loaded rows…"
           getSearchText={(c) => `${c.name} ${c.phone ?? ""} ${c.email ?? ""} ${c.status}`}
           filterChips={[
             { id: "", label: "All" },
@@ -346,6 +381,37 @@ export function AdminCustomers() {
                 </li>
               ))}
             </ul>
+            <h4>Recent orders ({orders.length})</h4>
+            {orders.length === 0 ? (
+              <p className="admin-panel__empty">No orders for this customer.</p>
+            ) : (
+              <ul>
+                {orders.map((o) => (
+                  <li key={o.id}>
+                    <code>{o.order_code}</code> · {o.status} · ₹{o.total.toFixed(0)} · {o.kitchen_name}
+                  </li>
+                ))}
+              </ul>
+            )}
+            <h4>Tickets ({tickets.length})</h4>
+            {tickets.length === 0 ? (
+              <p className="admin-panel__empty">No tickets linked.</p>
+            ) : (
+              <ul>
+                {tickets.map((t) => (
+                  <li key={t.id}>
+                    <button
+                      type="button"
+                      className="btn btn--ghost btn--sm"
+                      onClick={() => adminNavigate({ tab: "tickets" })}
+                    >
+                      {t.ticket_number}
+                    </button>{" "}
+                    {t.status} · {t.subject}
+                  </li>
+                ))}
+              </ul>
+            )}
             <div className="admin-detail__actions">
               <button
                 type="button"
@@ -397,23 +463,31 @@ export function AdminCustomers() {
   );
 }
 
-export function AdminRefunds() {
+export function AdminRefunds({ initialSearch = "" }: { initialSearch?: string }) {
   const [rows, setRows] = useState<AdminRefund[]>([]);
+  const [settlements, setSettlements] = useState<AdminSettlement[]>([]);
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<AdminRefund | null>(null);
   const [note, setNote] = useState("");
   const [money, setMoney] = useState<Awaited<ReturnType<typeof fetchAdminMoneyStats>> | null>(null);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [tableSearch, setTableSearch] = useState(initialSearch);
+
+  useEffect(() => {
+    if (initialSearch) setTableSearch(initialSearch);
+  }, [initialSearch]);
 
   const load = async () => {
     try {
-      const [refunds, stats] = await Promise.all([
+      const [refunds, stats, settles] = await Promise.all([
         fetchAdminRefunds(),
         fetchAdminMoneyStats(),
+        fetchAdminSettlements({ limit: 100 }).catch(() => [] as AdminSettlement[]),
       ]);
       setRows(refunds);
       setMoney(stats);
+      setSettlements(settles);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to load refunds");
     }
@@ -495,6 +569,10 @@ export function AdminRefunds() {
             <strong>{money.payments_captured}</strong>
             <span>Captured payments</span>
           </div>
+          <div className="admin-stat">
+            <strong>{money.settlements_transferred}</strong>
+            <span>Settlements transferred</span>
+          </div>
         </div>
       )}
       <div className={`admin-split${selected ? "" : " admin-split--list-only"}`}>
@@ -502,9 +580,10 @@ export function AdminRefunds() {
           rows={rows}
           loading={loading}
           emptyMessage="No refunds yet."
-          searchPlaceholder="Search kind, channel, remark…"
+          searchPlaceholder="Search kind, channel, remark, order…"
+          initialSearch={tableSearch}
           getSearchText={(r) =>
-            `${r.kind} ${r.channel} ${r.status} ${r.transfer_remark} ${r.reason ?? ""} ${r.amount}`
+            `${r.kind} ${r.channel} ${r.status} ${r.transfer_remark} ${r.reason ?? ""} ${r.amount} ${r.order_id ?? ""}`
           }
           filterChips={[
             { id: "", label: "All" },
@@ -575,6 +654,51 @@ export function AdminRefunds() {
           </aside>
         )}
       </div>
+
+      <section style={{ marginTop: "1.5rem" }}>
+        <h3>Settlements (Route split)</h3>
+        <p className="report-hint">
+          Multi-kitchen payouts — platform fee is always ₹0 (no per-order food commission).
+        </p>
+        {settlements.length === 0 ? (
+          <p className="admin-panel__empty">No settlements yet.</p>
+        ) : (
+          <div className="owner-table-wrap">
+            <table className="owner-table">
+              <thead>
+                <tr>
+                  <th>Kitchen</th>
+                  <th>Gross</th>
+                  <th>Net to owner</th>
+                  <th>Status</th>
+                  <th>Settled</th>
+                </tr>
+              </thead>
+              <tbody>
+                {settlements.map((s) => (
+                  <tr key={s.id}>
+                    <td>
+                      <code className="admin-code">{s.kitchen_id.slice(0, 8)}</code>
+                    </td>
+                    <td>{inr(s.gross_amount)}</td>
+                    <td>{inr(s.net_to_owner)}</td>
+                    <td>
+                      <span className={`status-badge status-badge--${s.settlement_status}`}>
+                        {s.settlement_status}
+                      </span>
+                    </td>
+                    <td>
+                      {s.settled_at
+                        ? new Date(s.settled_at).toLocaleDateString("en-IN")
+                        : "—"}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
     </div>
   );
 }

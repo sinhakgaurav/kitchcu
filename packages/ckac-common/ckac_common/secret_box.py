@@ -33,6 +33,8 @@ def decrypt_secret(token: str | None) -> str | None:
 def mask_secret(plain: str | None, *, keep: int = 4) -> str | None:
     if not plain:
         return None
+    if keep <= 0:
+        return "••••"
     if len(plain) <= keep:
         return "*" * len(plain)
     return ("*" * (len(plain) - keep)) + plain[-keep:]

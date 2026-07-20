@@ -367,7 +367,13 @@ async def kitchen_media_upload(
         bool, Form(description="True only if captured live via camera (getUserMedia), never a stock photo.")
     ] = False,
     context: Annotated[
-        str, Form(description="Upload context — one of: dish, ingredient, prep_step, general.")
+        str,
+        Form(
+            description=(
+                "Upload context — one of: dish, ingredient, prep_step, general, "
+                "brand_logo, brand_background."
+            )
+        ),
     ] = "general",
     captured_at: Annotated[
         str | None, Form(description="ISO-8601 capture timestamp, required context for live-capture audit.")

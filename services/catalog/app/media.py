@@ -15,7 +15,9 @@ ALLOWED_CONTENT_TYPES = {
     "image/webp": "webp",
 }
 MAX_UPLOAD_BYTES = 10 * 1024 * 1024
-ALLOWED_CONTEXTS = frozenset({"dish", "ingredient", "prep_step", "general"})
+ALLOWED_CONTEXTS = frozenset(
+    {"dish", "ingredient", "prep_step", "general", "brand_logo", "brand_background"}
+)
 
 JPEG_MAGIC = b"\xff\xd8\xff"
 PNG_MAGIC = b"\x89PNG\r\n\x1a\n"

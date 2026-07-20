@@ -6,7 +6,7 @@ import uuid
 from datetime import UTC, datetime
 from typing import Annotated, Literal
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from pydantic import BaseModel, Field
 from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -444,13 +444,13 @@ async def admin_settlements_list(
     admin: Annotated[AdminContext, Depends(get_current_admin)],
     session: Annotated[AsyncSession, Depends(get_db)],
     limit: Annotated[int, Query(ge=1, le=500)] = 200,
+    kitchen_id: uuid.UUID | None = None,
 ) -> list[SettlementResponse]:
     await _assert_admin_perm(session, admin, "refunds:read")
-    rows = list(
-        (
-            await session.execute(select(Settlement).order_by(Settlement.created_at.desc()).limit(limit))
-        ).scalars().all()
-    )
+    stmt = select(Settlement).order_by(Settlement.created_at.desc()).limit(limit)
+    if kitchen_id is not None:
+        stmt = stmt.where(Settlement.kitchen_id == kitchen_id)
+    rows = list((await session.execute(stmt)).scalars().all())
     return [settlement_to_response(s) for s in rows]
 
 
@@ -489,4 +489,199 @@ async def admin_money_stats(
         refunds_failed=int(row["refunds_failed"] or 0),
         refunds_amount_completed=float(row["refunds_amount_completed"] or 0),
         settlements_transferred=int(row["settlements_transferred"] or 0),
+    )
+
+
+# --- Kitchen GST (super admin read + exports) ---------------------------------
+
+
+async def _admin_gst_bundle(
+    session: AsyncSession,
+    kitchen_id: uuid.UUID,
+    year: int,
+    month: int,
+):
+    from app.gst import build_balance_sheet, get_monthly_audit, get_monthly_gst_report
+
+    report = await get_monthly_gst_report(session, kitchen_id, year, month)
+    audit = await get_monthly_audit(session, kitchen_id, year, month)
+    sheet = audit.balance_sheet
+    if sheet is None:
+        sheet = await build_balance_sheet(
+            session,
+            kitchen_id,
+            year,
+            month,
+            gst_payable=audit.total_tax,
+            gross_sales=audit.total_gross_sales,
+        )
+    return report, audit, sheet
+
+
+@router.get(
+    "/kitchens/{kitchen_id}/gst/profile",
+    summary="Get kitchen GST profile (super admin)",
+    responses={**auth_errors(), 404: RESP_404},
+)
+async def admin_kitchen_gst_profile(
+    kitchen_id: uuid.UUID,
+    admin: Annotated[AdminContext, Depends(get_current_admin)],
+    session: Annotated[AsyncSession, Depends(get_db)],
+):
+    from app.gst import get_gst_profile, profile_to_response
+
+    await _assert_admin_perm(session, admin, "kitchens:read")
+    if not await _kitchen_exists(session, kitchen_id):
+        raise HTTPException(status_code=404, detail="Kitchen not found")
+    profile = await get_gst_profile(session, kitchen_id)
+    if not profile:
+        raise HTTPException(status_code=404, detail="GST profile not found")
+    return profile_to_response(profile)
+
+
+@router.get(
+    "/kitchens/{kitchen_id}/gst/reports/monthly",
+    summary="Kitchen monthly GST report (super admin)",
+    responses={**auth_errors(), 400: RESP_400, 404: RESP_404},
+)
+async def admin_kitchen_gst_monthly(
+    kitchen_id: uuid.UUID,
+    admin: Annotated[AdminContext, Depends(get_current_admin)],
+    session: Annotated[AsyncSession, Depends(get_db)],
+    year: Annotated[int, Query()],
+    month: Annotated[int, Query()],
+):
+    await _assert_admin_perm(session, admin, "kitchens:read")
+    if not await _kitchen_exists(session, kitchen_id):
+        raise HTTPException(status_code=404, detail="Kitchen not found")
+    if month < 1 or month > 12:
+        raise HTTPException(status_code=400, detail="Invalid month")
+    try:
+        report, _, _ = await _admin_gst_bundle(session, kitchen_id, year, month)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return report
+
+
+@router.get(
+    "/kitchens/{kitchen_id}/gst/audit",
+    summary="Kitchen monthly GST audit (super admin)",
+    responses={**auth_errors(), 400: RESP_400, 404: RESP_404},
+)
+async def admin_kitchen_gst_audit(
+    kitchen_id: uuid.UUID,
+    admin: Annotated[AdminContext, Depends(get_current_admin)],
+    session: Annotated[AsyncSession, Depends(get_db)],
+    year: Annotated[int, Query()],
+    month: Annotated[int, Query()],
+):
+    await _assert_admin_perm(session, admin, "kitchens:read")
+    if not await _kitchen_exists(session, kitchen_id):
+        raise HTTPException(status_code=404, detail="Kitchen not found")
+    if month < 1 or month > 12:
+        raise HTTPException(status_code=400, detail="Invalid month")
+    try:
+        _, audit, _ = await _admin_gst_bundle(session, kitchen_id, year, month)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return audit
+
+
+@router.get(
+    "/kitchens/{kitchen_id}/gst/reports/balance-sheet",
+    summary="Kitchen monthly balance sheet (super admin)",
+    responses={**auth_errors(), 400: RESP_400, 404: RESP_404},
+)
+async def admin_kitchen_gst_balance_sheet(
+    kitchen_id: uuid.UUID,
+    admin: Annotated[AdminContext, Depends(get_current_admin)],
+    session: Annotated[AsyncSession, Depends(get_db)],
+    year: Annotated[int, Query()],
+    month: Annotated[int, Query()],
+):
+    await _assert_admin_perm(session, admin, "kitchens:read")
+    if not await _kitchen_exists(session, kitchen_id):
+        raise HTTPException(status_code=404, detail="Kitchen not found")
+    if month < 1 or month > 12:
+        raise HTTPException(status_code=400, detail="Invalid month")
+    try:
+        _, _, sheet = await _admin_gst_bundle(session, kitchen_id, year, month)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return sheet
+
+
+@router.get(
+    "/kitchens/{kitchen_id}/gst/reports/monthly/export.xlsx",
+    summary="Download kitchen monthly GST Excel (super admin)",
+    responses={**auth_errors(), 400: RESP_400, 404: RESP_404},
+)
+async def admin_kitchen_gst_export_excel(
+    kitchen_id: uuid.UUID,
+    admin: Annotated[AdminContext, Depends(get_current_admin)],
+    session: Annotated[AsyncSession, Depends(get_db)],
+    year: Annotated[int, Query()],
+    month: Annotated[int, Query()],
+) -> Response:
+    from app.gst_export import export_filename, render_monthly_gst_excel
+
+    await _assert_admin_perm(session, admin, "kitchens:read")
+    if not await _kitchen_exists(session, kitchen_id):
+        raise HTTPException(status_code=404, detail="Kitchen not found")
+    if month < 1 or month > 12:
+        raise HTTPException(status_code=400, detail="Invalid month")
+    try:
+        report, _, sheet = await _admin_gst_bundle(session, kitchen_id, year, month)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    code = (
+        await session.execute(
+            text("SELECT code FROM ckac_identity.kitchens WHERE id = :kid LIMIT 1"),
+            {"kid": kitchen_id},
+        )
+    ).scalar_one_or_none()
+    body = render_monthly_gst_excel(report, sheet)
+    filename = export_filename(str(code) if code else None, year, month, "xlsx")
+    return Response(
+        content=body,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+@router.get(
+    "/kitchens/{kitchen_id}/gst/reports/monthly/export.pdf",
+    summary="Download kitchen monthly GST PDF (super admin)",
+    responses={**auth_errors(), 400: RESP_400, 404: RESP_404},
+)
+async def admin_kitchen_gst_export_pdf(
+    kitchen_id: uuid.UUID,
+    admin: Annotated[AdminContext, Depends(get_current_admin)],
+    session: Annotated[AsyncSession, Depends(get_db)],
+    year: Annotated[int, Query()],
+    month: Annotated[int, Query()],
+) -> Response:
+    from app.gst_export import export_filename, render_monthly_gst_pdf
+
+    await _assert_admin_perm(session, admin, "kitchens:read")
+    if not await _kitchen_exists(session, kitchen_id):
+        raise HTTPException(status_code=404, detail="Kitchen not found")
+    if month < 1 or month > 12:
+        raise HTTPException(status_code=400, detail="Invalid month")
+    try:
+        report, _, sheet = await _admin_gst_bundle(session, kitchen_id, year, month)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    code = (
+        await session.execute(
+            text("SELECT code FROM ckac_identity.kitchens WHERE id = :kid LIMIT 1"),
+            {"kid": kitchen_id},
+        )
+    ).scalar_one_or_none()
+    body = render_monthly_gst_pdf(report, sheet)
+    filename = export_filename(str(code) if code else None, year, month, "pdf")
+    return Response(
+        content=body,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )

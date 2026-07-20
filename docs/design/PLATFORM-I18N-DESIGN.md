@@ -12,10 +12,14 @@
 
 | In | Out |
 |----|-----|
-| Location → language suggestion | Full page translation of every screen |
-| One-time chooser (EN vs suggested) | Server-side locale / Accept-Language APIs |
-| Portal + customer + kitchen shells | Admin (ops stays English for now) |
-| Catalogs: en + hi (+ gate strings for major IN langs) | Live translation / LLM |
+| Location → language suggestion | Server-side locale / Accept-Language APIs |
+| One-time chooser (EN vs suggested) | Live translation / LLM |
+| Portal + customer + kitchen shells + dashboard chrome | Admin (ops stays English for now) |
+| Catalogs: en + hi + mr + ta + te + kn + ml + bn + gu + pa (184 keys; parity checked) | 100% of every long-form page body |
+
+**Wired to `t()`:** LanguageGate/Switcher · PortalNavbar · PortalHero · OwnerLayout nav · Owner login/home/subscription · CustomerNavbar · customer login/discovery/checkout/orders/dashboard tabs.
+
+**Parity:** `python scripts/check-i18n-locale-parity.py`
 
 ## 3. Detection order
 

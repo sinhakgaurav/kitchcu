@@ -4,7 +4,7 @@ import uuid
 from datetime import UTC, datetime, timedelta
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 import bcrypt
 from jose import JWTError, jwt
@@ -12,6 +12,7 @@ from pydantic import BaseModel, EmailStr, Field
 from sqlalchemy import bindparam, func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.brand_media import upload_brand_media
 from app.models import (
     Customer,
     CustomerAddress,
@@ -244,13 +245,13 @@ class JourneyMap(BaseModel):
 def _api_key_row(row: PlatformApiKey) -> PlatformApiKeyRow:
     plain = decrypt_secret(row.value_enc)
     configured = bool(plain)
+    # Never echo full values after save — secrets and non-secrets both truncated.
     if not configured:
         masked = None
     elif row.is_secret:
-        masked = mask_secret(plain)
+        masked = mask_secret(plain, keep=0) or "••••"
     else:
-        # Non-secret public-ish keys (Maps, OAuth client id) still masked lightly
-        masked = plain if len(plain) <= 48 else mask_secret(plain, keep=8)
+        masked = mask_secret(plain, keep=4)
     return PlatformApiKeyRow(
         key=row.key,
         category=row.category,
@@ -297,6 +298,18 @@ class AdminKitchenRow(BaseModel):
         default=False,
         description="True when the public branded storefront at `/k/{code}` is published.",
     )
+    last_order_at: datetime | None = Field(
+        default=None,
+        description="Most recent order created_at for this kitchen (UTC), if any.",
+    )
+    open_ticket_count: int = Field(
+        default=0,
+        description="Open / in_progress / waiting_customer support tickets for this kitchen.",
+    )
+    open_refund_count: int = Field(
+        default=0,
+        description="Refunds in requested/processing for orders of this kitchen.",
+    )
 
 
 class AdminKitchenDetail(AdminKitchenRow):
@@ -333,6 +346,9 @@ def _admin_kitchen_row(
     owner: Owner,
     *,
     payment_gateway_configured: bool = False,
+    last_order_at: datetime | None = None,
+    open_ticket_count: int = 0,
+    open_refund_count: int = 0,
 ) -> AdminKitchenRow:
     bp = branded_page_from_settings(
         kitchen.settings if isinstance(kitchen.settings, dict) else None
@@ -348,7 +364,82 @@ def _admin_kitchen_row(
         whatsapp_connected=bool(kitchen.whatsapp_phone_id),
         payment_gateway_configured=payment_gateway_configured,
         branded_page_enabled=bool(bp.enabled),
+        last_order_at=last_order_at,
+        open_ticket_count=open_ticket_count,
+        open_refund_count=open_refund_count,
     )
+
+
+async def _kitchen_health_map(
+    session: AsyncSession,
+    kitchen_ids: list[uuid.UUID],
+) -> dict[uuid.UUID, dict[str, object]]:
+    """Cross-schema health counters for kitchen list (best-effort; empty on missing tables)."""
+    if not kitchen_ids:
+        return {}
+    out: dict[uuid.UUID, dict[str, object]] = {
+        kid: {"last_order_at": None, "open_ticket_count": 0, "open_refund_count": 0}
+        for kid in kitchen_ids
+    }
+    id_list = list(kitchen_ids)
+    try:
+        last_rows = (
+            await session.execute(
+                text(
+                    """
+                    SELECT kitchen_id, MAX(created_at) AS last_order_at
+                    FROM ckac_orders.orders
+                    WHERE kitchen_id IN :ids
+                    GROUP BY kitchen_id
+                    """
+                ).bindparams(bindparam("ids", expanding=True)),
+                {"ids": id_list},
+            )
+        ).mappings().all()
+        for r in last_rows:
+            out[r["kitchen_id"]]["last_order_at"] = r["last_order_at"]
+    except Exception:
+        pass
+    try:
+        ticket_rows = (
+            await session.execute(
+                text(
+                    """
+                    SELECT kitchen_id, COUNT(*)::int AS cnt
+                    FROM ckac_support.support_tickets
+                    WHERE kitchen_id IN :ids
+                      AND status IN ('open', 'in_progress', 'waiting_customer')
+                    GROUP BY kitchen_id
+                    """
+                ).bindparams(bindparam("ids", expanding=True)),
+                {"ids": id_list},
+            )
+        ).mappings().all()
+        for r in ticket_rows:
+            out[r["kitchen_id"]]["open_ticket_count"] = int(r["cnt"] or 0)
+    except Exception:
+        pass
+    try:
+        refund_rows = (
+            await session.execute(
+                text(
+                    """
+                    SELECT o.kitchen_id, COUNT(*)::int AS cnt
+                    FROM ckac_billing.refunds r
+                    JOIN ckac_orders.orders o ON o.id = r.order_id
+                    WHERE o.kitchen_id IN :ids
+                      AND r.status IN ('requested', 'processing')
+                    GROUP BY o.kitchen_id
+                    """
+                ).bindparams(bindparam("ids", expanding=True)),
+                {"ids": id_list},
+            )
+        ).mappings().all()
+        for r in refund_rows:
+            out[r["kitchen_id"]]["open_refund_count"] = int(r["cnt"] or 0)
+    except Exception:
+        pass
+    return out
 
 
 def _admin_kitchen_detail(
@@ -356,10 +447,18 @@ def _admin_kitchen_detail(
     owner: Owner,
     *,
     payment_gateway_configured: bool = False,
+    last_order_at: datetime | None = None,
+    open_ticket_count: int = 0,
+    open_refund_count: int = 0,
 ) -> AdminKitchenDetail:
     wa = kitchen_whatsapp_to_response(kitchen)
     base = _admin_kitchen_row(
-        kitchen, owner, payment_gateway_configured=payment_gateway_configured
+        kitchen,
+        owner,
+        payment_gateway_configured=payment_gateway_configured,
+        last_order_at=last_order_at,
+        open_ticket_count=open_ticket_count,
+        open_refund_count=open_refund_count,
     )
     return AdminKitchenDetail(
         **base.model_dump(),
@@ -384,9 +483,11 @@ class AdminOrderRow(BaseModel):
     order_code: str = Field(..., description="Human-readable order code.", examples=["CKPNQ001-BILL-20260712-0042"])
     kitchen_id: uuid.UUID = Field(..., description="UUID of the fulfilling kitchen.")
     kitchen_name: str = Field(..., description="Name of the fulfilling kitchen.", examples=["Spice Route Kitchen"])
+    customer_id: uuid.UUID | None = Field(default=None, description="Customer UUID when known.")
     status: str = Field(..., description="Order lifecycle status.", examples=["delivered"])
     total: float = Field(..., description="Order total in INR.", examples=[349.0])
     customer_name: str | None = Field(default=None, description="Customer name captured on the order, if any.")
+    customer_phone: str | None = Field(default=None, description="Customer phone on the order, if any.")
     created_at: datetime = Field(..., description="Order creation timestamp (UTC).")
 
 
@@ -466,15 +567,11 @@ async def ensure_default_admin(session: AsyncSession) -> None:
 
 
 def _admin_login_reveal_allowed() -> bool:
-    """Allow showing ADMIN_PASSWORD on the login form during bring-up only."""
+    """Allow showing ADMIN_PASSWORD only with explicit env flag (never APP_ENV alone)."""
     import os
 
-    from ckac_common.platform_config import is_non_production
-
     raw = os.environ.get("ADMIN_LOGIN_REVEAL_PASSWORD", "").strip().lower()
-    if raw in ("1", "true", "yes", "on"):
-        return True
-    return is_non_production()
+    return raw in ("1", "true", "yes", "on")
 
 
 @router.get(
@@ -483,8 +580,7 @@ def _admin_login_reveal_allowed() -> bool:
     summary="Admin login credential hint (bring-up)",
     description=(
         "Returns the expected admin email. Includes plaintext `ADMIN_PASSWORD` only when "
-        "`APP_ENV` is development/test (GCP demo-mode / run-seed) or "
-        "`ADMIN_LOGIN_REVEAL_PASSWORD=1`. Never enabled for hard production without that flag."
+        "`ADMIN_LOGIN_REVEAL_PASSWORD=1` is explicitly set. Never inferred from APP_ENV alone."
     ),
     tags=["Admin"],
 )
@@ -720,9 +816,18 @@ async def admin_kitchens(
         .limit(300)
     )
     pairs = list(result.all())
-    gateway_ids = await _payment_gateway_kitchen_ids(session, [k.id for k, _ in pairs])
+    kids = [k.id for k, _ in pairs]
+    gateway_ids = await _payment_gateway_kitchen_ids(session, kids)
+    health = await _kitchen_health_map(session, kids)
     return [
-        _admin_kitchen_row(k, o, payment_gateway_configured=k.id in gateway_ids)
+        _admin_kitchen_row(
+            k,
+            o,
+            payment_gateway_configured=k.id in gateway_ids,
+            last_order_at=health.get(k.id, {}).get("last_order_at"),  # type: ignore[arg-type]
+            open_ticket_count=int(health.get(k.id, {}).get("open_ticket_count") or 0),
+            open_refund_count=int(health.get(k.id, {}).get("open_refund_count") or 0),
+        )
         for k, o in pairs
     ]
 
@@ -760,8 +865,15 @@ async def admin_kitchen_detail(
         raise HTTPException(status_code=404, detail="Kitchen not found")
     kitchen, owner = row
     gateway_ids = await _payment_gateway_kitchen_ids(session, [kitchen.id])
+    health = await _kitchen_health_map(session, [kitchen.id])
+    h = health.get(kitchen.id, {})
     return _admin_kitchen_detail(
-        kitchen, owner, payment_gateway_configured=kitchen.id in gateway_ids
+        kitchen,
+        owner,
+        payment_gateway_configured=kitchen.id in gateway_ids,
+        last_order_at=h.get("last_order_at"),  # type: ignore[arg-type]
+        open_ticket_count=int(h.get("open_ticket_count") or 0),
+        open_refund_count=int(h.get("open_refund_count") or 0),
     )
 
 
@@ -870,6 +982,70 @@ async def admin_kitchen_branded_page(
     await session.commit()
     await session.refresh(kitchen)
 
+    gateway_ids = await _payment_gateway_kitchen_ids(session, [kitchen.id])
+    return _admin_kitchen_detail(
+        kitchen, owner, payment_gateway_configured=kitchen.id in gateway_ids
+    )
+
+
+@router.post(
+    "/kitchens/{kitchen_id}/branded-page/media",
+    response_model=AdminKitchenDetail,
+    summary="Upload kitchen brand logo or background (super admin)",
+    description=(
+        "Upload JPEG/PNG/WebP for the branded storefront (`slot=logo|background`), "
+        "persist the URL on `branded_page`, and return the kitchen detail."
+    ),
+    responses=auth_errors(include_404=True),
+    tags=["Admin"],
+)
+async def admin_kitchen_branded_page_media(
+    kitchen_id: uuid.UUID,
+    admin: Annotated[PlatformAdmin, Depends(get_current_admin)],
+    session: Annotated[AsyncSession, Depends(get_db)],
+    publisher: Annotated[EventPublisher, Depends(get_publisher)],
+    file: Annotated[UploadFile, File(..., description="Image file — JPEG, PNG, or WebP.")],
+    slot: Annotated[str, Form(description="logo or background")] = "logo",
+) -> AdminKitchenDetail:
+    from app.admin_audit import record_admin_audit
+    from app.rbac import assert_admin_permission
+
+    await assert_admin_permission(session, role=admin.role, permission="kitchens:write")
+    result = await session.execute(
+        select(Kitchen, Owner)
+        .join(Owner, Owner.id == Kitchen.owner_id)
+        .where(Kitchen.id == kitchen_id)
+    )
+    row = result.first()
+    if not row:
+        raise HTTPException(status_code=404, detail="Kitchen not found")
+    kitchen, owner = row
+    try:
+        uploaded = await upload_brand_media(kitchen_id=kitchen_id, file=file, slot=slot)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    if slot == "logo":
+        patch = KitchenBrandedPageUpdate(logo_url=uploaded.url)
+    else:
+        patch = KitchenBrandedPageUpdate(background_url=uploaded.url)
+
+    kitchen = await update_kitchen_branded_page(session, kitchen, patch, publisher)
+    bp = branded_page_from_settings(
+        kitchen.settings if isinstance(kitchen.settings, dict) else None
+    )
+    await record_admin_audit(
+        session,
+        actor=admin,
+        action="kitchen.branded_page.media",
+        resource_type="kitchen",
+        resource_id=str(kitchen_id),
+        kitchen_id=kitchen_id,
+        summary=f"{kitchen.code} branded {slot} uploaded",
+        after={"slot": slot, "has_url": True, "enabled": bp.enabled},
+    )
+    await session.commit()
+    await session.refresh(kitchen)
     gateway_ids = await _payment_gateway_kitchen_ids(session, [kitchen.id])
     return _admin_kitchen_detail(
         kitchen, owner, payment_gateway_configured=kitchen.id in gateway_ids
@@ -1020,23 +1196,56 @@ async def admin_orders(
     admin: Annotated[PlatformAdmin, Depends(get_current_admin)],
     session: Annotated[AsyncSession, Depends(get_db)],
     limit: int = 100,
+    kitchen_id: uuid.UUID | None = None,
+    customer_id: uuid.UUID | None = None,
+    status_filter: Annotated[str | None, Query(alias="status")] = None,
 ) -> list[AdminOrderRow]:
     from app.rbac import assert_admin_permission
 
     await assert_admin_permission(session, role=admin.role, permission="kitchens:read")
     _ = admin
+    clauses = ["1=1"]
+    params: dict[str, object] = {"lim": min(limit, 500)}
+    if kitchen_id is not None:
+        clauses.append("o.kitchen_id = :kitchen_id")
+        params["kitchen_id"] = kitchen_id
+    if customer_id is not None:
+        # orders.customer_id does not exist — resolve via master_order or phone match
+        clauses.append(
+            """(
+                mo.customer_id = :customer_id
+                OR (
+                    o.customer_phone IS NOT NULL
+                    AND o.customer_phone = (
+                        SELECT c.phone FROM ckac_identity.customers c WHERE c.id = :customer_id
+                    )
+                )
+            )"""
+        )
+        params["customer_id"] = customer_id
+    if status_filter:
+        clauses.append("o.status = :status")
+        params["status"] = status_filter
+    where_sql = " AND ".join(clauses)
     result = await session.execute(
         text(
-            """
-            SELECT o.id, o.order_code, o.kitchen_id, o.status, o.total, o.customer_name, o.created_at,
+            f"""
+            SELECT o.id, o.order_code, o.kitchen_id,
+                   COALESCE(mo.customer_id, cust.id) AS customer_id,
+                   o.status, o.total,
+                   o.customer_name, o.customer_phone, o.created_at,
                    k.name AS kitchen_name
             FROM ckac_orders.orders o
             JOIN ckac_identity.kitchens k ON k.id = o.kitchen_id
+            LEFT JOIN ckac_orders.master_orders mo ON mo.id = o.master_order_id
+            LEFT JOIN ckac_identity.customers cust
+              ON cust.phone IS NOT NULL AND cust.phone = o.customer_phone
+            WHERE {where_sql}
             ORDER BY o.created_at DESC
             LIMIT :lim
             """
         ),
-        {"lim": min(limit, 500)},
+        params,
     )
     return [
         AdminOrderRow(
@@ -1044,9 +1253,11 @@ async def admin_orders(
             order_code=r.order_code,
             kitchen_id=r.kitchen_id,
             kitchen_name=r.kitchen_name,
+            customer_id=r.customer_id,
             status=r.status,
             total=float(r.total),
             customer_name=r.customer_name,
+            customer_phone=r.customer_phone,
             created_at=r.created_at,
         )
         for r in result.mappings().all()
@@ -1831,3 +2042,143 @@ async def admin_employees_deactivate(
         admin,
         session,
     )
+
+
+# --- Referrals (super admin configure + manage) --------------------------------
+
+
+@router.get(
+    "/referrals/settings",
+    summary="Get referral program settings",
+    tags=["Admin Referrals"],
+    responses=auth_errors(),
+)
+async def admin_referral_settings_get(
+    admin: Annotated[PlatformAdmin, Depends(get_current_admin)],
+    session: Annotated[AsyncSession, Depends(get_db)],
+):
+    from app.rbac import assert_admin_permission
+    from app.referral import get_settings_response
+
+    await assert_admin_permission(session, role=admin.role, permission="referrals:read")
+    return await get_settings_response(session)
+
+
+@router.patch(
+    "/referrals/settings",
+    summary="Update referral rewards and triggers",
+    tags=["Admin Referrals"],
+    responses=auth_errors(),
+)
+async def admin_referral_settings_patch(
+    body: dict,
+    admin: Annotated[PlatformAdmin, Depends(get_current_admin)],
+    session: Annotated[AsyncSession, Depends(get_db)],
+):
+    from app.admin_audit import record_admin_audit
+    from app.rbac import assert_admin_permission
+    from app.referral import ReferralSettingsUpdate, get_settings_response, update_settings
+
+    await assert_admin_permission(session, role=admin.role, permission="referrals:write")
+    data = ReferralSettingsUpdate.model_validate(body)
+    before = (await get_settings_response(session)).model_dump(mode="json")
+    await update_settings(session, data, admin_id=admin.id)
+    after = (await get_settings_response(session)).model_dump(mode="json")
+    await record_admin_audit(
+        session,
+        actor=admin,
+        action="referrals.settings_updated",
+        resource_type="referral_settings",
+        resource_id="1",
+        summary="Updated referral program settings",
+        before=before,
+        after=after,
+    )
+    await session.commit()
+    return after
+
+
+@router.get(
+    "/referrals/leads",
+    summary="List referral leads",
+    tags=["Admin Referrals"],
+    responses=auth_errors(),
+)
+async def admin_referral_leads(
+    admin: Annotated[PlatformAdmin, Depends(get_current_admin)],
+    session: Annotated[AsyncSession, Depends(get_db)],
+    direction: str | None = None,
+    status_filter: str | None = None,
+    limit: int = 100,
+):
+    from app.rbac import assert_admin_permission
+    from app.referral import lead_to_response, list_admin_leads
+
+    await assert_admin_permission(session, role=admin.role, permission="referrals:read")
+    leads = await list_admin_leads(
+        session, direction=direction, status_filter=status_filter, limit=limit
+    )
+    return {"leads": [lead_to_response(L).model_dump(mode="json") for L in leads]}
+
+
+@router.post(
+    "/referrals/leads/{lead_id}/reject",
+    summary="Reject a referral lead",
+    tags=["Admin Referrals"],
+    responses=auth_errors(include_404=True),
+)
+async def admin_referral_reject(
+    lead_id: uuid.UUID,
+    body: dict,
+    admin: Annotated[PlatformAdmin, Depends(get_current_admin)],
+    session: Annotated[AsyncSession, Depends(get_db)],
+):
+    from app.admin_audit import record_admin_audit
+    from app.rbac import assert_admin_permission
+    from app.referral import AdminLeadRejectRequest, lead_to_response, reject_lead
+
+    await assert_admin_permission(session, role=admin.role, permission="referrals:write")
+    data = AdminLeadRejectRequest.model_validate(body)
+    lead = await reject_lead(session, lead_id, reason=data.reason)
+    await record_admin_audit(
+        session,
+        actor=admin,
+        action="referrals.lead_rejected",
+        resource_type="referral_lead",
+        resource_id=str(lead_id),
+        summary=f"Rejected referral lead: {data.reason[:120]}",
+    )
+    await session.commit()
+    return lead_to_response(lead)
+
+
+@router.post(
+    "/referrals/leads/{lead_id}/grant",
+    summary="Manually grant referral reward",
+    tags=["Admin Referrals"],
+    responses=auth_errors(include_404=True),
+)
+async def admin_referral_grant(
+    lead_id: uuid.UUID,
+    body: dict,
+    admin: Annotated[PlatformAdmin, Depends(get_current_admin)],
+    session: Annotated[AsyncSession, Depends(get_db)],
+    publisher: Annotated[EventPublisher, Depends(get_publisher)],
+):
+    from app.admin_audit import record_admin_audit
+    from app.rbac import assert_admin_permission
+    from app.referral import AdminLeadGrantRequest, admin_grant_lead, lead_to_response
+
+    await assert_admin_permission(session, role=admin.role, permission="referrals:write")
+    data = AdminLeadGrantRequest.model_validate(body or {})
+    lead = await admin_grant_lead(session, lead_id, note=data.note, publisher=publisher)
+    await record_admin_audit(
+        session,
+        actor=admin,
+        action="referrals.lead_granted",
+        resource_type="referral_lead",
+        resource_id=str(lead_id),
+        summary="Manually granted referral reward",
+    )
+    await session.commit()
+    return lead_to_response(lead)

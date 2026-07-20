@@ -19,7 +19,13 @@ http_clients: dict[str, httpx.AsyncClient] = {}
 redis_client: redis.Redis | None = None
 _openapi_cache: dict | None = None
 
-IDENTITY_PREFIXES = ("/api/v1/auth", "/api/v1/owners", "/api/v1/admin", "/api/v1/customers")
+IDENTITY_PREFIXES = (
+    "/api/v1/auth",
+    "/api/v1/owners",
+    "/api/v1/admin",
+    "/api/v1/customers",
+    "/api/v1/discovery",
+)
 CATALOG_PATH_MARKERS = ("/categories", "/menu", "/dishes", "/cuisines", "/ingredients", "/media")
 ORDER_PATH_MARKERS = ("/orders", "/analytics")
 MARKETING_PATH_MARKERS = (
@@ -70,10 +76,11 @@ def resolve_service_url(path: str) -> str | None:
         "/api/v1/admin/plan-packages",
     )):
         return settings.billing_service_url
-    # Kitchen Razorpay / package assignment — billing owns the tables.
+    # Kitchen Razorpay / package / GST — billing owns the tables.
     if path.startswith("/api/v1/admin/kitchens/") and (
         path.rstrip("/").endswith("/payment-gateway")
         or path.rstrip("/").endswith("/package")
+        or "/gst" in path
     ):
         return settings.billing_service_url
     if path.startswith("/api/v1/admin/kitchens/") and (

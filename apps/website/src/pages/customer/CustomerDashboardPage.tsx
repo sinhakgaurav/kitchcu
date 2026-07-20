@@ -1,5 +1,6 @@
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { Link, Navigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import {
   fetchCustomerProfile,
   getCustomerToken,
@@ -23,26 +24,36 @@ import {
   type DashboardOrder,
 } from "../../shared/customerDashboardApi";
 import { openStreetMapEmbedUrl } from "../../lib/locationMaps";
+import {
+  bulkCustomerKitchenReferrals,
+  customerReferralTemplateUrl,
+  fetchCustomerReferrals,
+  submitCustomerKitchenReferral,
+  uploadCustomerReferralCsv,
+  type ReferralDashboard,
+} from "../../shared/referralApi";
 
 type Tab =
   | "overview"
   | "orders"
   | "savings"
+  | "referrals"
   | "health"
   | "refunds"
   | "complaints"
   | "addresses"
   | "account";
 
-const TABS: { id: Tab; label: string }[] = [
-  { id: "overview", label: "Overview" },
-  { id: "orders", label: "Orders" },
-  { id: "savings", label: "Savings" },
-  { id: "health", label: "Health" },
-  { id: "refunds", label: "Refunds" },
-  { id: "complaints", label: "Complaints" },
-  { id: "addresses", label: "Addresses" },
-  { id: "account", label: "Account" },
+const TABS: { id: Tab; labelKey: string }[] = [
+  { id: "overview", labelKey: "owner.nav.overview" },
+  { id: "orders", labelKey: "customer.nav.myOrders" },
+  { id: "savings", labelKey: "customer.dashboard.title" },
+  { id: "referrals", labelKey: "customer.dashboard.referrals" },
+  { id: "health", labelKey: "customer.dashboard.title" },
+  { id: "refunds", labelKey: "customer.account.payout" },
+  { id: "complaints", labelKey: "customer.dashboard.tickets" },
+  { id: "addresses", labelKey: "customer.account.addresses" },
+  { id: "account", labelKey: "customer.nav.account" },
 ];
 
 const inr = (n: number) => `₹${Math.round(n).toLocaleString("en-IN")}`;
@@ -60,6 +71,7 @@ function formatWhen(iso: string): string {
 }
 
 export function CustomerDashboardPage() {
+  const { t } = useTranslation();
   const token = getCustomerToken();
   const [tab, setTab] = useState<Tab>("overview");
   const [dash, setDash] = useState<CustomerDashboard | null>(null);
@@ -128,31 +140,35 @@ export function CustomerDashboardPage() {
       <header className="customer-dash__hero">
         <div>
           <p className="customer-dash__eyebrow">Your kitchCU space</p>
-          <h1>{profile?.name ? `Hi, ${profile.name.split(" ")[0]}` : "Customer dashboard"}</h1>
+          <h1>
+            {profile?.name
+              ? `Hi, ${profile.name.split(" ")[0]}`
+              : t("customer.dashboard.title")}
+          </h1>
           <p>
             Orders, savings vs restaurants, health patterns, refunds, complaints, and delivery pins —
             everything in one place.
           </p>
         </div>
         <div className="customer-dash__hero-actions">
-          <Link to="/#nearby" className="btn btn--ghost btn--sm">
-            Discover kitchens
+          <Link to="/#near-you" className="btn btn--ghost btn--sm">
+            {t("customer.discovery.title")}
           </Link>
           <Link to="/account" className="btn btn--ghost btn--sm">
-            Payout details
+            {t("customer.account.payout")}
           </Link>
         </div>
       </header>
 
       <nav className="customer-dash__tabs" aria-label="Dashboard sections">
-        {TABS.map((t) => (
+        {TABS.map((item) => (
           <button
-            key={t.id}
+            key={item.id}
             type="button"
-            className={tab === t.id ? "active" : ""}
-            onClick={() => setTab(t.id)}
+            className={tab === item.id ? "active" : ""}
+            onClick={() => setTab(item.id)}
           >
-            {t.label}
+            {t(item.labelKey)}
           </button>
         ))}
       </nav>
@@ -179,6 +195,9 @@ export function CustomerDashboardPage() {
         />
       )}
       {!loading && dash && tab === "savings" && <SavingsPanel dash={dash} />}
+      {!loading && tab === "referrals" && (
+        <ReferralsPanel setError={setError} busy={busy} setBusy={setBusy} />
+      )}
       {!loading && dash && tab === "health" && <HealthPanel dash={dash} />}
       {!loading && tab === "refunds" && <RefundsPanel refunds={refunds} />}
       {!loading && tab === "complaints" && (
@@ -401,6 +420,215 @@ function OrderCard({
         </div>
       )}
     </li>
+  );
+}
+
+function ReferralsPanel({
+  setError,
+  busy,
+  setBusy,
+}: {
+  setError: (v: string) => void;
+  busy: boolean;
+  setBusy: (v: boolean) => void;
+}) {
+  const [dash, setDash] = useState<ReferralDashboard | null>(null);
+  const [rows, setRows] = useState([
+    { kitchen_name: "", contact_name: "", contact_phone: "", contact_email: "", city: "", notes: "" },
+    { kitchen_name: "", contact_name: "", contact_phone: "", contact_email: "", city: "", notes: "" },
+  ]);
+
+  const reload = useCallback(async () => {
+    try {
+      setDash(await fetchCustomerReferrals());
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not load referrals");
+    }
+  }, [setError]);
+
+  useEffect(() => {
+    void reload();
+  }, [reload]);
+
+  const submit = async () => {
+    setBusy(true);
+    setError("");
+    try {
+      const payload = rows
+        .filter((r) => r.contact_phone.trim() && r.kitchen_name.trim())
+        .map((r) => ({
+          kitchen_name: r.kitchen_name.trim(),
+          contact_name: r.contact_name || undefined,
+          contact_phone: r.contact_phone.trim(),
+          contact_email: r.contact_email || undefined,
+          city: r.city || undefined,
+          notes: r.notes || undefined,
+        }));
+      if (payload.length === 1) {
+        await submitCustomerKitchenReferral(payload[0]);
+      } else {
+        const result = await bulkCustomerKitchenReferrals(payload);
+        if (result.rejected) {
+          setError(`${result.accepted} accepted, ${result.rejected} rejected`);
+        }
+      }
+      await reload();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Submit failed");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const downloadTemplate = async () => {
+    const token = getCustomerToken();
+    const res = await fetch(customerReferralTemplateUrl(), {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    });
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "kitchcu-refer-kitchens-template.csv";
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  return (
+    <section className="glass customer-dash__card">
+      <h2>Refer a kitchen</h2>
+      <p>
+        Share kitchen details with KitchCu. When that kitchen onboards, you earn subscription credit
+        (admin-configurable, default ₹10).
+      </p>
+      {dash && (
+        <div className="customer-dash__grid">
+          <div className="customer-dash__stat">
+            <strong>{inr(dash.credit.balance_inr)}</strong>
+            <span>Available credit</span>
+          </div>
+          <div className="customer-dash__stat">
+            <strong>{inr(dash.credit.lifetime_earned_inr)}</strong>
+            <span>Lifetime earned</span>
+          </div>
+          <div className="customer-dash__stat">
+            <strong>{inr(dash.estimated_subscription_savings_inr)}</strong>
+            <span>Ready for subscription savings</span>
+          </div>
+          <div className="customer-dash__stat">
+            <strong>{inr(dash.credit.reward_per_conversion_inr)}</strong>
+            <span>Per kitchen onboard</span>
+          </div>
+        </div>
+      )}
+      <p className="muted">{dash?.credit.subscription_credit_note}</p>
+      <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap", margin: "1rem 0" }}>
+        <button type="button" className="btn btn--ghost btn--sm" onClick={downloadTemplate}>
+          Download Excel template
+        </button>
+        <label className="btn btn--ghost btn--sm">
+          Upload CSV
+          <input
+            type="file"
+            accept=".csv,text/csv"
+            hidden
+            onChange={async (e) => {
+              const file = e.target.files?.[0];
+              if (!file) return;
+              setBusy(true);
+              try {
+                await uploadCustomerReferralCsv(file);
+                await reload();
+              } catch (err) {
+                setError(err instanceof Error ? err.message : "Upload failed");
+              } finally {
+                setBusy(false);
+              }
+            }}
+          />
+        </label>
+        <button
+          type="button"
+          className="btn btn--ghost btn--sm"
+          onClick={() =>
+            setRows((r) => [
+              ...r,
+              {
+                kitchen_name: "",
+                contact_name: "",
+                contact_phone: "",
+                contact_email: "",
+                city: "",
+                notes: "",
+              },
+            ])
+          }
+        >
+          Add row
+        </button>
+      </div>
+      <div className="owner-table-wrap">
+        <table className="owner-table">
+          <thead>
+            <tr>
+              <th>Kitchen</th>
+              <th>Contact</th>
+              <th>Phone</th>
+              <th>Email</th>
+              <th>City</th>
+              <th>Notes</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row, i) => (
+              <tr key={i}>
+                {(
+                  [
+                    "kitchen_name",
+                    "contact_name",
+                    "contact_phone",
+                    "contact_email",
+                    "city",
+                    "notes",
+                  ] as const
+                ).map((key) => (
+                  <td key={key}>
+                    <input
+                      className="owner-input"
+                      value={row[key]}
+                      onChange={(e) =>
+                        setRows((prev) =>
+                          prev.map((r, idx) => (idx === i ? { ...r, [key]: e.target.value } : r)),
+                        )
+                      }
+                    />
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <button type="button" className="btn btn--primary" disabled={busy} onClick={submit}>
+        {busy ? "Saving…" : "Submit kitchen referrals"}
+      </button>
+      {dash && dash.leads.length > 0 && (
+        <>
+          <h3 style={{ marginTop: "1.5rem" }}>Your referrals</h3>
+          <ul className="customer-dash__tips">
+            {dash.leads.map((L) => (
+              <li key={L.id}>
+                <strong>{L.kitchen_name || "Kitchen"}</strong>
+                <span>
+                  {L.status}
+                  {L.reward_inr != null ? ` · ${inr(L.reward_inr)}` : ""}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
+    </section>
   );
 }
 

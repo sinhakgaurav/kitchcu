@@ -108,6 +108,41 @@ async def test_template_send_dry_run_preview(client: AsyncClient, marketing_ctx)
 
 
 @pytest.mark.asyncio
+async def test_template_send_includes_storefront_defaults(client: AsyncClient, marketing_ctx):
+    kid = marketing_ctx["kitchen_id"]
+    headers = {"Authorization": f"Bearer {marketing_ctx['owner_token']}"}
+    created = await client.post(
+        f"/api/v1/kitchens/{kid}/templates",
+        headers=headers,
+        json={
+            "channel": "whatsapp",
+            "name": "Brand link",
+            "body": "Order at {{ storefront_url }} — {{ tagline }} · {{ menu_line }}",
+        },
+    )
+    assert created.status_code == 201, created.text
+    tid = created.json()["id"]
+
+    preview = await client.post(
+        f"/api/v1/kitchens/{kid}/templates/{tid}/send",
+        headers=headers,
+        json={
+            "audience": "all",
+            "dry_run": True,
+            "sample_vars": {
+                "storefront_url": "https://customer.example/k/CKPNQ001",
+                "tagline": "Home taste",
+            },
+        },
+    )
+    assert preview.status_code == 200, preview.text
+    text = preview.json()["preview"]
+    assert "https://customer.example/k/CKPNQ001" in text
+    assert "Home taste" in text
+    assert "chef specials" in text  # menu_line default when omitted
+
+
+@pytest.mark.asyncio
 async def test_template_send_402_when_wallet_deduct_fails(
     client: AsyncClient, marketing_ctx, monkeypatch
 ):

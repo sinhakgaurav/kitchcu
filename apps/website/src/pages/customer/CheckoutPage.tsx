@@ -1,5 +1,6 @@
 import { Link, Navigate, useNavigate } from "react-router-dom";
 import { useEffect, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useBrandedStorefront } from "../../customer/BrandedStorefront";
 import { useGeolocation } from "../../hooks/useGeolocation";
 import { getCustomerToken } from "../../shared/customerApi";
@@ -86,6 +87,7 @@ function buildGroupPayload(
 }
 
 export function CheckoutPage() {
+  const { t } = useTranslation();
   const { loading } = useCustomerAuth();
   const navigate = useNavigate();
   const token = getCustomerToken();
@@ -199,7 +201,7 @@ export function CheckoutPage() {
 
   const branded = useBrandedStorefront();
   const loginNext = branded ? `${branded.basePath}/checkout` : "/checkout";
-  const menuBack = branded ? `${branded.basePath}/menu` : "/#nearby";
+  const menuBack = branded ? `${branded.basePath}/menu` : "/#near-you";
 
   if (!loading && !token) {
     return <Navigate to={`/login?next=${encodeURIComponent(loginNext)}`} replace />;
@@ -342,7 +344,7 @@ export function CheckoutPage() {
       </Link>
       <header className="owner-page__head">
         <div>
-          <h1>{isMultiKitchen ? "Multi-kitchen checkout" : "Checkout"}</h1>
+          <h1>{isMultiKitchen ? t("customer.checkout.title") : t("customer.checkout.title")}</h1>
           <p>
             {cart.kitchens.length} kitchen{cart.kitchens.length === 1 ? "" : "s"} ·{" "}
             {isMultiKitchen ? "separate tracking for every kitchen" : cart.kitchens[0].kitchenCode}

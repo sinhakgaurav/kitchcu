@@ -12,31 +12,30 @@ SYNC_DB_URL = os.environ["DATABASE_SYNC_URL"]
 
 
 @pytest.mark.asyncio
-async def test_admin_login_hint_reveals_password_in_non_production(client: AsyncClient, monkeypatch):
+async def test_admin_login_hint_hides_password_without_explicit_flag(client: AsyncClient, monkeypatch):
     monkeypatch.setattr("app.admin_routes.settings.admin_email", "admin@kitchcu.com")
     monkeypatch.setattr("app.admin_routes.settings.admin_password", "gcp-meta-secret")
     monkeypatch.delenv("ADMIN_LOGIN_REVEAL_PASSWORD", raising=False)
-    # APP_ENV=test in conftest → reveal allowed
-    res = await client.get("/api/v1/admin/auth/login-hint")
-    assert res.status_code == 200, res.text
-    body = res.json()
-    assert body["email"] == "admin@kitchcu.com"
-    assert body["revealed"] is True
-    assert body["password"] == "gcp-meta-secret"
-
-
-@pytest.mark.asyncio
-async def test_admin_login_hint_hides_password_in_production(client: AsyncClient, monkeypatch):
-    # Patch the gate directly — do not mutate global APP_ENV (breaks later OTP tests).
-    monkeypatch.setattr("app.admin_routes._admin_login_reveal_allowed", lambda: False)
-    monkeypatch.setattr("app.admin_routes.settings.admin_email", "admin@kitchcu.com")
-    monkeypatch.setattr("app.admin_routes.settings.admin_password", "secret-should-hide")
+    # APP_ENV alone must NOT reveal — only explicit ADMIN_LOGIN_REVEAL_PASSWORD=1
     res = await client.get("/api/v1/admin/auth/login-hint")
     assert res.status_code == 200, res.text
     body = res.json()
     assert body["email"] == "admin@kitchcu.com"
     assert body["revealed"] is False
     assert body["password"] is None
+
+
+@pytest.mark.asyncio
+async def test_admin_login_hint_reveals_password_with_explicit_flag(client: AsyncClient, monkeypatch):
+    monkeypatch.setattr("app.admin_routes.settings.admin_email", "admin@kitchcu.com")
+    monkeypatch.setattr("app.admin_routes.settings.admin_password", "gcp-meta-secret")
+    monkeypatch.setenv("ADMIN_LOGIN_REVEAL_PASSWORD", "1")
+    res = await client.get("/api/v1/admin/auth/login-hint")
+    assert res.status_code == 200, res.text
+    body = res.json()
+    assert body["email"] == "admin@kitchcu.com"
+    assert body["revealed"] is True
+    assert body["password"] == "gcp-meta-secret"
 
 
 @pytest.mark.asyncio

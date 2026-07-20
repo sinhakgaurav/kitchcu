@@ -1,16 +1,232 @@
 {
   "lang": {
-    "title": "Choose your language",
-    "detected": "We think your local language is {{language}}.",
-    "ask": "Would you like to continue in English or {{language}}?",
-    "continueEn": "Continue in English",
-    "continueLocal": "Continue in {{language}}",
-    "detecting": "Detecting your location…",
-    "change": "Language"
+    "title": "ਆਪਣੀ ਭਾਸ਼ਾ ਚੁਣੋ",
+    "detected": "ਸਾਨੂં ਲੱਗਦਾ ਹੈ ਕਿ ਤੁਹਾਡੀ ਸਥਾਨਕ ਭਾਸ਼ਾ {{language}} ਹੈ।",
+    "ask": "ਕੀ ਤੁਸੀਂ ਅੰਗਰੇਜ਼ੀ ਜਾਂ ਜਾਂ {{language}} ਵਿੱਚ ਜਾਰੀ ਰੱਖਣਾ ਚਾਹੁਂਦੇ ਹੋ?",
+    "continueEn": "ਅੰਗਰੇਜ਼ੀ ਵਿੱਚ ਜਾਰੀ ਰੱਖੋ",
+    "continueLocal": "{{language}} ਵਿੱਚ ਜਾਰੀ ਰੱਖੋ",
+    "detecting": "ਆਪਣੇ ਟਿਕਾਣੇ ਦੀ ਖੋਜ ਕੀਤੀ ਜਾ ਰਹੀ ਹੈ…",
+    "change": "ਭਾਸ਼ਾ"
   },
   "common": {
-    "continue": "Continue",
-    "cancel": "Cancel",
-    "loading": "Loading…"
+    "continue": "ਜਾਰੀ ਰੱਖੋ",
+    "cancel": "ਰੱਦ ਕਰੋ",
+    "loading": "ਲੋਡ ਹੋ ਰਿਹਾ ਹੈ…",
+    "save": "ਸੇਵ ਕਰੋ",
+    "close": "ਬੰਦ",
+    "search": "ਖੋਜ",
+    "back": "ਵਾਪਸ ਜਾਓ",
+    "retry": "ਮੁੜ ਕੋਸ਼ਿਸ਼ ਕਰੋ",
+    "yes": "ਹਾਂ",
+    "no": "ਨਹੀਂ",
+    "error": "﻿ਕੁਝ ਗਲਤ ਹੋ ਗਿਆ ਸੀ\"",
+    "signOut": "ਸਾਈਨ ਆਉਟ",
+    "openMenu": "ਮੇਨੂ ਖੋਲ੍ਹੋ",
+    "closeMenu": "ਮੇਨੂ ਬੰਦ ਕਰੋ",
+    "toggleMenu": "ਮੇਨੂ ਬਦਲੋ",
+    "dashboard": "ਡੈਸ਼ਬੋਰਡ",
+    "customerApp": "ਗਾਹਕ ਐਪ",
+    "kitchenOwner": "ਰਸੋਈ ਮਾਲਕ →",
+    "ownerLogin": "ਮਾਲਕ ਲਾਗਇਨ"
+  },
+  "status": {
+    "received": "ਮਿਲੇ:",
+    "accepted": "ਮਨਜ਼ੂਰ",
+    "preparing": "% 1 à¨à©±à¨¤à© à¨à©- à¨à¨¡à¨°à©à©±à¨¸- à¨¬à©à©±à¨ à¨µà¨²à©à¨ à¨ªà¨°à¨¿à©°à¨ à¨à©à¨¤à¨¾ à¨à¨¿à¨ (htt: // www. kde. org)",
+    "ready": "ਤਿਆਰ",
+    "out_for_delivery": "ਡਿਲਿਵਰੀ ਲਈ ਬਾਹਰ",
+    "delivered": "ਸਪੁਰਦ ਕੀਤਾ ਗਿਆ",
+    "cancelled": "ਰੱਦ ਕੀਤਾ",
+    "active": "ਸਰਗਰਮ",
+    "suspended": "ਮੁਅੱਤਲ",
+    "trial": "ਟਰਾਇਲ",
+    "open": "ਖੋਲ੍ਹੋ",
+    "closed": "ਬੰਦ ਕੀਤਾ"
+  },
+  "portal": {
+    "heroSubtitle": "ਘਰੇਲੂ ਸ਼ੈੱਫਾਂ, ਟਿਫਿਨ ਸੇਵਾਵਾਂ, ਅਤੇ ਸਪੁਰਦਗੀ ਲਈ ਸਿਰਫ ਰਸੋਈਆਂ ਲਈ ਗ੍ਰੋਥ ਓਐਸ — ਵਟਸਐਪ ਆਰਡਰ, ਲਾਈਵ ਕੈਪਚਰ ਮੀਨੂ, ਜ਼ੀਰੋ ਫੂਡ ਕਮਿਸ਼ਨ.",
+    "ctaOwner": "ਰਸੋਈ ਮਾਲਕ ਵਜੋਂ ਸ਼ੁਰੂ ਕਰੋ",
+    "ctaCustomer": "ਗਾਹਕ ਵਜੋਂ ਬ੍ਰਾਊਜ਼ ਕਰੋ →",
+    "trustCommission": "ਜ਼ੀਰੋ ਫੂਡ ਕਮਿਸ਼ਨ",
+    "trustCrm": "ਮਾਲਕ ਦੀ ਮਲਕੀਅਤ ਸੀਆਰਐਮ",
+    "trustHonest": "ਈਮਾਨਦਾਰ ਤਿਆਰੀ ਅਤੇ ਸਪੁਰਦਗੀ ਦੇ ਸਮੇਂ",
+    "navApps": "ਐਪਸ",
+    "navFeatures": "ਫੀਚਰ",
+    "navPricing": "ਕੀਮਤਾਂ",
+    "navSupport": "ਸਹਿਯੋਗ",
+    "navContact": "ਸੰਪਰਕ"
+  },
+  "owner": {
+    "nav": {
+      "operations": "ਓਪਰੇਸ਼ਨ",
+      "overview": "ਸੰਖੇਪ",
+      "orders": "ਦੇ ਹੁਕਮ",
+      "menu": "ਮੇਨੂ",
+      "brand": "ਬ੍ਰਾਂਡ ਪੇਜ",
+      "ingredients": "ਸਮੱਗਰੀ",
+      "growth": "ਵਾਧਾ",
+      "reports": "ਰਿਪੋਰਟਾਂ",
+      "intelligence": "ਬੁੱਧੀ",
+      "crm": "CRM",
+      "coupons": "ਕੂਪਨ",
+      "tiffin": "ਟਿਫਿਨ ਯੋਜਨਾਵਾਂ",
+      "templates": "ਟੈਪਲੇਟ",
+      "stream": "ਲਾਈਵ ਸਟ੍ਰੀਮ",
+      "learn": "ਸਿੱਖੋ ਅਤੇ ਜੁੜੋ",
+      "learning": "ਸਿੱਖਣਾ",
+      "community": "ਭਾਈਚਾਰਾ",
+      "account": "ਅਕਾਊਂਟ",
+      "subscription": "à¨à¨µà¨¾à¨¬( R)…",
+      "referrals": "ਹਵਾਲੇ",
+      "whatsapp": "WhatsApp",
+      "paymentGateway": "ਭੁਗਤਾਨ ਗੇਟਵੇ",
+      "gst": "ਜੀਐਸਟੀ ਅਤੇ ਵਿੱਤ",
+      "setup": "ਰਸੋਈ ਸੈੱਟਅੱਪ"
+    },
+    "shell": {
+      "activeKitchen": "ਸਰਗਰਮ ਰਸੋਈ",
+      "loadingKitchen": "ਰਸੋਈ ਲੋਡ ਕੀਤੀ ਜਾ ਰਹੀ ਹੈ…",
+      "loadingAuth": "ਲੋਡ ਹੋ ਰਿਹਾ ਹੈ…"
+    },
+    "auth": {
+      "titleLogin": "ਮਾਲਕ ਸਾਈਨ ਇਨ ਕਰੋ",
+      "titleRegister": "ਮਾਲਕ ਖਾਤਾ ਬਣਾਓ",
+      "phone": "ਫੋਨ",
+      "name": "ਨਾਮ",
+      "email": "ਈਮੇਲ (ਵਿਕਲਪਿਕ)",
+      "otp": "OTP",
+      "sendOtp": "OTP ਭੇਜੋ",
+      "verify": "ਜਾਂਚ ਜਾਰੀ ਰੱਖੋ (o)",
+      "register": "ਰਜਿਸਟਰ",
+      "haveAccount": "ਪਹਿਲਾਂ ਹੀ ਕੋਈ ਖਾਤਾ ਹੈ? ਸਾਈਨ ਇਨ ਕਰੋ",
+      "needAccount": "ਨਵੀਂ ਰਸੋਈ? ਰਜਿਸਟਰ ਕਰੋ",
+      "sessionExpired": "ਤੁਹਾਡਾ ਸ਼ੈਸ਼ਨ ਸਮਾਪਤ ਹੋ ਗਿਆ ਹੈ । ਕਿਰਪਾ ਕਰਕੇ ਦੁਬਾਰਾ ਸਾਈਨ ਇਨ ਕਰੋ ।",
+      "agreePolicies": "ਕਿਰਪਾ ਕਰਕੇ ਰਜਿਸਟਰ ਕਰਨ ਲਈ ਸ਼ਰਤਾਂ, ਗੋਪਨੀਯਤਾ ਅਤੇ ਰਿਫੰਡ ਨੀਤੀਆਂ ਨਾਲ ਸਹਿਮਤ ਹੋਵੋ.",
+      "demoHint": "ਡੈਮੋ OTP ਹੈ {{otp}}"
+    },
+    "home": {
+      "greetingMorning": "ਸਤਿ ਸ਼੍ਰੀ ਅਕਾਲ",
+      "greetingAfternoon": "ਸ਼ੁਭ ਦੁਪਹਿਰ",
+      "greetingEvening": "ਸਤਿ ਸ਼੍ਰੀ ਅਕਾਲ",
+      "quickNewOrder": "ਨਵਾਂ ਆਰਡਰ",
+      "quickNewOrderDesc": "ਮੈਨੁਅਲ ਜਾਂ ਵਾਕ-ਇਨ",
+      "quickBrand": "ਬ੍ਰਾਂਡ ਪੇਜ",
+      "quickBrandDesc": "ਸਾਂਝਾ ਕਰੋ/k/ਕੋਡ ਪ੍ਰਕਾਸ਼ਿਤ ਕਰੋ (S)",
+      "quickDrafts": "ਵਟਸਐਪ ਡਰਾਫਟ",
+      "quickDraftsDesc": "ਪਾਰਸ ਕੀਤੇ ਆਦੇਸ਼ਾਂ ਦੀ ਸਮੀਖਿਆ ਕਰੋ",
+      "quickAddDish": "ਕਟੋਰੇ ਸ਼ਾਮਲ ਕਰੋ",
+      "quickAddDishDesc": "ਲਾਈਵ ਕੈਪਚਰ ਫੋਟੋ",
+      "quickReports": "ਵਿਕਾਸ ਰਿਪੋਰਟਾਂ",
+      "quickReportsDesc": "ਮਾਲੀਆ ਅਤੇ ਧਾਰਨ",
+      "quickStream": "ਲਾਈਵ ਸਟ੍ਰੀਮ",
+      "quickStreamDesc": "ਗਾਹਕਾਂ ਨੂੰ ਲਾਈਵ ਜਾਓ",
+      "quickCoupons": "ਕੂਪਨ",
+      "quickCouponsDesc": "ਤਰੱਕੀ ਚਲਾਓ",
+      "quickTiffin": "ਟਿਫਿਨ ਯੋਜਨਾਵਾਂ",
+      "quickTiffinDesc": "ਮਾਸਿਕ ਥਾਲੀ ਗਾਹਕ",
+      "recentOrders": "ਹਾਲੀਆ ਆਦੇਸ਼",
+      "noOrders": "ਅਜੇ ਤੱਕ ਕੋਈ ਆਦੇਸ਼ ਨਹੀਂ",
+      "viewAllOrders": "ਸਾਰੇ ਆਰਡਰ ਵੇਖੋ"
+    },
+    "orders": {
+      "title": "ਦੇ ਹੁਕਮ",
+      "newOrder": "ਨਵਾਂ ਆਰਡਰ",
+      "drafts": "ਡਰਾਫਟ",
+      "empty": "ਅਜੇ ਤੱਕ ਕੋਈ ਆਦੇਸ਼ ਨਹੀਂ",
+      "searchPlaceholder": "ਆਰਡਰ ਕੋਡ ਖੋਜੋ, ਗਾਹਕ…",
+      "detail": "ਆਰਡਰ ਵੇਰਵਾ",
+      "accept": "ਸਵੀਕਾਰ ਕਰੋ",
+      "reject": "ਬੈਕ ਆਰਡਰ ਰੱਦ ਕਰੋ",
+      "updateStatus": "ਸਥਿਤੀ ਅੱਪਡੇਟ ਕਰੋ"
+    },
+    "menu": {
+      "title": "ਮੇਨੂ",
+      "addDish": "ਕਟੋਰੇ ਸ਼ਾਮਲ ਕਰੋ",
+      "empty": "ਅਜੇ ਤੱਕ ਕੋਈ ਪਕਵਾਨ ਨਹੀਂ",
+      "liveCapture": "ਹੀਰੋ ਫੋਟੋ ਲਈ ਲਾਈਵ ਕੈਪਚਰ ਦੀ ਲੋੜ",
+      "price": "ਕੀਮਤ",
+      "prepTime": "ਤਿਆਰੀ ਦਾ ਸਮਾਂ (ਮਿੰਟ)",
+      "active": "ਮੇਨੂ ਉੱਤੇ"
+    },
+    "subscription": {
+      "title": "à¨à¨µà¨¾à¨¬( R)…",
+      "loading": "ਯੋਜਨਾਵਾਂ ਲੋਡ ਕੀਤੀਆਂ ਜਾ ਰਹੀਆਂ ਹਨ…",
+      "monthly": "ਮਹੀਨਾਵਾਰ",
+      "yearly": "ਸਾਲਾਨਾ",
+      "subscribe": "ਗਾਹਕ ਬਣੋ",
+      "activate": "ਸਰਗਰਮ (dev)",
+      "current": "ਮੌਜੂਦਾ ਯੋਜਨਾ",
+      "referralCredit": "ਰੈਫਰਲ ਕ੍ਰੈਡਿਟ: ₹{{amount}}",
+      "referralNote": "ਕ੍ਰੈਡਿਟ ਤੁਹਾਡੇ ਅਗਲੇ ਸਬਸਕ੍ਰਿਪਸ਼ਨ ਚਾਰਜ 'ਤੇ ਆਪਣੇ ਆਪ ਲਾਗੂ ਹੁੰਦੇ ਹਨ.",
+      "loadError": "ਸਬਸਕ੍ਰਿਪਸ਼ਨ ਡਾਟਾ ਲੋਡ ਨਹੀਂ ਕੀਤਾ ਜਾ ਸਕਿਆ"
+    },
+    "setup": {
+      "title": "ਰਸੋਈ ਸੈੱਟਅੱਪ",
+      "save": "ਸੈਟਿੰਗ ਸੰਭਾਲੋ"
+    },
+    "referrals": {
+      "title": "ਹਵਾਲੇ",
+      "creditBalance": "ਕ੍ਰੈਡਿਟ ਸੰਤੁਲਨ",
+      "submitLead": "ਗਾਹਕ ਦਾ ਹਵਾਲਾ ਦਿਓ",
+      "empty": "ਅਜੇ ਤੱਕ ਕੋਈ ਰੈਫਰਲ ਲੀਡ ਨਹੀਂ ਹੈ"
+    }
+  },
+  "customer": {
+    "nav": {
+      "nearYou": "ਤੁਹਾਡੇ ਨੇੜੇ",
+      "featured": "ਫੀਚਰਡ",
+      "bestPrices": "ਵਧੀਆ ਕੀਮਤਾਂ",
+      "kitchenCode": "ਰਸੋਈ ਕੋਡ",
+      "myOrders": "ਮੇਰੇ ਆਦੇਸ਼",
+      "dashboard": "ਡੈਸ਼ਬੋਰਡ",
+      "account": "ਅਕਾਊਂਟ",
+      "signIn": "ਗਾਹਕ ਸਾਈਨ ਇਨ ਕਰੋ"
+    },
+    "auth": {
+      "title": "ਗਾਹਕ ਸਾਈਨ ਇਨ ਕਰੋ",
+      "whatsappOtp": "WhatsApp OTP",
+      "socialContinue": "ਸਮਾਜਿਕ ਨਾਲ ਜਾਰੀ ਰੱਖੋ",
+      "phone": "ਫੋਨ",
+      "sendOtp": "OTP ਭੇਜੋ",
+      "verify": "ਜਾਂਚ"
+    },
+    "discovery": {
+      "title": "ਆਪਣੇ ਨੇੜੇ ਦੇ ਘਰੇਲੂ ਰਸੋਈ ਲੱਭੋ",
+      "searchPlaceholder": "ਖੋਜ ਰਸੋਈ, ਪਕਵਾਨ, ਪਕਵਾਨ…",
+      "useLocation": "ਮੇਰਾ ਟਿਕਾਣਾ ਵਰਤੋ",
+      "noResults": "ਕੋਈ ਰਸੋਈ ਤੁਹਾਡੇ ਫਿਲਟਰਾਂ ਨਾਲ ਮੇਲ ਨਹੀਂ ਖਾਂਦੀ"
+    },
+    "checkout": {
+      "title": "ਚੈਕਆਉਟ",
+      "placeOrder": "ਪਲੇਸ ਆਰਡਰ",
+      "cartEmpty": "ਤੁਹਾਡਾ ਕਾਰਟ ਖਾਲੀ ਹੈ",
+      "deliveryAddress": "ਡਿਲਿਵਰੀ ਪਤਾ",
+      "payment": "ਭੁਗਤਾਨ",
+      "total": "ਕੁੱਲ"
+    },
+    "orders": {
+      "title": "ਮੇਰੇ ਆਦੇਸ਼",
+      "empty": "ਅਜੇ ਤੱਕ ਕੋਈ ਆਦੇਸ਼ ਨਹੀਂ",
+      "track": "ਟਰੈਕ",
+      "repeat": "ਮੁੜ- ਆਰਡਰ ਕਰੋ",
+      "history": "ਆਰਡਰ ਇਤਿਹਾਸ"
+    },
+    "track": {
+      "title": "ਟਰੈਕ ਆਰਡਰ",
+      "eta": "ਅਨੁਮਾਨਿਤ ਸਮਾਂ",
+      "status": "ਸਥਿਤੀ"
+    },
+    "dashboard": {
+      "title": "ਤੁਹਾਡਾ ਡੈਸ਼ਬੋਰਡ",
+      "savedKitchens": "ਸੇਵ ਕੀਤੀ ਰਸੋਈ",
+      "referrals": "ਹਵਾਲੇ",
+      "tickets": "ਸਹਿਯੋਗ"
+    },
+    "account": {
+      "title": "ਅਕਾਊਂਟ",
+      "addresses": "à¨à©à¨à¨¾ à¨¨à¨¾à¨:",
+      "payout": "ਰਿਫੰਡ ਭੁਗਤਾਨ",
+      "save": "ਪ੍ਰੋਫ਼ਾਈਲ ਸੰਭਾਲੋ"
+    }
   }
 }

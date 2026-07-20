@@ -1,24 +1,232 @@
 {
   "lang": {
     "title": "अपनी भाषा चुनें",
-    "detected": "हमें लगता है आपकी स्थानीय भाषा {{language}} है।",
-    "ask": "क्या आप अंग्रेज़ी में जारी रखना चाहेंगे या {{language}} में?",
+    "detected": "हमें लगता है कि आपकी स्थानीय भाषा {{language}} है।",
+    "ask": "क्या आप अंग्रेज़ी या {{language}} में जारी रखना चाहेंगे?",
     "continueEn": "अंग्रेज़ी में जारी रखें",
     "continueLocal": "{{language}} में जारी रखें",
     "detecting": "आपका स्थान पहचाना जा रहा है…",
     "change": "भाषा"
   },
-  "portal": {
-    "heroSubtitle": "होम शेफ़, टिफ़िन सेवाओं और डिलीवरी-ओनली किचन के लिए ग्रोथ OS — व्हाट्सऐप ऑर्डर, लाइव-कैप्चर मेनू, शून्य फ़ूड कमीशन।",
-    "ctaOwner": "किचन ओनर के रूप में शुरू करें",
-    "ctaCustomer": "ग्राहक के रूप में देखें →",
-    "trustCommission": "शून्य फ़ूड कमीशन",
-    "trustCrm": "ओनर का अपना CRM",
-    "trustHonest": "ईमानदार तैयारी और डिलीवरी समय"
-  },
   "common": {
     "continue": "जारी रखें",
     "cancel": "रद्द करें",
-    "loading": "लोड हो रहा है…"
+    "loading": "लोड हो रहा है…",
+    "save": "सहेजें",
+    "close": "बंद करें",
+    "search": "खोजें",
+    "back": "वापस",
+    "retry": "फिर से कोशिश करें",
+    "yes": "हाँ",
+    "no": "नहीं",
+    "error": "कुछ गलत हो गया",
+    "signOut": "साइन आउट",
+    "openMenu": "मेनू खोलें",
+    "closeMenu": "मेनू बंद करें",
+    "toggleMenu": "मेनू टॉगल करें",
+    "dashboard": "डैशबोर्ड",
+    "customerApp": "ग्राहक ऐप",
+    "kitchenOwner": "किचन ओनर →",
+    "ownerLogin": "ओनर लॉगिन"
+  },
+  "status": {
+    "received": "प्राप्त",
+    "accepted": "स्वीकृत",
+    "preparing": "तैयार हो रहा है",
+    "ready": "तैयार",
+    "out_for_delivery": "डिलीवरी के लिए निकला",
+    "delivered": "डिलीवर हो गया",
+    "cancelled": "रद्द",
+    "active": "सक्रिय",
+    "suspended": "निलंबित",
+    "trial": "ट्रायल",
+    "open": "खुला",
+    "closed": "बंद"
+  },
+  "portal": {
+    "heroSubtitle": "होम शेफ़, टिफ़िन सेवाओं और डिलीवरी-ओनली किचन के लिए ग्रोथ OS — WhatsApp ऑर्डर, लाइव-कैप्चर मेनू, शून्य फ़ूड कमीशन।",
+    "ctaOwner": "किचन ओनर के रूप में शुरू करें",
+    "ctaCustomer": "ग्राहक के रूप में देखें →",
+    "trustCommission": "शून्य फ़ूड कमीशन",
+    "trustCrm": "ओनर-स्वामित्व वाला CRM",
+    "trustHonest": "ईमानदार तैयारी और डिलीवरी समय",
+    "navApps": "ऐप्स",
+    "navFeatures": "विशेषताएँ",
+    "navPricing": "मूल्य निर्धारण",
+    "navSupport": "सहायता",
+    "navContact": "संपर्क"
+  },
+  "owner": {
+    "nav": {
+      "operations": "संचालन",
+      "overview": "अवलोकन",
+      "orders": "ऑर्डर",
+      "menu": "मेनू",
+      "brand": "ब्रांड पेज",
+      "ingredients": "सामग्री",
+      "growth": "ग्रोथ",
+      "reports": "रिपोर्ट",
+      "intelligence": "इंटेलिजेंस",
+      "crm": "CRM",
+      "coupons": "कूपन",
+      "tiffin": "टिफ़िन प्लान",
+      "templates": "टेम्प्लेट",
+      "stream": "लाइव स्ट्रीम",
+      "learn": "सीखें और जुड़ें",
+      "learning": "लर्निंग",
+      "community": "कम्युनिटी",
+      "account": "अकाउंट",
+      "subscription": "सब्सक्रिप्शन",
+      "referrals": "रेफ़रल",
+      "whatsapp": "WhatsApp",
+      "paymentGateway": "पेमेंट गेटवे",
+      "gst": "GST और वित्त",
+      "setup": "किचन सेटअप"
+    },
+    "shell": {
+      "activeKitchen": "सक्रिय किचन",
+      "loadingKitchen": "किचन लोड हो रहा है…",
+      "loadingAuth": "लोड हो रहा है…"
+    },
+    "auth": {
+      "titleLogin": "ओनर साइन इन",
+      "titleRegister": "ओनर अकाउंट बनाएँ",
+      "phone": "फ़ोन",
+      "name": "नाम",
+      "email": "ईमेल (वैकल्पिक)",
+      "otp": "OTP",
+      "sendOtp": "OTP भेजें",
+      "verify": "सत्यापित करें और जारी रखें",
+      "register": "रजिस्टर करें",
+      "haveAccount": "पहले से अकाउंट है? साइन इन करें",
+      "needAccount": "नया किचन? रजिस्टर करें",
+      "sessionExpired": "आपका सत्र समाप्त हो गया। कृपया फिर से साइन इन करें।",
+      "agreePolicies": "रजिस्टर करने के लिए कृपया नियम, गोपनीयता और रिफ़ंड नीति से सहमत हों।",
+      "demoHint": "डेमो OTP है {{otp}}"
+    },
+    "home": {
+      "greetingMorning": "सुप्रभात",
+      "greetingAfternoon": "नमस्कार",
+      "greetingEvening": "शुभ संध्या",
+      "quickNewOrder": "नया ऑर्डर",
+      "quickNewOrderDesc": "मैनुअल या वॉक-इन",
+      "quickBrand": "ब्रांड पेज",
+      "quickBrandDesc": "/k/code प्रकाशित करें और साझा करें",
+      "quickDrafts": "WhatsApp ड्राफ़्ट",
+      "quickDraftsDesc": "पार्स किए गए ऑर्डर देखें",
+      "quickAddDish": "डिश जोड़ें",
+      "quickAddDishDesc": "लाइव-कैप्चर फ़ोटो",
+      "quickReports": "ग्रोथ रिपोर्ट",
+      "quickReportsDesc": "रेवेन्यू और रिटेंशन",
+      "quickStream": "लाइव स्ट्रीम",
+      "quickStreamDesc": "ग्राहकों के लिए लाइव जाएँ",
+      "quickCoupons": "कूपन",
+      "quickCouponsDesc": "प्रमोशन चलाएँ",
+      "quickTiffin": "टिफ़िन प्लान",
+      "quickTiffinDesc": "मासिक थाली सब्सक्राइबर",
+      "recentOrders": "हाल के ऑर्डर",
+      "noOrders": "अभी कोई ऑर्डर नहीं",
+      "viewAllOrders": "सभी ऑर्डर देखें"
+    },
+    "orders": {
+      "title": "ऑर्डर",
+      "newOrder": "नया ऑर्डर",
+      "drafts": "ड्राफ़्ट",
+      "empty": "अभी कोई ऑर्डर नहीं",
+      "searchPlaceholder": "ऑर्डर कोड, ग्राहक खोजें…",
+      "detail": "ऑर्डर विवरण",
+      "accept": "स्वीकार करें",
+      "reject": "ऑर्डर रद्द करें",
+      "updateStatus": "स्थिति अपडेट करें"
+    },
+    "menu": {
+      "title": "मेनू",
+      "addDish": "डिश जोड़ें",
+      "empty": "अभी कोई डिश नहीं",
+      "liveCapture": "हीरो फ़ोटो के लिए लाइव-कैप्चर आवश्यक",
+      "price": "कीमत",
+      "prepTime": "तैयारी समय (मिनट)",
+      "active": "मेनू पर"
+    },
+    "subscription": {
+      "title": "सब्सक्रिप्शन",
+      "loading": "प्लान लोड हो रहे हैं…",
+      "monthly": "मासिक",
+      "yearly": "वार्षिक",
+      "subscribe": "सब्सक्राइब करें",
+      "activate": "सक्रिय करें (डेव)",
+      "current": "वर्तमान प्लान",
+      "referralCredit": "रेफ़रल क्रेडिट: ₹{{amount}}",
+      "referralNote": "क्रेडिट आपकी अगली सब्सक्रिप्शन चार्ज पर स्वतः लागू होंगे।",
+      "loadError": "सब्सक्रिप्शन डेटा लोड नहीं हो सका"
+    },
+    "setup": {
+      "title": "किचन सेटअप",
+      "save": "सेटिंग्स सहेजें"
+    },
+    "referrals": {
+      "title": "रेफ़रल",
+      "creditBalance": "क्रेडिट शेष",
+      "submitLead": "ग्राहक रेफ़र करें",
+      "empty": "अभी कोई रेफ़रल लीड नहीं"
+    }
+  },
+  "customer": {
+    "nav": {
+      "nearYou": "आपके पास",
+      "featured": "फ़ीचर्ड",
+      "bestPrices": "सबसे अच्छी कीमतें",
+      "kitchenCode": "किचन कोड",
+      "myOrders": "मेरे ऑर्डर",
+      "dashboard": "डैशबोर्ड",
+      "account": "अकाउंट",
+      "signIn": "ग्राहक साइन इन"
+    },
+    "auth": {
+      "title": "ग्राहक साइन इन",
+      "whatsappOtp": "WhatsApp OTP",
+      "socialContinue": "सोशल से जारी रखें",
+      "phone": "फ़ोन",
+      "sendOtp": "OTP भेजें",
+      "verify": "सत्यापित करें"
+    },
+    "discovery": {
+      "title": "अपने पास होम किचन खोजें",
+      "searchPlaceholder": "किचन, व्यंजन, डिश खोजें…",
+      "useLocation": "मेरा स्थान उपयोग करें",
+      "noResults": "आपके फ़िल्टर से कोई किचन मेल नहीं खाता"
+    },
+    "checkout": {
+      "title": "चेकआउट",
+      "placeOrder": "ऑर्डर करें",
+      "cartEmpty": "आपकी कार्ट खाली है",
+      "deliveryAddress": "डिलीवरी पता",
+      "payment": "भुगतान",
+      "total": "कुल"
+    },
+    "orders": {
+      "title": "मेरे ऑर्डर",
+      "empty": "अभी कोई ऑर्डर नहीं",
+      "track": "ट्रैक करें",
+      "repeat": "फिर से ऑर्डर करें",
+      "history": "ऑर्डर इतिहास"
+    },
+    "track": {
+      "title": "ऑर्डर ट्रैक करें",
+      "eta": "अनुमानित समय",
+      "status": "स्थिति"
+    },
+    "dashboard": {
+      "title": "आपका डैशबोर्ड",
+      "savedKitchens": "सहेजे गए किचन",
+      "referrals": "रेफ़रल",
+      "tickets": "सहायता"
+    },
+    "account": {
+      "title": "अकाउंट",
+      "addresses": "पते",
+      "payout": "रिफ़ंड भुगतान",
+      "save": "प्रोफ़ाइल सहेजें"
+    }
   }
 }

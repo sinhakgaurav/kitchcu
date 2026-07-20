@@ -65,7 +65,7 @@ export function Hero({ variant }: Props) {
                 </>
               ) : (
                 <>
-                  <a href="/#nearby" className="btn btn--primary btn--lg">
+                  <a href="/#near-you" className="btn btn--primary btn--lg">
                     Order now
                   </a>
                   <Link to="/login" className="btn btn--ghost btn--lg">

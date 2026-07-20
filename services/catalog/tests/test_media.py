@@ -78,3 +78,18 @@ async def test_media_upload_requires_kitchen_owner(client: AsyncClient, kitchen_
         data={"context": "dish"},
     )
     assert res.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_media_upload_brand_contexts(client: AsyncClient, kitchen_ctx):
+    _, kitchen_id, token = kitchen_ctx
+    headers = {"Authorization": f"Bearer {token}"}
+    for context in ("brand_logo", "brand_background"):
+        res = await client.post(
+            f"/api/v1/kitchens/{kitchen_id}/media/upload",
+            headers=headers,
+            files={"file": ("brand.jpg", io.BytesIO(_jpeg_bytes()), "image/jpeg")},
+            data={"context": context, "is_live_capture": "false"},
+        )
+        assert res.status_code == 200, res.text
+        assert res.json()["url"]

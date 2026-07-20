@@ -11,6 +11,7 @@ dependencies = [
     "psycopg2-binary>=2.9",
     "python-jose[cryptography]>=3.3",
     "python-multipart>=0.0.9",
+    "fpdf2>=2.8",
 ]
 
 [project.optional-dependencies]

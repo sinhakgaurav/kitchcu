@@ -1,6 +1,7 @@
 import { FormEvent, useState } from "react";
 import type { CSSProperties, RefObject } from "react";
 import { Link, Navigate, useNavigate, useSearchParams } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { images, sampleDishImages } from "../../data/content";
 import { AuthLoginHighlights } from "../../components/AuthLoginHighlights";
 import { BrandAuthArt, BrandLogo } from "../../components/BrandLogo";
@@ -22,6 +23,7 @@ import {
 } from "../../shared/customerApi";
 
 export function CustomerLoginPage() {
+  const { t } = useTranslation();
   const { session, applyAuthResult } = useCustomerAuth();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -141,7 +143,7 @@ export function CustomerLoginPage() {
         <div className="auth-page__overlay" />
         <div className="auth-page__brand-stack">
           <BrandLogo variant="wordmark" className="brand-logo--lg" />
-          <h1>Customer sign in</h1>
+          <h1>{t("customer.auth.title")}</h1>
           <p>Save your profile and favourite kitchens on {CUSTOMER_HOST}</p>
           <AuthLoginHighlights surface="customer" />
           <BrandAuthArt surface="customer" />
@@ -151,7 +153,7 @@ export function CustomerLoginPage() {
       <div className="auth-page__form-wrap">
         <div className="auth-page__mobile-brand">
           <BrandLogo variant="wordmark" className="brand-logo--lg" />
-          <p>Customer sign in · {CUSTOMER_HOST}</p>
+          <p>{t("customer.auth.title")} · {CUSTOMER_HOST}</p>
         </div>
         <div className="auth-card glass">
           <div className="auth-card__demo">
@@ -193,7 +195,7 @@ export function CustomerLoginPage() {
               <input value={name} onChange={(e) => setName(e.target.value)} required placeholder={DEMO.customerName} />
             </label>
             <label>
-              Phone
+              {t("customer.auth.phone")}
               <input
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
@@ -203,7 +205,7 @@ export function CustomerLoginPage() {
               />
             </label>
             <label>
-              Kitchen code (optional)
+              {t("customer.nav.kitchenCode")}
               <input
                 value={code}
                 onChange={(e) => setCode(e.target.value.toUpperCase())}
@@ -212,7 +214,7 @@ export function CustomerLoginPage() {
             </label>
             {otpSent && (
               <label>
-                OTP code
+                {t("owner.auth.otp")}
                 <input
                   value={otp}
                   onChange={(e) => setOtp(e.target.value)}
@@ -232,7 +234,7 @@ export function CustomerLoginPage() {
               className="btn btn--primary btn--lg"
               disabled={busy || !policiesAgreed}
             >
-              {busy ? "Please wait…" : otpSent ? "Verify & sign in" : "Send WhatsApp OTP"}
+              {busy ? t("common.loading") : otpSent ? t("customer.auth.verify") : t("customer.auth.sendOtp")}
             </button>
             {otpSent ? (
               <button type="button" className="btn btn--ghost auth-card__resend" onClick={() => setOtpSent(false)}>

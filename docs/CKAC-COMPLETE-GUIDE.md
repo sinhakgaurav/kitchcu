@@ -4,11 +4,11 @@
 
 | Field | Value |
 |-------|-------|
-| Version | **3.2** |
-| Status | Phase 1 **S1–S18** + post-S18 **P19–P28**; prod `*.kitchcu.com`; tracker [`ADVANCEMENT-TRACKER.md`](./ADVANCEMENT-TRACKER.md); solution depth [`PLATFORM-SOLUTION-BLUEPRINT.md`](./PLATFORM-SOLUTION-BLUEPRINT.md); **E1/E2** design pack only |
+| Version | **3.2.3** |
+| Status | Phase 1 **S1–S18** + post-S18 **P19–P40**; prod `*.kitchcu.com`; tracker [`ADVANCEMENT-TRACKER.md`](./ADVANCEMENT-TRACKER.md); solution depth [`PLATFORM-SOLUTION-BLUEPRINT.md`](./PLATFORM-SOLUTION-BLUEPRINT.md); **E1/E2** design pack only |
 | Audience | CEO, CPO, CTO, Product, Engineering, DBA, QA, Investors, AI coding agents |
-| Last updated | July 2026 |
-| Supersedes | `CKAC-COMPLETE-GUIDE.md` v3.1 (July 2026) |
+| Last updated | 2026-07-20 |
+| Supersedes | `CKAC-COMPLETE-GUIDE.md` v3.2.2 (July 2026) |
 | Operating charter | [`.cursor/rules/kitchcu-executive-operating-charter.mdc`](../.cursor/rules/kitchcu-executive-operating-charter.mdc) — always-on, non-negotiable |
 | Engineering constitution | [`KITCHCU-ENGINEERING-STANDARDS.md`](./KITCHCU-ENGINEERING-STANDARDS.md) |
 | Agent quick spec | [`AGENTS.md`](../AGENTS.md) |
@@ -1064,6 +1064,10 @@ curl "http://localhost:18000/openapi.json?refresh=true"   # force refresh after 
 | Owner WhatsApp/email marketing templates | P26 | ✅ |
 | Platform employees CRUD + RBAC | P27 | ✅ |
 | Super-admin kitchen workspace (Package/Marketing/Streaming + Cursor gate) | P28 | ✅ |
+| Dual referral program (customer↔kitchen) | P37 | ✅ |
+| GST monthly Excel/PDF + admin kitchen GST | P38 | ✅ |
+| Super-admin ops console (orders/tickets/settlements/health) | P39 | ✅ |
+| Platform i18n (10 locales) + HTML/API-key/login-hint harden | P40 | ✅ |
 | **Purchases ledger + chef-standard lock (E1/E2)** | **S19 proposed** | **📋 Design only — not started** |
 
 ---
@@ -1253,15 +1257,17 @@ See [`DELIVERY-PAYER-MODE-DESIGN.md`](./DELIVERY-PAYER-MODE-DESIGN.md) for the c
 | Area | Admin tab / API | Job |
 |------|-----------------|-----|
 | Health | Overview | Stat tiles, charts, quick actions (tickets, refunds, suspended kitchens, trials) |
-| People | Customers, Owners, Kitchens | Suspend, activate, subscription overrides |
+| People | Customers, Owners, Kitchens | Suspend, activate, subscription overrides; customer **order + ticket history** + server search (P39) |
 | Staff | **Employees** | CRUD/deactivate platform admins; roles `superadmin` / `ops` / `support` / `finance`; permissions `resource:action` |
-| Monetization | **Packages** | Map platform features → packages → plan tiers; assign package on kitchen workspace |
-| Money | Refunds + billing admin | Gateway vs direct refunds, payments, settlements, money-stats |
-| Governance | **Control** | Feature flags, application data journeys, subscription overrides, API Keys (platform secrets) |
-| Support | Tickets | Escalated AI-chat queues |
-| Kitchen workspace | Profile / WhatsApp / Payments / **Package** / **Marketing** / Modules / **Streaming** | Per-kitchen credentials, entitlements, template inventory, streaming modules |
+| Monetization | **Packages** · **Referrals** | Map features→packages→plans; dual referral rewards + lead queue (P37) |
+| Money | Refunds + settlements + billing admin | Gateway vs direct refunds, payments, settlements list, money-stats; GST kitchen exports (P38) |
+| Governance | **Control** | Feature flags, journeys, subscription overrides, API Keys (`value_masked` never full secret — P40) |
+| Support | Tickets | Escalated queues; **assignee / priority / resolution note**; deep-link to kitchen + refunds (P39) |
+| Kitchen workspace | Profile / Brand / WhatsApp / Payments / Package / Marketing / Modules / **Orders** / Streaming / Delivery / Tiffin / **GST** | Care strip (open tickets/refunds, last order); per-kitchen credentials + GST (P38–P39) |
 
-Gateway note: admin **billing** paths (packages, refunds, payment-gateway) are registered **before** the identity admin catch-all so they proxy correctly.
+Gateway note: admin **billing** paths (packages, refunds, payment-gateway, GST) are registered **before** the identity admin catch-all so they proxy correctly.
+
+**Security (P40):** `GET /admin/auth/login-hint` reveals `ADMIN_PASSWORD` only when `ADMIN_LOGIN_REVEAL_PASSWORD=1` (never inferred from `APP_ENV` alone). Dish HTML is sanitized server- and client-side.
 
 ---
 
@@ -1565,7 +1571,7 @@ Full acceptance criteria for every feature: [`CKAC-COMPLETE-PLANNING-BENCHMARK.m
 
 | Doc | Role |
 |-----|------|
-| **This guide (v3.2)** | CEO/CPO/CTO master encyclopedia |
+| **This guide (v3.2.3)** | CEO/CPO/CTO master encyclopedia |
 | [`PLATFORM-SOLUTION-BLUEPRINT.md`](./PLATFORM-SOLUTION-BLUEPRINT.md) | Expectations → CEO/CPO solution → CTO impl → arch/DB/UX per journey & admin controls |
 | [`PLATFORM-PERSONA-DEEP-DIVE.md`](./PLATFORM-PERSONA-DEEP-DIVE.md) | Persona lived experience + scorecards |
 | [`PLATFORM-STRATEGIC-ANALYSIS.md`](./PLATFORM-STRATEGIC-ANALYSIS.md) | Competitive honesty + Waves A–D |
@@ -1593,6 +1599,7 @@ Full acceptance criteria for every feature: [`CKAC-COMPLETE-PLANNING-BENCHMARK.m
 | Version | Date | Changes |
 |---------|------|---------|
 | **3.2.3** | July 2026 | Platform Solution Blueprint + Persona Deep Dive + Strategic Analysis linked from tracker/index; multilevel admin & package planner solution matrices. |
+| **3.2.3** | 2026-07-20 | P37–P40: dual referrals, GST Excel/PDF + admin GST, super-admin ops console (orders/tickets/settlements/health), platform i18n (10 locales) + HTML/API-key/login-hint harden; docs/PDFs refresh. |
 | **3.2.2** | July 2026 | Post-S18 P25–P28: package mapper, owner WA/email templates, employees CRUD+RBAC, expanded kitchen workspace + always-on super-admin Cursor gate; docs/PDFs/tracker refresh. |
 | **3.2.1** | July 2026 | Post-S18 P19–P24: branded storefront, golden performance day, kitchen integrations admin workspace, live dish showcase, admin password env sync; prod admin `admin@kitchcu.com`; living [`ADVANCEMENT-TRACKER.md`](./ADVANCEMENT-TRACKER.md). |
 | **3.2** | July 2026 | Super-admin Control plane (Customers/Refunds/Control, feature flags, journeys); dish prep/delivery/`max_time` + customer ready-within; delivery payer modes (owner in-range / customer extended) + platform courier + Google Maps tracking; login `AuthLoginHighlights` + owner `CommissionAdvantagePanel` + customer dashboard; expanded UI Catalog (§18.1–18.8) with new screenshots; flows §17.9–17.10; PDF layout v3.2 (header clearance, caption-above-figure, no overlap). |
@@ -1603,4 +1610,4 @@ Full acceptance criteria for every feature: [`CKAC-COMPLETE-PLANNING-BENCHMARK.m
 
 ---
 
-*KitchCu Complete Executive & Engineering Guide v3.2.2 — Confidential — July 2026*
+*KitchCu Complete Executive & Engineering Guide v3.2.3 — Confidential — July 2026*

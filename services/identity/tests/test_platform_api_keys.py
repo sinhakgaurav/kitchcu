@@ -63,7 +63,8 @@ async def test_admin_api_keys_list_and_upsert_masks_secret(client):
     assert body["configured"] is True
     assert body["value_masked"] is not None
     assert "super_secret" not in (body["value_masked"] or "")
-    assert body["value_masked"].endswith("1234")
+    assert "1234" not in (body["value_masked"] or "")
+    assert body["value_masked"] == "••••"
 
     listed2 = await client.get("/api/v1/admin/api-keys", headers=headers)
     rz2 = next(k for k in listed2.json() if k["key"] == "razorpay_key_secret")

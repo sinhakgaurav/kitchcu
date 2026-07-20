@@ -1,16 +1,232 @@
 {
   "lang": {
-    "title": "Choose your language",
-    "detected": "We think your local language is {{language}}.",
-    "ask": "Would you like to continue in English or {{language}}?",
-    "continueEn": "Continue in English",
-    "continueLocal": "Continue in {{language}}",
-    "detecting": "Detecting your location…",
-    "change": "Language"
+    "title": "તમારી ભાષા પસંદ કરો",
+    "detected": "અમને લાગે છે કે તમારી સ્થાનિક ભાષા {{language}} છે.",
+    "ask": "શું તમે અંગ્રેજી અથવા {{language}}માં ચાલુ રાખવા માંગો છો?",
+    "continueEn": "અંગ્રેજીમાં ચાલુ રાખો",
+    "continueLocal": "{{language}}માં ચાલુ રાખો",
+    "detecting": "તમારું સ્થાન શોધી રહ્યું છે…",
+    "change": "ભાષા"
   },
   "common": {
-    "continue": "Continue",
-    "cancel": "Cancel",
-    "loading": "Loading…"
+    "continue": "ચાલુ રાખો",
+    "cancel": "રદ કરો",
+    "loading": "લાવી રહ્યા છીએ…",
+    "save": "સેવ કરો",
+    "close": "બંધ કરો",
+    "search": "શોધ",
+    "back": "પાછળ",
+    "retry": "રીટ્રાય",
+    "yes": "હા",
+    "no": "ના",
+    "error": "કંઈક ખોટું થયું",
+    "signOut": "સાઇન આઉટ કરો",
+    "openMenu": "મેનૂ ખોલો",
+    "closeMenu": "મેનૂ બંધ કરો",
+    "toggleMenu": "ટોગલ મેનૂ",
+    "dashboard": "ડેશબોર્ડ",
+    "customerApp": "ગ્રાહક એપ્લિકેશન",
+    "kitchenOwner": "રસોડાના માલિક →",
+    "ownerLogin": "માલિક લૉગિન"
+  },
+  "status": {
+    "received": "મળેલ",
+    "accepted": "સ્વીકારાયેલ",
+    "preparing": "તૈયાર કરી રહ્યા છીએ",
+    "ready": "તૈયાર",
+    "out_for_delivery": "ડિલિવરી માટે બહાર",
+    "delivered": "પહોંચી ગયો:",
+    "cancelled": "રદ કરેલુ",
+    "active": "સક્રિય",
+    "suspended": "નિલંબિત",
+    "trial": "મુકદ્દમો",
+    "open": "ઓપન",
+    "closed": "ક્લોઝ થયેલ"
+  },
+  "portal": {
+    "heroSubtitle": "હોમ શેફ, ટિફિન સેવાઓ અને ડિલિવરી-માત્ર રસોડાઓ માટે ગ્રોથ ઓએસ — વોટ્સએપ ઓર્ડર, લાઇવ-કૅપ્ચર મેનૂઝ, ઝીરો ફૂડ કમિશન.",
+    "ctaOwner": "રસોડાના માલિક તરીકે પ્રારંભ કરો",
+    "ctaCustomer": "ગ્રાહક તરીકે બ્રાઉઝ કરો →",
+    "trustCommission": "ઝીરો ફૂડ કમિશન",
+    "trustCrm": "માલિકની માલિકીની CRM",
+    "trustHonest": "પ્રામાણિક તૈયારી અને ડિલિવરીનો સમય",
+    "navApps": "એપ્લિકેશન્સ",
+    "navFeatures": "વિશેષતાઓ",
+    "navPricing": "ભાવ",
+    "navSupport": "સપોર્ટ",
+    "navContact": "જોડાઓ"
+  },
+  "owner": {
+    "nav": {
+      "operations": "કાર્યવાહી",
+      "overview": "ઓવરવ્યૂ",
+      "orders": "ઓર્ડર્સ",
+      "menu": "મેનૂ",
+      "brand": "બ્રાન્ડ પૃષ્ઠ",
+      "ingredients": "સામગ્રી",
+      "growth": "વૃદ્ધિ",
+      "reports": "રિપોર્ટ",
+      "intelligence": "બુદ્ધિ",
+      "crm": "CRM",
+      "coupons": "કૂપન્સ",
+      "tiffin": "ટિફિન યોજનાઓ",
+      "templates": "ટેમ્પલેટ્સ",
+      "stream": "લાઇવ સ્ટ્રીમ",
+      "learn": "શીખો અને કનેક્ટ કરો",
+      "learning": "+++",
+      "community": "સમુદાય",
+      "account": "એકાઉન્ટ",
+      "subscription": "ઉમેદવારી",
+      "referrals": "રેફરલ્સ",
+      "whatsapp": "WhatsApp",
+      "paymentGateway": "ચુકવણી ગેટવે",
+      "gst": "જીએસટી અને ફાઇનાન્સ",
+      "setup": "કિચન સેટઅપ"
+    },
+    "shell": {
+      "activeKitchen": "સક્રિય રસોડું",
+      "loadingKitchen": "રસોડું લોડ થઈ રહ્યું છે…",
+      "loadingAuth": "લાવી રહ્યા છીએ…"
+    },
+    "auth": {
+      "titleLogin": "માલિક સાઇન ઇન",
+      "titleRegister": "માલિક એકાઉન્ટ બનાવો",
+      "phone": "ફોન",
+      "name": "નામ",
+      "email": "ઇમેઇલ (વૈકલ્પિક)",
+      "otp": "OTP",
+      "sendOtp": "OTP મોકલો",
+      "verify": "ચકાસો અને ચાલુ રાખો",
+      "register": "રજીસ્ટર",
+      "haveAccount": "પહેલેથી જ એકાઉન્ટ છે?",
+      "needAccount": "નવું રસોડું? રજીસ્ટર કરો",
+      "sessionExpired": "તમારું સત્ર સમાપ્ત થઈ ગયું છે. કૃપા કરીને ફરીથી સાઇન ઇન કરો.",
+      "agreePolicies": "રજીસ્ટર કરવા માટે કૃપા કરીને શરતો, ગોપનીયતા અને રિફંડ નીતિઓ સાથે સંમત થાઓ.",
+      "demoHint": "ડેમો OTP છે {{otp}}"
+    },
+    "home": {
+      "greetingMorning": "સુપ્રભાત",
+      "greetingAfternoon": "બંને ખૂબ સરસ દેખાઈ રહ્યા છે",
+      "greetingEvening": "શુભ સંધ્યા",
+      "quickNewOrder": "નવો ઓર્ડર,",
+      "quickNewOrderDesc": "મેન્યુઅલ અથવા વોક-ઇન",
+      "quickBrand": "બ્રાન્ડ પૃષ્ઠ",
+      "quickBrandDesc": "પ્રકાશિત કરો અને શેર કરો/k/કોડ",
+      "quickDrafts": "વોટ્સએપ ડ્રાફ્ટ્સ",
+      "quickDraftsDesc": "પદચ્છેદન કરેલા ઓર્ડરની સમીક્ષા કરો",
+      "quickAddDish": "વાનગી ઉમેરો",
+      "quickAddDishDesc": "લાઇવ-કૅપ્ચર ફોટો",
+      "quickReports": "વૃદ્ધિ અહેવાલો",
+      "quickReportsDesc": "આવક અને જાળવણી",
+      "quickStream": "લાઇવ સ્ટ્રીમ",
+      "quickStreamDesc": "ગ્રાહકોને લાઇવ કરો",
+      "quickCoupons": "કૂપન્સ",
+      "quickCouponsDesc": "પ્રમોશન ચલાવો",
+      "quickTiffin": "ટિફિન યોજનાઓ",
+      "quickTiffinDesc": "માસિક થાળી સબ્સ્ક્રાઇબર્સ",
+      "recentOrders": "તાજેતરના ઓર્ડર",
+      "noOrders": "હજી સુધી કોઈ ઓર્ડર નથી",
+      "viewAllOrders": "બધા ઓર્ડર જુઓ"
+    },
+    "orders": {
+      "title": "ઓર્ડર્સ",
+      "newOrder": "નવો ઓર્ડર,",
+      "drafts": "ડ્રાફ્ટ",
+      "empty": "હજી સુધી કોઈ ઓર્ડર નથી",
+      "searchPlaceholder": "ઓર્ડર કોડ શોધો, ગ્રાહક…",
+      "detail": "ઓર્ડર વિગતો",
+      "accept": "માન્ય કરો",
+      "reject": "ઓર્ડર કેન્સલ કરો",
+      "updateStatus": "સ્થિતિ અપડેટ કરો"
+    },
+    "menu": {
+      "title": "મેનૂ",
+      "addDish": "વાનગી ઉમેરો",
+      "empty": "હજુ સુધી કોઈ વાનગીઓ નથી",
+      "liveCapture": "હીરો ફોટો માટે લાઇવ કેપ્ચર જરૂરી છે",
+      "price": "કિંમત",
+      "prepTime": "તૈયારીનો સમય (મિનિટ)",
+      "active": "મેનૂ પર"
+    },
+    "subscription": {
+      "title": "ઉમેદવારી",
+      "loading": "યોજનાઓ લોડ થઈ રહી છે…",
+      "monthly": "મહિનામાં એકવાર",
+      "yearly": "વાર્ષિક",
+      "subscribe": "સબ્સ્ક્રાઇબ કરો",
+      "activate": "સક્રિય કરો (dev)",
+      "current": "વર્તમાન યોજના",
+      "referralCredit": "રેફરલ ક્રેડિટ: ₹{{amount}}",
+      "referralNote": "તમારા આગામી સબ્સ્ક્રિપ્શન ચાર્જ પર ક્રેડિટ આપમેળે લાગુ થાય છે.",
+      "loadError": "સબ્સ્ક્રિપ્શન ડેટા લોડ કરી શકાતો નથી"
+    },
+    "setup": {
+      "title": "કિચન સેટઅપ",
+      "save": "સુયોજનાઓ સંગ્રહ કરો (S)"
+    },
+    "referrals": {
+      "title": "રેફરલ્સ",
+      "creditBalance": "ક્રેડિટ બેલેન્સ",
+      "submitLead": "ગ્રાહકનો સંદર્ભ લો",
+      "empty": "હજી સુધી કોઈ રેફરલ લીડ્સ નથી"
+    }
+  },
+  "customer": {
+    "nav": {
+      "nearYou": "તમારી નજીક",
+      "featured": "ફીચર્ડ",
+      "bestPrices": "શ્રેષ્ઠ ભાવ",
+      "kitchenCode": "કિચન કોડ",
+      "myOrders": "મારા ઓર્ડર,",
+      "dashboard": "ડેશબોર્ડ",
+      "account": "એકાઉન્ટ",
+      "signIn": "ગ્રાહક સાઇન ઇન"
+    },
+    "auth": {
+      "title": "ગ્રાહક સાઇન ઇન",
+      "whatsappOtp": "WhatsApp OTP",
+      "socialContinue": "સામાજિક સાથે ચાલુ રાખો",
+      "phone": "ફોન",
+      "sendOtp": "OTP મોકલો",
+      "verify": "ચકાસો (y)"
+    },
+    "discovery": {
+      "title": "તમારી નજીક હોમ કિચન શોધો",
+      "searchPlaceholder": "રસોડું, રાંધણકળા, વાનગી શોધો…",
+      "useLocation": "મારા સ્થાનનો ઉપયોગ કરો",
+      "noResults": "કોઈ રસોડું તમારા ફિલ્ટર્સ સાથે મેળ ખાતું નથી"
+    },
+    "checkout": {
+      "title": "ચેકઆઉટ",
+      "placeOrder": "ઓર્ડર માં મૂકો",
+      "cartEmpty": "તમારું કાર્ટ ખાલી છે",
+      "deliveryAddress": "ડિલિવરીનું સરનામું",
+      "payment": "ચૂકવણી",
+      "total": "કુલ"
+    },
+    "orders": {
+      "title": "મારા ઓર્ડર,",
+      "empty": "હજી સુધી કોઈ ઓર્ડર નથી",
+      "track": "માઉસની ખબર રાખો",
+      "repeat": "રીઓર્ડર",
+      "history": "ઓર્ડરનો ઇતિહાસ"
+    },
+    "track": {
+      "title": "ઓર્ડર ટ્રૅક કરો",
+      "eta": "અંદાજિત સમય",
+      "status": "સ્ટેટ્સ"
+    },
+    "dashboard": {
+      "title": "તમારું ડેશબોર્ડ",
+      "savedKitchens": "સાચવેલા રસોડા",
+      "referrals": "રેફરલ્સ",
+      "tickets": "સપોર્ટ"
+    },
+    "account": {
+      "title": "એકાઉન્ટ",
+      "addresses": "સરનામું",
+      "payout": "રિફંડ ચુકવણી",
+      "save": "પ્રોફાઇલ સાચવો"
+    }
   }
 }

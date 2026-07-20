@@ -468,7 +468,7 @@ def build() -> GuidePDF:
             ["Date", "July 2026"],
             ["Traceability", "Every route/event read directly from services/*/app source"],
             ["Change policy", "Update .md whenever a route/event/status changes; regenerate PDF same change"],
-            ["Supersedes", "v1.0; aligned with Complete Guide v3.2 addons"],
+            ["Supersedes", "v1.2; aligned with Complete Guide v3.2.3 (P37–P40)"],
         ],
         [40, 130],
         size=7,
