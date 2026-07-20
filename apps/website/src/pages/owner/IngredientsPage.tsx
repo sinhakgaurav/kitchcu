@@ -1,5 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
+import { ListingToolbar } from "../../components/ListingToolbar";
 import { LiveCapturePhotoField } from "../../components/LiveCapturePhotoField";
 import { RichTextEditor } from "../../components/RichTextEditor";
 import { OwnerPageShell, OwnerPanel } from "../../components/owner/OwnerPageShell";
@@ -48,6 +49,9 @@ export function IngredientsPage() {
   const [recipe, setRecipe] = useState<DishRecipe | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [pantrySearch, setPantrySearch] = useState("");
+  const [pantrySort, setPantrySort] = useState<"name_asc" | "name_desc" | "stock_asc" | "stock_desc">("name_asc");
+  const [pantryFilter, setPantryFilter] = useState("");
   const [busy, setBusy] = useState(false);
   const [savedMsg, setSavedMsg] = useState("");
   const [dishGolden, setDishGolden] = useState<GrowthSuggestion | GoldenRecipePin | null>(null);
@@ -235,6 +239,22 @@ export function IngredientsPage() {
     });
   };
 
+  const shownIngredients = useMemo(() => {
+    let list = [...ingredients];
+    if (pantrySearch.trim()) {
+      const n = pantrySearch.trim().toLowerCase();
+      list = list.filter((i) => i.name.toLowerCase().includes(n) || i.unit.toLowerCase().includes(n));
+    }
+    if (pantryFilter === "low") list = list.filter((i) => i.is_low);
+    list.sort((a, b) => {
+      if (pantrySort === "name_desc") return b.name.localeCompare(a.name);
+      if (pantrySort === "stock_asc") return a.current_stock - b.current_stock;
+      if (pantrySort === "stock_desc") return b.current_stock - a.current_stock;
+      return a.name.localeCompare(b.name);
+    });
+    return list;
+  }, [ingredients, pantrySearch, pantrySort, pantryFilter]);
+
   if (!kitchen) return null;
 
   return (
@@ -271,21 +291,40 @@ export function IngredientsPage() {
                 Low threshold
                 <input type="number" min={0} value={newThreshold} onChange={(e) => setNewThreshold(e.target.value)} />
               </label>
-              <LiveCapturePhotoField
-                kitchenId={kitchen.id}
-                context="ingredient"
-                label="Reference photo"
-                value={newPhoto}
-                onChange={setNewPhoto}
-              />
-              <div className="owner-form__actions">
+              <div className="owner-form__wide">
+                <LiveCapturePhotoField
+                  kitchenId={kitchen.id}
+                  context="ingredient"
+                  label="Reference photo"
+                  value={newPhoto}
+                  onChange={setNewPhoto}
+                />
+              </div>
+              <div className="owner-form__actions owner-form__wide">
                 <button type="submit" className="btn btn--primary" disabled={busy}>
                   Add ingredient
                 </button>
               </div>
             </form>
 
-            <div className="owner-table-wrap dash-card">
+            <ListingToolbar
+              search={pantrySearch}
+              onSearchChange={setPantrySearch}
+              searchPlaceholder="Search pantry…"
+              sort={pantrySort}
+              onSortChange={(v) => setPantrySort(v as typeof pantrySort)}
+              sortOptions={[
+                { value: "name_asc", label: "Name A–Z" },
+                { value: "name_desc", label: "Name Z–A" },
+                { value: "stock_asc", label: "Stock ↑" },
+                { value: "stock_desc", label: "Stock ↓" },
+              ]}
+              filterChips={[{ id: "low", label: "Low stock" }]}
+              activeFilter={pantryFilter}
+              onFilterChange={setPantryFilter}
+              resultCount={shownIngredients.length}
+            />
+            <div className="owner-table-wrap">
               <table className="owner-table">
                 <thead>
                   <tr>
@@ -298,11 +337,13 @@ export function IngredientsPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {ingredients.map((ing) => (
+                  {shownIngredients.map((ing) => (
                     <tr key={ing.id} className={ing.is_low ? "owner-row--warn" : undefined}>
                       <td>
                         {ing.photo_url ? (
-                          <img src={ing.photo_url} alt="" className="owner-thumb" />
+                          <img src={ing.photo_url} alt="" className="owner-thumb" onError={(e) => {
+                            (e.currentTarget as HTMLImageElement).style.display = "none";
+                          }} />
                         ) : (
                           <span className="owner-thumb owner-thumb--empty">—</span>
                         )}
@@ -314,10 +355,10 @@ export function IngredientsPage() {
                       <td>{ing.low_stock_threshold}</td>
                       <td>{ing.is_low ? "Low" : "OK"}</td>
                       <td>
-                        <button type="button" className="btn btn--ghost" disabled={busy} onClick={() => onAdjust(ing.id, 100)}>
+                        <button type="button" className="btn btn--ghost btn--sm" disabled={busy} onClick={() => onAdjust(ing.id, 100)}>
                           +100
                         </button>
-                        <button type="button" className="btn btn--ghost" disabled={busy} onClick={() => onAdjust(ing.id, -10)}>
+                        <button type="button" className="btn btn--ghost btn--sm" disabled={busy} onClick={() => onAdjust(ing.id, -10)}>
                           −10
                         </button>
                       </td>
@@ -329,6 +370,7 @@ export function IngredientsPage() {
           </OwnerPanel>
 
           <OwnerPanel title="Dish recipe & prep" description="Standard portions and preparation steps">
+            <div className="owner-form">
             <label>
               Dish
               <select value={selectedDishId} onChange={(e) => setSelectedDishId(e.target.value)}>
@@ -574,6 +616,7 @@ export function IngredientsPage() {
                 </div>
               </>
             )}
+            </div>
           </OwnerPanel>
         </>
       )}

@@ -36,9 +36,9 @@ app = FastAPI(
     description=(
         "Owns a kitchen's menu: cuisines, diet categories, dishes, and photo media. Enforces "
         "**truth in media** — active dish hero images must be live-captured, never stock photos. "
-        "Also owns the ingredient balance mapper (F19): raw ingredient stock, dish recipes, "
-        "low-stock warnings, and automatic stock deduction on order acceptance (via internal "
-        "service-to-service routes called by the order service)."
+        "Also owns the ingredient balance mapper (F19/F19b): raw ingredient stock, dish recipes, "
+        "bulk prep batches, low-stock warnings, and stock deduction on order ready / prep prepared "
+        "(via owner APIs and internal routes called by the order service)."
     ),
     lifespan=lifespan,
 )

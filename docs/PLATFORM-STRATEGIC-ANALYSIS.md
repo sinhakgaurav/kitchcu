@@ -149,7 +149,7 @@ Discover (nearby / code / branded /k/:code / live_only)
 
 ```
 Register → OTP → Create kitchen → Menu (live heroes) → Integrations (WA + Razorpay)
-  → Orders inbox → Accept (stock deduct) → Lifecycle → Delivery
+  → Orders inbox → Accept → Ready (stock deduct) / Bulk prep → Lifecycle → Delivery
   → Growth (analytics, suggestions, golden day)
   → CRM / coupons / templates
   → Stream (opt-in → go-live → dish phases)

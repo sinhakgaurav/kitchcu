@@ -1,4 +1,5 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { ListingToolbar } from "../../components/ListingToolbar";
 import { OwnerEmpty, OwnerPageShell, OwnerPanel } from "../../components/owner/OwnerPageShell";
 import {
   createCoupon,
@@ -42,6 +43,9 @@ export function CouponsPage() {
   const [promoSegment, setPromoSegment] = useState<(typeof SEGMENTS)[number]["value"]>("all");
   const [promoLimit, setPromoLimit] = useState("20");
   const [promoDays, setPromoDays] = useState(7);
+  const [couponSearch, setCouponSearch] = useState("");
+  const [couponSort, setCouponSort] = useState<"newest" | "code_asc" | "used_desc">("newest");
+  const [couponFilter, setCouponFilter] = useState("");
 
   const load = () => {
     if (!kitchen) return;
@@ -132,6 +136,22 @@ export function CouponsPage() {
     }
   };
 
+  const shownCoupons = useMemo(() => {
+    let list = [...coupons];
+    if (couponSearch.trim()) {
+      const n = couponSearch.trim().toLowerCase();
+      list = list.filter((c) => c.code.toLowerCase().includes(n));
+    }
+    if (couponFilter === "active") list = list.filter((c) => c.is_active);
+    if (couponFilter === "inactive") list = list.filter((c) => !c.is_active);
+    list.sort((a, b) => {
+      if (couponSort === "code_asc") return a.code.localeCompare(b.code);
+      if (couponSort === "used_desc") return b.used_count - a.used_count;
+      return 0;
+    });
+    return list;
+  }, [coupons, couponSearch, couponSort, couponFilter]);
+
   if (!kitchen) return null;
 
   return (
@@ -155,7 +175,7 @@ export function CouponsPage() {
                 required
               />
               <select
-                className="owner-input"
+                className="kc-select"
                 value={discountType}
                 onChange={(e) => setDiscountType(e.target.value as "percent" | "fixed")}
               >
@@ -186,28 +206,53 @@ export function CouponsPage() {
             {coupons.length === 0 ? (
               <OwnerEmpty message="No coupons yet — create one above to share on WhatsApp." />
             ) : (
-              <ul className="owner-list">
-                {coupons.map((c) => (
-                  <li key={c.id}>
-                    <strong>{c.code}</strong> —{" "}
-                    {c.discount_type === "percent"
-                      ? `${c.discount_value}% off`
-                      : `₹${c.discount_value} off`}
-                    {c.min_order_amount != null && ` · min ₹${c.min_order_amount}`}
-                    {c.used_count > 0 && ` · used ${c.used_count}`}
-                    {!c.is_active && " · inactive"}
-                    {c.is_active && (
-                      <button
-                        type="button"
-                        className="btn btn--ghost btn--sm"
-                        onClick={() => disableCoupon(c.id)}
-                      >
-                        Deactivate
-                      </button>
-                    )}
-                  </li>
-                ))}
-              </ul>
+              <>
+                <ListingToolbar
+                  search={couponSearch}
+                  onSearchChange={setCouponSearch}
+                  searchPlaceholder="Search coupon codes…"
+                  sort={couponSort}
+                  onSortChange={(v) => setCouponSort(v as typeof couponSort)}
+                  sortOptions={[
+                    { value: "newest", label: "Newest" },
+                    { value: "code_asc", label: "Code A–Z" },
+                    { value: "used_desc", label: "Most used" },
+                  ]}
+                  filterChips={[
+                    { id: "active", label: "Active" },
+                    { id: "inactive", label: "Inactive" },
+                  ]}
+                  activeFilter={couponFilter}
+                  onFilterChange={setCouponFilter}
+                  resultCount={shownCoupons.length}
+                />
+                {shownCoupons.length === 0 ? (
+                  <OwnerEmpty message="No coupons match this search or filter." />
+                ) : (
+                  <ul className="owner-list">
+                    {shownCoupons.map((c) => (
+                      <li key={c.id}>
+                        <strong>{c.code}</strong> —{" "}
+                        {c.discount_type === "percent"
+                          ? `${c.discount_value}% off`
+                          : `₹${c.discount_value} off`}
+                        {c.min_order_amount != null && ` · min ₹${c.min_order_amount}`}
+                        {c.used_count > 0 && ` · used ${c.used_count}`}
+                        {!c.is_active && " · inactive"}
+                        {c.is_active && (
+                          <button
+                            type="button"
+                            className="btn btn--ghost btn--sm"
+                            onClick={() => disableCoupon(c.id)}
+                          >
+                            Deactivate
+                          </button>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </>
             )}
           </OwnerPanel>
 
@@ -215,7 +260,7 @@ export function CouponsPage() {
             title="Targeted promotion"
             description="Special pricing for a customer segment (F38)"
           >
-            <form className="owner-form" onSubmit={addPromotion}>
+            <form className="owner-form owner-form--wide" onSubmit={addPromotion}>
               <input
                 className="owner-input"
                 placeholder="Campaign name"
@@ -223,7 +268,7 @@ export function CouponsPage() {
                 onChange={(e) => setPromoName(e.target.value)}
               />
               <select
-                className="owner-input"
+                className="kc-select"
                 value={promoDishId}
                 onChange={(e) => setPromoDishId(e.target.value)}
               >
@@ -242,7 +287,7 @@ export function CouponsPage() {
                 onChange={(e) => setPromoPrice(Number(e.target.value))}
               />
               <select
-                className="owner-input"
+                className="kc-select"
                 value={promoSegment}
                 onChange={(e) =>
                   setPromoSegment(e.target.value as (typeof SEGMENTS)[number]["value"])

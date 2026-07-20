@@ -27,7 +27,8 @@ For journeys see [CKAC-USERFLOWS.md](./CKAC-USERFLOWS.md).
 For **solution blueprint** (expectations → CEO/CPO solution → CTO impl → arch/DB per journey) see [PLATFORM-SOLUTION-BLUEPRINT.md](./PLATFORM-SOLUTION-BLUEPRINT.md).  
 For **strategic waves** see [PLATFORM-STRATEGIC-ANALYSIS.md](./PLATFORM-STRATEGIC-ANALYSIS.md).  
 For **persona lived experience** see [PLATFORM-PERSONA-DEEP-DIVE.md](./PLATFORM-PERSONA-DEEP-DIVE.md).  
-For **architecture + end-to-end flows** see [PLATFORM-ARCHITECTURE-FLOWS.md](./PLATFORM-ARCHITECTURE-FLOWS.md).
+For **architecture + end-to-end flows** see [PLATFORM-ARCHITECTURE-FLOWS.md](./PLATFORM-ARCHITECTURE-FLOWS.md).  
+For **manual QA / release sign-off** see [QA-INSTRUCTION-PACK.md](./QA-INSTRUCTION-PACK.md) (+ [PDF](./QA-INSTRUCTION-PACK.pdf)).
 
 ---
 
@@ -65,6 +66,7 @@ For **architecture + end-to-end flows** see [PLATFORM-ARCHITECTURE-FLOWS.md](./P
 | S13 | Delivery fees/distance/tracking (F27–F31) | ✅ |
 | S14 | Tracking reminders + order WhatsApp (F29/F45) | ✅ |
 | S15 | Ingredient mapper (F19) | ✅ |
+| S15b | Bulk prep + deduct on prepared/ready (F19b) | ✅ |
 | S16 | Learning portal + dish trials (F21–F22) | ✅ |
 | S17 | Recipe rewards + chef rankings (F23–F24) | ✅ |
 | S18 | Live streaming LiveKit (F46–F48) | ✅ |

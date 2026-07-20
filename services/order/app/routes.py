@@ -625,8 +625,9 @@ async def order_stock_warnings(
         "optional `note` and a `cancel_reason` required when cancelling.\n\n"
         "**Behavior:** Rejects invalid transitions (`400`). Records the transition in the "
         "status-event audit trail, emits `order.status.changed`, dispatches a WhatsApp "
-        "notification, and — on first transition into `accepted` — best-effort deducts recipe "
-        "ingredients from stock (never blocks the status change if that call fails).\n\n"
+        "notification, and — on first transition into `ready` (prepared) — best-effort deducts "
+        "recipe ingredients from stock when the kitchen uses `order_ready` mode (never blocks "
+        "the status change if that call fails; skipped when kitchen is `prep_batch_only`).\n\n"
         "**Response:** Updated `OrderResponse`."
     ),
     responses={**auth_errors(include_403=True, include_404=True), 400: RESP_400},
@@ -648,9 +649,9 @@ async def order_status_update(
         await session.rollback()
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
     await dispatch_order_status_changed(order, previous_status)
-    if body.status == "accepted" and previous_status != "accepted":
-        import logging
+    import logging
 
+    if body.status == "ready" and previous_status != "ready":
         rows = (await session.execute(select(OrderItem).where(OrderItem.order_id == order.id))).scalars().all()
         items = [{"dish_id": str(i.dish_id), "quantity": i.quantity} for i in rows]
         if items:
@@ -658,10 +659,11 @@ async def order_status_update(
                 await deduct_order_stock(order.kitchen_id, order.id, items)
             except Exception:
                 logging.getLogger("order.stock").exception(
-                    "Stock deduct failed after accept order_id=%s kitchen_id=%s",
+                    "Stock deduct failed after ready order_id=%s kitchen_id=%s",
                     order.id,
                     order.kitchen_id,
                 )
+    if body.status == "accepted" and previous_status != "accepted":
         # Porter: schedule delayed auto-book when entitled; else book immediately on accept.
         if (
             order.delivery_type == "delivery"

@@ -276,6 +276,7 @@ export function TiffinSubscriptionsPage() {
             <label>
               Type
               <select
+                className="kc-select"
                 value={planType}
                 onChange={(e) => {
                   const next = e.target.value as typeof planType;
@@ -296,7 +297,7 @@ export function TiffinSubscriptionsPage() {
             </label>
             <label>
               Meals / day
-              <select value={mealsPerDay} onChange={(e) => setMealsPerDay(Number(e.target.value))}>
+              <select className="kc-select" value={mealsPerDay} onChange={(e) => setMealsPerDay(Number(e.target.value))}>
                 <option value={1}>1</option>
                 <option value={2}>2</option>
                 <option value={3}>3</option>
@@ -494,7 +495,7 @@ export function TiffinSubscriptionsPage() {
         <div className="form-row" style={{ marginBottom: "0.75rem" }}>
           <label>
             Filter
-            <select value={filter} onChange={(e) => setFilter(e.target.value)}>
+            <select className="kc-select" value={filter} onChange={(e) => setFilter(e.target.value)}>
               <option value="">All</option>
               <option value="pending">Pending</option>
               <option value="active">Active</option>

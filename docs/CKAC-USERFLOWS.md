@@ -135,19 +135,19 @@ Every transition writes an immutable `ckac_orders.order_status_events` row and p
 | 5a | `POST /api/v1/kitchens/{kitchen_id}/media/upload` | owner | multipart upload; response includes `is_live_capture` echo |
 | 5b | `POST /api/v1/kitchens/{kitchen_id}/dishes` | owner | `DishCreateRequest{name, price, category_id, media:[{url, is_live_capture:true}]}` -> `DishResponse`; server **rejects** hero media with `is_live_capture:false` (`400`) |
 | 6 | `POST /api/v1/kitchens/{kitchen_id}/orders/manual` | owner | `ManualOrderCreateRequest{items, customer_name, customer_phone, payment_method}` -> `OrderResponse{status:"received", order_code}` |
-| 7 | `PATCH /api/v1/orders/{order_id}/status` | owner | `OrderStatusUpdateRequest{status:"accepted"}` -> `OrderResponse`; triggers internal stock deduction: `POST /api/v1/internal/kitchens/{kitchen_id}/stock/deduct-order` (catalog, `X-Internal-Key`) |
+| 7 | `PATCH /api/v1/orders/{order_id}/status` | owner | Status machine; first transition to `ready` triggers stock deduct: `POST /api/v1/internal/kitchens/{kitchen_id}/stock/deduct-order` (catalog; skipped if kitchen `prep_batch_only`). Bulk thali: owner prep batches → `mark-prepared` |
 | 8 | `GET /api/v1/kitchens/{kitchen_id}/analytics/summary?days=1` | owner | `RevenueSummary` |
 
 ### Domain events published
 
-`kitchen.created` (`ckac:identity:kitchen`) -> `dish.created` (`ckac:catalog:dish`) -> `order.placed` (`ckac:orders:order`) -> `order.status.changed` (`ckac:orders:order`, `received -> accepted`) -> `ingredient.stock.deducted` (`ckac:catalog:ingredient`, if a recipe is mapped) -> `notification.sent` (`ckac:notify:dispatch`, order-accepted push if configured).
+`kitchen.created` (`ckac:identity:kitchen`) -> `dish.created` (`ckac:catalog:dish`) -> `order.placed` (`ckac:orders:order`) -> `order.status.changed` (`ckac:orders:order`, `received -> accepted`) -> `order.status.changed` (`… -> ready`) -> `ingredient.stock.deducted` (`ckac:catalog:ingredient`, if a recipe is mapped and deduct mode is `order_ready`) -> `notification.sent` (`ckac:notify:dispatch`, order-accepted push if configured).
 
 ### Success screen / failure paths
 
 - **Success:** Reports tab shows non-zero revenue, order count = 1, order visible in "Recent Orders" with green `accepted` chip.
 - **Failure — OTP:** wrong/expired OTP -> `401 {"detail": "Invalid OTP"}`; owner not registered -> `404` on verify, UI routes back to register.
 - **Failure — dish media:** gallery photo submitted as hero -> `400/422`, UI blocks save and prompts "use camera capture."
-- **Failure — order accept:** invalid status jump (e.g. `received -> ready`) -> `400`; low/zero stock on a mapped ingredient -> `200` with a stock-warning banner (`GET /api/v1/orders/{id}/stock-warnings`), order still accepted (owner decision, not blocked).
+- **Failure — order accept:** invalid status jump (e.g. `received -> ready`) -> `400`; low/zero stock on a mapped ingredient -> `200` with a stock-warning banner (`GET /api/v1/orders/{id}/stock-warnings`), order still accepted (owner decision, not blocked). Stock deduct itself runs on **Ready**, not Accept.
 
 ### Diagram
 
@@ -215,8 +215,9 @@ sequenceDiagram
 3. **Path B — Manual:** owner taps New Order and keys the order directly (as in Flow 1 step 6).
 4. Owner reviews/edits the draft, taps **Confirm** to convert it to a real order.
 5. Owner advances the order through the lifecycle as kitchen work progresses: Accept -> Start Preparing -> Mark Ready -> Out for Delivery -> Delivered.
-6. Customer receives a WhatsApp status push at each transition and periodic tracking-interval reminders while `out_for_delivery` (owner-set delivery SLA, never a fake countdown).
-7. Owner or customer opens the shareable tracking link to see current status.
+6. **Stock (F19b):** on first transition to **Ready**, order service calls catalog `deduct-order` when kitchen mode is `order_ready` (default). Porter booking still happens on **Accept** when customer chose platform delivery.
+7. Customer receives a WhatsApp status push at each transition and periodic tracking-interval reminders while `out_for_delivery` (owner-set delivery SLA, never a fake countdown).
+8. Owner or customer opens the shareable tracking link to see current status.
 
 ### API calls
 
@@ -230,12 +231,13 @@ sequenceDiagram
 | — (parse alt) | `POST /api/v1/kitchens/{kitchen_id}/orders/parse-message` | owner | Manually paste WA text -> parsed draft |
 | 4 | `POST /api/v1/kitchens/{kitchen_id}/orders/drafts/{draft_id}/confirm` | owner | Draft -> `OrderResponse` (status `received`) |
 | 5 (each hop) | `PATCH /api/v1/orders/{order_id}/status` | owner | `{status: accepted\|preparing\|ready\|out_for_delivery\|delivered\|cancelled}` |
+| 6 | `POST /api/v1/internal/kitchens/{kitchen_id}/stock/deduct-order` | internal | Triggered on first `ready` when deduct mode ≠ `prep_batch_only` |
 | — | `GET /api/v1/kitchens/{kitchen_id}/orders?status=&source=` | owner | Orders inbox list/filter |
-| 7 | `GET /api/v1/delivery/track/{token}` | none (signed token) | Public tracking page data |
+| 8 | `GET /api/v1/delivery/track/{token}` | none (signed token) | Public tracking page data |
 
 ### Domain events published
 
-`order.draft.created` (`ckac:orders:draft`) -> `order.placed` (`ckac:orders:order`, on confirm) -> `delivery.tracking_created` (`ckac:delivery:tracking`, when `delivery_type=delivery`) -> `order.status.changed` **per transition** (`ckac:orders:order`) -> `notification.sent` (`ckac:notify:dispatch`, F45 WA status push) -> `notification.tracking_interval` (`ckac:notify:tracking`, F29 reminders while `out_for_delivery`).
+`order.draft.created` (`ckac:orders:draft`) -> `order.placed` (`ckac:orders:order`, on confirm) -> `delivery.tracking_created` (`ckac:delivery:tracking`, when `delivery_type=delivery`) -> `order.status.changed` **per transition** (`ckac:orders:order`) -> `ingredient.stock.deducted` (`ckac:catalog:ingredient`, on first `ready` if recipes mapped and mode `order_ready`) -> `notification.sent` (`ckac:notify:dispatch`, F45 WA status push) -> `notification.tracking_interval` (`ckac:notify:tracking`, F29 reminders while `out_for_delivery`).
 
 ### Success screen / failure paths
 
@@ -682,6 +684,67 @@ flowchart LR
 
 ---
 
+## 11b. Flow 8b — Ingredient Mapper + Bulk Prep (F19 / F19b)
+
+**Goal:** Owner maps recipes, chooses when pantry deducts, and (for thali/combo kitchens) cooks once for many portions without double-counting stock.
+**Persona:** Owner
+**Entry URL:** `kitchen.kitchcu.in` → **Ingredients** (`/dashboard/ingredients`) · **Bulk prep** (`/dashboard/prep`)
+
+### Preconditions
+- Owner has a kitchen with active dishes (demo: `9876543210` / OTP `123456`, kitchen `CKPNQ001`).
+- Gateway routes `/prep-batches` and `/stock-settings` to **catalog** (not identity).
+
+### Step-by-step UI actions
+
+1. Owner opens **Ingredients** — pantry form (name, unit, stock, low threshold) + list with search/sort/low-stock filter.
+2. Owner selects a dish → edits **Ingredients (per portion)** + **Preparation steps** → **Save recipe & prep steps**.
+3. Owner opens **Bulk prep** → sets deduct mode:
+   - **Order Ready** (default à la carte): stock deducts when an order first reaches `ready`.
+   - **Bulk prep only** (thali): orders never deduct; only Mark prepared does.
+4. Owner creates a batch (name, portions, single dish or combo/thali, dish checklist) → **Create batch from recipes**.
+5. Owner reviews expanded ingredient totals → **Edit qty** if needed → **Mark prepared** → pantry deducts once.
+6. Owner uses search/sort/status chips on the batches table to find open vs prepared cooks.
+
+### API calls
+
+| Step | Method + Path | Auth | Notes |
+|------|----------------|------|-------|
+| 1 | `GET/POST /api/v1/kitchens/{kitchen_id}/ingredients` | owner | Pantry list / create |
+| 1 | `POST …/ingredients/{id}/adjust-stock` | owner | Manual ± stock |
+| 2 | `GET/PUT /api/v1/kitchens/{kitchen_id}/dishes/{dish_id}/recipe` | owner | Lines + prep steps |
+| 3 | `GET/PATCH /api/v1/kitchens/{kitchen_id}/stock-settings` | owner | `{deduct_mode: order_ready\|prep_batch_only}` |
+| 4 | `POST /api/v1/kitchens/{kitchen_id}/prep-batches` | owner | Expand recipes × portions |
+| 4–5 | `GET/PATCH …/prep-batches[/{id}]` | owner | List / edit ingredient totals |
+| 5 | `POST …/prep-batches/{id}/mark-prepared` | owner | Deduct + `prep_batch.prepared` event |
+| — | `POST /api/v1/internal/kitchens/{kitchen_id}/stock/deduct-order` | internal | Order service on first `ready` when mode `order_ready` |
+
+### Domain events published
+
+`ingredient.created` / `ingredient.stock.adjusted` (`ckac:catalog:ingredient`) → `prep_batch.created` / `prep_batch.prepared` (`ckac:catalog:prep_batch` or catalog ingredient stream per design) → `ingredient.stock.deducted` (`ckac:catalog:ingredient`).
+
+### Success screen / failure paths
+
+- **Success:** pantry stock drops after Mark prepared (or after Ready in `order_ready` mode); batches table shows `prepared`.
+- **Failure — gateway 404:** if `/prep-batches` not in catalog path markers, UI shows load error — rebuild gateway.
+- **Failure — empty recipes:** creating a combo without ≥2 dishes or without dish recipes → validation error; owner must map recipes first.
+
+### Diagram
+
+```mermaid
+flowchart TD
+    A[Owner: Ingredients] --> B[Save dish recipes]
+    B --> C{Deduct mode}
+    C -->|order_ready| D[Order reaches Ready]
+    D --> E[internal deduct-order]
+    C -->|prep_batch_only| F[Bulk prep batch]
+    F --> G[Edit totals]
+    G --> H[Mark prepared]
+    H --> E
+    E --> I[ingredient.stock.deducted]
+```
+
+---
+
 ## 12. Flow 9 — Live Stream Opt-In (Owner Go-Live; Customer Live Filter)
 
 **Goal:** Owner opts in to a live prep session (never mandatory); customers can filter discovery to kitchens live right now — an engagement layer that reinforces live-capture trust, not a broadcast gimmick.
@@ -811,10 +874,11 @@ Gateway-owned (not forwarded): `GET /`, `GET /health/live`, `GET /health/ready`,
 | Field | Value |
 |-------|-------|
 | Document | `CKAC-USERFLOWS.md` |
-| Version | 1.2 |
+| Version | 1.3 |
 | Date | July 2026 |
 | Author | KitchCu engineering (AI-assisted, human-reviewed) |
 | Traceability | Every route/event cited here was read directly from `services/*/app/routes.py`, `schemas.py`, and `main.py` in this repository as of July 2026 — not inferred from memory |
 | Companion | `docs/CKAC-USERFLOWS.pdf` — generate/refresh via `python scripts/generate_userflows_pdf.py` |
+| QA checklist | `docs/QA-INSTRUCTION-PACK.md` (+ PDF) — smoke, lists/UI, F19b; `python scripts/generate_qa_instruction_pdf.py` |
 | Change policy | Update this file whenever a route, event name, or status transition changes; regenerate the PDF in the same change |
 | Supersedes | v1.2; aligned with Complete Guide v3.2.3 (P37–P40 referrals, GST export, admin ops, i18n) |

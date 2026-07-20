@@ -148,3 +148,69 @@ class DishPrepStep(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(UTC)
     )
+
+
+class KitchenStockSettings(Base):
+    """F19b — when pantry deducts: per-order ready vs bulk prep only."""
+
+    __tablename__ = "kitchen_stock_settings"
+    __table_args__ = {"schema": "ckac_catalog"}
+
+    kitchen_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True)
+    deduct_mode: Mapped[str] = mapped_column(String(32), default="order_ready", nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(UTC)
+    )
+
+
+class PrepBatch(Base):
+    __tablename__ = "prep_batches"
+    __table_args__ = {"schema": "ckac_catalog"}
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    kitchen_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False, index=True)
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+    batch_type: Mapped[str] = mapped_column(String(32), nullable=False)
+    portions: Mapped[float] = mapped_column(Numeric(12, 3), nullable=False)
+    status: Mapped[str] = mapped_column(String(32), default="draft", nullable=False)
+    notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    prepared_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(UTC)
+    )
+
+
+class PrepBatchDish(Base):
+    __tablename__ = "prep_batch_dishes"
+    __table_args__ = {"schema": "ckac_catalog"}
+
+    batch_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("ckac_catalog.prep_batches.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    dish_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("ckac_catalog.dishes.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    quantity_per_portion: Mapped[float] = mapped_column(Numeric(12, 3), default=1)
+
+
+class PrepBatchIngredient(Base):
+    __tablename__ = "prep_batch_ingredients"
+    __table_args__ = {"schema": "ckac_catalog"}
+
+    batch_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("ckac_catalog.prep_batches.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    ingredient_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("ckac_catalog.ingredients.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    quantity: Mapped[float] = mapped_column(Numeric(12, 3), nullable=False)
+    unit: Mapped[str] = mapped_column(String(20), nullable=False)
+    sort_order: Mapped[int] = mapped_column(Integer, default=0)

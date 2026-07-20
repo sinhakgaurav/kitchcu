@@ -137,9 +137,17 @@ export function OrdersPage() {
           d.parsed_items.some((p) => (p.dish_name ?? p.raw).toLowerCase().includes(n)),
       );
     }
-    list.sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at));
+    list.sort((a, b) => {
+      if (sort === "name_asc") {
+        return (a.raw_message || "").localeCompare(b.raw_message || "");
+      }
+      if (sort === "name_desc") {
+        return (b.raw_message || "").localeCompare(a.raw_message || "");
+      }
+      return Date.parse(b.created_at) - Date.parse(a.created_at);
+    });
     return list;
-  }, [drafts, search]);
+  }, [drafts, search, sort]);
 
   if (!kitchen) return null;
 

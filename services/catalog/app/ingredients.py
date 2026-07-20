@@ -606,6 +606,12 @@ async def deduct_stock_for_order(
     data: StockDeductRequest,
     publisher: EventPublisher,
 ) -> StockDeductResponse:
+    from app.prep_batches import kitchen_uses_prep_batch_only
+
+    # F19b — thali/bulk kitchens deduct via prep batches only (avoid double-count).
+    if await kitchen_uses_prep_batch_only(session, kitchen_id):
+        return StockDeductResponse(deducted=[], low_stock_alerts=[])
+
     requirements = await _aggregate_requirements(session, kitchen_id, data.items)
     if not requirements:
         return StockDeductResponse(deducted=[], low_stock_alerts=[])

@@ -37,6 +37,21 @@ from app.ingredients import (
     set_dish_recipe,
     update_ingredient,
 )
+from app.prep_batches import (
+    PrepBatchCreateRequest,
+    PrepBatchListResponse,
+    PrepBatchResponse,
+    PrepBatchUpdateRequest,
+    StockSettingsResponse,
+    StockSettingsUpdateRequest,
+    create_prep_batch,
+    get_prep_batch_response,
+    get_stock_settings_response,
+    list_prep_batches,
+    mark_prep_batch_prepared,
+    update_prep_batch,
+    update_stock_settings,
+)
 from app.dish_bulk import (
     BulkDishImportResponse,
     build_dish_bulk_template_xlsx,
@@ -54,6 +69,7 @@ router = APIRouter()
 TAG_MENU = "Menu"
 TAG_DISHES = "Dishes"
 TAG_INGREDIENTS = "Ingredients"
+TAG_PREP = "Bulk prep"
 TAG_MEDIA = "Media"
 
 
@@ -513,3 +529,154 @@ async def dish_recipe_set(
     except ValueError as exc:
         status_code = status.HTTP_404_NOT_FOUND if "not found" in str(exc).lower() else status.HTTP_400_BAD_REQUEST
         raise HTTPException(status_code=status_code, detail=str(exc)) from exc
+
+
+@router.get(
+    "/kitchens/{kitchen_id}/stock-settings",
+    response_model=StockSettingsResponse,
+    tags=[TAG_PREP],
+    summary="Get kitchen stock deduct mode",
+    description=(
+        "Owner-only — `order_ready` deducts pantry when an order is marked ready; "
+        "`prep_batch_only` deducts only when a bulk prep batch is marked prepared (F19b)."
+    ),
+    responses={**auth_errors(include_403=True), 422: RESP_422},
+)
+async def stock_settings_get(
+    kitchen_id: uuid.UUID,
+    owner_id: Annotated[uuid.UUID, Depends(get_current_owner_id)],
+    session: Annotated[AsyncSession, Depends(get_db)],
+) -> StockSettingsResponse:
+    await verify_kitchen_owner(kitchen_id, owner_id, session)
+    return await get_stock_settings_response(session, kitchen_id)
+
+
+@router.patch(
+    "/kitchens/{kitchen_id}/stock-settings",
+    response_model=StockSettingsResponse,
+    tags=[TAG_PREP],
+    summary="Update kitchen stock deduct mode",
+    responses={**auth_errors(include_403=True), 400: RESP_400, 422: RESP_422},
+)
+async def stock_settings_patch(
+    kitchen_id: uuid.UUID,
+    body: StockSettingsUpdateRequest,
+    owner_id: Annotated[uuid.UUID, Depends(get_current_owner_id)],
+    session: Annotated[AsyncSession, Depends(get_db)],
+) -> StockSettingsResponse:
+    await verify_kitchen_owner(kitchen_id, owner_id, session)
+    return await update_stock_settings(session, kitchen_id, body)
+
+
+@router.get(
+    "/kitchens/{kitchen_id}/prep-batches",
+    response_model=PrepBatchListResponse,
+    tags=[TAG_PREP],
+    summary="List bulk prep batches",
+    responses={**auth_errors(include_403=True), 422: RESP_422},
+)
+async def prep_batches_list(
+    kitchen_id: uuid.UUID,
+    owner_id: Annotated[uuid.UUID, Depends(get_current_owner_id)],
+    session: Annotated[AsyncSession, Depends(get_db)],
+    status_filter: Annotated[str | None, Query(alias="status")] = None,
+) -> PrepBatchListResponse:
+    await verify_kitchen_owner(kitchen_id, owner_id, session)
+    return await list_prep_batches(session, kitchen_id, status=status_filter)
+
+
+@router.post(
+    "/kitchens/{kitchen_id}/prep-batches",
+    response_model=PrepBatchResponse,
+    status_code=status.HTTP_201_CREATED,
+    tags=[TAG_PREP],
+    summary="Create a bulk prep batch",
+    description=(
+        "Owner-only — expand dish/combo recipes × portions into editable ingredient totals "
+        "for a morning thali cook or similar bulk prep (F19b)."
+    ),
+    responses={**auth_errors(include_403=True), 400: RESP_400, 422: RESP_422},
+)
+async def prep_batches_create(
+    kitchen_id: uuid.UUID,
+    body: PrepBatchCreateRequest,
+    owner_id: Annotated[uuid.UUID, Depends(get_current_owner_id)],
+    session: Annotated[AsyncSession, Depends(get_db)],
+    publisher: Annotated[EventPublisher, Depends(get_publisher)],
+) -> PrepBatchResponse:
+    await verify_kitchen_owner(kitchen_id, owner_id, session)
+    try:
+        return await create_prep_batch(session, kitchen_id, body, publisher)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+
+
+@router.get(
+    "/kitchens/{kitchen_id}/prep-batches/{batch_id}",
+    response_model=PrepBatchResponse,
+    tags=[TAG_PREP],
+    summary="Get a prep batch",
+    responses={**auth_errors(include_403=True, include_404=True), 422: RESP_422},
+)
+async def prep_batches_get(
+    kitchen_id: uuid.UUID,
+    batch_id: uuid.UUID,
+    owner_id: Annotated[uuid.UUID, Depends(get_current_owner_id)],
+    session: Annotated[AsyncSession, Depends(get_db)],
+) -> PrepBatchResponse:
+    await verify_kitchen_owner(kitchen_id, owner_id, session)
+    try:
+        return await get_prep_batch_response(session, kitchen_id, batch_id)
+    except LookupError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+
+
+@router.patch(
+    "/kitchens/{kitchen_id}/prep-batches/{batch_id}",
+    response_model=PrepBatchResponse,
+    tags=[TAG_PREP],
+    summary="Update a draft/preparing prep batch",
+    description="Owner-only — edit name, notes, status, or explicit ingredient quantities before marking prepared.",
+    responses={**auth_errors(include_403=True, include_404=True), 400: RESP_400, 422: RESP_422},
+)
+async def prep_batches_patch(
+    kitchen_id: uuid.UUID,
+    batch_id: uuid.UUID,
+    body: PrepBatchUpdateRequest,
+    owner_id: Annotated[uuid.UUID, Depends(get_current_owner_id)],
+    session: Annotated[AsyncSession, Depends(get_db)],
+) -> PrepBatchResponse:
+    await verify_kitchen_owner(kitchen_id, owner_id, session)
+    try:
+        return await update_prep_batch(session, kitchen_id, batch_id, body)
+    except LookupError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+
+
+@router.post(
+    "/kitchens/{kitchen_id}/prep-batches/{batch_id}/mark-prepared",
+    response_model=PrepBatchResponse,
+    tags=[TAG_PREP],
+    summary="Mark prep batch prepared (deduct stock)",
+    description=(
+        "Owner-only — deducts the batch's explicit ingredient totals from pantry once. "
+        "Idempotent if already prepared. Publishes `ingredient.stock.deducted` and `prep_batch.prepared`."
+    ),
+    responses={**auth_errors(include_403=True, include_404=True), 400: RESP_400, 422: RESP_422},
+)
+async def prep_batches_mark_prepared(
+    kitchen_id: uuid.UUID,
+    batch_id: uuid.UUID,
+    owner_id: Annotated[uuid.UUID, Depends(get_current_owner_id)],
+    session: Annotated[AsyncSession, Depends(get_db)],
+    publisher: Annotated[EventPublisher, Depends(get_publisher)],
+) -> PrepBatchResponse:
+    await verify_kitchen_owner(kitchen_id, owner_id, session)
+    try:
+        return await mark_prep_batch_prepared(session, kitchen_id, batch_id, publisher)
+    except LookupError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc

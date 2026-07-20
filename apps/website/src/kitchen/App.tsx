@@ -14,6 +14,7 @@ import { AddDishPage } from "../pages/owner/AddDishPage";
 import { ReportsPage } from "../pages/owner/ReportsPage";
 import { GrowthPage } from "../pages/owner/GrowthPage";
 import { IngredientsPage } from "../pages/owner/IngredientsPage";
+import { PrepBatchesPage } from "../pages/owner/PrepBatchesPage";
 import { CommunityPage } from "../pages/owner/CommunityPage";
 import { StreamPage } from "../pages/owner/StreamPage";
 import { LearningPage } from "../pages/owner/LearningPage";
@@ -58,6 +59,7 @@ export default function KitchenApp() {
             <Route path="reports" element={<ReportsPage />} />
             <Route path="growth" element={<GrowthPage />} />
             <Route path="ingredients" element={<IngredientsPage />} />
+            <Route path="prep" element={<PrepBatchesPage />} />
             <Route path="learning" element={<LearningPage />} />
             <Route path="learning/trials/:trialId" element={<TrialDetailPage />} />
             <Route path="community" element={<CommunityPage />} />

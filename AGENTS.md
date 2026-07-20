@@ -21,6 +21,7 @@
 | `docs/PLATFORM-PERSONA-DEEP-DIVE.md` | **Persona deep dive** — lived experience, scorecards, RBAC reality |
 | `docs/CKAC-COMPLETE-GUIDE.md` | **Master guide v3.2.3** — CEO + CPO + CTO encyclopedia (definitions, how/why, flows, UI Catalog, aggregated OpenAPI reference + PDF) |
 | `docs/CKAC-USERFLOWS.md` | **Full user journey pack** — every persona, every screen, every API call, step-by-step (+ PDF) |
+| `docs/QA-INSTRUCTION-PACK.md` | **QA instruction pack** — smoke, list/UI polish, F19b stock/bulk prep, sign-off (+ PDF) |
 | `docs/API.md` | **Public API reference** — auth, body/response examples; live aggregated OpenAPI at gateway `/openapi.json`/`/docs`/`/redoc` + portal `/openapi` |
 | `docs/CKAC-ARCHITECTURE-CTO.md` | **CTO layers + CPO product ↔ code map** |
 | `docs/CKAC-PRODUCT-DEPTH-GUIDE.md` | Product depth guide (superseded by Complete Guide) |
@@ -76,7 +77,7 @@
 | **Growth intelligence** | `services/growth/`, `apps/website/` | **S12** — F09 combos, F10 patterns, F11 suggestions, F39 daily menu WhatsApp |
 | **Delivery** | `services/delivery/`, `apps/website/` | **S13** — F27–F31 radius/fees/distance, F29 tracking links |
 | **Order notifications** | `services/notification/`, `services/order/` | **S14** — F29 tracking interval reminders, F45 WhatsApp order updates |
-| **Ingredient mapper** | `services/catalog/`, `apps/website/` | **S15** — F19 recipes, stock deduct on accept, low-stock warnings |
+| **Ingredient mapper** | `services/catalog/`, `apps/website/` | **S15/S15b** — F19 recipes; stock deduct on order **ready** or bulk prep **prepared**; low-stock warnings |
 | **Learning service** | `services/learning/`, `apps/website/` | **S16** — F21 curated portal, F22 dish trials + promote |
 | **Community service** | `services/community/`, `apps/website/` | **S17** — F23 recipe rewards (+ `cover_url`), F24 chef rankings |
 | **Streaming service** | `services/streaming/`, `apps/website/` | **S18** — F46 LiveKit sessions, F47 owner opt-in go-live, F48 customer live filter; **P22** per-dish showcase phases |

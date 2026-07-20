@@ -25,6 +25,23 @@
 .owner-form input:not([type="checkbox"]):not([type="radio"]):not([type="file"]),
 .owner-form select,
 .owner-form textarea,
+.owner-forms input:not([type="checkbox"]):not([type="radio"]):not([type="file"]),
+.owner-forms select,
+.owner-forms textarea,
+.owner-recipe-card input:not([type="checkbox"]):not([type="radio"]):not([type="file"]),
+.owner-recipe-card select,
+.owner-prep-step input:not([type="checkbox"]):not([type="radio"]):not([type="file"]),
+.owner-prep-step select,
+.owner-panel > label input:not([type="checkbox"]):not([type="radio"]):not([type="file"]),
+.owner-panel > label select,
+.owner-panel .owner-form select,
+.owner-panel .owner-form input:not([type="checkbox"]):not([type="radio"]):not([type="file"]),
+.owner-input,
+.listing-toolbar__sort select,
+.listing-toolbar__search input,
+.form-row label select,
+.form-row label input:not([type="checkbox"]):not([type="radio"]):not([type="file"]),
+.stream-dish-pick select,
 .od-orders__parse textarea,
 .owner-parse textarea,
 .owner-cancel input,
@@ -69,6 +86,16 @@
 
 .kc-select,
 .owner-form select,
+.owner-forms select,
+.owner-recipe-card select,
+.owner-prep-step select,
+.owner-panel > label select,
+.owner-panel .owner-form select,
+.owner-input[type="select"],
+select.owner-input,
+.listing-toolbar__sort select,
+.form-row label select,
+.stream-dish-pick select,
 .admin-tickets__filters select,
 .admin-tickets__actions select,
 .owner-app__kitchen-select,
@@ -83,6 +110,30 @@
   background-repeat: no-repeat;
   background-position: right 0.85rem center;
   background-size: 1rem;
+}
+
+/* Compact controls inside tables / toolbars */
+.listing-toolbar__sort select,
+.owner-input--compact,
+.owner-table select,
+.owner-table input.owner-input {
+  min-height: 2.4rem;
+  font-size: 0.9rem;
+  padding-top: 0.45rem;
+  padding-bottom: 0.45rem;
+}
+
+.listing-toolbar__sort select,
+.listing-toolbar__search input {
+  display: block;
+  width: auto;
+  min-width: 9.5rem;
+  max-width: 100%;
+}
+
+.listing-toolbar__search input {
+  width: 100%;
+  min-width: 0;
 }
 
 .kc-input::placeholder,
@@ -151,8 +202,14 @@
 
 .kc-field,
 .auth-card label,
-.owner-form > label,
+.owner-form label,
+.owner-forms label,
 .owner-form .kc-field,
+.owner-recipe-card__row > label,
+.owner-prep-step > label,
+.owner-panel > label,
+.owner-panel .owner-form label,
+.form-row label,
 .customer-search label,
 .admin-login__card label {
   display: flex;
@@ -165,6 +222,20 @@
   font-weight: 600;
   letter-spacing: 0.02em;
   color: var(--text-muted);
+}
+
+/* Toolbar / chip rows must stay horizontal — never inherit field stacks */
+.listing-toolbar label,
+.listing-toolbar__sort,
+.listing-toolbar__search {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 0.45rem;
+  width: auto;
+  max-width: 100%;
+  font-weight: 600;
+  margin: 0;
 }
 
 .kc-field__label {
@@ -189,11 +260,34 @@
 .auth-card form,
 .auth-card.admin-login__card,
 form.auth-card,
-.owner-form:not(.owner-form--inline),
+.owner-form:not(.owner-form--inline):not(.owner-form--grid),
 .customer-search form {
   display: flex;
   flex-direction: column;
   gap: var(--kc-field-stack-gap);
+}
+
+/* Multi-column owner forms (pantry, bulk prep) — must beat the flex stack above */
+.owner-form.owner-form--grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 0.85rem 1rem;
+  max-width: 100%;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 0.15rem 0 0;
+}
+
+.owner-form.owner-form--grid > label {
+  width: auto;
+  min-width: 0;
+}
+
+.owner-form.owner-form--grid > .owner-form__wide,
+.owner-form.owner-form--grid > .owner-form__fieldset,
+.owner-form.owner-form--grid > .owner-form__actions,
+.owner-form.owner-form--grid > .live-capture-field {
+  grid-column: 1 / -1;
 }
 
 .auth-card form > h2,
@@ -243,12 +337,15 @@ form.auth-card > .btn {
 /* Checkbox / radio rows keep horizontal rhythm */
 .owner-form label:has(> input[type="checkbox"]),
 .owner-form label:has(> input[type="radio"]),
+.owner-forms label:has(> input[type="checkbox"]),
+.owner-panel label:has(> input[type="checkbox"]),
 .auth-card label:has(> input[type="checkbox"]),
 .kc-field:has(> input[type="checkbox"]) {
   flex-direction: row;
   align-items: center;
   gap: 0.65rem;
   font-weight: 500;
+  width: auto;
 }
 
 .owner-form input[type="checkbox"],
@@ -388,6 +485,10 @@ form.auth-card > .btn {
   display: flex;
   flex-direction: column;
   gap: var(--kc-field-stack-gap);
+  width: 100%;
+  max-width: 100%;
+}
+.owner-forms--narrow {
   max-width: 36rem;
 }
 

@@ -23,7 +23,7 @@ These are not two unrelated features. They form one **closed kitchen quality loo
 Purchases restock pantry (E1)
         │
         ▼
-Recipes consume stock on accept (F19 — exists)
+Recipes consume stock on order Ready / bulk prep Prepared (F19b — exists)
         │
         ▼
 Orders + home-taste ratings accumulate signal
@@ -48,7 +48,7 @@ Shipping only E2 proposes standards without trusting pantry math for “buy this
 
 ### E1 — Purchase-linked automatic inventory
 
-- **Problem:** Owners still restock by guessing. F19 only *deducts* on accept and allows manual adjust — there is no purchase ledger, so `current_stock` drifts from reality.
+- **Problem:** Owners still restock by guessing. F19b deducts on Ready / bulk prepared and allows manual adjust — there is no purchase ledger, so `current_stock` drifts from reality.
 - **Vision:** Every purchase (kirana / vendor bill) becomes an immutable stock-in entry tied to ingredient lines; pantry updates automatically from the bill, not from memory.
 - **Business objective:** Trustworthy stock → fewer “accepted then can’t cook” moments → higher accept confidence and less waste.
 - **Why now:** Recipe deduct already ships; without stock-in, the balance mapper is half a system.
@@ -72,7 +72,7 @@ Does this help cloud kitchens grow without aggregator dependency? **Yes** — co
 
 | Assumption | Challenge | Decision |
 |------------|-----------|----------|
-| “Just auto-deduct from purchases” | Purchases are *stock-in*; recipes are *stock-out*. Mixing them confused F19. | E1 = purchase ledger + auto stock-in; keep deduct on accept. |
+| “Just auto-deduct from purchases” | Purchases are *stock-in*; recipes are *stock-out*. Mixing them confused F19. | E1 = purchase ledger + auto stock-in; keep F19b deduct on Ready / prepared. |
 | “AI invents new recipes” | Owners distrust black-box recipe changes. | E2 proposes **deltas on existing recipe lines** from evidence; owner must lock. |
 | “Put everything in catalog” | Daily ranking needs order + ratings fan-in. | Growth **orchestrates**; Catalog **owns lock + purchases**. |
 | “New microservice for inventory” | Stock already lives in catalog; premature split. | Stay in `services/catalog/` until purchase volume / multi-vendor warrants `inventory` service. |
@@ -649,7 +649,7 @@ Keep loop inside **Ingredients** + **Growth** to avoid dashboard sprawl. Optiona
 
 | Existing | Role in E1/E2 |
 |----------|----------------|
-| F19 stock deduct on accept | Unchanged trigger; gains ledger rows |
+| F19b stock deduct on ready / prepared | Unchanged trigger; gains ledger rows |
 | F11 generate suggestions | Extended with `chef_standard` / `restock_plan` |
 | F12 performance + recipe suggestions | E2 fulfills the “act on suggestions” half |
 | F20 customer tips | Primary evidence for `adopt_tip` mode |
@@ -674,6 +674,6 @@ Keep loop inside **Ingredients** + **Growth** to avoid dashboard sprawl. Optiona
 |----------|--------|-----------|
 | Inventory service split? | **No** for S19 | Stock already catalog-owned |
 | Auto-lock overnight? | **No** | Owner consent invariant |
-| Deduct timing | Keep on **accept** | Matches F19 shipped behavior |
+| Deduct timing | Keep on **ready** / bulk **prepared** | Matches F19b shipped behavior |
 | Brief trigger | Owner generate + optional later cron | Simpler ops, testable |
 | Build E1 alone first? | **No** | User asked to design/build both together; forecast needs lock |

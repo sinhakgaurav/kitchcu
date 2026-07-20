@@ -130,8 +130,8 @@ Status tags: ✅ Done well · 🟡 Partial · 🔴 Gap / not built · 📋 Desig
 | **Problem (CEO)** | Shared owner phone = churn + security risk at scale. |
 | **Problem (CPO)** | Inbox must be glove-friendly; staff roles are table-stakes for real kitchens. |
 | **Solution** | Strong lifecycle (done) + urgency UX + **kitchen staff RBAC** (design → build) + stock warnings (done) + refunds evidence (done). |
-| **Implementation (CTO)** | Order state machine + stock deduct on accept; refunds billing; **new** `kitchen_members` + staff JWT. |
-| **Achievements / done well** | ✅ Full lifecycle · ✅ Stock deduct/warnings (F19) · ✅ Porter book on accept (P32.1) · ✅ Refunds with evidence · ✅ Analytics |
+| **Implementation (CTO)** | Order state machine + stock deduct on **ready** (F19b; skip if `prep_batch_only`); bulk prep mark-prepared; refunds billing; **new** `kitchen_members` + staff JWT. |
+| **Achievements / done well** | ✅ Full lifecycle · ✅ Stock deduct/warnings (F19/F19b) · ✅ Porter book on accept (P32.1) · ✅ Refunds with evidence · ✅ Analytics |
 | **Gaps** | 🔴 Kitchen staff roles · 🟡 Inbox urgency · 🟡 Porter webhooks · 🔴 Profit without E1 purchases |
 | **Architecture enhancements** | Staff JWT `type:staff` scoped to one kitchen; permissions subset; events unchanged. |
 | **DB enhancements** | `ckac_identity.kitchen_members(id, kitchen_id, phone, role, is_active)` + unique (kitchen_id, phone); RLS by kitchen_id. |

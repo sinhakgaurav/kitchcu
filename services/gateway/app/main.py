@@ -26,7 +26,16 @@ IDENTITY_PREFIXES = (
     "/api/v1/customers",
     "/api/v1/discovery",
 )
-CATALOG_PATH_MARKERS = ("/categories", "/menu", "/dishes", "/cuisines", "/ingredients", "/media")
+CATALOG_PATH_MARKERS = (
+    "/categories",
+    "/menu",
+    "/dishes",
+    "/cuisines",
+    "/ingredients",
+    "/media",
+    "/prep-batches",
+    "/stock-settings",
+)
 ORDER_PATH_MARKERS = ("/orders", "/analytics")
 MARKETING_PATH_MARKERS = (
     "/crm",

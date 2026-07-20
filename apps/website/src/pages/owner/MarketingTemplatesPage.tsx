@@ -181,6 +181,7 @@ export function MarketingTemplatesPage() {
           <label>
             Channel
             <select
+              className="kc-select"
               value={channel}
               onChange={(e) => setChannel(e.target.value as "whatsapp" | "email")}
               disabled={Boolean(editingId)}
@@ -241,7 +242,7 @@ export function MarketingTemplatesPage() {
       <OwnerPanel title="Send to CRM" description="Audience for Preview / Send actions below">
         <label className="owner-forms">
           Audience
-          <select value={audience} onChange={(e) => setAudience(e.target.value)}>
+          <select className="kc-select" value={audience} onChange={(e) => setAudience(e.target.value)}>
             <option value="all">All CRM customers</option>
             <option value="vip">VIP (spend ≥ ₹2000 or vip tag)</option>
             <option value="repeat">Repeat (2+ orders)</option>

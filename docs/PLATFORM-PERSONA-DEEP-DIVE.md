@@ -182,7 +182,7 @@ Register → OTP → Create kitchen → Setup / branded publish
 **Flow achievement**
 
 ```
-Orders inbox → Drafts confirm → Accept (stock deduct + Porter book if platform)
+Orders inbox → Drafts confirm → Accept (Porter book if platform) → Ready (stock deduct if `order_ready`)
   → preparing → ready → out_for_delivery → delivered
   → Delivery fulfillment (self vs platform) · cost-share visible
   → Refunds with evidence when needed
@@ -192,7 +192,7 @@ Orders inbox → Drafts confirm → Accept (stock deduct + Porter book if platfo
 **What’s good**
 
 - Lifecycle is clear and audited (`order_status_events`).  
-- Accept → stock deduct is real ops (F19); accept → Porter book when customer chose platform (P32.1).  
+- Ready → stock deduct is real ops (F19b, mode `order_ready`); bulk prep → Mark prepared for thali kitchens (`prep_batch_only`); Accept → Porter book when customer chose platform (P32.1).  
 - Delivery settings: radius, min order, subsidy % — I control who pays beyond range.  
 - Order detail refunds with gateway/direct + evidence match Indian reality.  
 - Analytics (revenue, peak hours, segments) answer “what sold today.”

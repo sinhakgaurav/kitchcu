@@ -56,9 +56,9 @@ async def internal_low_stock_check(
     tags=[TAG_INGREDIENTS],
     summary="[Internal] Deduct stock for an order",
     description=(
-        "Internal service-to-service (X-Internal-Key) — called by the order service on order acceptance "
-        "to deduct ingredient stock per dish recipe, publishing `ingredient.stock.deducted` and "
-        "`ingredient.low_stock` events as thresholds are crossed."
+        "Internal service-to-service (X-Internal-Key) — called by the order service when an order "
+        "first becomes `ready` (prepared). Deducts recipe stock unless the kitchen is in "
+        "`prep_batch_only` mode (F19b). Publishes `ingredient.stock.deducted` / `ingredient.low_stock`."
     ),
     responses={401: RESP_401},
 )

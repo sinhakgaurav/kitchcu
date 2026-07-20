@@ -314,7 +314,7 @@ Each module is a **bounded product + engineering context**: one row per module w
 | **Problem solved** | P9 (mid-service stock-outs discovered too late); lays the foundation for taste consistency (P5) that E2 will complete. |
 | **Logic / how it works** | `ingredients` carry a low-stock `threshold`; `dish_ingredients` is the many-to-many recipe line (ingredient × quantity × unit) per dish; on **order accept** (not on placement — an unaccepted order should never move stock) the order service calls catalog internally to deduct each recipe line's quantity × order quantity from `current_stock`, clamped at zero with a warning event rather than going negative. `dish_prep_steps` hold ordered textual/photo guidance for consistent execution. |
 | **Data / events** | Schema `ckac_catalog`: `ingredients`, `dish_ingredients`, `dish_prep_steps`. Events on `ckac:catalog:ingredient`: `ingredient.stock.deducted`, `ingredient.stock.adjusted`. |
-| **Surfaces** | Kitchen PWA — **Ingredients** page (pantry list, low-stock badges, recipe editor). |
+| **Surfaces** | Kitchen PWA — **Ingredients** (pantry + recipes + search/sort) · **Bulk prep** (deduct mode, batches, mark prepared). |
 | **Status** | ✅ S15. **E1 (purchase ledger) is the next design increment — not built.** |
 
 ---
@@ -740,7 +740,7 @@ sequenceDiagram
     O->>Ord: place / accept order
     Ord->>Ord: insert order + order_items + order_status_events
     Ord->>R: XADD ckac:orders:order (order.placed)
-    Ord->>Cat: internal deduct-stock call (on accept)
+    Ord->>Cat: internal deduct-stock call (on ready; F19b)
     Cat->>Cat: decrement dish_ingredients × qty, clamp at 0
     Cat->>R: XADD ckac:catalog:ingredient (ingredient.stock.deducted)
     R-->>N: consume order.status.changed
@@ -1515,7 +1515,7 @@ Full spec: [`E1-E2-KITCHEN-QUALITY-LOOP-DESIGN.md`](./E1-E2-KITCHEN-QUALITY-LOOP
 Purchases restock pantry (E1)
         │
         ▼
-Recipes consume stock on accept (F19 — already shipped)
+Recipes consume stock on order Ready or bulk prep Prepared (F19b — already shipped)
         │
         ▼
 Orders + home-taste ratings accumulate signal
@@ -1536,7 +1536,7 @@ Next purchase plan uses locked qty × forecasted orders (E1 ← E2)
 |----------|--------|-----------|
 | New `inventory` microservice? | **No** for S19 | Stock is already Catalog-owned; splitting now would be premature per the split rule (§9.1) |
 | Auto-lock a recipe standard overnight? | **No** | Owner consent is a safety/audit invariant — the brief only *proposes*, the owner always explicitly *locks* |
-| Where does deduct-on-accept happen? | Unchanged — stays on **accept** | Matches F19's shipped, tested behavior; no regression risk |
+| Where does stock deduct happen? | On **ready** (or bulk prep **prepared**) | Matches F19b shipped behavior; Accept remains Porter + warnings only |
 | Chef-brief trigger | Owner-initiated generate call (cron optional later) | Simpler ops, easier to test, no silent background writes |
 | Scoring engine | Rules-based (`0.45×volume + 0.35×taste + tip_boost + 0.20×quality_risk`), **no LLM in v1** | Owners distrust black-box recipe changes; a transparent formula is auditable and explainable in the UI |
 
@@ -1557,7 +1557,7 @@ Full acceptance criteria for every feature: [`CKAC-COMPLETE-PLANNING-BENCHMARK.m
 | Analytics & growth | F07–F12, F39 | Revenue/dish/pattern reports, suggestions, daily menu push | ✅ done |
 | Catalog & trust media | F13–F15 | Live-capture dish photo, price/quality/ingredients, categories | ✅ done |
 | Ratings | F16–F18, F20 | Home-taste rating, aggregate, A/V reviews, customer tips | ✅ done (owner-facing F20 UI still thin) |
-| Ingredients | F19 | Ingredient balance mapper (deduct on accept, low-stock warn) | ✅ done — **E1 extends with a purchase ledger, design only** |
+| Ingredients | F19/F19b | Ingredient mapper + bulk prep; deduct on **ready** or batch **prepared** | ✅ done — **E1 extends with a purchase ledger, design only** |
 | Social & subscription model | F25, F26 | Social share cards, zero-commission subscription | ✅ done |
 | Delivery / discovery | F27–F33 | Radius, fee accept/deny, tracking, prep/delivery time, distance, nearby, repeat orders | ✅ done |
 | Marketing | F34–F38, F40–F41 | Tiffin subscription, meal plans, coupons, CRM, targeted pricing, event menus, custom requests | ✅ core done |

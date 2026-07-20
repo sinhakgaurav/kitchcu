@@ -1730,6 +1730,96 @@ export async function fetchOrderStockWarnings(orderId: string): Promise<OrderSto
   return apiFetch(`/api/v1/orders/${orderId}/stock-warnings`);
 }
 
+export type StockDeductMode = "order_ready" | "prep_batch_only";
+
+export type KitchenStockSettings = {
+  kitchen_id: string;
+  deduct_mode: StockDeductMode;
+  updated_at?: string | null;
+};
+
+export type PrepBatchIngredientLine = {
+  ingredient_id: string;
+  ingredient_name?: string | null;
+  quantity: number;
+  unit: string;
+  sort_order: number;
+};
+
+export type PrepBatch = {
+  id: string;
+  kitchen_id: string;
+  name: string;
+  batch_type: "single_dish" | "combo" | string;
+  portions: number;
+  status: string;
+  notes?: string | null;
+  prepared_at?: string | null;
+  created_at: string;
+  dishes: { dish_id: string; dish_name?: string | null; quantity_per_portion: number }[];
+  ingredient_lines: PrepBatchIngredientLine[];
+};
+
+export async function fetchKitchenStockSettings(kitchenId: string): Promise<KitchenStockSettings> {
+  return apiFetch(`/api/v1/kitchens/${kitchenId}/stock-settings`);
+}
+
+export async function updateKitchenStockSettings(
+  kitchenId: string,
+  deduct_mode: StockDeductMode,
+): Promise<KitchenStockSettings> {
+  return apiFetch(`/api/v1/kitchens/${kitchenId}/stock-settings`, {
+    method: "PATCH",
+    body: JSON.stringify({ deduct_mode }),
+  });
+}
+
+export async function fetchPrepBatches(
+  kitchenId: string,
+  status?: string,
+): Promise<{ batches: PrepBatch[]; total: number }> {
+  const q = status ? `?status=${encodeURIComponent(status)}` : "";
+  return apiFetch(`/api/v1/kitchens/${kitchenId}/prep-batches${q}`);
+}
+
+export async function createPrepBatch(
+  kitchenId: string,
+  data: {
+    name: string;
+    batch_type: "single_dish" | "combo";
+    portions: number;
+    dishes: { dish_id: string; quantity_per_portion?: number }[];
+    notes?: string;
+  },
+): Promise<PrepBatch> {
+  return apiFetch(`/api/v1/kitchens/${kitchenId}/prep-batches`, {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+}
+
+export async function updatePrepBatch(
+  kitchenId: string,
+  batchId: string,
+  data: {
+    name?: string;
+    notes?: string;
+    status?: "draft" | "preparing" | "cancelled";
+    ingredient_lines?: { ingredient_id: string; quantity: number; unit: string; sort_order?: number }[];
+  },
+): Promise<PrepBatch> {
+  return apiFetch(`/api/v1/kitchens/${kitchenId}/prep-batches/${batchId}`, {
+    method: "PATCH",
+    body: JSON.stringify(data),
+  });
+}
+
+export async function markPrepBatchPrepared(kitchenId: string, batchId: string): Promise<PrepBatch> {
+  return apiFetch(`/api/v1/kitchens/${kitchenId}/prep-batches/${batchId}/mark-prepared`, {
+    method: "POST",
+  });
+}
+
 async function downloadPdf(path: string, filename: string): Promise<void> {
   const token = getToken();
   const res = await fetch(path, {

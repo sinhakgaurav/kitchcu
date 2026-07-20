@@ -89,12 +89,46 @@
 
 .od-board__hero.dash-card,
 .od-board__hero {
-  background: linear-gradient(135deg, var(--dash-surface) 0%, var(--dash-surface-2) 100%);
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem 1.5rem;
+  flex-wrap: nowrap;
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--brand-orange, #e65100) 7%, var(--dash-surface)) 0%,
+    color-mix(in srgb, var(--brand-teal, #0f766e) 6%, var(--dash-surface-2)) 100%
+  );
   border: 1px solid var(--dash-border-strong);
   border-radius: var(--dash-radius-lg);
   box-shadow: var(--dash-shadow);
-  padding: 1.5rem 1.75rem;
+  padding: 1.35rem 1.5rem;
   margin-bottom: 1.25rem;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.od-board__hero-text {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.od-board__hero .od-board__hero-actions {
+  flex: 0 0 auto;
+  align-self: flex-start;
+  width: auto;
+  max-width: 40%;
+}
+
+@media (max-width: 640px) {
+  .od-board__hero.dash-card,
+  .od-board__hero {
+    flex-wrap: wrap;
+  }
+  .od-board__hero .od-board__hero-actions {
+    max-width: 100%;
+  }
 }
 
 .od-board__eyebrow {
@@ -102,7 +136,7 @@
   font-weight: 600;
   letter-spacing: 0.04em;
   text-transform: uppercase;
-  color: var(--text-muted);
+  color: var(--brand-teal, #0f766e);
   margin-bottom: 0.5rem;
 }
 
@@ -601,6 +635,13 @@
   border-radius: var(--dash-radius-lg);
   box-shadow: var(--dash-shadow);
   padding: 1.5rem;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+.owner-panel .listing-toolbar {
+  margin-bottom: 1rem;
 }
 
 .owner-panel .od-panel__head {
@@ -649,6 +690,14 @@
   margin: 0 0 1rem;
 }
 
+.owner-table-wrap {
+  overflow-x: auto;
+  padding: 0;
+  border: 1px solid var(--dash-border);
+  border-radius: var(--dash-radius-lg);
+  background: var(--dash-surface);
+}
+
 .owner-table-wrap.dash-card {
   background: var(--dash-surface);
   border: 1px solid var(--dash-border);
@@ -656,6 +705,10 @@
   box-shadow: var(--dash-shadow);
   overflow-x: auto;
   padding: 0;
+}
+
+.owner-panel .owner-table-wrap {
+  box-shadow: none;
 }
 
 .owner-table {
@@ -674,6 +727,17 @@
   color: var(--text-muted);
   background: var(--veil-2);
   border-bottom: 1px solid var(--dash-border);
+}
+
+.owner-table td .owner-input,
+.owner-table td input.owner-input {
+  min-width: 7rem;
+  max-width: 11rem;
+  width: 100%;
+}
+
+.owner-table td .btn--sm {
+  margin-top: 0.35rem;
 }
 
 .owner-table td {

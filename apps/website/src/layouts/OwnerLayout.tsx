@@ -37,6 +37,7 @@ const NAV_SECTIONS: { labelKey: string; items: NavItem[] }[] = [
       { to: "/dashboard/menu", labelKey: "owner.nav.menu" },
       { to: "/dashboard/brand", labelKey: "owner.nav.brand" },
       { to: "/dashboard/ingredients", labelKey: "owner.nav.ingredients" },
+      { to: "/dashboard/prep", labelKey: "owner.nav.bulkPrep" },
     ],
   },
   {

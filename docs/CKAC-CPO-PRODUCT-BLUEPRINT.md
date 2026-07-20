@@ -77,7 +77,8 @@ Each module below is a **bounded product context**. For *Definition · Descripti
 | **Gateway** | Public API edge; never embeds domain logic | ✅ |
 | **Identity** | Owners, customers, kitchens, JWT/OTP, PostGIS | ✅ |
 | **Catalog** | Menu + live-capture media of truth | ✅ |
-| **Ingredients** | Pantry stock + recipes; deduct on accept | ✅ |
+| **Ingredients** | Pantry stock + recipes; deduct on order Ready or bulk prep Prepared (F19b) | ✅ |
+| **Bulk prep** | Combo/thali batches; expand recipes → edit totals → mark prepared | ✅ |
 | **Order** | Intake, lifecycle, PDF bills, owner analytics | ✅ |
 | **Multi-kitchen checkout** | One payment → many kitchen sub-orders | ✅ |
 | **Billing** | Payments, UPI, subscriptions, Route splits | ✅ |
