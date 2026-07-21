@@ -38,6 +38,28 @@ plans:
       - Advanced segmentation
       - Priority support + AI assistant
 
+# Illustrative cost stacks for FAQ transparency (not ledger accounting).
+# Owner subscription funds growth rails; customer platform/delivery rails fund quality care.
+cost_transparency:
+  owner_growth_plan_inr_month: 999
+  owner_growth_breakdown_pct:
+    servers_data: 28
+    operations_reliability: 18
+    support_ai_human: 22
+    streaming_live_media: 15
+    growth_intelligence_product: 17
+  customer_typical_platform_rail_inr: 60
+  customer_rail_breakdown_pct:
+    servers_data: 27
+    operations_reliability: 18
+    support_ai_human: 23
+    streaming_live_media: 17
+    quality_health_assurance: 15
+  notes:
+    - Zero commission on food for owners and customers
+    - Food payments go to the kitchen
+    - Customer platform/delivery rails fund quality & care, not a food cut
+
 order_lifecycle:
   - received
   - accepted

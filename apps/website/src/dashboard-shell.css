@@ -201,8 +201,8 @@
 }
 
 .od-kpi__icon--menu {
-  background-color: rgba(206, 147, 216, 0.12);
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23ce93d8' stroke-width='2'%3E%3Ccircle cx='12' cy='12' r='8'/%3E%3Cpath d='M8 12h8'/%3E%3C/svg%3E");
+  background-color: rgba(0, 137, 123, 0.12);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%234db6ac' stroke-width='2'%3E%3Ccircle cx='12' cy='12' r='8'/%3E%3Cpath d='M8 12h8'/%3E%3C/svg%3E");
 }
 
 .od-kpi strong {
@@ -277,6 +277,11 @@
   font-weight: 600;
   color: var(--text);
   font-family: var(--font-body);
+}
+
+.od-recent__cell--code strong {
+  color: var(--orange-light);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 }
 
 .od-share.dash-card,

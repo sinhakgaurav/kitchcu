@@ -73,7 +73,7 @@ export function SupportSection() {
                   }}
                 >
                   <summary>{item.q}</summary>
-                  <p>{item.a}</p>
+                  <p className="support-section__answer">{item.a}</p>
                 </details>
               ))}
             </div>

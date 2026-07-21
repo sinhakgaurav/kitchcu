@@ -36,12 +36,16 @@ export type OwnerProfile = {
   subscription_status: string;
 };
 
+export type BrandAlign = "left" | "center" | "right";
+
 export type KitchenBrandedPage = {
   enabled: boolean;
   tagline: string | null;
   accent_color: string | null;
   logo_url?: string | null;
   background_url?: string | null;
+  logo_align?: BrandAlign;
+  heading_align?: BrandAlign;
 };
 
 export type Kitchen = {
@@ -440,6 +444,8 @@ export async function updateKitchenBrandedPage(
     accent_color?: string | null;
     logo_url?: string | null;
     background_url?: string | null;
+    logo_align?: BrandAlign;
+    heading_align?: BrandAlign;
   },
 ): Promise<Kitchen> {
   return apiFetch(`/api/v1/kitchens/${kitchenId}/branded-page`, {
@@ -2154,6 +2160,7 @@ export async function fetchLiveKitchens(): Promise<{ kitchens: LiveKitchenSummar
   return apiFetch("/api/v1/stream/live-kitchens");
 }
 
+/** Owner-portal helper — prefer `fetchCustomerViewerToken` on the customer app. */
 export async function fetchViewerToken(sessionId: string): Promise<{
   session_id: string;
   room_name: string;

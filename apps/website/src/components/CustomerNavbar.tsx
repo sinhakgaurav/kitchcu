@@ -29,19 +29,32 @@ export function CustomerNavbar() {
         <BrandNavMark to="/" subtitle={CUSTOMER_HOST} height={44} />
 
         <nav className={`nav__links ${open ? "nav__links--open" : ""}`}>
-          <a href={hashLink("/#near-you")} onClick={() => setOpen(false)}>{t("customer.nav.nearYou")}</a>
-          <a href={hashLink("/#featured")} onClick={() => setOpen(false)}>{t("customer.nav.featured")}</a>
-          <a href={hashLink("/#cheapest")} onClick={() => setOpen(false)}>{t("customer.nav.bestPrices")}</a>
-          <a href={hashLink("/#by-code")} onClick={() => setOpen(false)}>{t("customer.nav.kitchenCode")}</a>
-          <Link to="/orders" onClick={() => setOpen(false)}>{t("customer.nav.myOrders")}</Link>
-          <Link to="/dashboard" onClick={() => setOpen(false)}>{t("customer.nav.dashboard")}</Link>
-          <Link to="/account" onClick={() => setOpen(false)}>{t("customer.nav.account")}</Link>
-          <Link to="/login" className="btn btn--ghost btn--sm" onClick={() => setOpen(false)}>
-            {session ? session.name : t("customer.nav.signIn")}
-          </Link>
+          <a href={hashLink("/#near-you")} onClick={() => setOpen(false)}>
+            {t("customer.nav.nearYou")}
+          </a>
+          <a href={hashLink("/#by-code")} onClick={() => setOpen(false)}>
+            {t("customer.nav.kitchenCode")}
+          </a>
+          {session ? (
+            <>
+              <Link to="/orders" onClick={() => setOpen(false)}>
+                {t("customer.nav.myOrders")}
+              </Link>
+              <Link to="/account" onClick={() => setOpen(false)}>
+                {t("customer.nav.account")}
+              </Link>
+              <Link to="/login" className="btn btn--ghost btn--sm" onClick={() => setOpen(false)}>
+                {session.name}
+              </Link>
+            </>
+          ) : (
+            <Link to="/login" className="btn btn--primary btn--sm" onClick={() => setOpen(false)}>
+              {t("customer.nav.signIn")}
+            </Link>
+          )}
           <a
             href={kitchenUrl("/login")}
-            className="btn btn--primary btn--sm"
+            className="nav__owner-link"
             target="_blank"
             rel="noopener noreferrer"
             onClick={() => setOpen(false)}

@@ -8,13 +8,9 @@ import {
 } from "react";
 import { Link, Navigate, Outlet, useParams } from "react-router-dom";
 import { APP_NAME } from "../shared/brand";
-import { fetchKitchenByCode, type KitchenPublic } from "../shared/api";
+import { fetchKitchenByCode, type BrandAlign, type KitchenPublic } from "../shared/api";
 import { saveKitchenToSession } from "../shared/customerSession";
 import { portalUrl } from "../shared/urls";
-
-function cssUrl(url: string): string {
-  return `url("${url.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}")`;
-}
 
 type BrandedCtx = {
   kitchen: KitchenPublic;
@@ -25,6 +21,11 @@ const BrandedStorefrontContext = createContext<BrandedCtx | null>(null);
 
 export function useBrandedStorefront(): BrandedCtx | null {
   return useContext(BrandedStorefrontContext);
+}
+
+function alignClass(align: BrandAlign | undefined, prefix: string): string {
+  const value = align === "center" || align === "right" ? align : "left";
+  return `${prefix} ${prefix}--${value}`;
 }
 
 /** Kitchen-first shell: menu → checkout → bill, with Powered by kitchCU. */
@@ -59,6 +60,8 @@ export function BrandedStorefrontLayout() {
     "Live-capture menu · order · bill";
   const logoUrl = kitchen?.branded_page?.logo_url || null;
   const backgroundUrl = kitchen?.branded_page?.background_url || null;
+  const logoAlign = kitchen?.branded_page?.logo_align || "left";
+  const headingAlign = kitchen?.branded_page?.heading_align || "left";
 
   const ctx = useMemo(
     () =>
@@ -90,17 +93,9 @@ export function BrandedStorefrontLayout() {
     );
   }
 
-  const shellStyle: CSSProperties = {
+  const shellStyle = {
     ["--branded-accent" as string]: accent,
-    ...(backgroundUrl
-      ? {
-          backgroundImage: `linear-gradient(180deg, rgba(250,248,245,0.9) 0%, rgba(243,240,234,0.94) 55%, rgba(243,240,234,0.98) 100%), ${cssUrl(backgroundUrl)}`,
-          backgroundSize: "cover",
-          backgroundPosition: "center top",
-          backgroundRepeat: "no-repeat",
-        }
-      : {}),
-  };
+  } as CSSProperties;
 
   return (
     <BrandedStorefrontContext.Provider value={ctx}>
@@ -108,14 +103,25 @@ export function BrandedStorefrontLayout() {
         className={`branded-store${backgroundUrl ? " branded-store--has-bg" : ""}`}
         style={shellStyle}
       >
+        {backgroundUrl ? (
+          <div
+            className="branded-store__bg"
+            style={{ backgroundImage: `url("${backgroundUrl.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}")` }}
+            aria-hidden="true"
+          />
+        ) : null}
         <header className="branded-store__header">
           <div className="branded-store__brand">
             {logoUrl ? (
-              <img src={logoUrl} alt="" className="branded-store__logo" />
+              <div className={alignClass(logoAlign, "branded-store__logo-row")}>
+                <img src={logoUrl} alt="" className="branded-store__logo" />
+              </div>
             ) : null}
-            <p className="branded-store__code">{kitchen.code}</p>
-            <h1>{kitchen.name}</h1>
-            <p className="branded-store__tagline">{tagline}</p>
+            <div className={alignClass(headingAlign, "branded-store__heading")}>
+              <p className="branded-store__code">{kitchen.code}</p>
+              <h1>{kitchen.name}</h1>
+              <p className="branded-store__tagline">{tagline}</p>
+            </div>
           </div>
           <Link to={`${ctx.basePath}/menu`} className="branded-store__menu-link">
             Menu

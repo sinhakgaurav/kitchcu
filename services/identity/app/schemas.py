@@ -1,6 +1,7 @@
 import re
 import uuid
 from datetime import UTC, datetime, timedelta
+from typing import Literal
 
 from geoalchemy2.elements import WKTElement
 from jose import jwt
@@ -241,6 +242,9 @@ def _normalize_brand_media_url(value: str | None, *, allow_clear_empty: bool) ->
     raise ValueError("media URL must be an http(s) URL or site-relative path")
 
 
+BrandAlign = Literal["left", "center", "right"]
+
+
 class KitchenBrandedPageSettings(BaseModel):
     """Owner-controlled kitchen-first storefront (menu → order → bill) with Powered-by kitchCU."""
 
@@ -269,6 +273,14 @@ class KitchenBrandedPageSettings(BaseModel):
         default=None,
         max_length=2048,
         description="Public URL for the branded storefront background / hero image.",
+    )
+    logo_align: BrandAlign = Field(
+        default="left",
+        description="Horizontal alignment for the kitchen logo: left, center, or right.",
+    )
+    heading_align: BrandAlign = Field(
+        default="left",
+        description="Horizontal alignment for kitchen code, name, and tagline: left, center, or right.",
     )
 
     @field_validator("tagline")
@@ -323,6 +335,14 @@ class KitchenBrandedPageUpdate(BaseModel):
         default=None,
         max_length=2048,
         description="Background/hero image URL. Pass empty string to clear.",
+    )
+    logo_align: BrandAlign | None = Field(
+        default=None,
+        description="Logo alignment: left, center, or right. Omit to leave unchanged.",
+    )
+    heading_align: BrandAlign | None = Field(
+        default=None,
+        description="Heading alignment: left, center, or right. Omit to leave unchanged.",
     )
 
     @field_validator("tagline")
@@ -644,6 +664,10 @@ async def update_kitchen_branded_page(
         current["logo_url"] = data.logo_url or None
     if "background_url" in data.model_fields_set:
         current["background_url"] = data.background_url or None
+    if data.logo_align is not None:
+        current["logo_align"] = data.logo_align
+    if data.heading_align is not None:
+        current["heading_align"] = data.heading_align
 
     settings_blob["branded_page"] = KitchenBrandedPageSettings.model_validate(current).model_dump()
     kitchen.settings = settings_blob

@@ -289,6 +289,19 @@ export const pricingPlans = [
 export const supportFaqs = {
   owner: [
     {
+      q: "Why do kitchen owners pay kitchCU?",
+      a: `kitchCU is subscription SaaS — zero per-order food commission. Your monthly plan funds the rails that grow the kitchen and keep a transparent layer between you and customers (live-capture menus, order lifecycle, analytics, intelligence, support, optional live stream).
+
+Illustrative cost stack behind a Growth plan (₹999/mo) — where your fee goes:
+• Servers & data (API, Postgres, Redis, media) — ≈ ₹280 (28%)
+• Operations & reliability (uptime, security, monitoring) — ≈ ₹180 (18%)
+• Support (AI assistant + human tickets for you & diners) — ≈ ₹220 (22%)
+• Streaming & live media capacity (when enabled) — ≈ ₹150 (15%)
+• Growth intelligence & product (reports, CRM signals, quality loops) — ≈ ₹169 (17%)
+
+What you get for that: revenue analytics, home-taste feedback, CRM patterns, and honest storefront trust — not a commission cut on every bill.`,
+    },
+    {
       q: "How do WhatsApp orders work?",
       a: "Customers message your kitchen on WhatsApp. Paste the message in kitchen.kitchCU.in → Orders → Parse to draft. Review matched items, fix unmatched lines, and confirm in one tap.",
     },
@@ -314,6 +327,19 @@ export const supportFaqs = {
     },
   ],
   customer: [
+    {
+      q: "Why does kitchCU charge customers?",
+      a: `Your food payment goes to the kitchen — kitchCU takes zero commission on food. Charges you may see (delivery beyond free radius, shared/platform delivery rails, or optional live-stream bandwidth) fund the platform that protects quality and health — live-capture menus, verified ratings, ready-within honesty, and support when something goes wrong.
+
+Illustrative breakdown of a typical ₹60 platform-related delivery / quality rail fee:
+• Servers & data (menus, orders, media, maps) — ≈ ₹16 (27%)
+• Operations & reliability (uptime, fraud/abuse checks) — ≈ ₹11 (18%)
+• Support (AI + human help for order issues) — ≈ ₹14 (23%)
+• Streaming & live media rails (watch prep when kitchen is live) — ≈ ₹10 (17%)
+• Quality & health assurance (live-capture trust, rating integrity) — ≈ ₹9 (15%)
+
+We charge for the care layer — not for a cut of your meal.`,
+    },
     {
       q: "How do I find a kitchen?",
       a: "Open the customer app, enter a kitchen code (e.g. CKPNQ001), open a branded link like /k/CKPNQ001, or use Nearby with your location to discover cloud kitchens sorted by distance.",

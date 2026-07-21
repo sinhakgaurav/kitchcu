@@ -22,7 +22,6 @@ import {
   type RevenueTimeseries,
   type StreamSettings,
 } from "../../lib/api";
-import { CommissionAdvantagePanel } from "../../components/owner/CommissionAdvantagePanel";
 import { customerUrl } from "../../shared/urls";
 
 const inr = (n: number) => `₹${Math.round(n).toLocaleString("en-IN")}`;
@@ -49,10 +48,6 @@ const QUICK_ACTIONS = [
   { to: "/dashboard/brand", titleKey: "owner.home.quickBrand", descKey: "owner.home.quickBrandDesc", accent: "teal" },
   { to: "/dashboard/orders?tab=drafts", titleKey: "owner.home.quickDrafts", descKey: "owner.home.quickDraftsDesc", accent: "teal" },
   { to: "/dashboard/menu/new", titleKey: "owner.home.quickAddDish", descKey: "owner.home.quickAddDishDesc", accent: "orange" },
-  { to: "/dashboard/reports", titleKey: "owner.home.quickReports", descKey: "owner.home.quickReportsDesc", accent: "teal" },
-  { to: "/dashboard/stream", titleKey: "owner.home.quickStream", descKey: "owner.home.quickStreamDesc", accent: "orange" },
-  { to: "/dashboard/coupons", titleKey: "owner.home.quickCoupons", descKey: "owner.home.quickCouponsDesc", accent: "teal" },
-  { to: "/dashboard/tiffin", titleKey: "owner.home.quickTiffin", descKey: "owner.home.quickTiffinDesc", accent: "orange" },
 ] as const;
 
 export function OwnerHomePage() {
@@ -161,18 +156,14 @@ export function OwnerHomePage() {
     {
       id: "share",
       done: brandedEnabled && dishCount >= 1,
-      label: "Share storefront link with customers",
+      label: brandedEnabled && dishCount >= 1
+        ? "Storefront ready to share"
+        : "Share storefront link with customers",
       to: "/dashboard/brand",
-    },
-    {
-      id: "whatsapp",
-      done: false,
-      label: "Connect WhatsApp (optional for day-1)",
-      to: "/dashboard/whatsapp",
     },
   ];
   const day1Done = day1Steps.filter((s) => s.done).length;
-  const showDay1 = day1Done < 3;
+  const showDay1 = day1Done < day1Steps.length;
 
   const onSaveGolden = async (suggestionId: string) => {
     setSavingGoldenId(suggestionId);
@@ -371,12 +362,6 @@ export function OwnerHomePage() {
             </Link>
           </div>
 
-          <CommissionAdvantagePanel
-            grossRevenue={summary?.gross_revenue ?? 0}
-            avgOrderValue={summary?.avg_order_value ?? 0}
-            completedOrders={summary?.completed_orders ?? 0}
-          />
-
           <div className="od-board__grid">
             <section className="dash-card od-panel">
               <header className="od-panel__head">
@@ -432,7 +417,7 @@ export function OwnerHomePage() {
             </section>
           </div>
 
-          <section className="dash-card od-panel">
+          <section className="dash-card od-panel od-orders__table">
             <header className="od-panel__head">
               <div>
                 <h2>{t("owner.home.recentOrders")}</h2>
@@ -443,24 +428,39 @@ export function OwnerHomePage() {
             {recentOrders.length === 0 ? (
               <p className="od-panel__empty">{t("owner.home.noOrders")}</p>
             ) : (
-              <ul className="od-recent">
-                {recentOrders.map((o) => (
-                  <li key={o.id}>
-                    <Link to={`/dashboard/orders/${o.id}`} className="od-recent__row">
-                      <div>
-                        <strong>{o.order_code}</strong>
-                        <span>{o.customer_name ?? o.customer_phone ?? t("owner.home.walkIn")}</span>
-                      </div>
-                      <div className="od-recent__end">
-                        <span className={`status-badge status-badge--${o.status}`}>
-                          {t(`status.${o.status}`, { defaultValue: STATUS_LABELS[o.status] ?? o.status })}
-                        </span>
-                        <span className="od-recent__meta">{inr(o.total)} · {formatWhen(o.created_at, locale)}</span>
-                      </div>
-                    </Link>
-                  </li>
-                ))}
-              </ul>
+              <>
+                <div className="od-recent__head" aria-hidden="true">
+                  <span>Order</span>
+                  <span>Customer</span>
+                  <span>Status</span>
+                  <span>Total</span>
+                </div>
+                <ul className="od-recent">
+                  {recentOrders.map((o) => (
+                    <li key={o.id}>
+                      <Link to={`/dashboard/orders/${o.id}`} className="od-recent__row">
+                        <div className="od-recent__cell od-recent__cell--code">
+                          <strong>{o.order_code}</strong>
+                        </div>
+                        <div className="od-recent__cell od-recent__cell--who">
+                          <span className="od-recent__who">
+                            {o.customer_name ?? o.customer_phone ?? t("owner.home.walkIn")}
+                          </span>
+                        </div>
+                        <div className="od-recent__cell od-recent__cell--status">
+                          <span className={`status-badge status-badge--${o.status}`}>
+                            {t(`status.${o.status}`, { defaultValue: STATUS_LABELS[o.status] ?? o.status })}
+                          </span>
+                        </div>
+                        <div className="od-recent__cell od-recent__cell--meta">
+                          <span className="od-recent__amount">{inr(o.total)}</span>
+                          <span className="od-recent__meta">{formatWhen(o.created_at, locale)}</span>
+                        </div>
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              </>
             )}
           </section>
 

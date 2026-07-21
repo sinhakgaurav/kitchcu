@@ -372,6 +372,17 @@ html.theme-brand-light .brand-nav-mark__sub {
   gap: 2rem;
 }
 
+.nav__owner-link {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-decoration: none;
+  white-space: nowrap;
+}
+.nav__owner-link:hover {
+  color: var(--teal-light, var(--brand-teal, #00897b));
+}
+
 .nav__links a:not(.btn) {
   font-size: 0.9rem;
   color: var(--text-muted);
@@ -1349,11 +1360,46 @@ html.theme-brand-light .brand-nav-mark__sub {
 }
 
 .auth-card__demo {
-  margin-bottom: 0;
-  padding: 1rem 1.15rem;
+  margin: 1rem 0 0;
+  padding: 0.75rem 1rem;
   border-radius: var(--radius-md);
   background: rgba(0, 137, 123, 0.08);
   border: 1px solid rgba(0, 137, 123, 0.25);
+}
+
+.auth-card__demo > summary {
+  cursor: pointer;
+  list-style: none;
+  font-family: var(--font-display);
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--teal-light);
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.auth-card__demo > summary::-webkit-details-marker {
+  display: none;
+}
+
+.auth-card__demo > summary::before {
+  content: "▸";
+  font-size: 0.75rem;
+  opacity: 0.8;
+}
+
+.auth-card__demo[open] > summary {
+  margin-bottom: 0.65rem;
+}
+
+.auth-card__demo[open] > summary::before {
+  content: "▾";
+}
+
+.auth-card__demo > summary code {
+  font-size: 0.85rem;
+  font-weight: 600;
 }
 
 .auth-card__demo strong {
@@ -3394,11 +3440,13 @@ form.auth-card > .btn,
   display: none;
 }
 
-.support-section__accordion p {
+.support-section__accordion p,
+.support-section__answer {
   margin-top: 0.65rem;
   color: var(--text-muted);
   font-size: 0.9rem;
   line-height: 1.55;
+  white-space: pre-line;
 }
 
 /* AI support chat widget */
@@ -3969,13 +4017,15 @@ form.auth-card > .btn,
 .listing-toolbar__row {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.65rem 1rem;
+  gap: 0.55rem 0.75rem;
   align-items: center;
+  justify-content: flex-start;
 }
 
 .listing-toolbar__search {
-  flex: 1 1 14rem;
+  flex: 0 1 16rem;
   min-width: 10rem;
+  max-width: 20rem;
 }
 
 .listing-toolbar__search input {
@@ -4011,10 +4061,6 @@ form.auth-card > .btn,
   flex: 0 0 auto;
 }
 
-.listing-toolbar__search {
-  flex: 1 1 14rem;
-}
-
 .listing-toolbar__search input {
   min-height: 2.4rem;
 }
@@ -4022,7 +4068,14 @@ form.auth-card > .btn,
 .listing-toolbar__count {
   font-size: 0.8rem;
   color: var(--text-muted);
-  margin-left: auto;
+  margin-left: 0.25rem;
+  white-space: nowrap;
+}
+
+@media (min-width: 900px) {
+  .listing-toolbar__row {
+    flex-wrap: nowrap;
+  }
 }
 
 .listing-toolbar__chips {
@@ -4075,8 +4128,8 @@ form.auth-card > .btn,
 }
 
 .dish-badge--unique_recipe {
-  background: rgba(123, 31, 162, 0.2);
-  color: #ce93d8;
+  background: rgba(230, 81, 0, 0.16);
+  color: var(--orange-light, #ff8a50);
 }
 
 .dish-highlight-fieldset {

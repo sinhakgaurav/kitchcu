@@ -6,7 +6,7 @@ import math
 import random
 from datetime import datetime, timezone
 
-from demo_data import CAPTURED_AT, DEMO_OTP, DEMO_OWNER, DEMO_OWNERS_EXTRA, unsplash
+from demo_data import CAPTURED_AT, DEMO_OTP, DEMO_OWNER, DEMO_OWNERS_EXTRA, FOOD_MEDIA_FILES, food_media
 
 random.seed(42)
 
@@ -81,24 +81,6 @@ CUSTOMER_NAMES = [
     "Building 4 Flat 12",
     "Regular - Table 3",
     "Guest Order",
-]
-
-UNSPLASH_DISH_IDS = [
-    "photo-1563379927098-05c457674dd8",
-    "photo-1585937421612-70a008592f82",
-    "photo-1630385930673-614492270638",
-    "photo-1603894584373-5e6e4bcb1d5c",
-    "photo-1626074353815-4aa7c2609e59",
-    "photo-1571875250683-875e8d8e8c8e",
-    "photo-1606491956689-2ea8660f9640",
-    "photo-1596797038530-2c107229654b",
-    "photo-1546069901-ba9599a7e63c",
-    "photo-1565958011703-398f087be584",
-    "photo-1565299624946-b28f40a0ae38",
-    "photo-1512621776951-a57141f2eefd",
-    "photo-1567620905732-2d1ec7ab7518",
-    "photo-1555939594-58d7cb561ad1",
-    "photo-1493770348163-869783f6a188",
 ]
 
 # 55 dishes across all catalog categories
@@ -215,12 +197,12 @@ ORDER_STATUS_WEIGHTS: list[tuple[str, int]] = [
 
 
 def dish_with_media(dish: dict, index: int) -> dict:
-    photo = UNSPLASH_DISH_IDS[index % len(UNSPLASH_DISH_IDS)]
+    photo = FOOD_MEDIA_FILES[index % len(FOOD_MEDIA_FILES)]
     return {
         **dish,
         "description": f"Home-style {dish['name']} — live-capture, made fresh to order.",
         "ingredients_description": "Fresh local ingredients, house spices",
-        "media_url": unsplash(photo, 900),
+        "media_url": food_media(photo),
     }
 
 

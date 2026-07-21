@@ -2,10 +2,58 @@ import { Link } from "react-router-dom";
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { OwnerPageShell, OwnerPanel } from "../../components/owner/OwnerPageShell";
-import { updateKitchenBrandedPage, uploadKitchenBrandedMedia } from "../../lib/api";
+import {
+  updateKitchenBrandedPage,
+  uploadKitchenBrandedMedia,
+  type BrandAlign,
+} from "../../lib/api";
 import { useKitchen } from "../../lib/kitchen";
 import { CUSTOMER_HOST } from "../../shared/brand";
 import { customerUrl } from "../../shared/urls";
+
+const ALIGN_OPTIONS: { id: BrandAlign; label: string }[] = [
+  { id: "left", label: "Left" },
+  { id: "center", label: "Center" },
+  { id: "right", label: "Right" },
+];
+
+function AlignPicker({
+  label,
+  value,
+  onChange,
+  disabled,
+}: {
+  label: string;
+  value: BrandAlign;
+  onChange: (next: BrandAlign) => void;
+  disabled?: boolean;
+}) {
+  return (
+    <div className="kc-field">
+      <span className="kc-field__label" id={`${label.replace(/\s+/g, "-").toLowerCase()}-label`}>
+        {label}
+      </span>
+      <div
+        className="od-brand-align"
+        role="group"
+        aria-labelledby={`${label.replace(/\s+/g, "-").toLowerCase()}-label`}
+      >
+        {ALIGN_OPTIONS.map((opt) => (
+          <button
+            key={opt.id}
+            type="button"
+            className={`btn btn--ghost btn--sm od-brand-align__btn${value === opt.id ? " is-active" : ""}`}
+            disabled={disabled}
+            aria-pressed={value === opt.id}
+            onClick={() => onChange(opt.id)}
+          >
+            {opt.label}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 export function BrandPage() {
   const { t } = useTranslation();
@@ -14,6 +62,8 @@ export function BrandPage() {
   const [accent, setAccent] = useState("#0F766E");
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
   const [backgroundUrl, setBackgroundUrl] = useState<string | null>(null);
+  const [logoAlign, setLogoAlign] = useState<BrandAlign>("left");
+  const [headingAlign, setHeadingAlign] = useState<BrandAlign>("left");
   const [busy, setBusy] = useState(false);
   const [uploading, setUploading] = useState<"logo" | "background" | null>(null);
   const [msg, setMsg] = useState("");
@@ -28,12 +78,16 @@ export function BrandPage() {
     setAccent(kitchen.branded_page?.accent_color ?? "#0F766E");
     setLogoUrl(kitchen.branded_page?.logo_url ?? null);
     setBackgroundUrl(kitchen.branded_page?.background_url ?? null);
+    setLogoAlign(kitchen.branded_page?.logo_align ?? "left");
+    setHeadingAlign(kitchen.branded_page?.heading_align ?? "left");
   }, [
     kitchen?.id,
     kitchen?.branded_page?.tagline,
     kitchen?.branded_page?.accent_color,
     kitchen?.branded_page?.logo_url,
     kitchen?.branded_page?.background_url,
+    kitchen?.branded_page?.logo_align,
+    kitchen?.branded_page?.heading_align,
   ]);
 
   if (!kitchen) return null;
@@ -56,6 +110,8 @@ export function BrandPage() {
     accent_color?: string | null;
     logo_url?: string | null;
     background_url?: string | null;
+    logo_align?: BrandAlign;
+    heading_align?: BrandAlign;
   }) => {
     setBusy(true);
     setError("");
@@ -137,6 +193,8 @@ export function BrandPage() {
                 accent_color: accent,
                 logo_url: logoUrl,
                 background_url: backgroundUrl,
+                logo_align: logoAlign,
+                heading_align: headingAlign,
               })
             }
           >
@@ -298,7 +356,10 @@ export function BrandPage() {
         </p>
       </OwnerPanel>
 
-      <OwnerPanel title="Page content" description="Tagline and accent colour on the storefront header.">
+      <OwnerPanel
+        title="Page content"
+        description="Tagline, accent, and header alignment on the storefront."
+      >
         <label className="kc-field">
           <span className="kc-field__label">Tagline</span>
           <input
@@ -330,6 +391,23 @@ export function BrandPage() {
             />
           </div>
         </label>
+        <div
+          className="owner-form--grid"
+          style={{ marginTop: "1rem", gridTemplateColumns: "repeat(auto-fit, minmax(12rem, 1fr))", gap: "1rem" }}
+        >
+          <AlignPicker
+            label="Logo alignment"
+            value={logoAlign}
+            onChange={setLogoAlign}
+            disabled={busy}
+          />
+          <AlignPicker
+            label="Heading alignment"
+            value={headingAlign}
+            onChange={setHeadingAlign}
+            disabled={busy}
+          />
+        </div>
         <div style={{ marginTop: "1rem" }}>
           <button
             type="button"
@@ -339,6 +417,8 @@ export function BrandPage() {
               save({
                 tagline: tagline.trim() || null,
                 accent_color: accent.trim() || null,
+                logo_align: logoAlign,
+                heading_align: headingAlign,
               })
             }
           >

@@ -172,6 +172,39 @@ export async function loginWithCustomerOAuthProvider(
   });
 }
 
+/** Live watch — requires customer JWT (streaming service rejects owner tokens). */
+export async function fetchCustomerViewerToken(sessionId: string): Promise<{
+  session_id: string;
+  room_name: string;
+  livekit_url: string | null;
+  token: string | null;
+  kitchen_name: string | null;
+}> {
+  return customerFetch(`/api/v1/stream/sessions/${sessionId}/viewer-token`, { method: "POST" });
+}
+
+export async function fetchCustomerLiveShowcase(sessionId: string): Promise<{
+  session_id: string;
+  kitchen_id: string;
+  dish_id: string | null;
+  dish_name: string | null;
+  showcase_phase: string;
+  active_prep_step_order: number | null;
+  ingredients: Array<{
+    ingredient_name: string;
+    quantity: number | null;
+    unit: string | null;
+  }>;
+  prep_steps: Array<{
+    step_order: number;
+    title: string | null;
+    body_html: string | null;
+    duration_min: number | null;
+  }>;
+}> {
+  return customerFetch(`/api/v1/stream/sessions/${sessionId}/showcase`);
+}
+
 /** Read+clear `next` path stashed before OAuth redirect (defaults to `/`). */
 export function takeCustomerOAuthNext(provider: string): string {
   const raw = sessionStorage.getItem(`${APP_STORAGE_PREFIX}_oauth_pending_${provider}`);

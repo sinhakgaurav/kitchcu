@@ -101,6 +101,8 @@ async def test_branded_page_logo_and_background_urls(client: AsyncClient, auth_h
     bp = updated.json()["branded_page"]
     assert bp["logo_url"] == "https://cdn.example.com/kitchens/logo.png"
     assert bp["background_url"] == "https://cdn.example.com/kitchens/hero.jpg"
+    assert bp["logo_align"] == "left"
+    assert bp["heading_align"] == "left"
 
     public = await client.get(f"/api/v1/kitchens/public/by-code/{code}")
     assert public.status_code == 200
@@ -116,6 +118,36 @@ async def test_branded_page_logo_and_background_urls(client: AsyncClient, auth_h
     assert cleared.status_code == 200
     assert cleared.json()["branded_page"]["logo_url"] is None
     assert cleared.json()["branded_page"]["background_url"] is None
+
+
+@pytest.mark.asyncio
+async def test_branded_page_logo_and_heading_align(client: AsyncClient, auth_headers: dict):
+    created = await client.post("/api/v1/kitchens", json=KITCHEN_PAYLOAD, headers=auth_headers)
+    kitchen_id = created.json()["id"]
+    code = created.json()["code"]
+
+    updated = await client.patch(
+        f"/api/v1/kitchens/{kitchen_id}/branded-page",
+        json={"logo_align": "center", "heading_align": "right"},
+        headers=auth_headers,
+    )
+    assert updated.status_code == 200, updated.text
+    bp = updated.json()["branded_page"]
+    assert bp["logo_align"] == "center"
+    assert bp["heading_align"] == "right"
+
+    public = await client.get(f"/api/v1/kitchens/public/by-code/{code}")
+    assert public.status_code == 200
+    pub_bp = public.json()["branded_page"]
+    assert pub_bp["logo_align"] == "center"
+    assert pub_bp["heading_align"] == "right"
+
+    bad = await client.patch(
+        f"/api/v1/kitchens/{kitchen_id}/branded-page",
+        json={"logo_align": "middle"},
+        headers=auth_headers,
+    )
+    assert bad.status_code == 422
 
 
 @pytest.mark.asyncio

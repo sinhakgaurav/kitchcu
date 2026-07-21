@@ -106,6 +106,14 @@ export async function fetchMyOrders(): Promise<{ orders: Order[]; total: number 
   return checkoutFetch("/api/v1/customers/me/orders");
 }
 
+export async function fetchMyOrder(orderId: string): Promise<Order> {
+  return checkoutFetch(`/api/v1/customers/me/orders/${orderId}`);
+}
+
+export async function fetchMyMasterOrder(masterOrderId: string): Promise<MasterOrder> {
+  return checkoutFetch(`/api/v1/customers/me/master-orders/${masterOrderId}`);
+}
+
 export async function repeatCustomerOrder(orderId: string): Promise<Order> {
   return checkoutFetch(`/api/v1/customers/me/orders/${orderId}/repeat`, {
     method: "POST",

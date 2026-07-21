@@ -6,8 +6,10 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
+import { BrandLogo } from "../../components/BrandLogo";
+import { images } from "../../data/content";
 import { useGeolocation } from "../../hooks/useGeolocation";
 import { DEMO } from "../../shared/demo";
 import type { KitchenPublic } from "../../shared/api";
@@ -22,15 +24,6 @@ import {
 } from "../../shared/publicApi";
 import { distanceKm } from "../../lib/locationMaps";
 
-const PATHWAYS = [
-  { id: "near-you", labelKey: "customer.nav.nearYou" },
-  { id: "featured", labelKey: "customer.nav.featured" },
-  { id: "most-liked", labelKey: "customer.nav.featured" },
-  { id: "live-now", labelKey: "owner.nav.stream" },
-  { id: "cheapest", labelKey: "customer.nav.bestPrices" },
-  { id: "by-code", labelKey: "customer.nav.kitchenCode" },
-] as const;
-
 function formatKm(km: number): string {
   if (km < 1) return `${Math.round(km * 1000)} m`;
   return `${km.toFixed(1)} km`;
@@ -41,26 +34,39 @@ function formatPrice(n: number | null | undefined): string {
   return `₹${Math.round(n)}`;
 }
 
+const FALLBACK_FOOD = [
+  images.customers.src,
+  images.menu.src,
+  images.steak.src,
+  images.tacos.src,
+  images.sushi.src,
+  images.hero.src,
+  images.heroSecondary.src,
+  images.owners.src,
+] as const;
+
+function fallbackFood(seed: string): string {
+  let h = 0;
+  for (let i = 0; i < seed.length; i += 1) h = (h + seed.charCodeAt(i) * (i + 1)) % 997;
+  return FALLBACK_FOOD[h % FALLBACK_FOOD.length];
+}
+
 function KitchenCard({
   kitchen,
   onOpen,
-  badge,
 }: {
   kitchen: DiscoveryKitchenCard;
   onOpen: (k: DiscoveryKitchenCard) => void;
-  badge?: string;
 }) {
   return (
     <button type="button" className="disc-card" onClick={() => onOpen(kitchen)}>
       <div className="disc-card__media">
-        {kitchen.logo_url ? (
-          <img src={kitchen.logo_url} alt="" loading="lazy" />
-        ) : (
-          <span className="disc-card__monogram" aria-hidden>
-            {(kitchen.name || "K").slice(0, 1).toUpperCase()}
-          </span>
-        )}
-        {badge ? <span className="disc-card__badge">{badge}</span> : null}
+        <img
+          src={kitchen.logo_url || fallbackFood(kitchen.id || kitchen.code || kitchen.name)}
+          alt=""
+          loading="lazy"
+          className={kitchen.logo_url ? undefined : "disc-card__fallback"}
+        />
         {kitchen.is_live_now ? <span className="disc-card__live">LIVE</span> : null}
       </div>
       <div className="disc-card__body">
@@ -70,7 +76,6 @@ function KitchenCard({
           {kitchen.city ? ` · ${kitchen.city}` : ""}
           {kitchen.avg_rating != null ? ` · ★ ${kitchen.avg_rating.toFixed(1)}` : ""}
         </span>
-        {kitchen.tagline ? <span className="disc-card__tagline">{kitchen.tagline}</span> : null}
         <span className="disc-card__price">
           {kitchen.min_dish_price != null ? `From ${formatPrice(kitchen.min_dish_price)}` : kitchen.code}
         </span>
@@ -92,20 +97,15 @@ function DishCard({
         {dish.image_url ? (
           <img src={dish.image_url} alt="" loading="lazy" />
         ) : (
-          <span className="disc-card__monogram" aria-hidden>
-            {(dish.dish_name || "D").slice(0, 1).toUpperCase()}
-          </span>
+          <img src={images.hero.src} alt="" loading="lazy" className="disc-card__fallback" />
         )}
-        <span className="disc-card__badge disc-card__badge--price">{formatPrice(dish.price)}</span>
       </div>
       <div className="disc-card__body">
         <strong>{dish.dish_name}</strong>
         <span className="disc-card__meta">
           {dish.kitchen_name} · {formatKm(dish.distance_km)}
         </span>
-        {dish.is_live_capture_hero ? (
-          <span className="disc-card__tagline">Live-capture photo</span>
-        ) : null}
+        <span className="disc-card__price">{formatPrice(dish.price)}</span>
       </div>
     </button>
   );
@@ -257,20 +257,26 @@ export function CustomerDiscoveryHome() {
     setMaxKm((km) => (km < 50 ? 50 : km));
   };
 
+  const heroName = session?.name?.trim()?.split(" ")[0];
+
   return (
     <div className="disc-home">
       <header className="disc-home__hero">
+        <div
+          className="disc-home__hero-bg"
+          style={{ backgroundImage: `url(${images.hero.src})` }}
+          role="img"
+          aria-label={images.hero.alt}
+        />
+        <div className="disc-home__hero-scrim" aria-hidden />
         <div className="container disc-home__hero-inner">
-          <p className="disc-home__eyebrow">Order paths · cloud kitchens</p>
+          <BrandLogo variant="wordmark" className="brand-logo--lg disc-home__brand" />
           <h1>
-            {session?.name?.trim()
-              ? `What are you ordering, ${session.name.split(" ")[0]}?`
+            {heroName
+              ? `Order home taste, ${heroName}`
               : t("customer.discovery.title")}
           </h1>
-          <p className="disc-home__lede">
-            Nearby kitchens, featured picks, top-rated home taste, live prep, and the best prices in your
-            area — pick a path and order.
-          </p>
+          <p className="disc-home__lede">Cloud kitchens near you — live-capture menus, ready-within times.</p>
 
           <div className="disc-home__search">
             <label className="disc-home__search-field">
@@ -283,12 +289,21 @@ export function CustomerDiscoveryHome() {
               />
             </label>
             <div className="disc-home__loc">
-              <button type="button" className="btn btn--ghost btn--sm" onClick={refresh} disabled={status === "loading"}>
+              <button
+                type="button"
+                className="btn btn--ghost btn--sm"
+                onClick={refresh}
+                disabled={status === "loading"}
+              >
                 {status === "loading" ? t("common.loading") : t("customer.discovery.useLocation")}
               </button>
               <label>
-                Radius
-                <select value={maxKm} onChange={(e) => setMaxKm(Number(e.target.value))}>
+                <span className="visually-hidden">Radius</span>
+                <select
+                  value={maxKm}
+                  onChange={(e) => setMaxKm(Number(e.target.value))}
+                  aria-label="Search radius"
+                >
                   <option value={10}>10 km</option>
                   <option value={25}>25 km</option>
                   <option value={50}>50 km</option>
@@ -301,23 +316,12 @@ export function CustomerDiscoveryHome() {
           {geoError ? <p className="disc-home__hint">{geoError}</p> : null}
           {farFromDemo && (feed?.total_kitchens ?? 0) === 0 ? (
             <div className="disc-home__banner">
-              <p>
-                No kitchens within {maxKm} km of your GPS ({Math.round(kmFromDemo)} km from the Pune demo
-                cluster).
-              </p>
+              <p>No kitchens in this radius near your GPS. Try the Pune demo cluster.</p>
               <button type="button" className="btn btn--primary btn--sm" onClick={useDemoPin}>
-                Show Pune demo kitchens
+                Show demo kitchens
               </button>
             </div>
           ) : null}
-
-          <nav className="disc-pathways" aria-label="Order pathways">
-            {PATHWAYS.map((p) => (
-              <a key={p.id} href={`#${p.id}`} className="disc-pathways__chip">
-                {t(p.labelKey)}
-              </a>
-            ))}
-          </nav>
         </div>
       </header>
 
@@ -327,7 +331,7 @@ export function CustomerDiscoveryHome() {
             <header className="disc-rail__head">
               <div>
                 <h2>Your kitchens</h2>
-                <p>Saved from previous visits — jump back in.</p>
+                <p>Jump back in</p>
               </div>
             </header>
             <div className="disc-rail__track">
@@ -352,63 +356,58 @@ export function CustomerDiscoveryHome() {
         ) : null}
 
         {fetchError ? <div className="auth-card__error">{fetchError}</div> : null}
-        {loading ? <p className="app-loading">Finding order options near you…</p> : null}
+        {loading ? <p className="app-loading">Finding kitchens near you…</p> : null}
 
         {!loading && feed ? (
           <>
             <Rail
               id="near-you"
               title="Near you"
-              subtitle={`${feed.total_kitchens} active kitchen${feed.total_kitchens === 1 ? "" : "s"} within ${maxKm} km`}
-              empty="No kitchens in this radius. Widen the search or try the Pune demo pin."
+              subtitle={`${feed.total_kitchens} within ${maxKm} km`}
+              empty="No kitchens in this radius. Widen search or try demo kitchens."
             >
               {nearYou.map((k) => (
-                <KitchenCard key={k.id} kitchen={k} onOpen={openDiscoveryKitchen} badge="Near" />
+                <KitchenCard key={k.id} kitchen={k} onOpen={openDiscoveryKitchen} />
               ))}
             </Rail>
 
             <Rail
               id="featured"
-              title="Featured kitchens"
-              subtitle="Published brand pages and chef-featured menus"
-              empty="No featured kitchens here yet — try nearby."
+              title="Featured"
+              subtitle="Published brand pages"
+              empty="No featured kitchens here yet."
             >
               {featured.map((k) => (
-                <KitchenCard key={`f-${k.id}`} kitchen={k} onOpen={openDiscoveryKitchen} badge="Featured" />
+                <KitchenCard key={`f-${k.id}`} kitchen={k} onOpen={openDiscoveryKitchen} />
               ))}
             </Rail>
 
             <Rail
               id="most-liked"
               title="Most liked"
-              subtitle="Home-taste ratings from verified orders"
-              empty="Ratings will appear after customers rate delivered dishes."
+              subtitle="Home-taste ratings"
+              empty="Ratings appear after delivered orders."
             >
               {mostLiked.map((k) => (
-                <KitchenCard
-                  key={`l-${k.id}`}
-                  kitchen={k}
-                  onOpen={openDiscoveryKitchen}
-                  badge={k.avg_rating != null ? `★ ${k.avg_rating.toFixed(1)}` : "Trusted"}
-                />
+                <KitchenCard key={`l-${k.id}`} kitchen={k} onOpen={openDiscoveryKitchen} />
               ))}
             </Rail>
 
             <Rail
               id="live-now"
               title="Live now"
-              subtitle="Watch prep as it happens — then order the same kitchen"
-              empty="No kitchens are live in this area right now."
+              subtitle="Watch prep, then order"
+              empty="No kitchens live nearby right now."
             >
               {liveNow.map((k) => (
-                <KitchenCard key={`live-${k.id}`} kitchen={k} onOpen={openDiscoveryKitchen} badge="Live" />
+                <KitchenCard key={`live-${k.id}`} kitchen={k} onOpen={openDiscoveryKitchen} />
               ))}
             </Rail>
 
             <Rail
               id="cheapest"
-              title="Best prices near you"
-              subtitle="Lowest active dish prices within your radius"
+              title="Best prices"
+              subtitle="Lowest active dishes nearby"
               empty="No priced dishes in range yet."
             >
               {cheapest.map((d) => (
@@ -421,13 +420,13 @@ export function CustomerDiscoveryHome() {
         <section className="disc-code" id="by-code">
           <header className="disc-rail__head">
             <div>
-              <h2>Have a kitchen code?</h2>
-              <p>Owners share codes like {DEMO.kitchenCode} on WhatsApp and flyers.</p>
+              <h2>Kitchen code</h2>
+              <p>Enter a code from WhatsApp or a flyer — e.g. {DEMO.kitchenCode}</p>
             </div>
           </header>
           <form className="disc-code__form" onSubmit={onCodeSubmit}>
             <label>
-              Kitchen code
+              Code
               <input
                 value={code}
                 onChange={(e) => setCode(e.target.value.toUpperCase())}
@@ -459,11 +458,8 @@ export function CustomerDiscoveryHome() {
                   })();
                 }}
               >
-                Demo {DEMO.kitchenCode}
+                Try {DEMO.kitchenCode}
               </button>
-              <Link to="/browse" className="btn btn--ghost">
-                Full code page
-              </Link>
             </div>
           </form>
         </section>

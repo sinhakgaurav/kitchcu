@@ -73,11 +73,12 @@ export function StreamPage() {
   const load = async () => {
     if (!kitchen) return;
     try {
+      // Soft-fail discovery/menu so a single upstream blip does not blank the whole page.
       const [settingsRes, sessionRes, liveRes, menu] = await Promise.all([
         fetchStreamSettings(kitchen.id),
         fetchStreamSession(kitchen.id),
-        fetchLiveKitchens(),
-        fetchMenu(kitchen.id),
+        fetchLiveKitchens().catch(() => ({ kitchens: [] as LiveKitchenSummary[], total: 0 })),
+        fetchMenu(kitchen.id).catch(() => ({ dishes: [] as { id: string; name: string; is_active: boolean }[] })),
       ]);
       setSettings(settingsRes);
       setSession(sessionRes);
@@ -93,7 +94,12 @@ export function StreamPage() {
       }
       setError("");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load stream settings");
+      const msg = err instanceof Error ? err.message : "Failed to load stream settings";
+      setError(
+        msg === "Failed to fetch"
+          ? "Cannot reach the API — is the gateway (port 18000) running?"
+          : msg,
+      );
     }
   };
 

@@ -249,7 +249,7 @@ export function CheckoutPage() {
   if (!cart) {
     return (
       <div className="container customer-checkout">
-        <p className="owner-empty">Your cart is empty.</p>
+        <p className="customer-checkout__empty">Your cart is empty.</p>
         <Link to={menuBack} className="btn btn--primary">
           {branded ? "Back to menu" : "Discover kitchens"}
         </Link>
@@ -400,7 +400,16 @@ export function CheckoutPage() {
         { state: { order, paymentMethod, upiIntent } },
       );
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Checkout failed");
+      const msg = err instanceof Error ? err.message : "Checkout failed";
+      if (msg === "Failed to fetch") {
+        setError("Cannot reach the API — check that the gateway is running, then try again.");
+      } else if (/not accepting orders|Kitchen not available/i.test(msg)) {
+        setError(
+          "This kitchen is not accepting orders right now (inactive or suspended). Choose another kitchen or try again later.",
+        );
+      } else {
+        setError(msg);
+      }
     } finally {
       setBusy(false);
     }
@@ -408,12 +417,12 @@ export function CheckoutPage() {
 
   return (
     <div className="container customer-checkout">
-      <Link to={menuBack} className="owner-back">
+      <Link to={menuBack} className="customer-checkout__back">
         {branded ? "← Back to menu" : "← Add from another kitchen"}
       </Link>
-      <header className="owner-page__head">
+      <header className="customer-checkout__head">
         <div>
-          <h1>{isMultiKitchen ? t("customer.checkout.title") : t("customer.checkout.title")}</h1>
+          <h1>{t("customer.checkout.title")}</h1>
           <p>
             {cart.kitchens.length} kitchen{cart.kitchens.length === 1 ? "" : "s"} ·{" "}
             {isMultiKitchen ? "separate tracking for every kitchen" : cart.kitchens[0].kitchenCode}
@@ -422,7 +431,7 @@ export function CheckoutPage() {
       </header>
 
       {addresses.length > 0 && (
-        <section className="glass" style={{ marginBottom: "1rem" }}>
+        <section className="customer-checkout__card">
           <label>
             Delivery address
             <select
@@ -438,7 +447,7 @@ export function CheckoutPage() {
             </select>
           </label>
           {selectedAddress && (
-            <p className="report-hint">
+            <p className="customer-checkout__hint">
               {selectedAddress.address_line}
               {selectedAddress.landmark ? ` · ${selectedAddress.landmark}` : ""}
               {selectedAddress.latitude == null &&
@@ -472,7 +481,7 @@ export function CheckoutPage() {
         const dtype = deliveryByKitchen[kitchen.kitchenId] ?? "pickup";
         const quote = quotes[kitchen.kitchenId];
         return (
-          <section key={kitchen.kitchenId} className="glass customer-checkout__cart">
+          <section key={kitchen.kitchenId} className="customer-checkout__card customer-checkout__cart">
             <h2>{kitchen.kitchenName} · {kitchen.kitchenCode}</h2>
             <p className="customer-checkout__eta">
               {dtype === "delivery" ? (
@@ -485,7 +494,7 @@ export function CheckoutPage() {
                 <>Ready for pickup in ~{projectKitchenReadyMin(kitchen, false)} min (prep)</>
               )}
             </p>
-            <ul className="owner-detail-items">
+            <ul className="customer-checkout__lines">
               {kitchen.lines.map((line) => (
                 <li key={line.dishId}>
                   <span>
@@ -529,7 +538,7 @@ export function CheckoutPage() {
               </select>
             </label>
             {dtype === "delivery" && (
-              <div className="report-hint">
+              <div className="customer-checkout__hint">
                 {quoteLoading && !quote && <span>Calculating distance & fee…</span>}
                 {quote && (
                   <>
@@ -637,7 +646,7 @@ export function CheckoutPage() {
                 )}
               </div>
             )}
-            <div className="owner-detail-total">
+            <div className="customer-checkout__row">
               <span>Kitchen subtotal</span>
               <strong>₹{kitchenCartSubtotal(kitchen).toFixed(0)}</strong>
             </div>
@@ -645,10 +654,10 @@ export function CheckoutPage() {
         );
       })}
 
-      <section className="glass owner-form customer-checkout__form">
+      <section className="customer-checkout__card customer-checkout__form">
         {!isMultiKitchen && (
-          <div className="form-row" style={{ alignItems: "flex-end" }}>
-            <label style={{ flex: 1 }}>
+          <div className="customer-checkout__coupon-row">
+            <label>
               Coupon code
               <input
                 value={couponCode}
@@ -675,7 +684,7 @@ export function CheckoutPage() {
           <p className={couponDiscount > 0 ? "auth-card__success" : "auth-card__error"}>{couponMsg}</p>
         )}
         {isMultiKitchen && (
-          <p className="nearby-kitchens__geo-hint">Coupons apply per kitchen — use single-kitchen checkout to redeem.</p>
+          <p className="customer-checkout__hint">Coupons apply per kitchen — use single-kitchen checkout to redeem.</p>
         )}
         <label>
           Payment
@@ -691,30 +700,30 @@ export function CheckoutPage() {
           </select>
         </label>
         {requiresPrepaid && (
-          <p className="nearby-kitchens__geo-hint">
+          <p className="customer-checkout__hint">
             Prepaid required for shared or pay-first delivery fees — capture UPI/online before Porter is booked.
           </p>
         )}
         {isMultiKitchen && paymentMethod !== "cod" && (
-          <p className="nearby-kitchens__geo-hint">
+          <p className="customer-checkout__hint">
             One payment is captured at checkout and split to each kitchen via Razorpay Route.
           </p>
         )}
-        <div className="owner-detail-total">
+        <div className="customer-checkout__row">
           <span>Food subtotal</span>
           <strong>₹{subtotal.toFixed(0)}</strong>
         </div>
         {discount > 0 && (
-          <div className="owner-detail-total">
+          <div className="customer-checkout__row">
             <span>Coupon ({couponCode})</span>
             <strong>−₹{discount.toFixed(0)}</strong>
           </div>
         )}
-        <div className="owner-detail-total">
+        <div className="customer-checkout__row">
           <span>Delivery fees</span>
           <strong>₹{deliveryFee.toFixed(0)}</strong>
         </div>
-        <div className="owner-detail-total">
+        <div className="customer-checkout__row customer-checkout__row--total">
           <span>Total</span>
           <strong>₹{total.toFixed(0)}</strong>
         </div>

@@ -131,36 +131,6 @@ export function LoginPage() {
           <p>Kitchen owner portal · {KITCHEN_HOST}</p>
         </div>
         <div className="auth-card glass">
-          <div className="auth-card__demo">
-            <strong>Demo owner accounts</strong>
-            <p className="auth-card__demo-otp">Dev OTP for all: <code>{DEMO.otp}</code></p>
-            <ul className="auth-card__demo-list">
-              {DEMO_OWNERS.map((account) => (
-                <li key={account.phone}>
-                  <div className="auth-card__demo-meta">
-                    <span className="auth-card__demo-name">
-                      {account.name}
-                      {account.primary ? " · primary" : ""}
-                    </span>
-                    <span>{account.phone} · {account.kitchenLabel}</span>
-                    {account.kitchenCode && <span className="auth-card__demo-code">{account.kitchenCode}</span>}
-                  </div>
-                  <button
-                    type="button"
-                    className="btn btn--primary btn--sm"
-                    disabled={busy}
-                    onClick={() => handleDemoLogin(account)}
-                  >
-                    {busyPhone === account.phone ? "Signing in…" : "Sign in"}
-                  </button>
-                </li>
-              ))}
-            </ul>
-            <p className="auth-card__demo-note">
-              Requires healthy API (<code>identity:true</code>). Seed only after that.
-            </p>
-          </div>
-
           <div className="auth-card__tabs">
             <button
               type="button"
@@ -236,11 +206,41 @@ export function LoginPage() {
               </button>
               {otpSent && (
                 <button type="button" className="btn btn--ghost auth-card__resend" onClick={() => setOtpSent(false)}>
-                  {t("owner.auth.phone")}
+                  Use a different phone
                 </button>
               )}
             </form>
           )}
+
+          <details className="auth-card__demo">
+            <summary>Demo owner accounts · OTP <code>{DEMO.otp}</code></summary>
+            <p className="auth-card__demo-otp">One-click sign-in for local / GCP demos</p>
+            <ul className="auth-card__demo-list">
+              {DEMO_OWNERS.map((account) => (
+                <li key={account.phone}>
+                  <div className="auth-card__demo-meta">
+                    <span className="auth-card__demo-name">
+                      {account.name}
+                      {account.primary ? " · primary" : ""}
+                    </span>
+                    <span>{account.phone} · {account.kitchenLabel}</span>
+                    {account.kitchenCode && <span className="auth-card__demo-code">{account.kitchenCode}</span>}
+                  </div>
+                  <button
+                    type="button"
+                    className="btn btn--primary btn--sm"
+                    disabled={busy}
+                    onClick={() => handleDemoLogin(account)}
+                  >
+                    {busyPhone === account.phone ? "Signing in…" : "Sign in"}
+                  </button>
+                </li>
+              ))}
+            </ul>
+            <p className="auth-card__demo-note">
+              Requires healthy API (<code>identity:true</code>). Seed only after that.
+            </p>
+          </details>
 
           <p className="auth-card__demo-note">
             Looking for menus? <a href={customerUrl("/")} target="_blank" rel="noopener noreferrer">Go to {CUSTOMER_HOST} →</a>

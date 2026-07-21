@@ -269,40 +269,36 @@ export function OrdersPage() {
         resultCount={tab === "drafts" ? shownDrafts.length : shown.length}
       />
 
-      <section className="dash-card od-panel od-orders__parse">
-        <header className="od-panel__head">
-          <div>
-            <h2>Paste WhatsApp order</h2>
-            <p>We match dishes from your menu and create a draft you can confirm</p>
-          </div>
-        </header>
-        <label className="kc-field od-orders__parse-field">
-          <span className="kc-field__label">WhatsApp message</span>
-          <textarea
-            className="kc-textarea"
-            value={message}
-            onChange={(e) => setMessage(e.target.value)}
-            rows={4}
-            placeholder="e.g. 2 butter chicken, 1 garlic naan, less spicy"
-            disabled={busy}
-          />
-          <span className="kc-field__hint">Paste the full customer message — we match dishes from your menu.</span>
-        </label>
-        {error && <div className="auth-card__error">{error}</div>}
-        <div className="kc-actions kc-actions--stack-sm">
-          <button type="button" className="btn btn--primary" disabled={busy || !message.trim()} onClick={handleParse}>
-            {busy ? "Parsing…" : "Parse to draft"}
-          </button>
-        </div>
-      </section>
-
       {loading ? (
         <OrdersSkeleton />
       ) : tab === "drafts" ? (
         <div className="od-orders__list">
+          <details className="dash-card od-panel od-orders__parse" open={shownDrafts.length === 0}>
+            <summary className="od-orders__parse-summary">
+              <strong>Paste WhatsApp order</strong>
+              <span>Match dishes → draft → confirm</span>
+            </summary>
+            <label className="kc-field od-orders__parse-field">
+              <span className="kc-field__label">WhatsApp message</span>
+              <textarea
+                className="kc-textarea"
+                value={message}
+                onChange={(e) => setMessage(e.target.value)}
+                rows={3}
+                placeholder="e.g. 2 butter chicken, 1 garlic naan, less spicy"
+                disabled={busy}
+              />
+            </label>
+            {error && <div className="auth-card__error">{error}</div>}
+            <div className="kc-actions kc-actions--stack-sm">
+              <button type="button" className="btn btn--primary" disabled={busy || !message.trim()} onClick={handleParse}>
+                {busy ? "Parsing…" : "Parse to draft"}
+              </button>
+            </div>
+          </details>
           {shownDrafts.length === 0 && (
             <p className="od-panel__empty dash-card od-panel">
-              No drafts yet — paste a WhatsApp message above or share your menu link with customers.
+              No drafts yet — paste a WhatsApp message or share your menu link.
             </p>
           )}
           {shownDrafts.map((d) => (
@@ -338,26 +334,46 @@ export function OrdersPage() {
                 : "No orders yet. Create a manual order or parse a WhatsApp message."}
             </p>
           )}
-          <ul className="od-recent dash-card od-panel">
-            {shown.map((o) => (
-              <li key={o.id}>
-                <Link to={`/dashboard/orders/${o.id}`} className="od-recent__row">
-                  <div>
-                    <strong>{o.order_code}</strong>
-                    <span>{o.customer_name ?? o.customer_phone ?? "Walk-in"} · {o.items.map((i) => `${i.quantity}× ${i.dish_name}`).join(", ")}</span>
-                  </div>
-                  <div className="od-recent__end">
-                    <span className={`status-badge status-badge--${o.status}`}>
-                      {STATUS_LABELS[o.status] ?? o.status}
-                    </span>
-                    <span className="od-recent__meta">
-                      {inr(o.total)} · {o.source} · {formatWhen(o.created_at)}
-                    </span>
-                  </div>
-                </Link>
-              </li>
-            ))}
-          </ul>
+          <div className="dash-card od-panel od-orders__table">
+            {shown.length > 0 && (
+              <div className="od-recent__head" aria-hidden="true">
+                <span>Order</span>
+                <span>Customer / items</span>
+                <span>Status</span>
+                <span>Total</span>
+              </div>
+            )}
+            <ul className="od-recent">
+              {shown.map((o) => (
+                <li key={o.id}>
+                  <Link to={`/dashboard/orders/${o.id}`} className="od-recent__row">
+                    <div className="od-recent__cell od-recent__cell--code">
+                      <strong>{o.order_code}</strong>
+                    </div>
+                    <div className="od-recent__cell od-recent__cell--who">
+                      <span className="od-recent__who">
+                        {o.customer_name ?? o.customer_phone ?? "Walk-in"}
+                      </span>
+                      <span className="od-recent__dishes">
+                        {o.items.map((i) => `${i.quantity}× ${i.dish_name}`).join(", ")}
+                      </span>
+                    </div>
+                    <div className="od-recent__cell od-recent__cell--status">
+                      <span className={`status-badge status-badge--${o.status}`}>
+                        {STATUS_LABELS[o.status] ?? o.status}
+                      </span>
+                    </div>
+                    <div className="od-recent__cell od-recent__cell--meta">
+                      <span className="od-recent__amount">{inr(o.total)}</span>
+                      <span className="od-recent__meta">
+                        {o.source} · {formatWhen(o.created_at)}
+                      </span>
+                    </div>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </div>
         </div>
       )}
     </div>

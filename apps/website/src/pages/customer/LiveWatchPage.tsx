@@ -2,10 +2,11 @@ import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { LiveKitViewer } from "../../components/LiveKitViewer";
 import {
-  fetchLiveShowcase,
-  fetchViewerToken,
-  type LiveShowcase,
-} from "../../shared/api";
+  fetchCustomerLiveShowcase,
+  fetchCustomerViewerToken,
+  getCustomerToken,
+} from "../../shared/customerApi";
+import type { LiveShowcase } from "../../shared/api";
 
 export function LiveWatchPage() {
   const { sessionId } = useParams<{ sessionId: string }>();
@@ -22,10 +23,16 @@ export function LiveWatchPage() {
     if (!sessionId) return;
     let cancelled = false;
     (async () => {
+      if (!getCustomerToken()) {
+        if (!cancelled) {
+          setError("Sign in as a customer to watch this live kitchen.");
+        }
+        return;
+      }
       try {
         const [tok, show] = await Promise.all([
-          fetchViewerToken(sessionId),
-          fetchLiveShowcase(sessionId).catch(() => null),
+          fetchCustomerViewerToken(sessionId),
+          fetchCustomerLiveShowcase(sessionId).catch(() => null),
         ]);
         if (cancelled) return;
         setTokenInfo({
@@ -34,17 +41,24 @@ export function LiveWatchPage() {
           token: tok.token,
           kitchen_name: tok.kitchen_name,
         });
-        setShowcase(show);
+        setShowcase(show as LiveShowcase | null);
         setError("");
       } catch (e) {
-        if (!cancelled) setError(e instanceof Error ? e.message : "Could not join live session");
+        if (!cancelled) {
+          const msg = e instanceof Error ? e.message : "Could not join live session";
+          setError(
+            msg === "Failed to fetch"
+              ? "Cannot reach the API — check that the gateway is running."
+              : msg,
+          );
+        }
       }
     })();
     const t = window.setInterval(() => {
-      if (!sessionId) return;
-      fetchLiveShowcase(sessionId)
+      if (!sessionId || !getCustomerToken()) return;
+      fetchCustomerLiveShowcase(sessionId)
         .then((s) => {
-          if (!cancelled) setShowcase(s);
+          if (!cancelled) setShowcase(s as LiveShowcase);
         })
         .catch(() => undefined);
     }, 8000);
@@ -63,6 +77,8 @@ export function LiveWatchPage() {
     );
   }
 
+  const loginNext = `/live/${sessionId}`;
+
   return (
     <div className="container" style={{ padding: "2rem 1rem", maxWidth: 720 }}>
       <p className="section__eyebrow">Live now</p>
@@ -70,7 +86,14 @@ export function LiveWatchPage() {
       <p className="owner-muted">
         Watch prep as the kitchen moves through ingredients → prep → prepared.
       </p>
-      {error && <p className="auth-card__error">{error}</p>}
+      {error && (
+        <p className="auth-card__error">
+          {error}{" "}
+          {!getCustomerToken() && (
+            <Link to={`/login?next=${encodeURIComponent(loginNext)}`}>Sign in</Link>
+          )}
+        </p>
+      )}
 
       <div className="glass" style={{ padding: "1.25rem", marginBottom: "1.25rem" }}>
         <strong>Phase:</strong>{" "}

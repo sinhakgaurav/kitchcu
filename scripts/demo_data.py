@@ -174,9 +174,36 @@ DEMO_CUSTOMER_LOCATION = {
     "label": "Koregaon Park, Pune",
 }
 
-# ── Image helpers (Unsplash — same IDs as apps/website/src/data/content.ts) ───
+# ── Image helpers ─────────────────────────────────────────────────────────────
+# Prefer local PWA assets (apps/website/public/media/food/) so demo menus never
+# depend on third-party CDNs. Relative paths resolve on customer/kitchen hosts.
+
+FOOD_MEDIA_FILES = (
+    "biryani.jpg",
+    "dosa.jpg",
+    "skewers.jpg",
+    "bowls.jpg",
+    "dessert.jpg",
+    "dining.jpg",
+    "samosa.jpg",
+    "rice.jpg",
+    "bbq.jpg",
+    "pasta.jpg",
+    "pizza.jpg",
+    "salad.jpg",
+    "burger.jpg",
+    "kitchen.jpg",
+    "service.jpg",
+    "restaurant.jpg",
+)
+
+
+def food_media(file: str) -> str:
+    return f"/media/food/{file}"
+
 
 def unsplash(photo_id: str, width: int = 800) -> str:
+    """Legacy helper — prefer food_media() for seeded dish heroes."""
     return f"https://images.unsplash.com/{photo_id}?w={width}&q=85&auto=format&fit=crop"
 
 
@@ -257,7 +284,7 @@ DEMO_DISHES: list[dict] = [
         "prep_time_min": 25,
         "description": "Char-grilled cottage cheese with bell peppers and mint chutney.",
         "ingredients_description": "Paneer, capsicum, onion, yogurt marinade, spices",
-        "media_url": unsplash("photo-1563379927098-05c457674dd8", 900),
+        "media_url": food_media("skewers.jpg"),
     },
     {
         "name": "Chicken Biryani",
@@ -267,7 +294,7 @@ DEMO_DISHES: list[dict] = [
         "prep_time_min": 40,
         "description": "Fragrant basmati rice with tender chicken and whole spices.",
         "ingredients_description": "Chicken, basmati rice, saffron, fried onions, biryani masala",
-        "media_url": unsplash("photo-1585937421612-70a008592f82", 900),
+        "media_url": food_media("biryani.jpg"),
     },
     {
         "name": "Masala Dosa",
@@ -277,7 +304,7 @@ DEMO_DISHES: list[dict] = [
         "prep_time_min": 20,
         "description": "Crispy rice crepe filled with spiced potato masala, served with sambar.",
         "ingredients_description": "Rice, urad dal, potato, mustard seeds, curry leaves",
-        "media_url": unsplash("photo-1630385930673-614492270638", 900),
+        "media_url": food_media("dosa.jpg"),
     },
     {
         "name": "Butter Chicken",
@@ -287,7 +314,7 @@ DEMO_DISHES: list[dict] = [
         "prep_time_min": 35,
         "description": "Creamy tomato gravy with tandoori chicken — home-style, not restaurant heavy.",
         "ingredients_description": "Chicken, tomato, butter, cream, kasuri methi",
-        "media_url": unsplash("photo-1603894584373-5e6e4bcb1d5c", 900),
+        "media_url": food_media("bbq.jpg"),
     },
     {
         "name": "Mango Lassi",
@@ -297,7 +324,7 @@ DEMO_DISHES: list[dict] = [
         "prep_time_min": 5,
         "description": "Thick yogurt drink blended with Alphonso mango pulp.",
         "ingredients_description": "Yogurt, mango pulp, cardamom, ice",
-        "media_url": unsplash("photo-1626074353815-4aa7c2609e59", 900),
+        "media_url": food_media("bowls.jpg"),
     },
     {
         "name": "Gulab Jamun",
@@ -307,7 +334,7 @@ DEMO_DISHES: list[dict] = [
         "prep_time_min": 10,
         "description": "Warm milk-solid dumplings in rose-cardamom syrup (2 pcs).",
         "ingredients_description": "Khoya, flour, sugar, rose water, cardamom",
-        "media_url": unsplash("photo-1571875250683-875e8d8e8c8e", 900),
+        "media_url": food_media("dessert.jpg"),
     },
     {
         "name": "Veg Thali Combo",
@@ -317,7 +344,7 @@ DEMO_DISHES: list[dict] = [
         "prep_time_min": 30,
         "description": "Dal, seasonal sabzi, rice, roti, pickle, and papad — complete meal.",
         "ingredients_description": "Dal, seasonal vegetables, wheat roti, rice, accompaniments",
-        "media_url": unsplash("photo-1606491956689-2ea8660f9640", 900),
+        "media_url": food_media("dining.jpg"),
     },
     {
         "name": "Pav Bhaji",
@@ -327,7 +354,7 @@ DEMO_DISHES: list[dict] = [
         "prep_time_min": 18,
         "description": "Mumbai-style mashed veggie curry with butter-toasted pav (2 pcs).",
         "ingredients_description": "Mixed vegetables, pav, butter, bhaji masala",
-        "media_url": unsplash("photo-1596797038530-2c107229654b", 900),
+        "media_url": food_media("samosa.jpg"),
     },
 ]
 

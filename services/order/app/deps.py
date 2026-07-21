@@ -59,7 +59,10 @@ async def verify_kitchen_active(kitchen_id: uuid.UUID, session: AsyncSession) ->
         {"kid": kitchen_id},
     )
     if result.scalar_one_or_none() is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Kitchen not available")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Kitchen is not accepting orders (inactive, suspended, or unknown)",
+        )
 
 
 async def get_order_for_customer(

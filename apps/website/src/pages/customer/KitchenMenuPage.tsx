@@ -184,7 +184,7 @@ export function KitchenMenuPage() {
 
   return (
     <div className={`container customer-menu${branded ? " customer-menu--branded" : ""}`}>
-      {!branded && <Link to="/" className="owner-back">← Back to discover</Link>}
+      {!branded && <Link to="/" className="customer-menu__back">← Discover kitchens</Link>}
       {error && <p className="auth-card__error">{error}</p>}
       {!menu && !error && <p className="app-loading">Loading menu...</p>}
 
@@ -192,15 +192,14 @@ export function KitchenMenuPage() {
         <>
           <header className="customer-menu__head">
             {!branded && <h1>{kitchenName || "Kitchen Menu"}</h1>}
-            <p>
-              {menu.dishes.length} dishes · Featured · Chef&apos;s special · Unique recipes
-            </p>
+            <p>{menu.dishes.length} dishes · live-capture when marked</p>
           </header>
 
           <ListingToolbar
+            className="customer-menu__toolbar"
             search={search}
             onSearchChange={setSearch}
-            searchPlaceholder="Search this menu…"
+            searchPlaceholder="Search menu…"
             sort={sort}
             onSortChange={(v) => setSort(v as DishSort)}
             highlights={highlights}
@@ -248,7 +247,7 @@ export function KitchenMenuPage() {
           )}
 
           {highlightSections.map((section) => (
-            <section key={section.key} className="customer-menu__highlight glass">
+            <section key={section.key} className="customer-menu__highlight">
               <h2 className="customer-menu__cuisine-title">{section.title}</h2>
               <div className="customer-menu__grid">
                 {section.dishes.map((d) => (
@@ -354,49 +353,48 @@ function DishCard({
 }) {
   const hero = dish.media.find((m) => m.is_hero) ?? dish.media[0];
   const badges = dishHighlightBadges(dish);
+  const readyMin = dish.projected_ready_min ?? dish.max_time_min ?? dish.prep_time_min;
+  const hasDetails = Boolean(dish.description || dish.ingredients_description);
   return (
-    <article className="glass customer-dish">
+    <article className="customer-dish">
       {hero?.url ? (
         <img src={hero.url} alt={dish.name} loading="lazy" className="customer-dish__img" />
       ) : (
         <div className="customer-dish__img customer-dish__img--pending" aria-hidden>
-          Photo pending — kitchen live capture
+          Photo pending
         </div>
       )}
-      <div>
-        <h4>{dish.name}</h4>
+      <div className="customer-dish__body">
+        <div className="customer-dish__title-row">
+          <h4>{dish.name}</h4>
+          <p className="customer-dish__price">₹{Math.round(dish.price)}</p>
+        </div>
+        <p className="customer-dish__eta">
+          Ready within <strong>{readyMin} min</strong>
+          {summary && summary.rating_count > 0
+            ? ` · ★ ${summary.overall_rating.toFixed(1)}`
+            : ""}
+          {hero?.is_live_capture ? " · Live capture" : ""}
+        </p>
         {badges.length > 0 && (
           <div className="dish-badges">
-            {badges.map((b) => (
+            {badges.slice(0, 2).map((b) => (
               <span key={b.key} className={`dish-badge dish-badge--${b.key}`}>
                 {b.label}
               </span>
             ))}
           </div>
         )}
-        <p className="customer-dish__price">₹{dish.price}</p>
-        <p className="customer-dish__eta">
-          Prep {dish.prep_time_min} min
-          {dish.delivery_time_min != null && dish.delivery_time_min > 0
-            ? ` · Delivery ${dish.delivery_time_min} min`
-            : ""}
-          {" · "}
-          <strong>
-            Ready within {dish.projected_ready_min ?? dish.max_time_min ?? dish.prep_time_min} min
-          </strong>
-        </p>
-        {summary && summary.rating_count > 0 && (
-          <p className="owner-muted">
-            ★ {summary.overall_rating.toFixed(1)} home taste · {summary.rating_count} rating
-            {summary.rating_count === 1 ? "" : "s"}
-          </p>
+        {hasDetails && (
+          <details className="customer-dish__more">
+            <summary>Details</summary>
+            {dish.description ? <RichHtml html={dish.description} /> : null}
+            {dish.ingredients_description ? (
+              <RichHtml html={dish.ingredients_description} className="customer-dish__ingredients" />
+            ) : null}
+          </details>
         )}
-        {dish.description && <RichHtml html={dish.description} />}
-        {hero?.is_live_capture && <span className="live-badge">Live capture</span>}
-        {dish.ingredients_description && (
-          <RichHtml html={dish.ingredients_description} className="customer-dish__ingredients" />
-        )}
-        <button type="button" className="btn btn--ghost btn--sm customer-dish__add" onClick={onAdd}>
+        <button type="button" className="btn btn--primary btn--sm customer-dish__add" onClick={onAdd}>
           Add to cart
         </button>
       </div>

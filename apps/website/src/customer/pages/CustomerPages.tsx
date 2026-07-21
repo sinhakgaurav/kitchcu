@@ -156,38 +156,11 @@ export function CustomerLoginPage() {
           <p>{t("customer.auth.title")} · {CUSTOMER_HOST}</p>
         </div>
         <div className="auth-card glass">
-          <div className="auth-card__demo">
-            <strong>Demo customer accounts</strong>
-            <p className="auth-card__demo-otp">WhatsApp OTP (dev): <code>{DEMO.otp}</code></p>
-            <ul className="auth-card__demo-list">
-              {DEMO_CUSTOMERS.map((account) => (
-                <li key={account.phone}>
-                  <div className="auth-card__demo-meta">
-                    <span className="auth-card__demo-name">{account.name}</span>
-                    <span>{account.phone} · {account.note}</span>
-                  </div>
-                  <button
-                    type="button"
-                    className="btn btn--primary btn--sm"
-                    disabled={busy}
-                    onClick={() => handleDemoWhatsApp(account)}
-                  >
-                    {busyPhone === account.phone ? "Signing in…" : "WhatsApp login"}
-                  </button>
-                </li>
-              ))}
-            </ul>
-            <p className="auth-card__demo-note">
-              Opens demo kitchen <code>{DEMO.kitchenCode}</code>. Owners:{" "}
-              {DEMO_OWNERS.map((o) => o.phone).join(", ")}
-            </p>
-          </div>
-
           <form onSubmit={otpSent ? handleVerify : handleRequestOtp}>
-            <h2>Welcome back</h2>
+            <h2>Sign in</h2>
             <p className="auth-card__hint">
-              WhatsApp OTP on <strong>{CUSTOMER_HOST}</strong> — separate from kitchen owners.
-              Dev OTP: <strong>{DEMO.otp}</strong>.
+              WhatsApp OTP on <strong>{CUSTOMER_HOST}</strong>
+              {import.meta.env.DEV ? <> · Dev OTP <strong>{DEMO.otp}</strong></> : null}
             </p>
             {error && <div className="auth-card__error">{error}</div>}
             <label>
@@ -260,6 +233,34 @@ export function CustomerLoginPage() {
             onSuccess={() => afterAuth(code)}
             onError={setError}
           />
+
+          <details className="auth-card__demo">
+            <summary>Demo customer accounts · OTP <code>{DEMO.otp}</code></summary>
+            <p className="auth-card__demo-otp">One-click WhatsApp login for local / GCP demos</p>
+            <ul className="auth-card__demo-list">
+              {DEMO_CUSTOMERS.map((account) => (
+                <li key={account.phone}>
+                  <div className="auth-card__demo-meta">
+                    <span className="auth-card__demo-name">{account.name}</span>
+                    <span>{account.phone} · {account.note}</span>
+                  </div>
+                  <button
+                    type="button"
+                    className="btn btn--primary btn--sm"
+                    disabled={busy}
+                    onClick={() => handleDemoWhatsApp(account)}
+                  >
+                    {busyPhone === account.phone ? "Signing in…" : "WhatsApp login"}
+                  </button>
+                </li>
+              ))}
+            </ul>
+            <p className="auth-card__demo-note">
+              Opens demo kitchen <code>{DEMO.kitchenCode}</code>. Owners:{" "}
+              {DEMO_OWNERS.map((o) => o.phone).join(", ")}
+            </p>
+          </details>
+
           <p className="auth-card__demo-note">
             Kitchen owner? <a href={kitchenUrl("/login")} target="_blank" rel="noopener noreferrer">Sign in on {KITCHEN_HOST} →</a>
           </p>

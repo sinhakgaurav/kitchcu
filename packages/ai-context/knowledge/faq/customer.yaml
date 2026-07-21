@@ -2,6 +2,28 @@
 version: "2026-07-15"
 audience: customer
 entries:
+  - answer_id: customer.pricing.why_charge
+    option_set_id: customer.after_about
+    paraphrases:
+      - Why does kitchCU charge customers?
+      - Why am I charged by the platform?
+      - Where does delivery fee / platform fee go?
+      - Server cost for customers
+      - Do you take commission on my food?
+    canonical_answer: |
+      Your **food payment goes to the kitchen** — kitchCU takes **zero commission on food**.
+      Charges you may see (delivery beyond free radius, shared/platform delivery rails, or live-stream bandwidth) fund the platform that protects **quality and health**: live-capture menus, verified ratings, ready-within honesty, and support when something goes wrong.
+
+      Illustrative breakdown of a typical **₹60** platform-related delivery / quality rail fee:
+      • Servers & data — ≈ ₹16 (27%)
+      • Operations & reliability — ≈ ₹11 (18%)
+      • Support (AI + human) — ≈ ₹14 (23%)
+      • Streaming & live media rails — ≈ ₹10 (17%)
+      • Quality & health assurance — ≈ ₹9 (15%)
+
+      We charge for the care layer — not for a cut of your meal.
+    facts_refs: [product, commission_on_food, cost_transparency]
+
   - answer_id: customer.find.kitchen
     option_set_id: customer.after_find
     paraphrases:
@@ -99,6 +121,7 @@ option_sets:
     - {id: "2", label: "Find kitchen contact"}
     - {id: "3", label: "Back to main"}
   customer.after_about:
-    - {id: "1", label: "Find a kitchen"}
-    - {id: "2", label: "Owner? Switch help"}
-    - {id: "3", label: "Pricing for kitchens"}
+    - {id: "1", label: "Why customers are charged"}
+    - {id: "2", label: "Find a kitchen"}
+    - {id: "3", label: "Owner? Switch help"}
+    - {id: "4", label: "Pricing for kitchens"}

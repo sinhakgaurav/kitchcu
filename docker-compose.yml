@@ -49,6 +49,8 @@ services:
       REDIS_URL: redis://redis:6379/0
       # Prefer mounted ckac-common over image site-packages (dev volume hot-reload)
       PYTHONPATH: /app/packages/ckac-common
+      MINIO_ENDPOINT: minio:9000
+      MINIO_PUBLIC_URL: http://localhost:9000
     ports:
       - "18001:8001"
     depends_on:
@@ -56,6 +58,8 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      minio:
+        condition: service_started
     volumes:
       - ./services/identity:/app/services/identity
       - ./packages:/app/packages

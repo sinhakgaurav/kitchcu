@@ -2,6 +2,27 @@
 version: "2026-07-15"
 audience: owner
 entries:
+  - answer_id: owner.pricing.why_charge
+    option_set_id: owner.after_pricing
+    paraphrases:
+      - Why do kitchen owners pay kitchCU?
+      - Why am I charged a subscription?
+      - Where does my subscription money go?
+      - Server cost breakdown
+      - What do I pay for?
+    canonical_answer: |
+      kitchCU is subscription SaaS — **zero per-order food commission**. Your monthly plan funds the rails that grow the kitchen and keep a **transparent layer** between you and customers (live-capture menus, order lifecycle, analytics, intelligence, support, optional live stream).
+
+      Illustrative cost stack behind a **Growth plan (₹999/mo)**:
+      • Servers & data (API, Postgres, Redis, media) — ≈ ₹280 (28%)
+      • Operations & reliability (uptime, security, monitoring) — ≈ ₹180 (18%)
+      • Support (AI assistant + human tickets) — ≈ ₹220 (22%)
+      • Streaming & live media capacity — ≈ ₹150 (15%)
+      • Growth intelligence & product (reports, CRM signals) — ≈ ₹169 (17%)
+
+      You pay for growth assurance — not a cut of every bill.
+    facts_refs: [plans, commission_on_food, cost_transparency]
+
   - answer_id: owner.pricing.plans
     option_set_id: owner.after_pricing
     paraphrases:
@@ -19,6 +40,7 @@ entries:
       • **Scale** — ₹1,999/mo: multi-kitchen, priority support, advanced analytics
 
       All plans include order lifecycle and customer menu links.
+      Ask “Why do kitchen owners pay?” for the server / ops / support / streaming cost breakdown.
     facts_refs: [plans, commission_on_food]
 
   - answer_id: owner.whatsapp.orders
@@ -115,9 +137,9 @@ entries:
 
 option_sets:
   owner.after_pricing:
-    - {id: "1", label: "Compare Starter vs Growth"}
-    - {id: "2", label: "WhatsApp orders"}
-    - {id: "3", label: "Start owner signup"}
+    - {id: "1", label: "Why owners pay (cost breakdown)"}
+    - {id: "2", label: "Compare Starter vs Growth"}
+    - {id: "3", label: "WhatsApp orders"}
     - {id: "4", label: "Raise billing ticket"}
   owner.after_whatsapp:
     - {id: "1", label: "Show parse example"}

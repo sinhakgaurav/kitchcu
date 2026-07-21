@@ -299,6 +299,8 @@ export type AdminKitchenBrandedPage = {
   accent_color: string | null;
   logo_url?: string | null;
   background_url?: string | null;
+  logo_align?: "left" | "center" | "right";
+  heading_align?: "left" | "center" | "right";
 };
 
 export type AdminKitchen = {
@@ -373,6 +375,8 @@ export async function updateAdminKitchenBrandedPage(
     accent_color?: string | null;
     logo_url?: string | null;
     background_url?: string | null;
+    logo_align?: "left" | "center" | "right";
+    heading_align?: "left" | "center" | "right";
   },
 ) {
   return adminFetch<AdminKitchenDetail>(`/api/v1/admin/kitchens/${kitchenId}/branded-page`, {
