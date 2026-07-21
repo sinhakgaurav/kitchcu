@@ -445,6 +445,7 @@ def main() -> None:
         kitchen_id=primary["id"],
         dish_ids=primary_dish_ids,
         kitchen_name=primary["name"],
+        kitchen_code=primary.get("code"),
     )
 
     # Additional owners — more kitchens for nearby density

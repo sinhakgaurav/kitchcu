@@ -34,6 +34,7 @@ from demo_data import (  # noqa: E402
 )
 from seed_common import ApiError, cuisine_map, dish_create_payload, ensure_dish_recipes, ensure_ingredients, login_owner, request, wait_for_gateway  # noqa: E402
 from ingredient_demo_data import DEMO_PANTRY, DISH_PREP_STEPS, DISH_RECIPES  # noqa: E402
+from seed_platform_extras import seed_kitchen_integrations, seed_kitchen_modules  # noqa: E402
 
 
 def _register_owner(owner: dict) -> None:
@@ -215,6 +216,19 @@ def main() -> None:
     ingredient_ids = ensure_ingredients(token, kitchen["id"], DEMO_PANTRY)
     ensure_dish_recipes(token, kitchen["id"], dish_ids, DISH_RECIPES, ingredient_ids, DISH_PREP_STEPS)
     ensure_orders(token, kitchen["id"], dish_ids)
+
+    print()
+    print("Brand page + tiffin + integrations")
+    print("-" * 40)
+    seed_kitchen_modules(token, kitchen["id"], dish_ids)
+    first_dish = next(iter(dish_ids.values()), None)
+    seed_kitchen_integrations(
+        token,
+        kitchen["id"],
+        kitchen.get("name") or DEMO_KITCHEN["name"],
+        kitchen_code=kitchen.get("code") or DEMO_KITCHEN_CODE,
+        dish_id=first_dish,
+    )
 
     print()
     print("Extra demo owners")

@@ -112,24 +112,36 @@ export function BrandedStorefrontLayout() {
   const shellStyle = {
     ["--branded-accent" as string]: accent,
   } as CSSProperties;
+  const logoOnHero = Boolean(logoUrl && backgroundUrl);
+  const safeBgUrl = backgroundUrl
+    ? backgroundUrl.replace(/\\/g, "/").replace(/"/g, "%22")
+    : null;
 
   return (
     <BrandedStorefrontContext.Provider value={ctx}>
       <div
-        className={`branded-store${backgroundUrl ? " branded-store--has-bg" : ""}`}
+        className={`branded-store${backgroundUrl ? " branded-store--has-bg" : ""}${logoOnHero ? " branded-store--logo-on-bg" : ""}`}
         style={shellStyle}
       >
         <div className="branded-store__hero">
-          {backgroundUrl ? (
+          {safeBgUrl ? (
             <div
               className="branded-store__bg"
-              style={{ backgroundImage: `url("${backgroundUrl.replace(/\\/g, "/").replace(/"/g, "%22")}")` }}
+              style={{ backgroundImage: `url("${safeBgUrl}")` }}
               aria-hidden="true"
             />
           ) : null}
+          {logoOnHero && logoUrl ? (
+            <div
+              className={alignClass(logoAlign, "branded-store__logo-on-bg")}
+              aria-hidden="true"
+            >
+              <img src={logoUrl} alt="" className="branded-store__logo branded-store__logo--hero" />
+            </div>
+          ) : null}
           <header className="branded-store__header">
             <div className="branded-store__brand">
-              {logoUrl ? (
+              {logoUrl && !logoOnHero ? (
                 <div className={alignClass(logoAlign, "branded-store__logo-row")}>
                   <img src={logoUrl} alt="" className="branded-store__logo" />
                 </div>

@@ -529,6 +529,32 @@
   margin: 0 0 0.65rem;
   filter: drop-shadow(0 4px 16px rgba(0, 0, 0, 0.25));
 }
+/* Logo composited on the hero photo (when both logo + background are set). */
+.branded-store__logo-on-bg {
+  position: absolute;
+  z-index: 1;
+  inset: 0 0 clamp(5.5rem, 14vh, 7.5rem);
+  display: flex;
+  align-items: center;
+  padding: 1.25rem clamp(1.25rem, 4vw, 2.5rem);
+  pointer-events: none;
+}
+.branded-store__logo-on-bg--left { justify-content: flex-start; }
+.branded-store__logo-on-bg--center { justify-content: center; }
+.branded-store__logo-on-bg--right { justify-content: flex-end; }
+.branded-store__logo--hero {
+  height: clamp(5.5rem, 18vw, 9.5rem);
+  max-width: min(18rem, 55vw);
+  margin: 0;
+  padding: 0.65rem 0.85rem;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.88);
+  box-shadow: 0 10px 36px rgba(0, 0, 0, 0.28);
+  filter: none;
+}
+.branded-store--logo-on-bg .branded-store__hero {
+  min-height: clamp(16rem, 38vh, 26rem);
+}
 .branded-store__code {
   margin: 0 0 0.35rem; font-size: 0.75rem; letter-spacing: 0.08em; text-transform: uppercase;
   color: var(--branded-accent); font-weight: 600;

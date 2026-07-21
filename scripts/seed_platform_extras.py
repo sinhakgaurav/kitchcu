@@ -292,6 +292,29 @@ COMMUNITY_RECIPE_COVER_URL = (
 )
 
 
+# Local public assets (portal/customer/kitchen PWAs all serve /media and /brand).
+BRAND_HERO_BACKGROUNDS = (
+    "/media/food/kitchen.jpg",
+    "/media/food/dining.jpg",
+    "/media/food/restaurant.jpg",
+    "/media/food/service.jpg",
+)
+BRAND_LOGO_MARKS = (
+    "/brand/mark-circle.png",
+    "/brand/badge.png",
+    "/brand/mascot.png",
+)
+
+
+def _brand_asset_for_kitchen(kitchen_id: str, options: tuple[str, ...]) -> str:
+    """Stable per-kitchen pick so re-seeds keep the same look."""
+    if not options:
+        return ""
+    # uuid hex chars → deterministic index
+    digest = sum(ord(c) for c in kitchen_id.replace("-", ""))
+    return options[digest % len(options)]
+
+
 def ensure_tiffin_plans(owner_token: str, kitchen_id: str, dish_ids: dict[str, str]) -> None:
     """F34/F35 — seed thali, combo (≥2 dishes), and single_dish plans (idempotent by name)."""
     ids = [str(v) for v in dish_ids.values() if v]
@@ -304,7 +327,9 @@ def ensure_tiffin_plans(owner_token: str, kitchen_id: str, dish_ids: dict[str, s
             token=owner_token,
         )
         plans = listed.get("plans") if isinstance(listed, dict) else listed
-        existing_names = {str(p.get("name") or "") for p in (plans or [])}
+        existing_by_name = {
+            str(p.get("name") or ""): p for p in (plans or []) if isinstance(p, dict)
+        }
     except ApiError as exc:
         log(f"  ! tiffin plans list: {exc}")
         return
@@ -352,8 +377,23 @@ def ensure_tiffin_plans(owner_token: str, kitchen_id: str, dish_ids: dict[str, s
         )
 
     created = 0
+    updated = 0
     for body in specs:
-        if body["name"] in existing_names:
+        existing = existing_by_name.get(body["name"])
+        if existing:
+            cfg = existing.get("dishes_config") or {}
+            want_img = (body.get("dishes_config") or {}).get("image_url")
+            if want_img and not cfg.get("image_url"):
+                try:
+                    request(
+                        "PATCH",
+                        f"/api/v1/kitchens/{kitchen_id}/subscription-plans/{existing['id']}",
+                        {"dishes_config": {**cfg, "image_url": want_img}},
+                        token=owner_token,
+                    )
+                    updated += 1
+                except ApiError as exc:
+                    log(f"  ! tiffin plan image {body['name']}: {exc}")
             continue
         try:
             request(
@@ -367,8 +407,13 @@ def ensure_tiffin_plans(owner_token: str, kitchen_id: str, dish_ids: dict[str, s
             if "409" in str(exc) or "already" in str(exc).lower():
                 continue
             log(f"  ! tiffin plan {body['name']}: {exc}")
-    if created:
-        log(f"  Tiffin plans created: {created} (thali / single_dish / combo)")
+    if created or updated:
+        parts = []
+        if created:
+            parts.append(f"{created} created")
+        if updated:
+            parts.append(f"{updated} images updated")
+        log(f"  Tiffin plans: {', '.join(parts)} (thali / single_dish / combo)")
     else:
         log("  Tiffin plans already present — skipped")
 
@@ -649,8 +694,20 @@ def ensure_support_tickets(customers: list[dict]) -> None:
             log(f"  ! customer ticket: {exc}")
 
 
-def ensure_branded_page(owner_token: str, kitchen_id: str, kitchen_name: str) -> None:
-    """Publish the customer branded storefront at /k/{code}."""
+def ensure_branded_page(
+    owner_token: str,
+    kitchen_id: str,
+    kitchen_name: str,
+    *,
+    kitchen_code: str | None = None,
+) -> None:
+    """Publish customer branded storefront with same-origin hero + logo on the big image."""
+    background_url = _brand_asset_for_kitchen(kitchen_id, BRAND_HERO_BACKGROUNDS)
+    logo_url = _brand_asset_for_kitchen(kitchen_id, BRAND_LOGO_MARKS)
+    # Prefer kitchen hero for primary demo code so docs/screenshots stay stable.
+    if kitchen_code and kitchen_code.upper() in ("CKPNQ001", "CKPNQ002"):
+        background_url = "/media/food/kitchen.jpg"
+        logo_url = "/brand/mark-circle.png"
     try:
         request(
             "PATCH",
@@ -659,12 +716,14 @@ def ensure_branded_page(owner_token: str, kitchen_id: str, kitchen_name: str) ->
                 "enabled": True,
                 "tagline": f"Home-taste from {kitchen_name}",
                 "accent_color": "#0F766E",
-                # Same-origin path works on portal/customer/kitchen hosts (public/media).
-                "background_url": "/media/food/kitchen.jpg",
+                "background_url": background_url,
+                "logo_url": logo_url,
+                "logo_align": "center",
+                "heading_align": "center",
             },
             token=owner_token,
         )
-        log("  Branded storefront published")
+        log(f"  Branded storefront published (logo on hero · {background_url})")
     except ApiError as exc:
         log(f"  ! branded page: {exc}")
 
@@ -1003,7 +1062,9 @@ def seed_kitchen_integrations(
         kitchen_code=kitchen_code,
     )
     ensure_delivery_quote(kitchen_id)
-    ensure_branded_page(owner_token, kitchen_id, kitchen_name)
+    ensure_branded_page(
+        owner_token, kitchen_id, kitchen_name, kitchen_code=kitchen_code
+    )
     ensure_streaming(owner_token, kitchen_id, dish_id=dish_id)
 
 
@@ -1024,6 +1085,7 @@ def seed_platform_extras(
     dish_ids: dict[str, str],
     owner_phone_e164: str = "+919876543210",
     kitchen_name: str = "Sharma Home Kitchen",
+    kitchen_code: str | None = None,
 ) -> None:
     """Seed every persona + module: admin, customers, ratings, marketing, subscription,
     community, growth, referrals, WhatsApp, payments/GST/refunds, delivery, support,
@@ -1070,7 +1132,12 @@ def seed_platform_extras(
     ensure_refund(owner_token, kitchen_id)
     ensure_delivery_quote(kitchen_id)
     ensure_support_tickets(customers)
-    ensure_branded_page(owner_token, kitchen_id, kitchen_name)
+    ensure_branded_page(
+        owner_token,
+        kitchen_id,
+        kitchen_name,
+        kitchen_code=kitchen_code or "CKPNQ001",
+    )
     first_dish = next(iter(dish_ids.values()), None) if dish_ids else None
     ensure_streaming(owner_token, kitchen_id, dish_id=first_dish)
     if dish_ids:
