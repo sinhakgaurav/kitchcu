@@ -211,26 +211,35 @@ export function KitchenMenuPage() {
           />
 
           {plans.length > 0 && (
-            <section className="glass customer-menu__cuisine">
+            <section className="customer-menu__cuisine customer-menu__tiffin">
               <h2 className="customer-menu__cuisine-title">Monthly thali / tiffin</h2>
-              <p className="owner-muted">Request a plan — kitchen confirms before it starts.</p>
-              {subMsg && <p className="report-hint">{subMsg}</p>}
-              <ul className="owner-detail-items plan-list">
+              <p className="customer-menu__tiffin-lead">
+                Request a plan — kitchen confirms before it starts.
+              </p>
+              {subMsg && <p className="customer-menu__tiffin-msg">{subMsg}</p>}
+              <ul className="customer-tiffin-list">
                 {plans.map((p) => {
                   const img = p.dishes_config?.image_url;
                   const dishCount = p.dishes_config?.dish_ids?.length ?? 0;
                   return (
-                    <li key={p.id} className="plan-list__item">
+                    <li key={p.id} className="customer-tiffin-card">
                       {img ? (
-                        <img className="plan-list__thumb" src={img} alt="" />
+                        <img className="customer-tiffin-card__media" src={img} alt="" />
                       ) : (
-                        <span className="plan-list__thumb plan-list__thumb--empty" aria-hidden />
+                        <span className="customer-tiffin-card__media customer-tiffin-card__media--empty" aria-hidden />
                       )}
-                      <span className="plan-list__body">
-                        <strong>{p.name}</strong> · {p.plan_type} · ₹{Math.round(p.price_monthly)}/mo
-                        {dishCount > 0 ? ` · ${dishCount} dish${dishCount === 1 ? "" : "es"}` : ""}
-                        {p.description ? <RichHtml html={p.description} className="plan-list__desc" /> : null}
-                      </span>
+                      <div className="customer-tiffin-card__body">
+                        <div className="customer-tiffin-card__meta">
+                          <strong>{p.name}</strong>
+                          <span>
+                            {p.plan_type.replace(/_/g, " ")} · ₹{Math.round(p.price_monthly)}/mo
+                            {dishCount > 0 ? ` · ${dishCount} dish${dishCount === 1 ? "" : "es"}` : ""}
+                          </span>
+                        </div>
+                        {p.description ? (
+                          <RichHtml html={p.description} className="customer-tiffin-card__desc" />
+                        ) : null}
+                      </div>
                       <button
                         type="button"
                         className="btn btn--primary btn--sm"

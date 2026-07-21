@@ -436,43 +436,70 @@
   min-height: 100vh;
   min-height: 100dvh;
   display: flex; flex-direction: column;
+  background: linear-gradient(180deg, #faf8f5 0%, #f3f0ea 100%);
+  color: #1a1a1a;
+}
+.branded-store__hero {
+  position: relative;
+  isolation: isolate;
+  min-height: clamp(14rem, 32vh, 22rem);
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  overflow: hidden;
   background:
     radial-gradient(ellipse 80% 50% at 10% -10%, color-mix(in srgb, var(--branded-accent) 18%, transparent), transparent),
     linear-gradient(180deg, #faf8f5 0%, #f3f0ea 100%);
-  color: #1a1a1a;
 }
 .branded-store__bg {
   position: absolute;
   inset: 0;
   z-index: 0;
   background-size: cover;
-  background-position: center top;
+  background-position: center;
   background-repeat: no-repeat;
   pointer-events: none;
+  transform: scale(1.02);
 }
-/* Light veil only — keep the hero photo readable (was nearly opaque cream). */
 .branded-store__bg::after {
   content: "";
   position: absolute;
   inset: 0;
   background: linear-gradient(
     180deg,
-    rgba(250, 248, 245, 0.28) 0%,
-    rgba(243, 240, 234, 0.38) 42%,
-    rgba(243, 240, 234, 0.62) 100%
+    rgba(12, 24, 22, 0.35) 0%,
+    rgba(12, 24, 22, 0.22) 45%,
+    rgba(250, 248, 245, 0.82) 100%
   );
 }
-.branded-store--has-bg {
-  background: #f3f0ea;
-}
-.branded-store > *:not(.branded-store__bg) {
-  position: relative;
-  z-index: 1;
+.branded-store--has-bg .branded-store__hero {
+  background: #1a2420;
 }
 .branded-store__header {
-  display: flex; justify-content: space-between; align-items: flex-end; gap: 1rem;
-  padding: 1.75rem clamp(1.25rem, 4vw, 2.5rem) 1.25rem;
-  border-bottom: 1px solid color-mix(in srgb, var(--branded-accent) 25%, transparent);
+  position: relative;
+  z-index: 1;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 1rem;
+  padding: 1.75rem clamp(1.25rem, 4vw, 2.5rem) 1.35rem;
+}
+.branded-store--has-bg .branded-store__header {
+  background: transparent;
+  backdrop-filter: none;
+}
+.branded-store--has-bg .branded-store__code {
+  color: #9fe8df;
+}
+.branded-store--has-bg .branded-store__brand h1,
+.branded-store--has-bg .branded-store__tagline,
+.branded-store--has-bg .branded-store__menu-link,
+.branded-store--has-bg .branded-store__nav-link {
+  color: #fff;
+  text-shadow: 0 1px 12px rgba(0, 0, 0, 0.35);
+}
+.branded-store--has-bg .branded-store__tagline {
+  color: rgba(255, 255, 255, 0.9);
 }
 .branded-store__brand {
   flex: 1;
@@ -500,6 +527,7 @@
   max-width: min(12rem, 40vw);
   object-fit: contain;
   margin: 0 0 0.65rem;
+  filter: drop-shadow(0 4px 16px rgba(0, 0, 0, 0.25));
 }
 .branded-store__code {
   margin: 0 0 0.35rem; font-size: 0.75rem; letter-spacing: 0.08em; text-transform: uppercase;
@@ -512,9 +540,26 @@
 .branded-store__tagline { margin: 0.45rem 0 0; color: #4a5560; font-size: 0.95rem; max-width: 36ch; }
 .branded-store__heading--center .branded-store__tagline,
 .branded-store__heading--right .branded-store__tagline { max-width: none; }
-.branded-store--has-bg .branded-store__header {
-  background: rgba(255, 255, 255, 0.72);
-  backdrop-filter: blur(8px);
+.branded-store__nav {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.65rem 1rem;
+  flex-shrink: 0;
+}
+.branded-store__nav-link,
+.branded-store__menu-link {
+  color: var(--branded-accent);
+  font-weight: 600;
+  text-decoration: none;
+  font-size: 0.9rem;
+  white-space: nowrap;
+}
+.branded-store__main {
+  flex: 1;
+  padding: 1.25rem 0 2rem;
+  background: linear-gradient(180deg, #faf8f5 0%, #f3f0ea 100%);
 }
 .od-brand-align {
   display: flex;
@@ -617,10 +662,6 @@
   white-space: pre-wrap;
   word-break: break-word;
 }
-.branded-store__menu-link {
-  color: var(--branded-accent); font-weight: 600; text-decoration: none; font-size: 0.9rem;
-}
-.branded-store__main { flex: 1; padding-bottom: 2rem; }
 .branded-store__footer {
   display: flex; justify-content: space-between; align-items: center; gap: 1rem; flex-wrap: wrap;
   flex-shrink: 0;
@@ -1184,6 +1225,81 @@
 }
 .customer-menu__cuisine { margin-bottom: 2rem; }
 .customer-menu__highlight { margin-bottom: 1.75rem; }
+.customer-menu__tiffin {
+  margin-bottom: 2rem;
+  padding: 1.15rem 1.2rem 1.25rem;
+  border-radius: 14px;
+  background: #fff;
+  border: 1px solid rgba(11, 27, 50, 0.08);
+  box-shadow: 0 8px 24px rgba(11, 27, 50, 0.05);
+}
+.customer-menu__tiffin-lead,
+.customer-menu__tiffin-msg {
+  margin: 0.25rem 0 0.9rem;
+  color: var(--text-muted, #5c564c);
+  font-size: 0.9rem;
+}
+.customer-menu__tiffin-msg { color: var(--brand-teal-deep, #0f766e); font-weight: 600; }
+.customer-tiffin-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+.customer-tiffin-card {
+  display: grid;
+  grid-template-columns: 4.5rem minmax(0, 1fr) auto;
+  gap: 0.85rem;
+  align-items: center;
+  padding: 0.75rem;
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--brand-teal, #0f766e) 5%, #faf8f5);
+  border: 1px solid rgba(11, 27, 50, 0.06);
+}
+.customer-tiffin-card__media {
+  width: 4.5rem;
+  height: 4.5rem;
+  object-fit: cover;
+  border-radius: 10px;
+  background: rgba(11, 27, 50, 0.06);
+}
+.customer-tiffin-card__media--empty { display: block; }
+.customer-tiffin-card__body { min-width: 0; }
+.customer-tiffin-card__meta {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+.customer-tiffin-card__meta strong {
+  font-size: 1rem;
+  color: #14201c;
+}
+.customer-tiffin-card__meta span {
+  font-size: 0.82rem;
+  color: var(--text-muted, #5c564c);
+  text-transform: capitalize;
+}
+.customer-tiffin-card__desc {
+  margin: 0.35rem 0 0;
+  font-size: 0.85rem;
+  color: var(--text-muted, #5c564c);
+}
+.customer-tiffin-card__desc p { margin: 0 0 0.2rem; }
+.customer-tiffin-card .btn {
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+@media (max-width: 640px) {
+  .customer-tiffin-card {
+    grid-template-columns: 4rem minmax(0, 1fr);
+  }
+  .customer-tiffin-card .btn {
+    grid-column: 1 / -1;
+    justify-self: stretch;
+  }
+}
 .customer-menu__cuisine-title {
   font-family: var(--font-display);
   font-size: 1.75rem;

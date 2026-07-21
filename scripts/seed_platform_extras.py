@@ -319,6 +319,7 @@ def ensure_tiffin_plans(owner_token: str, kitchen_id: str, dish_ids: dict[str, s
                 "dish_ids": [ids[0]],
                 "weekdays": [0, 1, 2, 3, 4],
                 "meals_per_day": 1,
+                "image_url": "/media/food/rice.jpg",
             },
         },
         {
@@ -330,6 +331,7 @@ def ensure_tiffin_plans(owner_token: str, kitchen_id: str, dish_ids: dict[str, s
                 "dish_ids": [ids[0]],
                 "weekdays": [0, 1, 2, 3, 4, 5],
                 "meals_per_day": 1,
+                "image_url": "/media/food/bowls.jpg",
             },
         },
     ]
@@ -344,6 +346,7 @@ def ensure_tiffin_plans(owner_token: str, kitchen_id: str, dish_ids: dict[str, s
                     "dish_ids": ids[:2],
                     "weekdays": [0, 1, 2, 3, 4],
                     "meals_per_day": 1,
+                    "image_url": "/media/food/dining.jpg",
                 },
             }
         )
@@ -656,6 +659,8 @@ def ensure_branded_page(owner_token: str, kitchen_id: str, kitchen_name: str) ->
                 "enabled": True,
                 "tagline": f"Home-taste from {kitchen_name}",
                 "accent_color": "#0F766E",
+                # Same-origin path works on portal/customer/kitchen hosts (public/media).
+                "background_url": "/media/food/kitchen.jpg",
             },
             token=owner_token,
         )

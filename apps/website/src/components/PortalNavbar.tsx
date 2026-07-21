@@ -28,7 +28,7 @@ export function PortalNavbar() {
   return (
     <header className={`nav ${scrolled ? "nav--scrolled" : ""}`}>
       <div className="nav__inner container">
-        <BrandNavMark href="/" subtitle={APP_TAGLINE} height={48} />
+        <BrandNavMark href="/" subtitle={APP_TAGLINE} height={40} />
 
         <nav className={`nav__links ${open ? "nav__links--open" : ""}`}>
           {links.map((l) => {
@@ -41,7 +41,7 @@ export function PortalNavbar() {
           })}
           <a
             href={customerUrl("/")}
-            className="btn btn--ghost btn--sm"
+            className="btn btn--ghost btn--sm nav__auth-btn"
             target="_blank"
             rel="noopener noreferrer"
             onClick={() => setOpen(false)}
@@ -50,14 +50,14 @@ export function PortalNavbar() {
           </a>
           <a
             href={kitchenUrl("/login")}
-            className="btn btn--primary btn--sm"
+            className="btn btn--primary btn--sm nav__auth-btn"
             target="_blank"
             rel="noopener noreferrer"
             onClick={() => setOpen(false)}
           >
             {t("common.ownerLogin")}
           </a>
-          <LanguageSwitcher />
+          <LanguageSwitcher className="lang-switcher--nav" />
         </nav>
 
         <button

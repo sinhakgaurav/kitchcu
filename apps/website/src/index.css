@@ -369,7 +369,8 @@ html.theme-brand-light .brand-nav-mark__sub {
 .nav__links {
   display: flex;
   align-items: center;
-  gap: 2rem;
+  flex-wrap: nowrap;
+  gap: clamp(0.65rem, 1.4vw, 1.35rem);
 }
 
 .nav__owner-link {
@@ -378,15 +379,26 @@ html.theme-brand-light .brand-nav-mark__sub {
   color: var(--text-muted);
   text-decoration: none;
   white-space: nowrap;
+  flex-shrink: 0;
 }
 .nav__owner-link:hover {
   color: var(--teal-light, var(--brand-teal, #00897b));
+}
+
+.nav__links .btn,
+.nav__auth-btn {
+  flex-shrink: 0;
+  white-space: nowrap;
+  line-height: 1.2;
+  max-width: none;
 }
 
 .nav__links a:not(.btn) {
   font-size: 0.9rem;
   color: var(--text-muted);
   transition: color 0.2s;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .nav__links a:not(.btn):hover {
@@ -2472,6 +2484,9 @@ form.auth-card > .btn,
     top: var(--nav-h);
     left: 0; right: 0;
     flex-direction: column;
+    flex-wrap: wrap;
+    align-items: stretch;
+    gap: 1rem;
     padding: 2rem;
     background: rgba(10, 10, 15, 0.97);
     backdrop-filter: blur(20px);

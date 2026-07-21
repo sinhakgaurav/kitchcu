@@ -28,6 +28,22 @@ function alignClass(align: BrandAlign | undefined, prefix: string): string {
   return `${prefix} ${prefix}--${value}`;
 }
 
+/** Prefer same-origin /media paths so brand assets work on customer/kitchen hosts. */
+export function resolveBrandAssetUrl(url: string | null | undefined): string | null {
+  if (!url || !url.trim()) return null;
+  const raw = url.trim();
+  if (raw.startsWith("/")) return raw;
+  try {
+    const parsed = new URL(raw);
+    if (parsed.pathname.startsWith("/media/")) {
+      return `${parsed.pathname}${parsed.search}`;
+    }
+  } catch {
+    /* keep as-is */
+  }
+  return raw;
+}
+
 /** Kitchen-first shell: menu → checkout → bill, with Powered by kitchCU. */
 export function BrandedStorefrontLayout() {
   const { code = "" } = useParams<{ code: string }>();
@@ -58,8 +74,8 @@ export function BrandedStorefrontLayout() {
     kitchen?.branded_page?.tagline ||
     kitchen?.description ||
     "Live-capture menu · order · bill";
-  const logoUrl = kitchen?.branded_page?.logo_url || null;
-  const backgroundUrl = kitchen?.branded_page?.background_url || null;
+  const logoUrl = resolveBrandAssetUrl(kitchen?.branded_page?.logo_url);
+  const backgroundUrl = resolveBrandAssetUrl(kitchen?.branded_page?.background_url);
   const logoAlign = kitchen?.branded_page?.logo_align || "left";
   const headingAlign = kitchen?.branded_page?.heading_align || "left";
 
@@ -103,30 +119,40 @@ export function BrandedStorefrontLayout() {
         className={`branded-store${backgroundUrl ? " branded-store--has-bg" : ""}`}
         style={shellStyle}
       >
-        {backgroundUrl ? (
-          <div
-            className="branded-store__bg"
-            style={{ backgroundImage: `url("${backgroundUrl.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}")` }}
-            aria-hidden="true"
-          />
-        ) : null}
-        <header className="branded-store__header">
-          <div className="branded-store__brand">
-            {logoUrl ? (
-              <div className={alignClass(logoAlign, "branded-store__logo-row")}>
-                <img src={logoUrl} alt="" className="branded-store__logo" />
+        <div className="branded-store__hero">
+          {backgroundUrl ? (
+            <div
+              className="branded-store__bg"
+              style={{ backgroundImage: `url("${backgroundUrl.replace(/\\/g, "/").replace(/"/g, "%22")}")` }}
+              aria-hidden="true"
+            />
+          ) : null}
+          <header className="branded-store__header">
+            <div className="branded-store__brand">
+              {logoUrl ? (
+                <div className={alignClass(logoAlign, "branded-store__logo-row")}>
+                  <img src={logoUrl} alt="" className="branded-store__logo" />
+                </div>
+              ) : null}
+              <div className={alignClass(headingAlign, "branded-store__heading")}>
+                <p className="branded-store__code">{kitchen.code}</p>
+                <h1>{kitchen.name}</h1>
+                <p className="branded-store__tagline">{tagline}</p>
               </div>
-            ) : null}
-            <div className={alignClass(headingAlign, "branded-store__heading")}>
-              <p className="branded-store__code">{kitchen.code}</p>
-              <h1>{kitchen.name}</h1>
-              <p className="branded-store__tagline">{tagline}</p>
             </div>
-          </div>
-          <Link to={`${ctx.basePath}/menu`} className="branded-store__menu-link">
-            Menu
-          </Link>
-        </header>
+            <nav className="branded-store__nav">
+              <Link to="/" className="branded-store__nav-link">
+                Home
+              </Link>
+              <Link to={`${ctx.basePath}/menu`} className="branded-store__menu-link">
+                Menu
+              </Link>
+              <Link to="/login" className="branded-store__nav-link">
+                Sign in
+              </Link>
+            </nav>
+          </header>
+        </div>
         <main className="branded-store__main">
           <Outlet />
         </main>

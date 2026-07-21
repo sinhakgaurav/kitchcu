@@ -1116,6 +1116,7 @@ html.theme-brand-light .hero__host-note {
   gap: 0.4rem;
   font-size: 0.85rem;
   color: var(--brand-ink-soft, #5c564c);
+  flex-shrink: 0;
 }
 
 .lang-switcher select {
@@ -1126,4 +1127,22 @@ html.theme-brand-light .hero__host-note {
   color: inherit;
   font: inherit;
   max-width: 11rem;
+}
+
+/* Compact control in crowded headers — hide label, keep select readable. */
+.lang-switcher--nav .lang-switcher__label {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+.lang-switcher--nav select {
+  max-width: 7.5rem;
+  padding: 0.3rem 0.4rem;
+  font-size: 0.8rem;
 }

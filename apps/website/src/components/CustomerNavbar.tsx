@@ -22,11 +22,17 @@ export function CustomerNavbar() {
   }, []);
 
   const hashLink = (href: string) => (location.pathname !== "/" ? href : href.replace(/^\//, ""));
+  const accountLabel = (() => {
+    const raw = (session?.name || "").trim();
+    if (!raw) return t("customer.nav.account");
+    const first = raw.split(/\s+/)[0] || raw;
+    return first.length > 14 ? `${first.slice(0, 12)}…` : first;
+  })();
 
   return (
     <header className={`nav nav--customer ${scrolled ? "nav--scrolled" : ""}`}>
       <div className="nav__inner container">
-        <BrandNavMark to="/" subtitle={CUSTOMER_HOST} height={44} />
+        <BrandNavMark to="/" subtitle={CUSTOMER_HOST} height={40} />
 
         <nav className={`nav__links ${open ? "nav__links--open" : ""}`}>
           <a href={hashLink("/#near-you")} onClick={() => setOpen(false)}>
@@ -43,12 +49,12 @@ export function CustomerNavbar() {
               <Link to="/account" onClick={() => setOpen(false)}>
                 {t("customer.nav.account")}
               </Link>
-              <Link to="/login" className="btn btn--ghost btn--sm" onClick={() => setOpen(false)}>
-                {session.name}
+              <Link to="/login" className="btn btn--ghost btn--sm nav__auth-btn" onClick={() => setOpen(false)}>
+                {accountLabel}
               </Link>
             </>
           ) : (
-            <Link to="/login" className="btn btn--primary btn--sm" onClick={() => setOpen(false)}>
+            <Link to="/login" className="btn btn--primary btn--sm nav__auth-btn" onClick={() => setOpen(false)}>
               {t("customer.nav.signIn")}
             </Link>
           )}
@@ -61,7 +67,7 @@ export function CustomerNavbar() {
           >
             {t("common.kitchenOwner")}
           </a>
-          <LanguageSwitcher />
+          <LanguageSwitcher className="lang-switcher--nav" />
         </nav>
 
         <button
