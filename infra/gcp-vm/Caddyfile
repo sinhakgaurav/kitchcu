@@ -1,27 +1,46 @@
 # kitchCU — single-VM reverse proxy + automatic HTTPS (Let's Encrypt).
-# Each frontend container already proxies /api/* to gateway:8000 internally
-# (see apps/website/nginx.*.conf). Caddy terminates TLS and routes by host.
+# One multi-SAN certificate for all public hosts (avoids burning LE's
+# "5 certs per exact identifier set / 168h" limit on every redeploy).
+# Do NOT delete the caddy_data volume unless certs are irrecoverably corrupt.
+#
+# Frontends already proxy /api/* to gateway:8000 (apps/website/nginx.*.conf).
 
-kitchcu.com, www.kitchcu.com {
-	reverse_proxy portal-web:80
+{
+	email admin@kitchcu.com
 }
 
-customer.kitchcu.com {
-	reverse_proxy customer-web:80
-}
+kitchcu.com, www.kitchcu.com, customer.kitchcu.com, kitchen.kitchcu.com, admin.kitchcu.com, api.kitchcu.com, media.kitchcu.com {
+	@portal host kitchcu.com www.kitchcu.com
+	handle @portal {
+		reverse_proxy portal-web:80
+	}
 
-kitchen.kitchcu.com {
-	reverse_proxy kitchen-web:80
-}
+	@customer host customer.kitchcu.com
+	handle @customer {
+		reverse_proxy customer-web:80
+	}
 
-admin.kitchcu.com {
-	reverse_proxy admin-web:80
-}
+	@kitchen host kitchen.kitchcu.com
+	handle @kitchen {
+		reverse_proxy kitchen-web:80
+	}
 
-api.kitchcu.com {
-	reverse_proxy gateway:8000
-}
+	@admin host admin.kitchcu.com
+	handle @admin {
+		reverse_proxy admin-web:80
+	}
 
-media.kitchcu.com {
-	reverse_proxy minio:9000
+	@api host api.kitchcu.com
+	handle @api {
+		reverse_proxy gateway:8000
+	}
+
+	@media host media.kitchcu.com
+	handle @media {
+		reverse_proxy minio:9000
+	}
+
+	handle {
+		respond "Unknown host" 404
+	}
 }
