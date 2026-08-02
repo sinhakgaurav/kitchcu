@@ -31,7 +31,8 @@
     "dashboard": "Dashboard",
     "customerApp": "Customer app",
     "kitchenOwner": "Kitchen owner →",
-    "ownerLogin": "Owner login"
+    "ownerLogin": "Owner login",
+    "adminLogin": "Super admin"
   },
   "status": {
     "received": "Received",

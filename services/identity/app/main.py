@@ -27,6 +27,17 @@ async def lifespan(app: FastAPI):
     redis_client = redis.from_url(settings.redis_url, decode_responses=True)
     event_publisher = EventPublisher(redis_client)
     set_event_publisher(event_publisher)
+    # Publish admin rate-limit config so gateway has overrides after restart.
+    try:
+        from ckac_common.database import SessionLocal
+        from app.rate_limit_settings import ensure_settings, publish_to_redis
+
+        async with SessionLocal() as session:
+            row = await ensure_settings(session)
+            await session.commit()
+            await publish_to_redis(redis_client, row)
+    except Exception:
+        pass
     yield
     set_event_publisher(None)
     if redis_client:

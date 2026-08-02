@@ -1,6 +1,21 @@
 /** Cross-app URLs — customer.kitchCU.in / kitchen.kitchCU.in / admin.kitchCU.in */
 
+import { readStoredLocale } from "../i18n/storage";
+
 const DEV_PORTS = { customer: 13001, kitchen: 13002, admin: 13003, portal: 13000 } as const;
+
+/** Carry selected locale across subdomains (portal → customer/kitchen). */
+function withLocale(url: string): string {
+  const code = typeof window !== "undefined" ? readStoredLocale() : null;
+  if (!code) return url;
+  try {
+    const u = new URL(url);
+    u.searchParams.set("lang", code);
+    return u.toString();
+  } catch {
+    return url;
+  }
+}
 
 function stripAppPrefix(hostname: string): string {
   let base = hostname;
@@ -69,12 +84,14 @@ export function portalUrl(path = "/"): string {
 
 export function customerUrl(path = "/"): string {
   const base = resolveAppUrl(CUSTOMER_APP_URL, "customer");
-  return path.startsWith("/") ? `${base}${path}` : `${base}/${path}`;
+  const url = path.startsWith("/") ? `${base}${path}` : `${base}/${path}`;
+  return withLocale(url);
 }
 
 export function kitchenUrl(path = "/"): string {
   const base = resolveAppUrl(KITCHEN_APP_URL, "kitchen");
-  return path.startsWith("/") ? `${base}${path}` : `${base}/${path}`;
+  const url = path.startsWith("/") ? `${base}${path}` : `${base}/${path}`;
+  return withLocale(url);
 }
 
 /** Navigate to another kitchCU app (full page — required for cross-subdomain). */

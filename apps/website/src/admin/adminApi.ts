@@ -252,6 +252,35 @@ export async function updateAdminFeatureFlag(key: string, enabled: boolean) {
   });
 }
 
+export type AdminRateLimitRule = {
+  name: string;
+  label: string;
+  limit: number;
+  window_seconds: number;
+};
+
+export type AdminRateLimitSettings = {
+  enabled: boolean;
+  rules: AdminRateLimitRule[];
+  updated_at: string | null;
+  presets: Record<string, string>;
+};
+
+export async function fetchAdminRateLimits() {
+  return adminFetch<AdminRateLimitSettings>("/api/v1/admin/rate-limits");
+}
+
+export async function updateAdminRateLimits(body: {
+  enabled?: boolean;
+  rules?: Record<string, { limit: number; window_seconds: number }>;
+  preset?: "defaults" | "test_phase";
+}) {
+  return adminFetch<AdminRateLimitSettings>("/api/v1/admin/rate-limits", {
+    method: "PATCH",
+    body: JSON.stringify(body),
+  });
+}
+
 export type PlatformApiKey = {
   key: string;
   category: string;

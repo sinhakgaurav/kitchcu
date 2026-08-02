@@ -19,7 +19,21 @@ from httpx import ASGITransport, AsyncClient, Response
 
 from app import main as gateway_main
 from app.main import app
-from app.rate_limit import check_rate_limit, client_ip, is_loopback_client, resolve_rule
+from app.rate_limit import (
+    apply_config,
+    check_rate_limit,
+    client_ip,
+    is_loopback_client,
+    reset_config_for_tests,
+    resolve_rule,
+)
+
+
+@pytest.fixture(autouse=True)
+def _reset_rate_limit_config():
+    reset_config_for_tests()
+    yield
+    reset_config_for_tests()
 
 
 def _fake_request(method: str = "GET", ip: str = "1.2.3.4", forwarded: str | None = None) -> Request:
@@ -42,9 +56,39 @@ def test_resolve_rule_matches_otp_request():
     assert rule.limit == 5
 
 
+def test_resolve_rule_matches_customer_whatsapp_otp():
+    assert resolve_rule("POST", "/api/v1/auth/customer/whatsapp/request").name == "otp_request"
+    assert resolve_rule("POST", "/api/v1/auth/customer/whatsapp/verify").name == "otp_verify"
+
+
 def test_resolve_rule_matches_otp_verify():
     rule = resolve_rule("POST", "/api/v1/auth/otp/verify")
     assert rule.name == "otp_verify"
+
+
+def test_apply_config_overrides_limits():
+    apply_config(
+        {
+            "enabled": True,
+            "rules": {"otp_request": {"limit": 99, "window_seconds": 120}},
+        }
+    )
+    rule = resolve_rule("POST", "/api/v1/auth/otp/request")
+    assert rule.limit == 99
+    assert rule.window_seconds == 120
+
+
+@pytest.mark.asyncio
+async def test_check_rate_limit_skips_when_disabled():
+    apply_config({"enabled": False, "rules": {}})
+    redis = AsyncMock()
+    redis.incr = AsyncMock(return_value=999)
+    req = _fake_request(method="POST")
+    allowed, retry_after, rule_name = await check_rate_limit(redis, req, "/api/v1/auth/otp/request")
+    assert allowed is True
+    assert retry_after == 0
+    assert rule_name == "otp_request"
+    redis.incr.assert_not_called()
 
 
 def test_resolve_rule_matches_owner_register():

@@ -1,5 +1,5 @@
 import { FormEvent, useEffect, useState } from "react";
-import { Link, Navigate } from "react-router-dom";
+import { Link, Navigate, useNavigate } from "react-router-dom";
 import {
   fetchCustomerProfile,
   getCustomerToken,
@@ -7,9 +7,12 @@ import {
   uploadCustomerPayoutQr,
   type CustomerProfile,
 } from "../../shared/customerApi";
+import { useCustomerAuth } from "../../shared/customerAuth";
 
 export function CustomerAccountPage() {
   const token = getCustomerToken();
+  const { logout } = useCustomerAuth();
+  const navigate = useNavigate();
   const [profile, setProfile] = useState<CustomerProfile | null>(null);
   const [upi, setUpi] = useState("");
   const [bankAccount, setBankAccount] = useState("");
@@ -78,7 +81,26 @@ export function CustomerAccountPage() {
       <p style={{ marginBottom: "0.5rem" }}>
         <Link to="/orders">← My orders</Link>
       </p>
-      <h1>Refund payout details</h1>
+      <h1>Account</h1>
+      <nav className="customer-account-nav" aria-label="Account">
+        <Link to="/dashboard" className="btn btn--ghost btn--sm">
+          My profile
+        </Link>
+        <Link to="/orders" className="btn btn--ghost btn--sm">
+          Notifications
+        </Link>
+        <button
+          type="button"
+          className="btn btn--ghost btn--sm"
+          onClick={() => {
+            logout();
+            navigate("/login", { replace: true });
+          }}
+        >
+          Log out
+        </button>
+      </nav>
+      <h2 style={{ marginTop: "1.5rem", fontSize: "1.25rem" }}>Refund payout details</h2>
       <p>
         Save your UPI ID, QR scanner image, and bank account so kitchen owners can send full or
         partial refunds directly (remark = order id).

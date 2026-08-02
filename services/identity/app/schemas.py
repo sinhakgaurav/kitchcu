@@ -27,17 +27,38 @@ CITY_CODES: dict[str, str] = {
 
 
 def normalize_india_phone(v: str) -> str:
-    """Normalize 10-digit India mobile or E.164 into +91XXXXXXXXXX."""
+    """Normalize India mobile to E.164 ``+91XXXXXXXXXX`` (exactly 10 national digits).
+
+    Accepts ``9876543210``, ``919876543210``, or ``+919876543210``.
+    Rejects 11+/non-91 longer nationals (e.g. ``987654321011``).
+    """
     digits = re.sub(r"\D", "", v or "")
-    if len(digits) < 10:
-        raise ValueError("Phone must have at least 10 digits")
     if len(digits) == 10:
-        return f"+91{digits}"
-    if len(digits) == 12 and digits.startswith("91"):
-        return f"+{digits}"
-    if 10 < len(digits) <= 15:
-        return f"+{digits}"
-    raise ValueError("Invalid phone number")
+        national = digits
+    elif len(digits) == 12 and digits.startswith("91"):
+        national = digits[2:]
+    else:
+        raise ValueError("Phone must be a 10-digit India mobile or +91XXXXXXXXXX")
+    if not re.fullmatch(r"[6-9]\d{9}", national):
+        raise ValueError("Phone must be a valid 10-digit India mobile number")
+    return f"+91{national}"
+
+
+_NAME_OK = re.compile(r"^[\w.\-'\s]+$", re.UNICODE)
+
+
+def normalize_person_name(v: str) -> str:
+    """Display name: letters (incl. Unicode), spaces, apostrophe/hyphen/dot — not digits-only."""
+    cleaned = (v or "").strip()
+    if len(cleaned) < 2:
+        raise ValueError("Name must be at least 2 characters")
+    if not _NAME_OK.fullmatch(cleaned):
+        raise ValueError("Name may only contain letters, spaces, apostrophes, hyphens, or dots")
+    if not any(ch.isalpha() for ch in cleaned):
+        raise ValueError("Name must include at least one letter")
+    if re.search(r"\d", cleaned):
+        raise ValueError("Name must not contain digits")
+    return cleaned
 
 
 class OwnerRegisterRequest(BaseModel):
@@ -46,7 +67,7 @@ class OwnerRegisterRequest(BaseModel):
     phone: str = Field(
         ...,
         min_length=10,
-        max_length=15,
+        max_length=16,
         description=(
             "India mobile as 10 digits or E.164 (+91...). Normalized to E.164 "
             "(+91XXXXXXXXXX) and used as the unique owner login identifier."
@@ -70,6 +91,18 @@ class OwnerRegisterRequest(BaseModel):
     @classmethod
     def normalize_phone(cls, v: str) -> str:
         return normalize_india_phone(v)
+
+    @field_validator("name")
+    @classmethod
+    def normalize_name(cls, v: str) -> str:
+        return normalize_person_name(v)
+
+    @field_validator("email")
+    @classmethod
+    def normalize_email(cls, v: EmailStr | None) -> str | None:
+        if v is None:
+            return None
+        return str(v).strip().lower() or None
 
 
 class OwnerResponse(BaseModel):

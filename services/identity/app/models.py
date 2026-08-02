@@ -185,6 +185,21 @@ class ReferralSettings(Base):
     updated_by: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
 
 
+class GatewayRateLimitSettings(Base):
+    """Singleton row — gateway reads a Redis mirror published on every update."""
+
+    __tablename__ = "gateway_rate_limit_settings"
+    __table_args__ = {"schema": "ckac_identity"}
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, default=1)
+    enabled: Mapped[bool] = mapped_column(Boolean, default=True)
+    rules: Mapped[dict] = mapped_column(JSONB, default=dict)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(UTC)
+    )
+    updated_by: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
+
+
 class ReferralLead(Base):
     __tablename__ = "referral_leads"
     __table_args__ = {"schema": "ckac_identity"}

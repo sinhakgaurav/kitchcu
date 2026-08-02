@@ -3,7 +3,7 @@ import { useTranslation } from "react-i18next";
 import { BrandNavMark } from "./BrandNavMark";
 import { LanguageSwitcher } from "../i18n/LanguageSwitcher";
 import { APP_TAGLINE } from "../shared/brand";
-import { customerUrl, kitchenUrl } from "../shared/urls";
+import { adminUrl, customerUrl, kitchenUrl } from "../shared/urls";
 
 export function PortalNavbar() {
   const { t } = useTranslation();
@@ -56,6 +56,15 @@ export function PortalNavbar() {
             onClick={() => setOpen(false)}
           >
             {t("common.ownerLogin")}
+          </a>
+          <a
+            href={adminUrl("/")}
+            className="btn btn--ghost btn--sm nav__auth-btn"
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={() => setOpen(false)}
+          >
+            {t("common.adminLogin")}
           </a>
           <LanguageSwitcher className="lang-switcher--nav" />
         </nav>

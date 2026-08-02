@@ -893,6 +893,14 @@
 .owner-detail-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
 .owner-detail-grid section { padding: 1.25rem; }
 .owner-pay-panel { grid-column: 1 / -1; }
+.owner-pay-panel .kc-field + .btn,
+.owner-pay-panel .kc-field + button.btn {
+  margin-top: 1.25rem;
+  align-self: flex-start;
+}
+.owner-pay-panel > .btn--primary {
+  margin-top: 1.25rem;
+}
 .owner-pay-status { margin-top: 0.75rem; font-size: 0.85rem; }
 .owner-pay-status--ok { color: #81c784; }
 .owner-upi-box { margin-top: 1rem; display: flex; flex-direction: column; gap: 0.75rem; }

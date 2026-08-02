@@ -1,7 +1,7 @@
 import { Link } from "react-router-dom";
 import { BrandNavMark } from "./BrandNavMark";
 import { APP_NAME } from "../shared/brand";
-import { customerUrl } from "../shared/urls";
+import { adminUrl, customerUrl } from "../shared/urls";
 
 export function Footer() {
   return (
@@ -17,6 +17,9 @@ export function Footer() {
             Customers
           </a>
           <Link to="/login">Owner Login</Link>
+          <a href={adminUrl("/")} target="_blank" rel="noopener noreferrer">
+            Super Admin
+          </a>
           <a href="/#contact">Contact</a>
         </div>
         <p className="footer__copy">

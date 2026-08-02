@@ -1142,7 +1142,18 @@ html.theme-brand-light .hero__host-note {
   border: 0;
 }
 .lang-switcher--nav select {
-  max-width: 7.5rem;
+  max-width: 8.25rem;
+  min-width: 5.25rem;
+  width: 8.25rem;
   padding: 0.3rem 0.4rem;
-  font-size: 0.8rem;
+  font-size: 0.78rem;
+  text-overflow: ellipsis;
+  overflow: hidden;
+  white-space: nowrap;
+}
+.lang-switcher select {
+  max-width: min(12rem, 38vw);
+  text-overflow: ellipsis;
+  overflow: hidden;
+  white-space: nowrap;
 }

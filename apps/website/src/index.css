@@ -1620,6 +1620,32 @@ form.auth-card > .btn,
   line-height: 1.4;
 }
 
+.auth-card input.input-invalid,
+.auth-card .input-invalid {
+  border-color: #e57373 !important;
+  box-shadow: 0 0 0 2px rgba(229, 115, 115, 0.25);
+}
+.auth-card .field-error {
+  display: block;
+  margin-top: 0.35rem;
+  font-size: 0.78rem;
+  color: #e57373;
+  font-weight: 500;
+}
+html.theme-brand-light .auth-card .field-error {
+  color: #b91c1c;
+}
+html.theme-brand-light .auth-card input.input-invalid {
+  border-color: #dc2626 !important;
+}
+
+.customer-account-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin: 0.75rem 0 1.25rem;
+}
+
 .auth-card__back {
   display: block;
   margin-top: 1.5rem;
@@ -2105,11 +2131,32 @@ form.auth-card > .btn,
   font-family: var(--font-display);
   font-size: clamp(1.5rem, 3vw, 2.25rem);
   margin-bottom: 1rem;
+  color: var(--text);
 }
 
 .contact__info > p {
   color: var(--text-muted);
   margin-bottom: 2rem;
+}
+
+/* Contact sits on a dark parallax veil — force readable light copy */
+.contact--parallax .contact__info .section__eyebrow,
+.contact--parallax .contact__info h2,
+.contact--parallax .contact__form h3 {
+  color: #faf6f0;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.45);
+}
+.contact--parallax .contact__info > p {
+  color: rgba(250, 246, 240, 0.88);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
+}
+html.theme-brand-light .contact--parallax .contact__info .section__eyebrow,
+html.theme-brand-light .contact--parallax .contact__info h2,
+html.theme-brand-light .contact--parallax .contact__form h3 {
+  color: #faf6f0;
+}
+html.theme-brand-light .contact--parallax .contact__info > p {
+  color: rgba(250, 246, 240, 0.9);
 }
 
 .contact__details {
@@ -3798,10 +3845,17 @@ form.auth-card > .btn,
   font-size: 0.85rem;
   font-weight: 600;
   cursor: pointer;
-  transition: background 0.15s, border-color 0.15s;
+  transition: background 0.15s, border-color 0.15s, color 0.15s, transform 0.12s;
 }
 .social-btn:hover:not(:disabled) {
   background: rgba(255, 255, 255, 0.08);
+}
+.social-btn:focus-visible {
+  outline: 2px solid var(--orange-light, #ff8a50);
+  outline-offset: 2px;
+}
+.social-btn:active:not(:disabled) {
+  transform: translateY(1px);
 }
 .social-btn:disabled {
   opacity: 0.6;
@@ -3812,6 +3866,47 @@ form.auth-card > .btn,
 .social-btn--instagram { border-color: rgba(225, 48, 108, 0.45); }
 .social-btn--twitter { border-color: rgba(29, 161, 242, 0.45); }
 .social-btn--whatsapp { border-color: rgba(37, 211, 102, 0.45); }
+
+/* Light customer auth — social buttons must read clearly on cream surfaces */
+html.theme-brand-light .social-btn {
+  background: #fff;
+  border-width: 1.5px;
+  color: var(--brand-ink, #1c1917);
+  box-shadow: 0 1px 0 rgba(28, 25, 23, 0.04);
+}
+html.theme-brand-light .social-btn:hover:not(:disabled) {
+  background: rgba(15, 118, 110, 0.08);
+  border-color: var(--brand-teal, #0f766e);
+  color: var(--brand-teal, #0f766e);
+}
+html.theme-brand-light .social-btn:active:not(:disabled) {
+  background: rgba(15, 118, 110, 0.14);
+}
+html.theme-brand-light .social-btn--google:hover:not(:disabled) {
+  border-color: #4285f4;
+  color: #1967d2;
+  background: rgba(66, 133, 244, 0.1);
+}
+html.theme-brand-light .social-btn--facebook:hover:not(:disabled) {
+  border-color: #1877f2;
+  color: #1877f2;
+  background: rgba(24, 119, 242, 0.1);
+}
+html.theme-brand-light .social-btn--instagram:hover:not(:disabled) {
+  border-color: #e1306c;
+  color: #c13584;
+  background: rgba(225, 48, 108, 0.1);
+}
+html.theme-brand-light .social-btn--twitter:hover:not(:disabled) {
+  border-color: #1da1f2;
+  color: #0d8bd9;
+  background: rgba(29, 161, 242, 0.1);
+}
+html.theme-brand-light .social-btn--whatsapp:hover:not(:disabled) {
+  border-color: #25d366;
+  color: #128c7e;
+  background: rgba(37, 211, 102, 0.12);
+}
 
 /* Customer dashboard */
 .customer-dash { padding: 1.5rem 1rem 3rem; max-width: 1100px; }

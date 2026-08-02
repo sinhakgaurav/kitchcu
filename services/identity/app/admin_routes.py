@@ -2044,6 +2044,70 @@ async def admin_employees_deactivate(
     )
 
 
+# --- Gateway rate limits (super admin — test-phase friendly) --------------------
+
+
+@router.get(
+    "/rate-limits",
+    summary="Get gateway API rate-limit settings",
+    tags=["Admin Control"],
+    responses=auth_errors(),
+)
+async def admin_rate_limits_get(
+    admin: Annotated[PlatformAdmin, Depends(get_current_admin)],
+    session: Annotated[AsyncSession, Depends(get_db)],
+):
+    from app.rate_limit_settings import get_settings_response
+    from app.rbac import assert_admin_permission
+
+    await assert_admin_permission(session, role=admin.role, permission="flags:read")
+    return await get_settings_response(session)
+
+
+@router.patch(
+    "/rate-limits",
+    summary="Update gateway API rate-limit settings",
+    description=(
+        "Configure per-rule limits/windows or disable limiting entirely for the test phase. "
+        "Use `preset: test_phase` for generous QA thresholds, `preset: defaults` to restore "
+        "production-safe values. Changes publish to Redis for the gateway within ~30s."
+    ),
+    tags=["Admin Control"],
+    responses=auth_errors(),
+)
+async def admin_rate_limits_patch(
+    body: dict,
+    admin: Annotated[PlatformAdmin, Depends(get_current_admin)],
+    session: Annotated[AsyncSession, Depends(get_db)],
+):
+    from app.admin_audit import record_admin_audit
+    from app.main import redis_client
+    from app.rate_limit_settings import (
+        RateLimitSettingsUpdate,
+        get_settings_response,
+        update_settings,
+    )
+    from app.rbac import assert_admin_permission
+
+    await assert_admin_permission(session, role=admin.role, permission="flags:write")
+    data = RateLimitSettingsUpdate.model_validate(body)
+    before = (await get_settings_response(session)).model_dump(mode="json")
+    await update_settings(session, data, admin_id=admin.id, redis_client=redis_client)
+    after = (await get_settings_response(session)).model_dump(mode="json")
+    await record_admin_audit(
+        session,
+        actor=admin,
+        action="rate_limits.updated",
+        resource_type="gateway_rate_limit_settings",
+        resource_id="1",
+        summary="Updated gateway API rate limits",
+        before=before,
+        after=after,
+    )
+    await session.commit()
+    return after
+
+
 # --- Referrals (super admin configure + manage) --------------------------------
 
 

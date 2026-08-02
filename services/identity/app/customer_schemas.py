@@ -14,6 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import Customer, CustomerOAuthIdentity
 from app.oauth import OAuthProfile, SUPPORTED_OAUTH_PROVIDERS
+from app.schemas import normalize_india_phone
 from ckac_common.config import get_settings
 
 settings = get_settings()
@@ -119,12 +120,7 @@ class CustomerPhoneRequest(BaseModel):
     @field_validator("phone")
     @classmethod
     def normalize_phone(cls, v: str) -> str:
-        digits = re.sub(r"\D", "", v)
-        if len(digits) < 10:
-            raise ValueError("Phone must have at least 10 digits")
-        if len(digits) == 10:
-            return f"+91{digits}"
-        return f"+{digits}" if not v.startswith("+") else v
+        return normalize_india_phone(v)
 
 
 class CustomerPhoneVerifyRequest(CustomerPhoneRequest):

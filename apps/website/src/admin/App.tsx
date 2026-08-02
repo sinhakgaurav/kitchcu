@@ -815,33 +815,55 @@ function AdminLogin({ onSuccess }: { onSuccess: (token: string) => void }) {
           <button type="submit" className="btn btn--primary btn--lg" disabled={busy}>
             {busy ? "Signing in..." : "Sign in"}
           </button>
-          <p className="auth-card__hint">
-            {revealedPassword ? (
-              <>
-                Admin: <strong>{email}</strong> · password: <code>{revealedPassword}</code>
-                {defaults.isProductionHost ? (
-                  <>
-                    {" "}
-                    (from VM <code>ADMIN_PASSWORD</code> / GCE <code>admin-password</code>; synced on login)
-                  </>
-                ) : null}
-              </>
-            ) : defaults.isProductionHost ? (
-              <>
-                Production admin: <strong>admin@kitchcu.com</strong> — password from VM{" "}
-                <code>ADMIN_PASSWORD</code> / GCE metadata <code>admin-password</code> (synced on login).
-                Do not use <code>admin@kitchcu.dev</code> here.
-              </>
-            ) : (
-              <>
-                Dev admin: {defaults.email} / {defaults.password}
-              </>
-            )}
-            <br />
-            Owner demos: {DEMO_OWNERS.map((o) => o.phone).join(", ")} (OTP 123456)
-            {" · "}
-            <a href={kitchenUrl("/login")} target="_blank" rel="noopener noreferrer">Owner app</a>
-          </p>
+          <details className="auth-card__demo" open={!defaults.isProductionHost}>
+            <summary>Login credentials</summary>
+            <p className="auth-card__demo-otp">
+              {revealedPassword ? (
+                <>
+                  Email <code>{email || defaults.email}</code>
+                  {" · "}
+                  Password <code>{revealedPassword}</code>
+                  {defaults.isProductionHost ? (
+                    <>
+                      {" "}
+                      (from VM <code>ADMIN_PASSWORD</code> / GCE <code>admin-password</code>)
+                    </>
+                  ) : (
+                    <> (dev / seeded default)</>
+                  )}
+                </>
+              ) : defaults.isProductionHost ? (
+                <>
+                  Production: <code>admin@kitchcu.com</code> — password from VM{" "}
+                  <code>ADMIN_PASSWORD</code> (not the .dev account).
+                </>
+              ) : (
+                <>
+                  Dev: <code>{defaults.email}</code> / <code>{defaults.password}</code>
+                </>
+              )}
+            </p>
+            {!defaults.isProductionHost && revealedPassword ? (
+              <button
+                type="button"
+                className="btn btn--ghost btn--sm"
+                disabled={busy}
+                onClick={() => {
+                  setEmail(defaults.email);
+                  setPassword(revealedPassword);
+                }}
+              >
+                Fill demo credentials
+              </button>
+            ) : null}
+            <p className="auth-card__demo-note">
+              Owner demos: {DEMO_OWNERS.map((o) => o.phone).join(", ")} (OTP 123456)
+              {" · "}
+              <a href={kitchenUrl("/login")} target="_blank" rel="noopener noreferrer">
+                Owner app
+              </a>
+            </p>
+          </details>
         </form>
       </div>
     </div>

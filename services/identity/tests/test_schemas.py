@@ -24,9 +24,31 @@ class TestOwnerRegisterRequest:
         with pytest.raises(ValidationError):
             OwnerRegisterRequest(phone="12345", name="Raj")
 
+    def test_rejects_overlong_national_phone(self):
+        with pytest.raises(ValidationError):
+            OwnerRegisterRequest(phone="987654321011", name="Raj")
+
     def test_rejects_short_name(self):
         with pytest.raises(ValidationError):
             OwnerRegisterRequest(phone="9876543210", name="R")
+
+    def test_rejects_numeric_name(self):
+        with pytest.raises(ValidationError):
+            OwnerRegisterRequest(phone="9876543210", name="123456")
+
+    def test_rejects_name_with_digits(self):
+        with pytest.raises(ValidationError):
+            OwnerRegisterRequest(phone="9876543210", name="Pooja123")
+
+    def test_normalizes_email_lowercase(self):
+        req = OwnerRegisterRequest(
+            phone="9876543210", name="Raj Kumar", email="POOJA020@GMAIL.COM"
+        )
+        assert req.email == "pooja020@gmail.com"
+
+    def test_allows_name_with_apostrophe(self):
+        req = OwnerRegisterRequest(phone="9876543210", name="O'Brien")
+        assert req.name == "O'Brien"
 
 
 class TestCreateAccessToken:

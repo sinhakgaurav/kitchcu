@@ -211,15 +211,31 @@ export function CustomerDiscoveryHome() {
     (list: DiscoveryKitchenCard[]) => {
       const q = query.trim().toLowerCase();
       if (!q) return list;
-      return list.filter(
-        (k) =>
-          k.name.toLowerCase().includes(q) ||
-          k.code.toLowerCase().includes(q) ||
-          (k.city || "").toLowerCase().includes(q) ||
-          (k.tagline || "").toLowerCase().includes(q),
+      const dishHits = new Set(
+        (feed?.cheapest_dishes ?? [])
+          .filter(
+            (d) =>
+              d.dish_name.toLowerCase().includes(q) ||
+              d.kitchen_name.toLowerCase().includes(q) ||
+              d.kitchen_code.toLowerCase().includes(q),
+          )
+          .map((d) => d.kitchen_id),
       );
+      return list.filter((k) => {
+        const hay = [k.name, k.code, k.city || "", k.tagline || ""].join(" ").toLowerCase();
+        if (hay.includes(q)) return true;
+        if (dishHits.has(k.id)) return true;
+        if ((q === "veg" || q.includes("vegetarian")) && k.has_veg) return true;
+        if (
+          (q.includes("non-veg") || q.includes("nonveg") || q.includes("non veg") || q.includes("chicken")) &&
+          k.has_non_veg
+        ) {
+          return true;
+        }
+        return false;
+      });
     },
-    [query],
+    [query, feed?.cheapest_dishes],
   );
 
   const nearYou = useMemo(() => filterKitchens(feed?.near_you ?? []), [feed, filterKitchens]);
@@ -278,7 +294,13 @@ export function CustomerDiscoveryHome() {
           </h1>
           <p className="disc-home__lede">Cloud kitchens near you — live-capture menus, ready-within times.</p>
 
-          <div className="disc-home__search">
+          <form
+            className="disc-home__search"
+            onSubmit={(e) => {
+              e.preventDefault();
+              void load();
+            }}
+          >
             <label className="disc-home__search-field">
               <span className="visually-hidden">{t("common.search")}</span>
               <input
@@ -286,13 +308,16 @@ export function CustomerDiscoveryHome() {
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder={t("customer.discovery.searchPlaceholder")}
                 autoComplete="off"
+                enterKeyHint="search"
               />
             </label>
             <div className="disc-home__loc">
               <button
                 type="button"
                 className="btn btn--ghost btn--sm"
-                onClick={refresh}
+                onClick={() => {
+                  void refresh();
+                }}
                 disabled={status === "loading"}
               >
                 {status === "loading" ? t("common.loading") : t("customer.discovery.useLocation")}
@@ -311,16 +336,30 @@ export function CustomerDiscoveryHome() {
                 </select>
               </label>
             </div>
-          </div>
+          </form>
 
           {geoError ? <p className="disc-home__hint">{geoError}</p> : null}
-          {farFromDemo && (feed?.total_kitchens ?? 0) === 0 ? (
+          {!loading && !fetchError && (feed?.total_kitchens ?? 0) === 0 ? (
             <div className="disc-home__banner">
-              <p>No kitchens in this radius near your GPS. Try the Pune demo cluster.</p>
+              <p>
+                {farFromDemo
+                  ? "No kitchens near this GPS pin (demo data is clustered in Pune). Jump to the demo map."
+                  : "No kitchens in this radius. Widen the search or use the Pune demo cluster."}
+              </p>
               <button type="button" className="btn btn--primary btn--sm" onClick={useDemoPin}>
                 Show demo kitchens
               </button>
             </div>
+          ) : null}
+          {!loading &&
+          query.trim() &&
+          nearYou.length === 0 &&
+          featured.length === 0 &&
+          cheapest.length === 0 &&
+          (feed?.total_kitchens ?? 0) > 0 ? (
+            <p className="disc-home__hint">
+              No kitchens or dishes match “{query.trim()}”. Try a kitchen name, dish (e.g. Samosa), or clear search.
+            </p>
           ) : null}
         </div>
       </header>

@@ -314,7 +314,7 @@ DEMO_DISHES: list[dict] = [
         "prep_time_min": 35,
         "description": "Creamy tomato gravy with tandoori chicken — home-style, not restaurant heavy.",
         "ingredients_description": "Chicken, tomato, butter, cream, kasuri methi",
-        "media_url": food_media("bbq.jpg"),
+        "media_url": food_media("restaurant.jpg"),
     },
     {
         "name": "Mango Lassi",
@@ -324,7 +324,7 @@ DEMO_DISHES: list[dict] = [
         "prep_time_min": 5,
         "description": "Thick yogurt drink blended with Alphonso mango pulp.",
         "ingredients_description": "Yogurt, mango pulp, cardamom, ice",
-        "media_url": food_media("bowls.jpg"),
+        "media_url": food_media("dessert.jpg"),
     },
     {
         "name": "Gulab Jamun",
@@ -344,7 +344,7 @@ DEMO_DISHES: list[dict] = [
         "prep_time_min": 30,
         "description": "Dal, seasonal sabzi, rice, roti, pickle, and papad — complete meal.",
         "ingredients_description": "Dal, seasonal vegetables, wheat roti, rice, accompaniments",
-        "media_url": food_media("dining.jpg"),
+        "media_url": food_media("rice.jpg"),
     },
     {
         "name": "Pav Bhaji",
@@ -354,7 +354,7 @@ DEMO_DISHES: list[dict] = [
         "prep_time_min": 18,
         "description": "Mumbai-style mashed veggie curry with butter-toasted pav (2 pcs).",
         "ingredients_description": "Mixed vegetables, pav, butter, bhaji masala",
-        "media_url": food_media("samosa.jpg"),
+        "media_url": food_media("dining.jpg"),
     },
 ]
 

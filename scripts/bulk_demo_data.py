@@ -196,13 +196,91 @@ ORDER_STATUS_WEIGHTS: list[tuple[str, int]] = [
 ]
 
 
+# Keyword → local food asset (avoid round-robin mismatches like Bhel→meat).
+_DISH_MEDIA_KEYWORDS: list[tuple[str, str]] = [
+    ("biryani", "biryani.jpg"),
+    ("dosa", "dosa.jpg"),
+    ("idli", "dosa.jpg"),
+    ("sambar", "dosa.jpg"),
+    ("tikka", "skewers.jpg"),
+    ("skewer", "skewers.jpg"),
+    ("wings", "bbq.jpg"),
+    ("bbq", "bbq.jpg"),
+    ("grill", "bbq.jpg"),
+    ("fish", "bbq.jpg"),
+    ("mutton", "bbq.jpg"),
+    ("chicken", "restaurant.jpg"),
+    ("butter chicken", "restaurant.jpg"),
+    ("keema", "restaurant.jpg"),
+    ("egg", "bowls.jpg"),
+    ("bowl", "bowls.jpg"),
+    ("salad", "salad.jpg"),
+    ("buddha", "salad.jpg"),
+    ("tofu", "salad.jpg"),
+    ("vegan", "salad.jpg"),
+    ("samosa", "samosa.jpg"),
+    ("bhel", "samosa.jpg"),
+    ("pani puri", "samosa.jpg"),
+    ("vada pav", "samosa.jpg"),
+    ("pav bhaji", "dining.jpg"),
+    ("misal", "dining.jpg"),
+    ("fries", "burger.jpg"),
+    ("burger", "burger.jpg"),
+    ("pizza", "pizza.jpg"),
+    ("pasta", "pasta.jpg"),
+    ("thali", "rice.jpg"),
+    ("rice", "rice.jpg"),
+    ("lunch", "rice.jpg"),
+    ("feast", "dining.jpg"),
+    ("brunch", "dining.jpg"),
+    ("naan", "dining.jpg"),
+    ("roti", "dining.jpg"),
+    ("paneer", "bowls.jpg"),
+    ("dal", "bowls.jpg"),
+    ("aloo", "bowls.jpg"),
+    ("gobi", "bowls.jpg"),
+    ("bhindi", "bowls.jpg"),
+    ("chole", "dining.jpg"),
+    ("palak", "bowls.jpg"),
+    ("sabudana", "bowls.jpg"),
+    ("thepla", "dining.jpg"),
+    ("lassi", "dessert.jpg"),
+    ("chai", "dessert.jpg"),
+    ("coffee", "dessert.jpg"),
+    ("chocolate", "dessert.jpg"),
+    ("juice", "dessert.jpg"),
+    ("soda", "dessert.jpg"),
+    ("buttermilk", "dessert.jpg"),
+    ("tea", "dessert.jpg"),
+    ("gulab", "dessert.jpg"),
+    ("kheer", "dessert.jpg"),
+    ("rasmalai", "dessert.jpg"),
+    ("brownie", "dessert.jpg"),
+    ("halwa", "dessert.jpg"),
+    ("sweet", "dessert.jpg"),
+    ("pakora", "samosa.jpg"),
+    ("mango", "dessert.jpg"),
+]
+
+
+def _media_for_dish(name: str, index: int) -> str:
+    lower = name.lower()
+    for keyword, file in _DISH_MEDIA_KEYWORDS:
+        if keyword in lower:
+            return food_media(file)
+    return food_media(FOOD_MEDIA_FILES[index % len(FOOD_MEDIA_FILES)])
+
+
 def dish_with_media(dish: dict, index: int) -> dict:
-    photo = FOOD_MEDIA_FILES[index % len(FOOD_MEDIA_FILES)]
+    if dish.get("media_url"):
+        media_url = dish["media_url"]
+    else:
+        media_url = _media_for_dish(str(dish.get("name", "")), index)
     return {
         **dish,
         "description": f"Home-style {dish['name']} — live-capture, made fresh to order.",
         "ingredients_description": "Fresh local ingredients, house spices",
-        "media_url": food_media(photo),
+        "media_url": media_url,
     }
 
 

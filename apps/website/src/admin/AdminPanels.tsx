@@ -19,6 +19,7 @@ import {
   fetchAdminOwners,
   fetchAdminPackages,
   fetchAdminPayments,
+  fetchAdminRateLimits,
   fetchAdminRefunds,
   fetchAdminSettlements,
   fetchAdminTickets,
@@ -28,6 +29,7 @@ import {
   updateAdminEmployee,
   updateAdminFeatureFlag,
   updateAdminOwnerSubscription,
+  updateAdminRateLimits,
   upsertAdminPackage,
   type AdminAuditEvent,
   type AdminCustomer,
@@ -36,6 +38,8 @@ import {
   type AdminFeature,
   type AdminOrder,
   type AdminPackage,
+  type AdminRateLimitRule,
+  type AdminRateLimitSettings,
   type AdminRefund,
   type AdminSettlement,
   type AdminTicket,
@@ -703,6 +707,171 @@ export function AdminRefunds({ initialSearch = "" }: { initialSearch?: string })
   );
 }
 
+function AdminRateLimitsPanel() {
+  const [settings, setSettings] = useState<AdminRateLimitSettings | null>(null);
+  const [draft, setDraft] = useState<AdminRateLimitRule[]>([]);
+  const [enabled, setEnabled] = useState(true);
+  const [error, setError] = useState("");
+  const [ok, setOk] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  const load = async () => {
+    try {
+      const data = await fetchAdminRateLimits();
+      setSettings(data);
+      setDraft(data.rules.map((r) => ({ ...r })));
+      setEnabled(data.enabled);
+      setError("");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to load rate limits");
+    }
+  };
+
+  useEffect(() => {
+    void load();
+  }, []);
+
+  const save = async () => {
+    setBusy(true);
+    setOk("");
+    setError("");
+    try {
+      const rules: Record<string, { limit: number; window_seconds: number }> = {};
+      for (const r of draft) {
+        rules[r.name] = { limit: Number(r.limit), window_seconds: Number(r.window_seconds) };
+      }
+      const next = await updateAdminRateLimits({ enabled, rules });
+      setSettings(next);
+      setDraft(next.rules.map((r) => ({ ...r })));
+      setEnabled(next.enabled);
+      setOk("Rate limits saved — gateway picks up changes within ~30 seconds.");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Save failed");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const applyPreset = async (preset: "defaults" | "test_phase") => {
+    setBusy(true);
+    setOk("");
+    setError("");
+    try {
+      const next = await updateAdminRateLimits({ preset });
+      setSettings(next);
+      setDraft(next.rules.map((r) => ({ ...r })));
+      setEnabled(next.enabled);
+      setOk(
+        preset === "test_phase"
+          ? "Test-phase preset applied (high limits for QA)."
+          : "Production-safe defaults restored.",
+      );
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Preset failed");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <section className="glass admin-detail" style={{ marginBottom: "1rem" }}>
+      <h3>API rate limits (gateway)</h3>
+      <p>
+        Testers hitting 429s during QA? Raise OTP/checkout thresholds here, or turn limiting off for
+        the test phase. Changes publish to Redis; gateway refreshes within ~30s (no redeploy).
+      </p>
+      {error ? <p className="auth-card__error">{error}</p> : null}
+      {ok ? <p className="auth-card__hint">{ok}</p> : null}
+      <div style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem", marginBottom: "0.75rem" }}>
+        <label style={{ display: "inline-flex", alignItems: "center", gap: "0.4rem" }}>
+          <input
+            type="checkbox"
+            checked={enabled}
+            onChange={(e) => setEnabled(e.target.checked)}
+            disabled={busy}
+          />
+          Rate limiting enabled
+        </label>
+        <button
+          type="button"
+          className="btn btn--primary btn--sm"
+          disabled={busy}
+          onClick={() => void applyPreset("test_phase")}
+        >
+          Apply test-phase preset
+        </button>
+        <button
+          type="button"
+          className="btn btn--ghost btn--sm"
+          disabled={busy}
+          onClick={() => void applyPreset("defaults")}
+        >
+          Restore defaults
+        </button>
+        <button type="button" className="btn btn--ghost btn--sm" disabled={busy} onClick={() => void save()}>
+          {busy ? "Saving…" : "Save limits"}
+        </button>
+      </div>
+      <table className="admin-table">
+        <thead>
+          <tr>
+            <th>Rule</th>
+            <th>Limit / window</th>
+            <th>Window (seconds)</th>
+          </tr>
+        </thead>
+        <tbody>
+          {draft.map((r, idx) => (
+            <tr key={r.name}>
+              <td>
+                <code>{r.name}</code>
+                <div style={{ fontSize: "0.8rem", opacity: 0.8 }}>{r.label}</div>
+              </td>
+              <td>
+                <input
+                  type="number"
+                  min={1}
+                  max={1000000}
+                  value={r.limit}
+                  disabled={busy}
+                  onChange={(e) => {
+                    const v = Number(e.target.value);
+                    setDraft((rows) =>
+                      rows.map((row, i) => (i === idx ? { ...row, limit: v } : row)),
+                    );
+                  }}
+                  style={{ width: "6rem" }}
+                />
+              </td>
+              <td>
+                <input
+                  type="number"
+                  min={1}
+                  max={86400}
+                  value={r.window_seconds}
+                  disabled={busy}
+                  onChange={(e) => {
+                    const v = Number(e.target.value);
+                    setDraft((rows) =>
+                      rows.map((row, i) => (i === idx ? { ...row, window_seconds: v } : row)),
+                    );
+                  }}
+                  style={{ width: "6rem" }}
+                />
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      {settings?.updated_at ? (
+        <p className="auth-card__hint" style={{ marginTop: "0.5rem" }}>
+          Last updated: {new Date(settings.updated_at).toLocaleString()}
+        </p>
+      ) : null}
+    </section>
+  );
+}
+
 export function AdminControlPlane() {
   const [flags, setFlags] = useState<FeatureFlag[]>([]);
   const [journeys, setJourneys] = useState<
@@ -738,6 +907,8 @@ export function AdminControlPlane() {
   return (
     <div className="admin-panel">
       {error && <p className="auth-card__error">{error}</p>}
+
+      <AdminRateLimitsPanel />
 
       <section className="glass admin-detail" style={{ marginBottom: "1rem" }}>
         <h3>Platform API keys</h3>

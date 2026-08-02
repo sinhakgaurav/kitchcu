@@ -31,10 +31,18 @@ export function useScrollProgress() {
   const [scrollY, setScrollY] = useState(0);
 
   useEffect(() => {
+    if (
+      typeof window !== "undefined" &&
+      (window.matchMedia("(prefers-reduced-motion: reduce)").matches ||
+        window.matchMedia("(max-width: 900px)").matches)
+    ) {
+      return;
+    }
     let raf = 0;
     const onScroll = () => {
-      cancelAnimationFrame(raf);
+      if (raf) return;
       raf = requestAnimationFrame(() => {
+        raf = 0;
         const doc = document.documentElement;
         const max = doc.scrollHeight - window.innerHeight;
         setScrollY(window.scrollY);
@@ -103,17 +111,38 @@ export function useInView(threshold = 0.15) {
   return { ref, visible };
 }
 
-export function useMouseParallax(intensity = 0.12) {
+export function useMouseParallax(intensity = 0.06) {
   const [offset, setOffset] = useState({ x: 0, y: 0 });
 
   useEffect(() => {
-    const onMove = (e: MouseEvent) => {
+    if (
+      typeof window !== "undefined" &&
+      (window.matchMedia("(prefers-reduced-motion: reduce)").matches ||
+        window.matchMedia("(pointer: coarse)").matches ||
+        window.matchMedia("(max-width: 900px)").matches)
+    ) {
+      return;
+    }
+    let raf = 0;
+    let latest: MouseEvent | null = null;
+    const flush = () => {
+      raf = 0;
+      if (!latest) return;
+      const e = latest;
+      latest = null;
       const x = (e.clientX / window.innerWidth - 0.5) * intensity * 100;
       const y = (e.clientY / window.innerHeight - 0.5) * intensity * 100;
       setOffset({ x, y });
     };
+    const onMove = (e: MouseEvent) => {
+      latest = e;
+      if (!raf) raf = requestAnimationFrame(flush);
+    };
     window.addEventListener("mousemove", onMove, { passive: true });
-    return () => window.removeEventListener("mousemove", onMove);
+    return () => {
+      cancelAnimationFrame(raf);
+      window.removeEventListener("mousemove", onMove);
+    };
   }, [intensity]);
 
   return offset;

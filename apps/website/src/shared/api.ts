@@ -370,11 +370,36 @@ export type OwnerSubscription = {
   created_at: string;
 };
 
+/** India mobile → E.164 ``+91XXXXXXXXXX``. Throws on invalid length / non-mobile. */
 export function normalizePhone(phone: string): string {
   const digits = phone.replace(/\D/g, "");
-  if (digits.length === 10) return `+91${digits}`;
-  if (phone.trim().startsWith("+")) return phone.trim();
-  return `+${digits}`;
+  let national = "";
+  if (digits.length === 10) national = digits;
+  else if (digits.length === 12 && digits.startsWith("91")) national = digits.slice(2);
+  else throw new Error("Enter a valid 10-digit India mobile number");
+  if (!/^[6-9]\d{9}$/.test(national)) {
+    throw new Error("Enter a valid 10-digit India mobile number");
+  }
+  return `+91${national}`;
+}
+
+/** Person display name — letters required; no digits. */
+export function normalizePersonName(name: string): string {
+  const cleaned = name.trim();
+  if (cleaned.length < 2) throw new Error("Name must be at least 2 characters");
+  if (!/^[\p{L}.\-'\s]+$/u.test(cleaned)) {
+    throw new Error("Name may only contain letters, spaces, apostrophes, hyphens, or dots");
+  }
+  if (/\d/.test(cleaned)) throw new Error("Name must not contain digits");
+  return cleaned;
+}
+
+export function normalizeEmail(email: string): string {
+  const cleaned = email.trim().toLowerCase();
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleaned)) {
+    throw new Error("Enter a valid email address");
+  }
+  return cleaned;
 }
 
 /** Authenticated owner API fetch — used by feature modules (referrals, etc.). */
@@ -410,7 +435,11 @@ export async function registerOwner(data: {
 }): Promise<OwnerProfile> {
   return apiFetch("/api/v1/owners/register", {
     method: "POST",
-    body: JSON.stringify({ ...data, phone: normalizePhone(data.phone) }),
+    body: JSON.stringify({
+      phone: normalizePhone(data.phone),
+      name: normalizePersonName(data.name),
+      email: data.email?.trim() ? normalizeEmail(data.email) : undefined,
+    }),
   });
 }
 

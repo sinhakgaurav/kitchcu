@@ -24,8 +24,8 @@ export function LanguageSwitcher({ className = "" }: { className?: string }) {
       >
         {OPTIONS.map((lang) => (
           <option key={lang.code} value={lang.code}>
-            {lang.nameEn}
-            {lang.code !== "en" ? ` · ${lang.name}` : ""}
+            {/* Short labels keep ta/te/ml from overflowing the nav select */}
+            {lang.code.toUpperCase()} · {lang.nameEn}
           </option>
         ))}
       </select>

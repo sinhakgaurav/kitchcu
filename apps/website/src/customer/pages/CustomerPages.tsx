@@ -6,7 +6,7 @@ import { images, sampleDishImages } from "../../data/content";
 import { AuthLoginHighlights } from "../../components/AuthLoginHighlights";
 import { BrandAuthArt, BrandLogo } from "../../components/BrandLogo";
 import { DEMO, DEMO_CUSTOMERS, DEMO_OWNERS, type DemoCustomerAccount } from "../../shared/demo";
-import { normalizePhone } from "../../shared/api";
+import { normalizePersonName, normalizePhone } from "../../shared/api";
 import { fetchKitchenByCode } from "../../shared/publicApi";
 import { CUSTOMER_HOST, KITCHEN_HOST } from "../../shared/brand";
 import { CustomerSocialLogin } from "../../components/CustomerSocialLogin";
@@ -37,6 +37,7 @@ export function CustomerLoginPage() {
   const [busy, setBusy] = useState(false);
   const [busyPhone, setBusyPhone] = useState<string | null>(null);
   const [policiesAgreed, setPoliciesAgreed] = useState(false);
+  const [fieldErrors, setFieldErrors] = useState<{ name?: string; phone?: string }>({});
 
   if (isCustomerSignedIn(session) && getCustomerToken()) {
     return <Navigate to={nextPath.startsWith("/") ? nextPath : "/"} replace />;
@@ -72,12 +73,34 @@ export function CustomerLoginPage() {
     e.preventDefault();
     if (!requirePolicyAgreement()) return;
     setError("");
+    const nextErrors: { name?: string; phone?: string } = {};
+    try {
+      if (name.trim()) normalizePersonName(name);
+      else nextErrors.name = "Enter your name";
+    } catch (err) {
+      nextErrors.name = err instanceof Error ? err.message : "Invalid name";
+    }
+    try {
+      normalizePhone(phone);
+    } catch (err) {
+      nextErrors.phone = err instanceof Error ? err.message : "Invalid phone";
+    }
+    setFieldErrors(nextErrors);
+    if (Object.keys(nextErrors).length) {
+      setError(Object.values(nextErrors)[0] || "Fix the highlighted fields");
+      return;
+    }
     setBusy(true);
     try {
       await requestCustomerWhatsAppOtp(normalizePhone(phone));
       setOtpSent(true);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not send OTP");
+      const msg = err instanceof Error ? err.message : "Could not send OTP";
+      setError(
+        /unavailable|503|WhatsApp|Configure/i.test(msg)
+          ? `${msg} — Use a demo customer below with OTP ${DEMO.otp}, or configure WhatsApp OTP delivery.`
+          : msg,
+      );
     } finally {
       setBusy(false);
     }
@@ -89,12 +112,13 @@ export function CustomerLoginPage() {
     setError("");
     setBusy(true);
     try {
+      const displayName = name.trim() ? normalizePersonName(name) : "";
       const result = await verifyCustomerWhatsAppOtp(normalizePhone(phone), otp.trim());
       applyAuthResult({
         ...result,
         customer: {
           ...result.customer,
-          name: name.trim() || result.customer.name,
+          name: displayName || result.customer.name,
         },
       });
       await afterAuth(code);
@@ -160,22 +184,41 @@ export function CustomerLoginPage() {
             <h2>Sign in</h2>
             <p className="auth-card__hint">
               WhatsApp OTP on <strong>{CUSTOMER_HOST}</strong>
-              {import.meta.env.DEV ? <> · Dev OTP <strong>{DEMO.otp}</strong></> : null}
+              {" · "}Demo OTP <strong>{DEMO.otp}</strong> when outbound WhatsApp is not configured
             </p>
             {error && <div className="auth-card__error">{error}</div>}
             <label>
               Your name
-              <input value={name} onChange={(e) => setName(e.target.value)} required placeholder={DEMO.customerName} />
+              <input
+                value={name}
+                onChange={(e) => {
+                  setName(e.target.value);
+                  setFieldErrors((f) => ({ ...f, name: undefined }));
+                }}
+                required
+                placeholder={DEMO.customerName}
+                className={fieldErrors.name ? "input-invalid" : undefined}
+                aria-invalid={Boolean(fieldErrors.name)}
+              />
+              {fieldErrors.name ? <span className="field-error">{fieldErrors.name}</span> : null}
             </label>
             <label>
               {t("customer.auth.phone")}
               <input
                 value={phone}
-                onChange={(e) => setPhone(e.target.value)}
+                onChange={(e) => {
+                  setPhone(e.target.value);
+                  setFieldErrors((f) => ({ ...f, phone: undefined }));
+                }}
                 required
                 placeholder="9123456789"
+                inputMode="numeric"
+                autoComplete="tel"
                 disabled={otpSent}
+                className={fieldErrors.phone ? "input-invalid" : undefined}
+                aria-invalid={Boolean(fieldErrors.phone)}
               />
+              {fieldErrors.phone ? <span className="field-error">{fieldErrors.phone}</span> : null}
             </label>
             <label>
               {t("customer.nav.kitchenCode")}
