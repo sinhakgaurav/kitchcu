@@ -31,7 +31,8 @@
     "dashboard": "டாஷ்போர்டு",
     "customerApp": "வாடிக்கையாளர் செயலி",
     "kitchenOwner": "கிச்சன் உரிமையாளர் →",
-    "ownerLogin": "உரிமையாளர் உள்நுழைவு"
+    "ownerLogin": "உரிமையாளர் உள்நுழைவு",
+    "adminLogin": "Super admin"
   },
   "status": {
     "received": "பெறப்பட்டது",
@@ -140,7 +141,8 @@
     "contactSubmit": "அணுகலைக் கோருங்கள்",
     "contactSending": "அனுப்புகிறது…",
     "contactSent": "நன்றி - விரைவில் தொடர்புகொள்வோம்.",
-    "contactError": "அனுப்ப முடியவில்லை. மீண்டும் முயற்சிக்கவும்."
+    "contactError": "அனுப்ப முடியவில்லை. மீண்டும் முயற்சிக்கவும்.",
+    "navCities": "Cities"
   },
   "owner": {
     "nav": {
@@ -167,7 +169,8 @@
       "whatsapp": "WhatsApp",
       "paymentGateway": "பேமெண்ட் கேட்வே",
       "gst": "GST & நிதி",
-      "setup": "கிச்சன் அமைப்பு"
+      "setup": "கிச்சன் அமைப்பு",
+      "bulkPrep": "Prep batches"
     },
     "shell": {
       "activeKitchen": "செயலில் உள்ள கிச்சன்",
@@ -333,13 +336,16 @@
       "socialContinue": "சமூக கணக்குடன் தொடரவும்",
       "phone": "தொலைபேசி",
       "sendOtp": "OTP அனுப்பு",
-      "verify": "சரிபார்"
+      "verify": "சரிபார்",
+      "kitchenCodeHint": "Skip if you are browsing kitchens nearby",
+      "kitchenCodeOptional": "Kitchen code (optional)"
     },
     "discovery": {
       "title": "உங்களுக்கு அருகிலுள்ள வீட்டு கிச்சன்களைக் கண்டறியுங்கள்",
       "searchPlaceholder": "கிச்சன், உணவுவகை, உணவு தேடு…",
       "useLocation": "என் இருப்பிடத்தைப் பயன்படுத்து",
-      "noResults": "உங்கள் வடிப்பான்களுடன் எந்த கிச்சனும் பொருந்தவில்லை"
+      "noResults": "உங்கள் வடிப்பான்களுடன் எந்த கிச்சனும் பொருந்தவில்லை",
+      "lede": "Real dish photos, honest prep times, and fair delivery — order home taste."
     },
     "checkout": {
       "title": "செக்அவுட்",
@@ -375,13 +381,41 @@
       "tabComplaints": "ஆதரவு",
       "tabAddresses": "முகவரிகள்",
       "tabAccount": "கணக்கு",
-      "tabPlans": "திட்டங்கள்"
+      "tabPlans": "திட்டங்கள்",
+      "findFood": "Find food nearby",
+      "moreTabs": "More",
+      "refundDetails": "Where refunds go",
+      "subtitle": "Orders, addresses, and support — simple tools for everyday ordering."
     },
     "account": {
       "title": "கணக்கு",
       "addresses": "முகவரிகள்",
       "payout": "பணத்திருப்ப பேஅவுட்",
-      "save": "சுயவிவரத்தைச் சேமி"
+      "save": "சுயவிவரத்தைச் சேமி",
+      "accountHolder": "Account holder name",
+      "bankAccount": "Bank account number",
+      "ifsc": "IFSC",
+      "intro": "Add your UPI or bank so kitchens can send refunds to you quickly.",
+      "logOut": "Log out",
+      "myOrders": "My orders",
+      "mySpace": "My space",
+      "pageTitle": "Account",
+      "payoutSaved": "Payout details saved — kitchens can refund to this UPI or bank account.",
+      "qrUploaded": "UPI QR image uploaded.",
+      "savePayout": "Save payout details",
+      "saving": "Saving…",
+      "upiId": "UPI ID",
+      "upiQrHint": "Optional — owners can use this when sending a direct UPI refund.",
+      "upiQrTitle": "UPI QR / scanner image",
+      "uploadImage": "Upload image"
     }
+  },
+  "cities": {
+    "body": "{{count}}+ cities with live kitchens — more opening soon across India.",
+    "eyebrow": "Where we are",
+    "nav": "Cities",
+    "statusLive": "Live",
+    "statusSoon": "Coming soon",
+    "title": "Our presence in cities"
   }
 }

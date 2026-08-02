@@ -1,5 +1,6 @@
 import { KitchenNavbar } from "../../components/KitchenNavbar";
 import { Hero } from "../../components/Hero";
+import { CitiesPresence } from "../../components/CitiesPresence";
 import { Features } from "../../components/Features";
 import { HowItWorks } from "../../components/HowItWorks";
 import { ParallaxDivider } from "../../components/ParallaxDivider";
@@ -14,6 +15,7 @@ export function KitchenLandingPage() {
         <Hero variant="kitchen" />
         <ParallaxDivider />
         <Features />
+        <CitiesPresence />
         <ParallaxDivider reverse />
         <HowItWorks />
         <Contact />

@@ -159,7 +159,9 @@ Run workflow. It will:
 Log in as Super Admin at `https://admin.kitchcu.com` with **`admin@kitchcu.com`**
 and the GCE metadata password (`admin-password` → VM `ADMIN_PASSWORD`). The identity
 service re-syncs the password hash from env on every login bootstrap — do **not** use
-`admin@kitchcu.dev` in production. Then open **Control → API Keys**, and set:
+`admin@kitchcu.dev` in production. Full portal URL + credential + feature QA matrix:
+[`PRODUCTION-PORTALS-CREDENTIALS-QA.md`](./PRODUCTION-PORTALS-CREDENTIALS-QA.md)
+(+ PDF). Then open **Control → API Keys**, and set:
 
 - `razorpay_key_id`, `razorpay_key_secret`, `razorpay_webhook_secret` — live Razorpay keys
 - `whatsapp_verify_token`, `whatsapp_app_secret` — from Meta App dashboard

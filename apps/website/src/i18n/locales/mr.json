@@ -31,7 +31,8 @@
     "dashboard": "डॅशबोर्ड",
     "customerApp": "ग्राहक अॅप",
     "kitchenOwner": "किचन ओनर →",
-    "ownerLogin": "ओनर लॉगिन"
+    "ownerLogin": "ओनर लॉगिन",
+    "adminLogin": "Super admin"
   },
   "status": {
     "received": "प्राप्त",
@@ -140,7 +141,8 @@
     "contactSubmit": "अॅक्सेसची विनंती करा",
     "contactSending": "पाठवत आहे…",
     "contactSent": "धन्यवाद — आम्ही लवकरच संपर्क करू.",
-    "contactError": "पाठवता आले नाही. पुन्हा प्रयत्न करा."
+    "contactError": "पाठवता आले नाही. पुन्हा प्रयत्न करा.",
+    "navCities": "Cities"
   },
   "owner": {
     "nav": {
@@ -167,7 +169,8 @@
       "whatsapp": "WhatsApp",
       "paymentGateway": "पेमेंट गेटवे",
       "gst": "GST आणि वित्त",
-      "setup": "किचन सेटअप"
+      "setup": "किचन सेटअप",
+      "bulkPrep": "Prep batches"
     },
     "shell": {
       "activeKitchen": "सक्रिय किचन",
@@ -333,13 +336,16 @@
       "socialContinue": "सोशलने सुरू ठेवा",
       "phone": "फोन",
       "sendOtp": "OTP पाठवा",
-      "verify": "सत्यापित करा"
+      "verify": "सत्यापित करा",
+      "kitchenCodeHint": "Skip if you are browsing kitchens nearby",
+      "kitchenCodeOptional": "Kitchen code (optional)"
     },
     "discovery": {
       "title": "तुमच्या जवळचे होम किचन शोधा",
       "searchPlaceholder": "किचन, पाककृती, डिश शोधा…",
       "useLocation": "माझे स्थान वापरा",
-      "noResults": "तुमच्या फिल्टरशी कोणतेही किचन जुळत नाही"
+      "noResults": "तुमच्या फिल्टरशी कोणतेही किचन जुळत नाही",
+      "lede": "Real dish photos, honest prep times, and fair delivery — order home taste."
     },
     "checkout": {
       "title": "चेकआउट",
@@ -375,13 +381,41 @@
       "tabComplaints": "सहाय्य",
       "tabAddresses": "पत्ते",
       "tabAccount": "खाते",
-      "tabPlans": "प्लॅन"
+      "tabPlans": "प्लॅन",
+      "findFood": "Find food nearby",
+      "moreTabs": "More",
+      "refundDetails": "Where refunds go",
+      "subtitle": "Orders, addresses, and support — simple tools for everyday ordering."
     },
     "account": {
       "title": "अकाउंट",
       "addresses": "पत्ते",
       "payout": "रिफंड पेआउट",
-      "save": "प्रोफाइल जतन करा"
+      "save": "प्रोफाइल जतन करा",
+      "accountHolder": "Account holder name",
+      "bankAccount": "Bank account number",
+      "ifsc": "IFSC",
+      "intro": "Add your UPI or bank so kitchens can send refunds to you quickly.",
+      "logOut": "Log out",
+      "myOrders": "My orders",
+      "mySpace": "My space",
+      "pageTitle": "Account",
+      "payoutSaved": "Payout details saved — kitchens can refund to this UPI or bank account.",
+      "qrUploaded": "UPI QR image uploaded.",
+      "savePayout": "Save payout details",
+      "saving": "Saving…",
+      "upiId": "UPI ID",
+      "upiQrHint": "Optional — owners can use this when sending a direct UPI refund.",
+      "upiQrTitle": "UPI QR / scanner image",
+      "uploadImage": "Upload image"
     }
+  },
+  "cities": {
+    "body": "{{count}}+ cities with live kitchens — more opening soon across India.",
+    "eyebrow": "Where we are",
+    "nav": "Cities",
+    "statusLive": "Live",
+    "statusSoon": "Coming soon",
+    "title": "Our presence in cities"
   }
 }

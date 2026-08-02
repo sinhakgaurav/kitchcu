@@ -86,7 +86,8 @@
 | **Kitchen integrations admin** | identity + billing admin APIs, admin PWA | **P21** — WhatsApp / Razorpay per kitchen (platform keys stay Admin API Keys) |
 | **Package mapper + employees RBAC** | billing packages · identity employees · admin PWA | **P25–P28** — Admin Packages/Employees; kitchen Package/Marketing/Streaming tabs; Cursor super-admin gate |
 | **Dual referrals + GST export + admin ops** | identity referrals · billing GST export · admin PWA | **P37–P39** — customer↔kitchen referrals; GST Excel/PDF; kitchen Orders/Care, ticket triage, settlements |
-| **Platform i18n** | `apps/website/src/i18n/` | **P40** — 10 locales; gate + dashboard chrome; admin stays English |
+| **Platform i18n** | `apps/website/src/i18n/` | **P40** — 12 locales (en + 11 IN); parity + sync scripts; admin stays English |
+| **Cities presence** | `apps/website/src/data/citiesPresence.ts` | Marketing + discovery strip; multi-city seed kitchens |
 | **Owner analytics** | `services/order/app/analytics.py` | F07–F08 revenue, top dishes, peak hours, customer segments |
 | Shared lib | `packages/ckac-common/` | Config, DB, auth, `EventPublisher`, cache, health, internal auth |
 | Event bus | Redis Streams | `ckac:catalog:dish`, `ckac:catalog:ingredient`, `ckac:orders:order`, `ckac:orders:draft`, `ckac:orders:master_order`, `ckac:billing:payment`, `ckac:billing:settlement`, `ckac:billing:subscription`, `ckac:billing:wallet`, `ckac:billing:gst`, `ckac:billing:refund`, `ckac:billing:package`, `ckac:identity:kitchen`, `ckac:identity:referral`, `ckac:marketing:coupon`, `ckac:marketing:promotion`, `ckac:marketing:crm`, `ckac:marketing:template`, `ckac:marketing:subscription`, `ckac:ratings:rating`, `ckac:ratings:dish`, `ckac:growth:suggestion`, `ckac:growth:daily_menu`, `ckac:delivery:quote`, `ckac:delivery:tracking`, `ckac:learning:trial`, `ckac:community:recipe`, `ckac:community:reward`, `ckac:community:ranking`, `ckac:streaming:session`, `ckac:notify:whatsapp`, `ckac:notify:dispatch`, `ckac:notify:tracking` |
@@ -299,7 +300,9 @@ Invalidate on domain events (`DishUpdated`, `OrderPlaced`, etc.)
 | Customer PWA | `apps/customer-pwa/` |
 | Offline | Workbox — cache menu, order history |
 | Live photo | `getUserMedia` — enforce `is_live_capture: true` on dish hero upload |
-| i18n | 10 IN locales (`en hi mr ta te kn ml bn gu pa`); dashboard chrome wired; catalogs in `apps/website/src/i18n/locales/`; parity via `scripts/check-i18n-locale-parity.py`; admin ops stays English |
+| i18n | 12 locales (`en hi mr ta te kn ml bn gu pa bho mai`); catalogs in `apps/website/src/i18n/locales/`; parity `scripts/check-i18n-locale-parity.py`; sync `scripts/sync-i18n-missing-keys.py`; admin ops stays English |
+| Cities | Presence UI on portal / customer / kitchen; `CITY_CODES` includes Delhi NCR + UP belt + Dehradun; seed `DEMO_KITCHENS_CITIES` |
+| Prod portals / QA | [`docs/PRODUCTION-PORTALS-CREDENTIALS-QA.md`](docs/PRODUCTION-PORTALS-CREDENTIALS-QA.md) (+ PDF) — URLs, credentials policy, feature test matrix |
 | API base | Gateway at `/api/v1/` |
 
 ---
@@ -437,7 +440,7 @@ Delivered order only → home_taste (1–5) + quality (1–5) → optional anony
 | Where does business logic go? | `schemas.py` domain functions or `domain/` package — not in routes |
 | How to handle phone numbers? | Normalize to E.164 (`+91...`) via Pydantic validator |
 | Default OTP in dev? | `123456` (replace with Redis + WhatsApp in prod) |
-| Demo owner / kitchen? | Run `python scripts/seed-dev-data.py` or `.\scripts\seed-all.ps1` (bulk + all personas) → phones `9876543210`–`9876543213`, OTP `123456`, primary kitchen `CKPNQ001` |
+| Demo owner / kitchen? | Run `python scripts/seed-dev-data.py` or `.\scripts\seed-all.ps1` → phones `9876543210`–`9876543213`, OTP `123456`, primary `CKPNQ001` (Pune) + multi-city kitchens (Delhi, Gurugram, Noida, Lucknow, Kanpur, Prayagraj, Varanasi, Jhansi, Dehradun, Mumbai) |
 | Demo customers? | WhatsApp OTP `123456` — `9123456789`, `9123456780`, `9988776655`, `9123456781`, `9123456782` (5 total — needed for CRM/learning-trial invite minimum) |
 | Platform admin (local)? | `admin@kitchcu.dev` / `admin123456` |
 | Platform admin (prod `admin.kitchcu.com`)? | `admin@kitchcu.com` + GCE metadata `admin-password` (`ADMIN_PASSWORD`) — hash synced on login |
@@ -462,4 +465,4 @@ Delivered order only → home_taste (1–5) + quality (1–5) → optional anony
 
 ---
 
-*Last updated: Phase 1 S1–S18 + P19–P40 + dish bulk Excel / recipe cover / tiffin dish rules. Tracker: `docs/ADVANCEMENT-TRACKER.md`. Guide: `docs/CKAC-COMPLETE-GUIDE.md` v3.2.3. Prod: `*.kitchcu.com`. Next: kitchen staff build · live Razorpay · E1–E2.*
+*Last updated: Phase 1 S1–S18 + P19–P40 · multi-city presence · i18n parity · portals/QA pack. Tracker: `docs/ADVANCEMENT-TRACKER.md`. Portals/QA: `docs/PRODUCTION-PORTALS-CREDENTIALS-QA.md`. Guide: `docs/CKAC-COMPLETE-GUIDE.md` v3.2.4. Prod: `*.kitchcu.com`. Next: kitchen staff build · live Razorpay · E1–E2.*

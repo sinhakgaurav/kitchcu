@@ -31,7 +31,8 @@
     "dashboard": "డాష్‌బోర్డ్",
     "customerApp": "కస్టమర్ యాప్",
     "kitchenOwner": "కిచెన్ యజమాని →",
-    "ownerLogin": "యజమాని లాగిన్"
+    "ownerLogin": "యజమాని లాగిన్",
+    "adminLogin": "Super admin"
   },
   "status": {
     "received": "అందుకుంది",
@@ -140,7 +141,8 @@
     "contactSubmit": "యాక్సెస్‌ని అభ్యర్థించండి",
     "contactSending": "పంపుతోంది...",
     "contactSent": "ధన్యవాదాలు — మేము త్వరలో చేరుకుంటాము.",
-    "contactError": "పంపడం సాధ్యం కాలేదు. దయచేసి మళ్లీ ప్రయత్నించండి."
+    "contactError": "పంపడం సాధ్యం కాలేదు. దయచేసి మళ్లీ ప్రయత్నించండి.",
+    "navCities": "Cities"
   },
   "owner": {
     "nav": {
@@ -167,7 +169,8 @@
       "whatsapp": "WhatsApp",
       "paymentGateway": "చెల్లింపు గేట్ ‌ వే",
       "gst": "GST & ఫైనాన్స్",
-      "setup": "కిచెన్ సెటప్"
+      "setup": "కిచెన్ సెటప్",
+      "bulkPrep": "Prep batches"
     },
     "shell": {
       "activeKitchen": "చురుకైన వంటగది",
@@ -333,13 +336,16 @@
       "socialContinue": "సామాజికంగా కొనసాగండి",
       "phone": "టెలీఫోను",
       "sendOtp": "OTP పంపండి",
-      "verify": "రూఢిపరుచుకోండి"
+      "verify": "రూఢిపరుచుకోండి",
+      "kitchenCodeHint": "Skip if you are browsing kitchens nearby",
+      "kitchenCodeOptional": "Kitchen code (optional)"
     },
     "discovery": {
       "title": "మీకు సమీపంలో ఉన్న ఇంటి వంటశాలలను కనుగొనండి",
       "searchPlaceholder": "వంటగది, వంటకాలు, డిష్ ‌ ని శోధించండి…",
       "useLocation": "నా స్థానం",
-      "noResults": "కిచెన్ ‌ లు మీ ఫిల్టర్ ‌ లతో సరిపోలడం లేదు"
+      "noResults": "కిచెన్ ‌ లు మీ ఫిల్టర్ ‌ లతో సరిపోలడం లేదు",
+      "lede": "Real dish photos, honest prep times, and fair delivery — order home taste."
     },
     "checkout": {
       "title": "చెక్అవుట్",
@@ -375,13 +381,41 @@
       "tabComplaints": "మద్దతు",
       "tabAddresses": "చిరునామాలు",
       "tabAccount": "ఖాతా",
-      "tabPlans": "ప్లాన్లు"
+      "tabPlans": "ప్లాన్లు",
+      "findFood": "Find food nearby",
+      "moreTabs": "More",
+      "refundDetails": "Where refunds go",
+      "subtitle": "Orders, addresses, and support — simple tools for everyday ordering."
     },
     "account": {
       "title": "ఖాతా",
       "addresses": "చిరునామాలు",
       "payout": "రీఫండ్ చెల్లింపు",
-      "save": "ప్రొఫైల్ సేవ్ చేయి"
+      "save": "ప్రొఫైల్ సేవ్ చేయి",
+      "accountHolder": "Account holder name",
+      "bankAccount": "Bank account number",
+      "ifsc": "IFSC",
+      "intro": "Add your UPI or bank so kitchens can send refunds to you quickly.",
+      "logOut": "Log out",
+      "myOrders": "My orders",
+      "mySpace": "My space",
+      "pageTitle": "Account",
+      "payoutSaved": "Payout details saved — kitchens can refund to this UPI or bank account.",
+      "qrUploaded": "UPI QR image uploaded.",
+      "savePayout": "Save payout details",
+      "saving": "Saving…",
+      "upiId": "UPI ID",
+      "upiQrHint": "Optional — owners can use this when sending a direct UPI refund.",
+      "upiQrTitle": "UPI QR / scanner image",
+      "uploadImage": "Upload image"
     }
+  },
+  "cities": {
+    "body": "{{count}}+ cities with live kitchens — more opening soon across India.",
+    "eyebrow": "Where we are",
+    "nav": "Cities",
+    "statusLive": "Live",
+    "statusSoon": "Coming soon",
+    "title": "Our presence in cities"
   }
 }

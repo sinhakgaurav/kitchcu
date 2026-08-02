@@ -50,18 +50,23 @@ type Tab =
   | "addresses"
   | "account";
 
-const TABS: { id: Tab; labelKey: string }[] = [
+const PRIMARY_TABS: { id: Tab; labelKey: string }[] = [
   { id: "overview", labelKey: "customer.dashboard.tabOverview" },
   { id: "orders", labelKey: "customer.dashboard.tabOrders" },
+  { id: "addresses", labelKey: "customer.dashboard.tabAddresses" },
+  { id: "complaints", labelKey: "customer.dashboard.tabComplaints" },
+];
+
+const MORE_TABS: { id: Tab; labelKey: string }[] = [
   { id: "plans", labelKey: "customer.dashboard.tabPlans" },
   { id: "savings", labelKey: "customer.dashboard.tabSavings" },
   { id: "referrals", labelKey: "customer.dashboard.tabReferrals" },
   { id: "health", labelKey: "customer.dashboard.tabHealth" },
   { id: "refunds", labelKey: "customer.dashboard.tabRefunds" },
-  { id: "complaints", labelKey: "customer.dashboard.tabComplaints" },
-  { id: "addresses", labelKey: "customer.dashboard.tabAddresses" },
   { id: "account", labelKey: "customer.dashboard.tabAccount" },
 ];
+
+const TABS = [...PRIMARY_TABS, ...MORE_TABS];
 
 const inr = (n: number) => `₹${Math.round(n).toLocaleString("en-IN")}`;
 
@@ -155,23 +160,20 @@ export function CustomerDashboardPage() {
               ? `Hi, ${profile.name.split(" ")[0]}`
               : t("customer.dashboard.title")}
           </h1>
-          <p>
-            Orders, savings vs restaurants, health patterns, refunds, complaints, and delivery pins —
-            everything in one place.
-          </p>
+          <p>{t("customer.dashboard.subtitle")}</p>
         </div>
         <div className="customer-dash__hero-actions">
-          <Link to="/#near-you" className="btn btn--ghost btn--sm">
-            {t("customer.discovery.title")}
+          <Link to="/#near-you" className="btn btn--primary btn--sm">
+            {t("customer.dashboard.findFood")}
           </Link>
           <Link to="/account" className="btn btn--ghost btn--sm">
-            {t("customer.account.payout")}
+            {t("customer.dashboard.refundDetails")}
           </Link>
         </div>
       </header>
 
       <nav className="customer-dash__tabs" aria-label="Dashboard sections">
-        {TABS.map((item) => (
+        {PRIMARY_TABS.map((item) => (
           <button
             key={item.id}
             type="button"
@@ -181,6 +183,24 @@ export function CustomerDashboardPage() {
             {t(item.labelKey)}
           </button>
         ))}
+        <label className="customer-dash__more">
+          <span className="visually-hidden">{t("customer.dashboard.moreTabs")}</span>
+          <select
+            value={MORE_TABS.some((m) => m.id === tab) ? tab : ""}
+            onChange={(e) => {
+              const next = e.target.value as Tab;
+              if (next) setTab(next);
+            }}
+            aria-label={t("customer.dashboard.moreTabs")}
+          >
+            <option value="">{t("customer.dashboard.moreTabs")}</option>
+            {MORE_TABS.map((item) => (
+              <option key={item.id} value={item.id}>
+                {t(item.labelKey)}
+              </option>
+            ))}
+          </select>
+        </label>
       </nav>
 
       {error && <div className="auth-card__error">{error}</div>}
@@ -273,15 +293,15 @@ function OverviewPanel({
     <div className="customer-dash__grid">
       <button type="button" className="glass customer-dash__stat" onClick={() => onGo("orders")}>
         <strong>{dash.orders.length}</strong>
-        <span>Orders in history</span>
+        <span>Your orders</span>
       </button>
       <button type="button" className="glass customer-dash__stat" onClick={() => onGo("savings")}>
         <strong>{inr(dash.savings.total_saved)}</strong>
-        <span>Est. saved vs restaurants</span>
+        <span>Saved vs eating out</span>
       </button>
       <button type="button" className="glass customer-dash__stat" onClick={() => onGo("health")}>
         <strong>{dash.health.home_freshness_score}</strong>
-        <span>Home freshness score</span>
+        <span>Home-cooked score</span>
       </button>
       <button type="button" className="glass customer-dash__stat" onClick={() => onGo("refunds")}>
         <strong>{completedRefunds.length}</strong>
@@ -289,23 +309,29 @@ function OverviewPanel({
       </button>
       <button type="button" className="glass customer-dash__stat" onClick={() => onGo("complaints")}>
         <strong>{openTickets}</strong>
-        <span>Open complaints</span>
+        <span>Open help requests</span>
       </button>
       <section className="glass customer-dash__card customer-dash__span2">
-        <h2>Wellness after recent meals</h2>
-        <ul className="customer-dash__tips">
-          {dash.tips.slice(0, 3).map((tip, i) => (
-            <li key={i}>
-              <strong>
-                Walk {tip.walk_minutes} min · {tip.water_ml} ml water
-              </strong>
-              <span>
-                {tip.after_dish ? `After ${tip.after_dish}: ` : ""}
-                {tip.message}
-              </span>
-            </li>
-          ))}
-        </ul>
+        <h2>Tips after your meals</h2>
+        {dash.tips.length === 0 ? (
+          <p className="customer-dash__empty-hint">
+            Order a few home meals — light walk and water tips will show up here.
+          </p>
+        ) : (
+          <ul className="customer-dash__tips">
+            {dash.tips.slice(0, 3).map((tip, i) => (
+              <li key={i}>
+                <strong>
+                  Walk {tip.walk_minutes} min · {tip.water_ml} ml water
+                </strong>
+                <span>
+                  {tip.after_dish ? `After ${tip.after_dish}: ` : ""}
+                  {tip.message}
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
       </section>
     </div>
   );

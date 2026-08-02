@@ -131,13 +131,13 @@ async def whatsapp_webhook(
     summary="AI-assisted support chat (marketing site)",
     description=(
         "**Auth:** None — public, used by the owner/customer marketing-site chat widget.\n\n"
-        "**Body:** `SupportChatRequest` — `audience`, `message`, and prior `history`.\n\n"
-        "**Behavior:** Answers from a curated, accurate knowledge base by default (never "
-        "hallucinated pricing/features); if `SUPPORT_AI_API_KEY` is configured, augments with an "
-        "LLM using that knowledge as grounding. Detects escalation-worthy messages (complaints, "
-        "explicit human requests) and flags `suggest_ticket` so the UI can offer **Raise ticket** "
-        "(`POST /support/tickets`).\n\n"
-        "**Response:** `SupportChatResponse`."
+        "**Body:** `SupportChatRequest` — `audience`, `message`, optional `selected_option_id` / "
+        "`prior_options`, and `history`.\n\n"
+        "**Behavior:** Options-first FAQ from the ai-context pack (`answer_id`s for pricing, "
+        "orders, delivery, billing, CRM, tiffin, etc.). Never invents POS or food commission. "
+        "If `SUPPORT_AI_API_KEY` is configured, may polish grounded FAQ replies. Escalation sets "
+        "`suggest_ticket` for **Raise ticket** (`POST /support/tickets`).\n\n"
+        "**Response:** `SupportChatResponse` including follow-up `options` chips."
     ),
     responses={422: RESP_422},
 )

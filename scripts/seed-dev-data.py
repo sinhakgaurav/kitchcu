@@ -24,6 +24,7 @@ from demo_data import (  # noqa: E402
     DEMO_DISHES,
     DEMO_KITCHEN,
     DEMO_KITCHENS_EXTRA,
+    DEMO_KITCHENS_CITIES,
     DEMO_KITCHEN_CODE,
     DEMO_ORDERS,
     DEMO_OTP,
@@ -107,11 +108,16 @@ def ensure_kitchens(token: str) -> dict:
         print(f"Created kitchen {kitchen['code']} - {kitchen['name']}")
         kitchens = [kitchen]
 
-    for extra in DEMO_KITCHENS_EXTRA:
+    for extra in [*DEMO_KITCHENS_EXTRA, *DEMO_KITCHENS_CITIES]:
         if extra["name"] not in existing_names:
             k = request("POST", "/api/v1/kitchens", extra, token=token)
-            print(f"Created kitchen {k['code']} - {k['name']}")
+            print(f"Created kitchen {k['code']} - {k['name']} ({extra['city']})")
             kitchens.append(k)
+            existing_names.add(extra["name"])
+            try:
+                ensure_dishes(token, k["id"])
+            except Exception as exc:  # noqa: BLE001
+                print(f"  (menu seed skipped: {exc})")
 
     primary = next((k for k in kitchens if k.get("code") == DEMO_KITCHEN_CODE), kitchens[0])
     print(f"Primary demo kitchen: {primary['code']} - {primary['name']} ({len(kitchens)} total)")

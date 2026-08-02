@@ -1,9 +1,15 @@
 import { FormEvent, useEffect, useRef, useState } from "react";
-import { CUSTOMER_GREETING, OWNER_GREETING } from "../lib/supportChat";
+import {
+  CUSTOMER_GREETING,
+  CUSTOMER_STARTER_OPTIONS,
+  OWNER_GREETING,
+  OWNER_STARTER_OPTIONS,
+} from "../lib/supportChat";
 import {
   createSupportTicket,
   sendSupportChat,
   type ChatAudience,
+  type SupportChatOption,
   type TicketCategory,
 } from "../lib/supportApi";
 
@@ -11,13 +17,21 @@ type Message = {
   id: string;
   role: "user" | "assistant";
   content: string;
+  options?: SupportChatOption[];
 };
+
+function starterOptions(audience: ChatAudience): SupportChatOption[] {
+  return audience === "owner"
+    ? OWNER_STARTER_OPTIONS.map((o) => ({ id: o.id, label: o.label }))
+    : CUSTOMER_STARTER_OPTIONS.map((o) => ({ id: o.id, label: o.label }));
+}
 
 function greeting(audience: ChatAudience): Message {
   return {
     id: "greeting",
     role: "assistant",
     content: audience === "owner" ? OWNER_GREETING : CUSTOMER_GREETING,
+    options: starterOptions(audience),
   };
 }
 
@@ -42,28 +56,31 @@ export function SupportChat() {
   const [suggestedCategory, setSuggestedCategory] = useState<TicketCategory>("general");
   const [showTicketForm, setShowTicketForm] = useState(false);
   const [ticketDone, setTicketDone] = useState<string | null>(null);
+  const [activeOptions, setActiveOptions] = useState<SupportChatOption[]>(starterOptions("owner"));
   const listRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (listRef.current) listRef.current.scrollTop = listRef.current.scrollHeight;
-  }, [messages, open, showTicketForm]);
+  }, [messages, open, showTicketForm, activeOptions]);
 
   const switchAudience = (next: ChatAudience) => {
     if (next === audience) return;
     setAudience(next);
-    setMessages([greeting(next)]);
+    const g = greeting(next);
+    setMessages([g]);
+    setActiveOptions(g.options ?? []);
     setError("");
     setSuggestTicket(false);
     setShowTicketForm(false);
     setTicketDone(null);
   };
 
-  const handleSubmit = async (e: FormEvent) => {
-    e.preventDefault();
-    const text = input.trim();
-    if (!text || busy) return;
+  const ask = async (text: string, selectedOptionId?: string) => {
+    const trimmed = text.trim();
+    if ((!trimmed && !selectedOptionId) || busy) return;
 
-    const userMsg: Message = { id: `u-${Date.now()}`, role: "user", content: text };
+    const display = trimmed || activeOptions.find((o) => o.id === selectedOptionId)?.label || "Option";
+    const userMsg: Message = { id: `u-${Date.now()}`, role: "user", content: display };
     const nextMessages = [...messages, userMsg];
     setMessages(nextMessages);
     setInput("");
@@ -73,17 +90,29 @@ export function SupportChat() {
     try {
       const res = await sendSupportChat(
         audience,
-        text,
+        trimmed || display,
         nextMessages.map((m) => ({ role: m.role, content: m.content })),
+        {
+          selectedOptionId,
+          priorOptions: activeOptions,
+        },
       );
+      const opts = res.options ?? [];
       setMessages((prev) => [
         ...prev,
-        { id: `a-${Date.now()}`, role: "assistant", content: res.reply },
+        {
+          id: `a-${Date.now()}`,
+          role: "assistant",
+          content: res.reply,
+          options: opts,
+        },
       ]);
+      setActiveOptions(opts);
       setSuggestTicket(res.suggest_ticket);
       if (res.suggested_category) {
         setSuggestedCategory(res.suggested_category as TicketCategory);
       }
+      if (res.suggest_ticket) setShowTicketForm(false);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to send");
     } finally {
@@ -91,12 +120,16 @@ export function SupportChat() {
     }
   };
 
+  const handleSubmit = async (e: FormEvent) => {
+    e.preventDefault();
+    await ask(input);
+  };
+
   const handleTicketSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setBusy(true);
     setError("");
     const fd = new FormData(e.currentTarget);
-    const lastUser = [...messages].reverse().find((m) => m.role === "user");
     try {
       const ticket = await createSupportTicket({
         audience,
@@ -120,15 +153,19 @@ export function SupportChat() {
           id: `sys-${Date.now()}`,
           role: "assistant",
           content: `Support ticket ${ticket.ticket_number} created. Our team will respond within 24 hours on weekdays.`,
+          options: starterOptions(audience).slice(0, 4),
         },
       ]);
+      setActiveOptions(starterOptions(audience).slice(0, 4));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to create ticket");
     } finally {
       setBusy(false);
     }
-    if (!lastUser) return;
   };
+
+  const lastAssistant = [...messages].reverse().find((m) => m.role === "assistant");
+  const chipOptions = lastAssistant?.options?.length ? lastAssistant.options : activeOptions;
 
   return (
     <>
@@ -147,7 +184,7 @@ export function SupportChat() {
           <header className="support-chat__head">
             <div>
               <strong>kitchCU Support</strong>
-              <span>AI assistant · raise tickets for order issues</span>
+              <span>Smart assistant · topics, options, tickets</span>
             </div>
             <button type="button" className="support-chat__close" onClick={() => setOpen(false)} aria-label="Close">
               ✕
@@ -158,7 +195,11 @@ export function SupportChat() {
             <button type="button" className={audience === "owner" ? "active" : ""} onClick={() => switchAudience("owner")}>
               Owner support
             </button>
-            <button type="button" className={audience === "customer" ? "active" : ""} onClick={() => switchAudience("customer")}>
+            <button
+              type="button"
+              className={audience === "customer" ? "active" : ""}
+              onClick={() => switchAudience("customer")}
+            >
               Customer support
             </button>
           </div>
@@ -171,8 +212,31 @@ export function SupportChat() {
                 ))}
               </div>
             ))}
-            {busy && !showTicketForm && <div className="support-chat__typing">Thinking...</div>}
+            {busy && !showTicketForm && <div className="support-chat__typing">Thinking…</div>}
           </div>
+
+          {!showTicketForm && chipOptions.length > 0 && (
+            <div className="support-chat__options" role="group" aria-label="Suggested topics">
+              {chipOptions.map((o) => (
+                <button
+                  key={`${o.id}-${o.label}`}
+                  type="button"
+                  className="support-chat__option"
+                  disabled={busy}
+                  onClick={() => {
+                    if (/ticket/i.test(o.label)) {
+                      setSuggestTicket(true);
+                      setShowTicketForm(true);
+                      return;
+                    }
+                    void ask(o.label, o.id);
+                  }}
+                >
+                  {o.label}
+                </button>
+              ))}
+            </div>
+          )}
 
           {(suggestTicket || ticketDone) && !showTicketForm && (
             <div className="support-chat__ticket-cta">
@@ -193,13 +257,20 @@ export function SupportChat() {
                 Category
                 <select name="category" defaultValue={suggestedCategory}>
                   {CATEGORIES.map((c) => (
-                    <option key={c.value} value={c.value}>{c.label}</option>
+                    <option key={c.value} value={c.value}>
+                      {c.label}
+                    </option>
                   ))}
                 </select>
               </label>
               <label>
                 Subject
-                <input name="subject" required placeholder="Brief summary" defaultValue={messages.filter(m => m.role === "user").at(-1)?.content.slice(0, 80)} />
+                <input
+                  name="subject"
+                  required
+                  placeholder="Brief summary"
+                  defaultValue={messages.filter((m) => m.role === "user").at(-1)?.content.slice(0, 80)}
+                />
               </label>
               <label>
                 Details
@@ -222,8 +293,12 @@ export function SupportChat() {
                 <input name="email" type="email" placeholder="Optional" />
               </label>
               <div className="support-chat__ticket-actions">
-                <button type="button" className="btn btn--ghost btn--sm" onClick={() => setShowTicketForm(false)}>Cancel</button>
-                <button type="submit" className="btn btn--primary btn--sm" disabled={busy}>Submit ticket</button>
+                <button type="button" className="btn btn--ghost btn--sm" onClick={() => setShowTicketForm(false)}>
+                  Cancel
+                </button>
+                <button type="submit" className="btn btn--primary btn--sm" disabled={busy}>
+                  Submit ticket
+                </button>
               </div>
             </form>
           )}
@@ -235,7 +310,11 @@ export function SupportChat() {
               <input
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
-                placeholder={audience === "owner" ? "Ask about pricing, WhatsApp orders..." : "Order issue? Describe here..."}
+                placeholder={
+                  audience === "owner"
+                    ? "Ask about pricing, refunds, WhatsApp…"
+                    : "Ask about checkout, tracking, payments…"
+                }
                 disabled={busy}
                 maxLength={500}
               />

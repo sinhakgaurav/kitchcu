@@ -8,6 +8,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends libpq-dev gcc \
 COPY packages/ckac-common /app/packages/ckac-common
 RUN pip install --no-cache-dir /app/packages/ckac-common
 
+COPY packages/ai-context /app/packages/ai-context
+ENV AI_CONTEXT_ROOT=/app/packages/ai-context
+RUN pip install --no-cache-dir "pyyaml>=6.0"
+
 COPY services/notification /app/services/notification
 WORKDIR /app/services/notification
 RUN pip install --no-cache-dir .

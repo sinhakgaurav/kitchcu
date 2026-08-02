@@ -98,6 +98,99 @@ entries:
       live-capture menus, kitchen codes / Nearby, and direct relationships (no aggregator games).
     facts_refs: [product]
 
+  - answer_id: customer.order.track
+    option_set_id: customer.after_order
+    paraphrases:
+      - Track my order
+      - Where is my order
+      - Order status
+      - Out for delivery
+      - Tracking link
+    canonical_answer: |
+      After you place an order on **customer.kitchcu.in**:
+
+      • Open **My orders** to see status: received → accepted → preparing → ready → out for delivery → delivered
+      • Use the kitchen’s tracking link when shared (WhatsApp reminders may ping at intervals)
+      • Issues with a live order? Contact the kitchen first, or raise a ticket here with the order code
+    facts_refs: [order_lifecycle]
+
+  - answer_id: customer.order.history
+    option_set_id: customer.after_order
+    paraphrases:
+      - Order history
+      - Repeat order
+      - Past orders
+      - Reorder
+    canonical_answer: |
+      On customer.kitchcu.in → **My orders** / history:
+
+      • See past orders from kitchens you’ve used
+      • **Repeat** an order when the kitchen still offers those dishes
+      • Rate home taste after delivery when prompted
+    facts_refs: []
+
+  - answer_id: customer.ratings.home_taste
+    option_set_id: customer.after_trust
+    paraphrases:
+      - How do ratings work?
+      - Home taste rating
+      - Leave a review
+      - Rate my order
+    canonical_answer: |
+      After **delivery**, you can rate **home taste** and quality (1–5).
+      Only verified purchases count — this keeps reviews honest for other diners.
+
+      Optional voice/video notes may be available when the kitchen enables them.
+    facts_refs: []
+
+  - answer_id: customer.tiffin.subscribe
+    option_set_id: customer.after_order
+    paraphrases:
+      - Tiffin subscription
+      - Meal plan
+      - Weekly tiffin
+      - Subscribe meals
+    canonical_answer: |
+      Some kitchens offer **tiffin / meal plans** on customer.kitchcu.in.
+
+      • Open the kitchen → look for Tiffin / plans
+      • Subscribe for recurring home-style meals
+      • Manage or pause from your account when the kitchen supports it
+    facts_refs: []
+
+  - answer_id: customer.payment.options
+    option_set_id: customer.after_order
+    paraphrases:
+      - Payment options
+      - How do I pay
+      - UPI payment
+      - Cash on delivery
+      - Split payment
+    canonical_answer: |
+      At checkout you can usually pay with:
+
+      • **UPI** / online pay when the kitchen enables gateway payments
+      • **COD** when the kitchen offers it
+      • Multi-kitchen carts may use a single payment with per-kitchen split behind the scenes
+
+      Food money goes to kitchens — kitchCU does **not** take a food commission.
+    facts_refs: [commission_on_food]
+
+  - answer_id: customer.multi.kitchen
+    option_set_id: customer.after_find
+    paraphrases:
+      - Multiple kitchens in cart
+      - Master order
+      - Order from two kitchens
+      - Grouped cart
+    canonical_answer: |
+      You can add dishes from more than one kitchen when discovery allows it.
+
+      • Checkout creates a **master receipt** with per-kitchen sub-orders
+      • Each kitchen prepares and delivers (or hands off) on its own timeline
+      • Track each sub-order in My orders
+    facts_refs: []
+
 option_sets:
   customer.after_find:
     - {id: "1", label: "Enter kitchen code help"}

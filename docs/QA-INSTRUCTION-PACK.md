@@ -56,6 +56,8 @@ After frontend rebuilds: hard-refresh or unregister the PWA service worker if UI
 
 Follow `docs/DEPLOYMENT-GCP.md`. Confirm `*.kitchcu.com` health and same persona logins against production seed policy.
 
+**Full production portal URLs + credentials policy + per-feature test matrix:** [`PRODUCTION-PORTALS-CREDENTIALS-QA.md`](./PRODUCTION-PORTALS-CREDENTIALS-QA.md) (+ PDF).
+
 ---
 
 ## 2. Smoke suite (Must — ~15 min)

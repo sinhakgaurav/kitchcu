@@ -135,6 +135,158 @@ entries:
       Or raise a ticket from this chat (I'll collect a few details).
     facts_refs: [support]
 
+  - answer_id: owner.billing.subscription
+    option_set_id: owner.after_billing
+    paraphrases:
+      - How do I pay my subscription?
+      - Billing and invoices
+      - GST invoice
+      - Upgrade plan
+      - Razorpay subscription
+      - Payment failed for plan
+    canonical_answer: |
+      Owner plans are billed as **subscription SaaS** (Starter / Growth / Scale) — never a cut of food orders.
+
+      • Manage plan: kitchen.kitchcu.in → **Subscription**
+      • Pay via Razorpay when prompted
+      • GST-ready receipts when GST is configured for your kitchen
+      • Stuck payment? Raise a **billing** ticket with your kitchen code
+    facts_refs: [plans, commission_on_food]
+
+  - answer_id: owner.billing.refunds
+    option_set_id: owner.after_billing
+    paraphrases:
+      - How do refunds work?
+      - Customer wants refund
+      - Partial refund
+      - Gateway refund
+      - Direct UPI refund
+    canonical_answer: |
+      From kitchen.kitchcu.in → **Orders** → open the order → **Refund**:
+
+      • **Full** — payment gateway reverse when paid online, or direct UPI/bank with evidence
+      • **Partial** — always direct transfer; attach a screenshot when required
+      • Customer payout details come from their saved account (UPI/bank)
+
+      Complete the transfer, then mark done — never invent refund timers.
+    facts_refs: []
+
+  - answer_id: owner.delivery.settings
+    option_set_id: owner.after_delivery
+    paraphrases:
+      - Delivery fee setup
+      - Delivery radius
+      - Free delivery
+      - Tracking link
+      - Porter auto book
+    canonical_answer: |
+      Delivery is **owner-controlled** (no aggregator markups):
+
+      • Set free/max radius and fee/km in kitchen delivery settings
+      • Customers see a quote before checkout
+      • Share tracking links; interval WhatsApp reminders are configurable
+      • Optional Porter auto-book delay is yours to set
+
+      Keep prep/delivery times honest — quality over fake speed races.
+    facts_refs: []
+
+  - answer_id: owner.marketing.crm
+    option_set_id: owner.after_marketing
+    paraphrases:
+      - CRM customers
+      - Coupons
+      - Promotions
+      - Targeted offers
+      - Win back customers
+    canonical_answer: |
+      You own your CRM on kitchen.kitchcu.in:
+
+      • **CRM** — spend, patterns, segments (Growth+ plans)
+      • **Coupons** — % or flat offers for your kitchen
+      • **Promotions** — target repeat / win-back customers
+      • Reports → win-back list for quiet customers (3+ weeks)
+    facts_refs: [plans]
+
+  - answer_id: owner.tiffin.plans
+    option_set_id: owner.after_tiffin
+    paraphrases:
+      - Tiffin plans
+      - Meal subscription
+      - Weekly tiffin
+      - Combo meals
+    canonical_answer: |
+      Tiffin / meal plans grow recurring home-food revenue:
+
+      • Create plans on kitchen.kitchcu.in (Tiffin area when enabled for your kitchen)
+      • Customers subscribe from the customer app
+      • Pair with combos and daily menu WhatsApp push
+
+      Cloud kitchen / home food only — not dine-in.
+    facts_refs: [product]
+
+  - answer_id: owner.ingredients.stock
+    option_set_id: owner.after_menu
+    paraphrases:
+      - Ingredient mapper
+      - Stock deduct
+      - Low stock
+      - Recipe ingredients
+      - Bulk prep
+    canonical_answer: |
+      Ingredient balance mapper:
+
+      • Attach recipes to dishes
+      • Stock deducts when you **accept** an order
+      • Low-stock warnings help you pause dishes before overselling
+
+      Keep recipes accurate for honest prep planning.
+    facts_refs: [menu]
+
+  - answer_id: owner.referrals.program
+    option_set_id: owner.after_marketing
+    paraphrases:
+      - Referral program
+      - Refer a kitchen
+      - Customer referral reward
+      - Invite kitchen
+    canonical_answer: |
+      Referrals reward growth without food commission:
+
+      • Invite other kitchens; customers can refer kitchens too
+      • Rewards (₹) follow Super Admin program settings
+      • Credits apply per rules (e.g. first order / onboard)
+
+      Wrong credit? Raise a billing ticket with referral codes.
+    facts_refs: []
+
+  - answer_id: owner.streaming.live
+    option_set_id: owner.after_reports
+    paraphrases:
+      - Live stream
+      - Go live
+      - LiveKit
+      - Customer watch cooking
+    canonical_answer: |
+      Optional **live cooking** (owner opt-in):
+
+      • Go live from streaming controls when LiveKit is configured
+      • Customers can filter kitchens that are live now
+      • Never claim live unless the session is actually active
+    facts_refs: [cost_transparency]
+
+  - answer_id: owner.ratings.home_taste
+    option_set_id: owner.after_orders
+    paraphrases:
+      - Home taste ratings
+      - Customer reviews
+      - Quality score
+    canonical_answer: |
+      Verified buyers leave **home taste** + quality ratings after delivery.
+      Aggregates show on dishes — only from real orders.
+
+      Use feedback with CRM/win-back; never fake review races.
+    facts_refs: []
+
 option_sets:
   owner.after_pricing:
     - {id: "1", label: "Why owners pay (cost breakdown)"}
@@ -171,3 +323,22 @@ option_sets:
     - {id: "1", label: "Raise a ticket"}
     - {id: "2", label: "Pricing"}
     - {id: "3", label: "Dashboard sections"}
+  owner.after_billing:
+    - {id: "1", label: "Pricing plans"}
+    - {id: "2", label: "How refunds work"}
+    - {id: "3", label: "Raise billing ticket"}
+    - {id: "4", label: "Back to main menu"}
+  owner.after_delivery:
+    - {id: "1", label: "Order lifecycle"}
+    - {id: "2", label: "WhatsApp orders"}
+    - {id: "3", label: "Raise delivery ticket"}
+    - {id: "4", label: "Back to main menu"}
+  owner.after_marketing:
+    - {id: "1", label: "Growth reports"}
+    - {id: "2", label: "Pricing plans"}
+    - {id: "3", label: "Referrals"}
+    - {id: "4", label: "Back to main menu"}
+  owner.after_tiffin:
+    - {id: "1", label: "Menu setup"}
+    - {id: "2", label: "Coupons & CRM"}
+    - {id: "3", label: "Back to main menu"}

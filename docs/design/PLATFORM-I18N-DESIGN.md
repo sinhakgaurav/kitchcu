@@ -15,11 +15,11 @@
 | Location → language suggestion | Server-side locale / Accept-Language APIs |
 | One-time chooser (EN vs suggested) | Live translation / LLM |
 | Portal + customer + kitchen shells + dashboard chrome | Admin (ops stays English for now) |
-| Catalogs: en + hi + mr + ta + te + kn + ml + bn + gu + pa + **bho** + **mai** (336 keys; parity checked) | Long FAQ bodies may remain EN |
+| Catalogs: en + hi + mr + ta + te + kn + ml + bn + gu + pa + **bho** + **mai** (~369 keys; parity checked) | Long FAQ bodies may remain EN |
 
-**Wired to `t()`:** LanguageGate/Switcher · PortalNavbar/Hero/Features/HowItWorks/Pricing/Support/Contact/Apps · OwnerLayout nav · Owner login/home/subscription/orders/brand/referrals · CustomerNavbar · customer login/discovery/checkout/orders/dashboard tabs.
+**Wired to `t()`:** LanguageGate/Switcher · PortalNavbar/Hero/Features/CitiesPresence/HowItWorks/Pricing/Support/Contact/Apps · OwnerLayout nav · Owner login/home/subscription/orders/brand/referrals · CustomerNavbar · customer login/discovery/account/checkout/orders/dashboard tabs.
 
-**Parity:** `python scripts/check-i18n-locale-parity.py` · regions: `python scripts/check-i18n-regions.py`
+**Parity:** `python scripts/check-i18n-locale-parity.py` · fill gaps: `python scripts/sync-i18n-missing-keys.py` · regions: `python scripts/check-i18n-regions.py`
 
 ## 3. Detection order
 

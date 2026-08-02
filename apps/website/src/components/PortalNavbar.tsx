@@ -20,6 +20,7 @@ export function PortalNavbar() {
   const links = [
     { href: "#apps", label: t("portal.navApps") },
     { href: "#features", label: t("portal.navFeatures") },
+    { href: "#cities", label: t("portal.navCities") },
     { href: "#pricing", label: t("portal.navPricing") },
     { href: "#support", label: t("portal.navSupport") },
     { href: "#contact", label: t("portal.navContact") },

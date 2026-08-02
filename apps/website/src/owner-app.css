@@ -1908,19 +1908,36 @@
 .rich-content p { margin: 0.35rem 0; }
 .rich-content ul, .rich-content ol { margin: 0.35rem 0 0.35rem 1.1rem; }
 
+.owner-day1 {
+  margin-bottom: 1.25rem;
+  border-color: rgba(15, 118, 110, 0.22);
+  background: linear-gradient(135deg, rgba(15, 118, 110, 0.06) 0%, rgba(230, 81, 0, 0.04) 100%);
+}
+.owner-day1 h2 {
+  margin: 0;
+  font-size: 1.15rem;
+}
 .owner-day1__list {
   list-style: none;
   margin: 0.75rem 0 0;
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 0.45rem;
+  gap: 0.55rem;
 }
 .owner-day1__list li {
   display: flex;
-  gap: 0.5rem;
+  gap: 0.55rem;
   align-items: baseline;
   font-size: 0.95rem;
+}
+.owner-day1__list a {
+  font-weight: 600;
+  color: var(--teal-light, #4db6ac);
+  text-decoration: none;
+}
+.owner-day1__list a:hover {
+  text-decoration: underline;
 }
 .owner-day1__done {
   color: var(--text-muted);
@@ -2066,10 +2083,18 @@
 }
 .disc-home__lede {
   margin: 0.75rem 0 0;
-  max-width: 34ch;
-  color: rgba(255, 255, 255, 0.88);
-  font-size: 1.05rem;
-  line-height: 1.4;
+  max-width: 38ch;
+  color: rgba(255, 255, 255, 0.92);
+  font-size: 1.08rem;
+  line-height: 1.45;
+  text-shadow: 0 1px 12px rgba(0, 0, 0, 0.35);
+}
+.disc-rail__head h2 {
+  font-size: clamp(1.15rem, 2.5vw, 1.4rem);
+}
+.disc-rail__head p {
+  color: var(--text-muted);
+  font-size: 0.9rem;
 }
 
 .disc-home__search {

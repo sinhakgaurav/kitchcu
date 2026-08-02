@@ -7,7 +7,8 @@
 | Baseline | Phase 1 **S1–S18** complete (gateway + 13 domain services + 4 PWAs + GST) |
 | Production | `*.kitchcu.com` (GCP VM + Caddy) |
 | Local demo | `*.kitchcu.in` / `admin@kitchcu.dev` |
-| Last updated | 2026-07-20 |
+| Last updated | 2026-08-02 |
+| Portals / QA pack | [PRODUCTION-PORTALS-CREDENTIALS-QA.md](./PRODUCTION-PORTALS-CREDENTIALS-QA.md) (+ PDF) |
 | Architecture flows | [PLATFORM-ARCHITECTURE-FLOWS.md](./PLATFORM-ARCHITECTURE-FLOWS.md) |
 
 ---
@@ -39,7 +40,8 @@ For **manual QA / release sign-off** see [QA-INSTRUCTION-PACK.md](./QA-INSTRUCTI
 | Edge | Gateway `:18000` — CORS, correlation ID, OTP rate limits |
 | Domains | 13 services (identity→streaming) — schema-per-domain + outbox EDD |
 | PWAs | portal / customer / kitchen / admin under `apps/website/` |
-| i18n | 10 IN locales (en/hi/mr/ta/te/kn/ml/bn/gu/pa) — dashboard chrome wired; admin stays EN |
+| i18n | 12 locales (en + hi/mr/ta/te/kn/ml/bn/gu/pa/bho/mai) — catalog parity green; admin stays EN |
+| Cities | Presence strip on portal / customer / kitchen; seed kitchens in Delhi NCR, UP, Dehradun, Mumbai |
 | Delivery | Cost-share + Self/Porter modes; book on accept (P32/P32.1) |
 | Trust | Admin RBAC + audit · HTML sanitize · API-key mask · login-hint flag-gated |
 | Growth | Dual referral program + GST monthly Excel/PDF |

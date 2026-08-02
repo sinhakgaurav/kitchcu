@@ -9,6 +9,7 @@ import {
 import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { BrandLogo } from "../../components/BrandLogo";
+import { CitiesPresence } from "../../components/CitiesPresence";
 import { images } from "../../data/content";
 import { useGeolocation } from "../../hooks/useGeolocation";
 import { DEMO } from "../../shared/demo";
@@ -292,7 +293,7 @@ export function CustomerDiscoveryHome() {
               ? `Order home taste, ${heroName}`
               : t("customer.discovery.title")}
           </h1>
-          <p className="disc-home__lede">Cloud kitchens near you — live-capture menus, ready-within times.</p>
+          <p className="disc-home__lede">{t("customer.discovery.lede")}</p>
 
           <form
             className="disc-home__search"
@@ -502,6 +503,8 @@ export function CustomerDiscoveryHome() {
             </div>
           </form>
         </section>
+
+        <CitiesPresence variant="inline" id="cities" />
       </div>
     </div>
   );

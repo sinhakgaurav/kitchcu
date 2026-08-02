@@ -181,10 +181,10 @@ export function CustomerLoginPage() {
         </div>
         <div className="auth-card glass">
           <form onSubmit={otpSent ? handleVerify : handleRequestOtp}>
-            <h2>Sign in</h2>
+            <h2>{t("customer.auth.title")}</h2>
             <p className="auth-card__hint">
-              WhatsApp OTP on <strong>{CUSTOMER_HOST}</strong>
-              {" · "}Demo OTP <strong>{DEMO.otp}</strong> when outbound WhatsApp is not configured
+              Quick WhatsApp OTP on <strong>{CUSTOMER_HOST}</strong>
+              {" · "}Demo OTP <strong>{DEMO.otp}</strong> when WhatsApp delivery is not configured
             </p>
             {error && <div className="auth-card__error">{error}</div>}
             <label>
@@ -221,12 +221,13 @@ export function CustomerLoginPage() {
               {fieldErrors.phone ? <span className="field-error">{fieldErrors.phone}</span> : null}
             </label>
             <label>
-              {t("customer.nav.kitchenCode")}
+              {t("customer.auth.kitchenCodeOptional")}
               <input
                 value={code}
                 onChange={(e) => setCode(e.target.value.toUpperCase())}
                 placeholder={DEMO.kitchenCode}
               />
+              <span className="field-hint">{t("customer.auth.kitchenCodeHint")}</span>
             </label>
             {otpSent && (
               <label>

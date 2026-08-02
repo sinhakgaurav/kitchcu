@@ -31,7 +31,8 @@
     "dashboard": "ਡੈਸ਼ਬੋਰਡ",
     "customerApp": "ਗਾਹਕ ਐਪ",
     "kitchenOwner": "ਰਸੋਈ ਮਾਲਕ →",
-    "ownerLogin": "ਮਾਲਕ ਲਾਗਇਨ"
+    "ownerLogin": "ਮਾਲਕ ਲਾਗਇਨ",
+    "adminLogin": "Super admin"
   },
   "status": {
     "received": "ਮਿਲੇ:",
@@ -140,7 +141,8 @@
     "contactSubmit": "ਪਹੁੰਚ ਦੀ ਬੇਨਤੀ ਕਰੋ",
     "contactSending": "ਭੇਜਿਆ ਜਾ ਰਿਹਾ ਹੈ...",
     "contactSent": "ਧੰਨਵਾਦ - ਅਸੀਂ ਜਲਦੀ ਹੀ ਸੰਪਰਕ ਕਰਾਂਗੇ।",
-    "contactError": "ਨਹੀਂ ਭੇਜ ਸਕਿਆ। ਕਿਰਪਾ ਕਰਕੇ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।"
+    "contactError": "ਨਹੀਂ ਭੇਜ ਸਕਿਆ। ਕਿਰਪਾ ਕਰਕੇ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
+    "navCities": "Cities"
   },
   "owner": {
     "nav": {
@@ -167,7 +169,8 @@
       "whatsapp": "WhatsApp",
       "paymentGateway": "ਭੁਗਤਾਨ ਗੇਟਵੇ",
       "gst": "ਜੀਐਸਟੀ ਅਤੇ ਵਿੱਤ",
-      "setup": "ਰਸੋਈ ਸੈੱਟਅੱਪ"
+      "setup": "ਰਸੋਈ ਸੈੱਟਅੱਪ",
+      "bulkPrep": "Prep batches"
     },
     "shell": {
       "activeKitchen": "ਸਰਗਰਮ ਰਸੋਈ",
@@ -333,13 +336,16 @@
       "socialContinue": "ਸਮਾਜਿਕ ਨਾਲ ਜਾਰੀ ਰੱਖੋ",
       "phone": "ਫੋਨ",
       "sendOtp": "OTP ਭੇਜੋ",
-      "verify": "ਜਾਂਚ"
+      "verify": "ਜਾਂਚ",
+      "kitchenCodeHint": "Skip if you are browsing kitchens nearby",
+      "kitchenCodeOptional": "Kitchen code (optional)"
     },
     "discovery": {
       "title": "ਆਪਣੇ ਨੇੜੇ ਦੇ ਘਰੇਲੂ ਰਸੋਈ ਲੱਭੋ",
       "searchPlaceholder": "ਖੋਜ ਰਸੋਈ, ਪਕਵਾਨ, ਪਕਵਾਨ…",
       "useLocation": "ਮੇਰਾ ਟਿਕਾਣਾ ਵਰਤੋ",
-      "noResults": "ਕੋਈ ਰਸੋਈ ਤੁਹਾਡੇ ਫਿਲਟਰਾਂ ਨਾਲ ਮੇਲ ਨਹੀਂ ਖਾਂਦੀ"
+      "noResults": "ਕੋਈ ਰਸੋਈ ਤੁਹਾਡੇ ਫਿਲਟਰਾਂ ਨਾਲ ਮੇਲ ਨਹੀਂ ਖਾਂਦੀ",
+      "lede": "Real dish photos, honest prep times, and fair delivery — order home taste."
     },
     "checkout": {
       "title": "ਚੈਕਆਉਟ",
@@ -375,13 +381,41 @@
       "tabComplaints": "ਸਪੋਰਟ",
       "tabAddresses": "ਪਤੇ",
       "tabAccount": "ਖਾਤਾ",
-      "tabPlans": "ਪਲਾਨ"
+      "tabPlans": "ਪਲਾਨ",
+      "findFood": "Find food nearby",
+      "moreTabs": "More",
+      "refundDetails": "Where refunds go",
+      "subtitle": "Orders, addresses, and support — simple tools for everyday ordering."
     },
     "account": {
       "title": "ਅਕਾਊਂਟ",
       "addresses": "à¨à©à¨à¨¾ à¨¨à¨¾à¨:",
       "payout": "ਰਿਫੰਡ ਭੁਗਤਾਨ",
-      "save": "ਪ੍ਰੋਫ਼ਾਈਲ ਸੰਭਾਲੋ"
+      "save": "ਪ੍ਰੋਫ਼ਾਈਲ ਸੰਭਾਲੋ",
+      "accountHolder": "Account holder name",
+      "bankAccount": "Bank account number",
+      "ifsc": "IFSC",
+      "intro": "Add your UPI or bank so kitchens can send refunds to you quickly.",
+      "logOut": "Log out",
+      "myOrders": "My orders",
+      "mySpace": "My space",
+      "pageTitle": "Account",
+      "payoutSaved": "Payout details saved — kitchens can refund to this UPI or bank account.",
+      "qrUploaded": "UPI QR image uploaded.",
+      "savePayout": "Save payout details",
+      "saving": "Saving…",
+      "upiId": "UPI ID",
+      "upiQrHint": "Optional — owners can use this when sending a direct UPI refund.",
+      "upiQrTitle": "UPI QR / scanner image",
+      "uploadImage": "Upload image"
     }
+  },
+  "cities": {
+    "body": "{{count}}+ cities with live kitchens — more opening soon across India.",
+    "eyebrow": "Where we are",
+    "nav": "Cities",
+    "statusLive": "Live",
+    "statusSoon": "Coming soon",
+    "title": "Our presence in cities"
   }
 }

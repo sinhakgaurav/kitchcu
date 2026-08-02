@@ -89,3 +89,14 @@ async def test_generate_kitchen_code_unknown_city():
         code = await generate_kitchen_code(session, "Solapur")
         assert code.startswith("CKSOL")
         assert code.endswith("001")
+
+
+@pytest.mark.asyncio
+async def test_generate_kitchen_code_ncr_and_up_cities():
+    async with SessionLocal() as session:
+        assert (await generate_kitchen_code(session, "Delhi")).startswith("CKDEL")
+        assert (await generate_kitchen_code(session, "Gurugram")).startswith("CKGGN")
+        assert (await generate_kitchen_code(session, "Noida")).startswith("CKNOI")
+        assert (await generate_kitchen_code(session, "Lucknow")).startswith("CKLKO")
+        assert (await generate_kitchen_code(session, "Prayagraj")).startswith("CKIXD")
+        assert (await generate_kitchen_code(session, "Jhansi")).startswith("CKJHS")

@@ -144,21 +144,21 @@ export function OwnerHomePage() {
     {
       id: "dishes",
       done: dishCount >= 3,
-      label: dishCount >= 3 ? `${dishCount} dishes on menu` : "Add 3 live-capture dishes",
+      label: dishCount >= 3 ? `${dishCount} dishes on menu` : "Add 3 dishes with real photos",
       to: "/dashboard/menu/new",
     },
     {
       id: "brand",
       done: brandedEnabled,
-      label: brandedEnabled ? "Branded page published" : "Publish your branded kitchen page",
+      label: brandedEnabled ? "Your customer page is live" : "Publish your customer page",
       to: "/dashboard/brand",
     },
     {
       id: "share",
       done: brandedEnabled && dishCount >= 1,
       label: brandedEnabled && dishCount >= 1
-        ? "Storefront ready to share"
-        : "Share storefront link with customers",
+        ? "Ready to share with customers"
+        : "Share your page link on WhatsApp",
       to: "/dashboard/brand",
     },
   ];
@@ -194,7 +194,8 @@ export function OwnerHomePage() {
           </p>
           <div className="od-board__pills">
             <span className={`od-pill od-pill--sub od-pill--${subStatus}`}>
-              {subTier} · {subStatus}
+              {subTier === "trial" ? "Trial plan" : `${subTier} plan`}
+              {subStatus === "active" || subStatus === "trial" ? "" : ` · ${subStatus}`}
             </span>
             {stream?.is_live && (
               <span className="od-pill od-pill--live">{t("owner.home.liveNow")}</span>
@@ -204,19 +205,41 @@ export function OwnerHomePage() {
                 {t("owner.home.draftsWaiting", { count: draftCount })}
               </Link>
             )}
+            {activeOrders.length > 0 && (
+              <Link to="/dashboard/orders" className="od-pill od-pill--live">
+                {activeOrders.length} in progress
+              </Link>
+            )}
           </div>
         </div>
         <div className="od-board__hero-actions">
-          <Link to="/dashboard/orders/new" className="btn btn--primary">{t("owner.home.quickNewOrder")}</Link>
-          <Link to="/dashboard/brand" className="btn btn--ghost">{t("owner.home.quickBrand")}</Link>
+          {activeOrders.length > 0 ? (
+            <>
+              <Link to="/dashboard/orders" className="btn btn--primary">
+                Open orders
+              </Link>
+              <Link to="/dashboard/orders/new" className="btn btn--ghost">
+                {t("owner.home.quickNewOrder")}
+              </Link>
+            </>
+          ) : (
+            <>
+              <Link to="/dashboard/orders/new" className="btn btn--primary">
+                {t("owner.home.quickNewOrder")}
+              </Link>
+              <Link to="/dashboard/brand" className="btn btn--ghost">
+                {t("owner.home.quickBrand")}
+              </Link>
+            </>
+          )}
         </div>
       </section>
 
       {showDay1 && (
         <section className="dash-card owner-day1">
-          <h2>Day-1 kitchen setup</h2>
+          <h2>Get ready to take orders</h2>
           <p className="owner-muted">
-            {day1Done}/3 core steps — get menu live, publish brand, share the link.
+            {day1Done}/3 quick steps — add dishes, publish your page, share the link with customers.
           </p>
           <ul className="owner-day1__list">
             {day1Steps.map((step) => (
@@ -233,28 +256,6 @@ export function OwnerHomePage() {
         </section>
       )}
 
-      <section className="dash-card od-share od-branded od-branded--teaser">
-        <div className="od-share__copy">
-          <h2>{t("owner.home.brandTitle")}</h2>
-          <p>
-            {t("owner.home.brandShare", { link: brandedLink })}{" "}
-            · {brandedEnabled ? t("owner.home.published") : t("owner.home.notPublished")}
-          </p>
-        </div>
-        <div className="od-share__aside od-branded__teaser-actions">
-          <Link to="/dashboard/brand" className="btn btn--primary btn--sm">
-            {t("owner.home.manageBrand")}
-          </Link>
-          <button
-            type="button"
-            className="btn btn--ghost btn--sm"
-            onClick={() => window.open(brandedLink, "_blank", "noopener,noreferrer")}
-          >
-            {t("owner.home.preview")}
-          </button>
-        </div>
-      </section>
-
       {pageLoading ? (
         <div className="od-board__loading">
           <div className="od-skeleton od-skeleton--wide" />
@@ -266,6 +267,69 @@ export function OwnerHomePage() {
         </div>
       ) : (
         <>
+          <div className="od-board__kpi-grid">
+            <Link to="/dashboard/reports" className="od-kpi dash-card">
+              <span className="od-kpi__icon od-kpi__icon--revenue" aria-hidden="true" />
+              <div>
+                <strong>{summary ? inr(summary.gross_revenue) : "—"}</strong>
+                <span>{t("owner.home.kpiRevenue")}</span>
+                {summary && summary.completed_orders > 0 && (
+                  <em>{t("owner.home.kpiAvgOrder", { amount: inr(summary.avg_order_value) })}</em>
+                )}
+              </div>
+            </Link>
+            <Link to="/dashboard/orders" className="od-kpi dash-card">
+              <span className="od-kpi__icon od-kpi__icon--orders" aria-hidden="true" />
+              <div>
+                <strong>{activeOrders.length}</strong>
+                <span>{t("owner.home.kpiActiveOrders")}</span>
+                <em>{t("owner.home.kpiCompletedWeek", { count: summary?.completed_orders ?? 0 })}</em>
+              </div>
+            </Link>
+            <Link to="/dashboard/orders?tab=drafts" className="od-kpi dash-card">
+              <span className="od-kpi__icon od-kpi__icon--drafts" aria-hidden="true" />
+              <div>
+                <strong>{draftCount}</strong>
+                <span>{t("owner.home.kpiDrafts")}</span>
+                <em>{t("owner.home.kpiDraftsHint")}</em>
+              </div>
+            </Link>
+            <Link to="/dashboard/menu" className="od-kpi dash-card">
+              <span className="od-kpi__icon od-kpi__icon--menu" aria-hidden="true" />
+              <div>
+                <strong>{dishCount}</strong>
+                <span>{t("owner.home.kpiMenu")}</span>
+                {topDish ? (
+                  <em>{t("owner.home.kpiTop", { name: topDish })}</em>
+                ) : (
+                  <em>{t("owner.home.kpiAddPhotos")}</em>
+                )}
+              </div>
+            </Link>
+          </div>
+
+          <section className="dash-card od-share od-branded od-branded--teaser">
+            <div className="od-share__copy">
+              <h2>{t("owner.home.brandTitle")}</h2>
+              <p>
+                {t("owner.home.brandShare", { link: brandedLink })}{" "}
+                · {brandedEnabled ? t("owner.home.published") : t("owner.home.notPublished")}
+              </p>
+            </div>
+            <div className="od-share__aside od-branded__teaser-actions">
+              <Link to="/dashboard/brand" className="btn btn--primary btn--sm">
+                {t("owner.home.manageBrand")}
+              </Link>
+              <button
+                type="button"
+                className="btn btn--ghost btn--sm"
+                onClick={() => window.open(brandedLink, "_blank", "noopener,noreferrer")}
+              >
+                {t("owner.home.preview")}
+              </button>
+            </div>
+          </section>
+
           {(goldenSuggestions.length > 0 || goldenPins.length > 0) && (
             <section className="dash-card od-panel od-golden">
               <header className="od-panel__head">
@@ -320,47 +384,6 @@ export function OwnerHomePage() {
               </ul>
             </section>
           )}
-
-          <div className="od-board__kpi-grid">
-            <Link to="/dashboard/reports" className="od-kpi dash-card">
-              <span className="od-kpi__icon od-kpi__icon--revenue" aria-hidden="true" />
-              <div>
-                <strong>{summary ? inr(summary.gross_revenue) : "—"}</strong>
-                <span>{t("owner.home.kpiRevenue")}</span>
-                {summary && summary.completed_orders > 0 && (
-                  <em>{t("owner.home.kpiAvgOrder", { amount: inr(summary.avg_order_value) })}</em>
-                )}
-              </div>
-            </Link>
-            <Link to="/dashboard/orders" className="od-kpi dash-card">
-              <span className="od-kpi__icon od-kpi__icon--orders" aria-hidden="true" />
-              <div>
-                <strong>{activeOrders.length}</strong>
-                <span>{t("owner.home.kpiActiveOrders")}</span>
-                <em>{t("owner.home.kpiCompletedWeek", { count: summary?.completed_orders ?? 0 })}</em>
-              </div>
-            </Link>
-            <Link to="/dashboard/orders?tab=drafts" className="od-kpi dash-card">
-              <span className="od-kpi__icon od-kpi__icon--drafts" aria-hidden="true" />
-              <div>
-                <strong>{draftCount}</strong>
-                <span>{t("owner.home.kpiDrafts")}</span>
-                <em>{t("owner.home.kpiDraftsHint")}</em>
-              </div>
-            </Link>
-            <Link to="/dashboard/menu" className="od-kpi dash-card">
-              <span className="od-kpi__icon od-kpi__icon--menu" aria-hidden="true" />
-              <div>
-                <strong>{dishCount}</strong>
-                <span>{t("owner.home.kpiMenu")}</span>
-                {topDish ? (
-                  <em>{t("owner.home.kpiTop", { name: topDish })}</em>
-                ) : (
-                  <em>{t("owner.home.kpiAddPhotos")}</em>
-                )}
-              </div>
-            </Link>
-          </div>
 
           <div className="od-board__grid">
             <section className="dash-card od-panel">

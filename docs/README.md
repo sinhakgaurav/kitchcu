@@ -5,6 +5,8 @@
 | **[KITCHCU-ENGINEERING-STANDARDS.md](./KITCHCU-ENGINEERING-STANDARDS.md)** | **Engineering constitution — DDD, EDD, TDD, security, observability** | Engineering, AI agents |
 | **[templates/MODULE-DESIGN-PACK.md](./templates/MODULE-DESIGN-PACK.md)** | Pre-code design template (mandatory for new modules) | Engineering |
 | **[ADVANCEMENT-TRACKER.md](./ADVANCEMENT-TRACKER.md)** | **Living release board** — S1–S18 + post-S18 increments, credentials, seed checklist, kitchcu.com gate | CEO, CPO, CTO, Engineering, AI agents |
+| **[PRODUCTION-PORTALS-CREDENTIALS-QA.md](./PRODUCTION-PORTALS-CREDENTIALS-QA.md)** | **Production portal URLs, credentials policy, cities presence, feature → test steps** | CEO, CPO, CTO, QA, Ops, Support |
+| **[PRODUCTION-PORTALS-CREDENTIALS-QA.pdf](./PRODUCTION-PORTALS-CREDENTIALS-QA.pdf)** | Same pack as PDF | Exec + QA field use |
 | **[PLATFORM-SOLUTION-BLUEPRINT.md](./PLATFORM-SOLUTION-BLUEPRINT.md)** | **Solution blueprint** — every journey: expectations, CEO/CPO problem→solution, CTO impl, achievements, gaps, arch/DB/UX; admin multilevel + package planner | CEO, CPO, CTO, Ops, Support, Finance, AI agents |
 | **[PLATFORM-STRATEGIC-ANALYSIS.md](./PLATFORM-STRATEGIC-ANALYSIS.md)** | **Strategic brief** — competitive honesty, gaps, Waves A–D | CEO, CPO, CTO, Investors, AI agents |
 | **[PLATFORM-PERSONA-DEEP-DIVE.md](./PLATFORM-PERSONA-DEEP-DIVE.md)** | **Persona lived experience** — friction, scorecards, RBAC reality | CEO, CPO, CTO, Ops, Support, Finance, AI agents |
@@ -46,12 +48,20 @@ python scripts/generate_product_depth_pdf.py
 
 # CPO pitch deck (landscape slides + UI Catalog embeds)
 python scripts/generate_pitch_pdf.py
+
+# Production portals, credentials, feature QA matrix
+python scripts/generate_production_portals_pdf.py
+
+# QA instruction pack
+python scripts/generate_qa_instruction_pdf.py
 ```
 
 ## Quick Stats
 
 - **S1–S18 + P19–P40 shipped** — track progress in [ADVANCEMENT-TRACKER.md](./ADVANCEMENT-TRACKER.md); encyclopedia [Complete Guide v3.2.3](./CKAC-COMPLETE-GUIDE.md)
-- **i18n:** 10 IN locales — `python scripts/check-i18n-locale-parity.py`
+- **i18n:** 12 locales (en + 11 IN) — parity `python scripts/check-i18n-locale-parity.py` · sync `python scripts/sync-i18n-missing-keys.py`
+- **Cities presence:** Pune, Mumbai, Delhi NCR, UP belt (Lucknow/Kanpur/Prayagraj/Varanasi/Jhansi), Dehradun + coming soon metros — UI `#cities` on portal / customer / kitchen
+- **Prod portals & QA:** [PRODUCTION-PORTALS-CREDENTIALS-QA.md](./PRODUCTION-PORTALS-CREDENTIALS-QA.md) (+ PDF)
 - **Prod:** `https://kitchcu.com` · `customer` / `kitchen` / `admin` / `api` / `media`.kitchcu.com
 - **Local apps:** Portal :13000 · customer.kitchcu.in :13001 · kitchen.kitchcu.in :13002 · admin.kitchcu.in :13003
 - **Stack:** React PWAs + Python FastAPI + PostgreSQL/PostGIS + Redis + Docker

@@ -31,7 +31,8 @@
     "dashboard": "डैशबोर्ड",
     "customerApp": "ग्राहक ऐप",
     "kitchenOwner": "किचन ओनर →",
-    "ownerLogin": "ओनर लॉगिन"
+    "ownerLogin": "ओनर लॉगिन",
+    "adminLogin": "सुपर एडमिन"
   },
   "status": {
     "received": "प्राप्त",
@@ -140,33 +141,35 @@
     "contactSubmit": "एक्सेस का अनुरोध करें",
     "contactSending": "भेजा जा रहा है…",
     "contactSent": "धन्यवाद — हम जल्द संपर्क करेंगे।",
-    "contactError": "भेज नहीं सके। कृपया फिर कोशिश करें।"
+    "contactError": "भेज नहीं सके। कृपया फिर कोशिश करें।",
+    "navCities": "शहर"
   },
   "owner": {
     "nav": {
-      "operations": "संचालन",
-      "overview": "अवलोकन",
+      "operations": "रोज़ का काम",
+      "overview": "होम",
       "orders": "ऑर्डर",
       "menu": "मेनू",
-      "brand": "ब्रांड पेज",
+      "brand": "आपका पेज",
       "ingredients": "सामग्री",
-      "growth": "ग्रोथ",
+      "bulkPrep": "बैच तैयारी",
+      "growth": "बढ़ाएँ",
       "reports": "रिपोर्ट",
-      "intelligence": "इंटेलिजेंस",
-      "crm": "CRM",
+      "intelligence": "ग्रोथ टिप्स",
+      "crm": "नियमित ग्राहक",
       "coupons": "कूपन",
       "tiffin": "टिफ़िन प्लान",
-      "templates": "टेम्प्लेट",
-      "stream": "लाइव स्ट्रीम",
+      "templates": "संदेश टेम्प्लेट",
+      "stream": "लाइव जाएं",
       "learn": "सीखें और जुड़ें",
       "learning": "लर्निंग",
       "community": "कम्युनिटी",
-      "account": "अकाउंट",
-      "subscription": "सब्सक्रिप्शन",
+      "account": "सेटिंग्स",
+      "subscription": "आपका प्लान",
       "referrals": "रेफ़रल",
       "whatsapp": "WhatsApp",
-      "paymentGateway": "पेमेंट गेटवे",
-      "gst": "GST और वित्त",
+      "paymentGateway": "भुगतान",
+      "gst": "GST और बिल",
       "setup": "किचन सेटअप"
     },
     "shell": {
@@ -321,22 +324,25 @@
       "nearYou": "आपके पास",
       "featured": "फ़ीचर्ड",
       "bestPrices": "सबसे अच्छी कीमतें",
-      "kitchenCode": "किचन कोड",
+      "kitchenCode": "कोड है?",
       "myOrders": "मेरे ऑर्डर",
-      "dashboard": "डैशबोर्ड",
+      "dashboard": "मेरी जगह",
       "account": "अकाउंट",
-      "signIn": "ग्राहक साइन इन"
+      "signIn": "साइन इन"
     },
     "auth": {
-      "title": "ग्राहक साइन इन",
+      "title": "ऑर्डर करने के लिए साइन इन",
       "whatsappOtp": "WhatsApp OTP",
       "socialContinue": "सोशल से जारी रखें",
       "phone": "फ़ोन",
       "sendOtp": "OTP भेजें",
-      "verify": "सत्यापित करें"
+      "verify": "सत्यापित करें",
+      "kitchenCodeOptional": "किचन कोड (वैकल्पिक)",
+      "kitchenCodeHint": "आस-पास किचन देख रहे हैं तो छोड़ दें"
     },
     "discovery": {
-      "title": "अपने पास होम किचन खोजें",
+      "title": "आपके पास होम किचन",
+      "lede": "असली डिश फ़ोटो, सही तैयारी समय, और सही डिलीवरी — घर जैसा स्वाद ऑर्डर करें।",
       "searchPlaceholder": "किचन, व्यंजन, डिश खोजें…",
       "useLocation": "मेरा स्थान उपयोग करें",
       "noResults": "आपके फ़िल्टर से कोई किचन मेल नहीं खाता"
@@ -362,26 +368,54 @@
       "status": "स्थिति"
     },
     "dashboard": {
-      "title": "आपका डैशबोर्ड",
-      "savedKitchens": "सहेजे गए किचन",
+      "title": "मेरी किचन जगह",
+      "subtitle": "ऑर्डर, पते और सहायता — रोज़ के ऑर्डर के लिए आसान टूल।",
+      "savedKitchens": "आपके किचन",
       "referrals": "रेफ़रल",
       "tickets": "सहायता",
-      "tabOverview": "अवलोकन",
+      "tabOverview": "होम",
       "tabOrders": "ऑर्डर",
-      "tabSavings": "बचत",
+      "tabSavings": "रेस्टोरेंट से बचत",
       "tabReferrals": "रेफ़रल",
-      "tabHealth": "हेल्थ",
+      "tabHealth": "खाने की आदतें",
       "tabRefunds": "रिफ़ंड",
-      "tabComplaints": "सहायता",
+      "tabComplaints": "मदद",
       "tabAddresses": "पते",
-      "tabAccount": "खाता",
-      "tabPlans": "प्लान"
+      "tabAccount": "प्रोफ़ाइल",
+      "tabPlans": "मील प्लान",
+      "moreTabs": "और",
+      "findFood": "पास का खाना खोजें",
+      "refundDetails": "रिफ़ंड कहाँ जाएँगे"
     },
     "account": {
-      "title": "अकाउंट",
+      "title": "रिफ़ंड कहाँ जाएँगे",
+      "intro": "अपना UPI या बैंक जोड़ें ताकि किचन आपको जल्दी रिफ़ंड भेज सकें।",
       "addresses": "पते",
-      "payout": "रिफ़ंड भुगतान",
-      "save": "प्रोफ़ाइल सहेजें"
+      "payout": "रिफ़ंड विवरण",
+      "save": "विवरण सहेजें",
+      "myOrders": "मेरे ऑर्डर",
+      "mySpace": "मेरी जगह",
+      "logOut": "लॉग आउट",
+      "accountHolder": "खाताधारक का नाम",
+      "bankAccount": "बैंक खाता संख्या",
+      "ifsc": "IFSC",
+      "pageTitle": "अकाउंट",
+      "payoutSaved": "भुगतान विवरण सहेजे गए — किचन इस UPI या बैंक पर रिफ़ंड भेज सकते हैं।",
+      "qrUploaded": "UPI QR छवि अपलोड हो गई।",
+      "savePayout": "भुगतान विवरण सहेजें",
+      "saving": "सहेजा जा रहा है…",
+      "upiId": "UPI ID",
+      "upiQrHint": "वैकल्पिक — सीधा UPI रिफ़ंड भेजते समय ओनर इसका उपयोग कर सकते हैं।",
+      "upiQrTitle": "UPI QR / स्कैनर छवि",
+      "uploadImage": "छवि अपलोड करें"
     }
+  },
+  "cities": {
+    "body": "{{count}}+ शहरों में लाइव किचन — जल्द और शहर।",
+    "eyebrow": "हम कहाँ हैं",
+    "nav": "शहर",
+    "statusLive": "लाइव",
+    "statusSoon": "जल्द आ रहा है",
+    "title": "शहरों में हमारी उपस्थिति"
   }
 }

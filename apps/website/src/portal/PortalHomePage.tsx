@@ -1,6 +1,7 @@
 import { useTranslation } from "react-i18next";
 import { AppTiles } from "../components/AppTiles";
 import { Contact } from "../components/Contact";
+import { CitiesPresence } from "../components/CitiesPresence";
 import { Features } from "../components/Features";
 import { HowItWorks } from "../components/HowItWorks";
 import { ParallaxScrollProgress } from "../components/ParallaxScrollProgress";
@@ -38,6 +39,7 @@ export function PortalHomePage() {
         </section>
 
         <Features />
+        <CitiesPresence />
         <HowItWorks ctaHref={kitchenUrl("/login")} />
         <Pricing />
         <SupportSection />

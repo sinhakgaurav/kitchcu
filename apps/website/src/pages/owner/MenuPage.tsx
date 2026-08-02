@@ -135,10 +135,14 @@ export function MenuPage() {
                       {!d.is_active && <span className="owner-muted"> · off menu</span>}
                     </h3>
                     <p>
-                      ₹{d.price} · prep {d.prep_time_min}m
-                      {d.delivery_time_min != null ? ` · delivery ${d.delivery_time_min}m` : ""}
+                      ₹{d.price}
                       {" · "}
-                      <strong>ready within {d.max_time_min ?? d.projected_ready_min}m</strong>
+                      <strong>Ready in ~{d.max_time_min ?? d.projected_ready_min}m</strong>
+                      <span className="owner-muted">
+                        {" "}
+                        (cook {d.prep_time_min}m
+                        {d.delivery_time_min != null ? ` · deliver ${d.delivery_time_min}m` : ""})
+                      </span>
                     </p>
                     {badges.length > 0 && (
                       <div className="dish-badges">

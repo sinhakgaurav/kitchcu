@@ -362,7 +362,10 @@ We charge for the care layer — not for a cut of your meal.`,
 export const supportChannels = [
   { label: "Email", value: "hello@kitchCU.in", href: "mailto:hello@kitchCU.in" },
   { label: "Hours", value: "Mon–Sat, 9am–7pm IST" },
-  { label: "Location", value: "Pune, Maharashtra, India" },
+  {
+    label: "Location",
+    value: "Pune HQ · Delhi NCR · Lucknow · Kanpur · Prayagraj · Varanasi · Jhansi · Dehradun · Mumbai",
+  },
   { label: "Response time", value: "Within 24 hours on weekdays" },
 ];
 

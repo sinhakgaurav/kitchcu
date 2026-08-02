@@ -1,9 +1,16 @@
 export type ChatAudience = "owner" | "customer";
 
+export type SupportChatOption = {
+  id: string;
+  label: string;
+};
+
 export type ChatResponse = {
   audience: ChatAudience;
   reply: string;
   source: "knowledge" | "ai";
+  answer_id?: string | null;
+  options?: SupportChatOption[];
   suggest_ticket: boolean;
   suggested_category: string | null;
 };
@@ -38,11 +45,21 @@ export async function sendSupportChat(
   audience: ChatAudience,
   message: string,
   history: { role: "user" | "assistant"; content: string }[],
+  opts?: {
+    selectedOptionId?: string;
+    priorOptions?: SupportChatOption[];
+  },
 ): Promise<ChatResponse> {
   const res = await fetch("/api/v1/support/chat", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ audience, message, history: history.slice(-10) }),
+    body: JSON.stringify({
+      audience,
+      message,
+      history: history.slice(-10),
+      selected_option_id: opts?.selectedOptionId,
+      prior_options: opts?.priorOptions?.slice(0, 20) ?? [],
+    }),
   });
   const body = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(typeof body.detail === "string" ? body.detail : "Chat unavailable");

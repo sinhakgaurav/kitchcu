@@ -38,6 +38,9 @@ export function CustomerNavbar() {
           <a href={hashLink("/#near-you")} onClick={() => setOpen(false)}>
             {t("customer.nav.nearYou")}
           </a>
+          <a href={hashLink("/#cities")} onClick={() => setOpen(false)}>
+            {t("cities.nav")}
+          </a>
           <a href={hashLink("/#by-code")} onClick={() => setOpen(false)}>
             {t("customer.nav.kitchenCode")}
           </a>
@@ -46,10 +49,14 @@ export function CustomerNavbar() {
               <Link to="/orders" onClick={() => setOpen(false)}>
                 {t("customer.nav.myOrders")}
               </Link>
-              <Link to="/account" onClick={() => setOpen(false)}>
-                {t("customer.nav.account")}
+              <Link to="/dashboard" onClick={() => setOpen(false)}>
+                {t("customer.nav.dashboard")}
               </Link>
-              <Link to="/login" className="btn btn--ghost btn--sm nav__auth-btn" onClick={() => setOpen(false)}>
+              <Link
+                to="/dashboard"
+                className="btn btn--primary btn--sm nav__auth-btn"
+                onClick={() => setOpen(false)}
+              >
                 {accountLabel}
               </Link>
             </>

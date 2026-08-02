@@ -1,5 +1,6 @@
 import { FormEvent, useEffect, useState } from "react";
 import { Link, Navigate, useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import {
   fetchCustomerProfile,
   getCustomerToken,
@@ -10,6 +11,7 @@ import {
 import { useCustomerAuth } from "../../shared/customerAuth";
 
 export function CustomerAccountPage() {
+  const { t } = useTranslation();
   const token = getCustomerToken();
   const { logout } = useCustomerAuth();
   const navigate = useNavigate();
@@ -31,8 +33,8 @@ export function CustomerAccountPage() {
         setBankIfsc(p.bank_ifsc ?? "");
         setBankName(p.bank_account_name ?? "");
       })
-      .catch((err) => setError(err instanceof Error ? err.message : "Could not load profile"));
-  }, [token]);
+      .catch((err) => setError(err instanceof Error ? err.message : t("common.error")));
+  }, [token, t]);
 
   if (!token) {
     return <Navigate to="/login?next=/account" replace />;
@@ -52,9 +54,9 @@ export function CustomerAccountPage() {
       });
       setProfile(next);
       setBankAccount("");
-      setOk("Payout details saved — kitchens can refund to this UPI or bank account.");
+      setOk(t("customer.account.payoutSaved"));
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Save failed");
+      setError(err instanceof Error ? err.message : t("common.error"));
     } finally {
       setBusy(false);
     }
@@ -68,26 +70,27 @@ export function CustomerAccountPage() {
     try {
       const next = await uploadCustomerPayoutQr(file);
       setProfile(next);
-      setOk("UPI QR image uploaded.");
+      setOk(t("customer.account.qrUploaded"));
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Upload failed");
+      setError(err instanceof Error ? err.message : t("common.error"));
     } finally {
       setBusy(false);
     }
   };
 
   return (
-    <div className="container customer-page__body" style={{ maxWidth: 560, padding: "2rem 1rem 3rem" }}>
+    <div className="container customer-page__body customer-account" style={{ maxWidth: 560, padding: "2rem 1rem 3rem" }}>
       <p style={{ marginBottom: "0.5rem" }}>
-        <Link to="/orders">← My orders</Link>
+        <Link to="/orders">← {t("customer.account.myOrders")}</Link>
       </p>
-      <h1>Account</h1>
-      <nav className="customer-account-nav" aria-label="Account">
+      <h1>{t("customer.account.pageTitle")}</h1>
+      <p className="customer-account__intro">{t("customer.account.intro")}</p>
+      <nav className="customer-account-nav" aria-label={t("customer.account.pageTitle")}>
         <Link to="/dashboard" className="btn btn--ghost btn--sm">
-          My profile
+          {t("customer.account.mySpace")}
         </Link>
         <Link to="/orders" className="btn btn--ghost btn--sm">
-          Notifications
+          {t("customer.account.myOrders")}
         </Link>
         <button
           type="button"
@@ -97,25 +100,22 @@ export function CustomerAccountPage() {
             navigate("/login", { replace: true });
           }}
         >
-          Log out
+          {t("customer.account.logOut")}
         </button>
       </nav>
-      <h2 style={{ marginTop: "1.5rem", fontSize: "1.25rem" }}>Refund payout details</h2>
-      <p>
-        Save your UPI ID, QR scanner image, and bank account so kitchen owners can send full or
-        partial refunds directly (remark = order id).
-      </p>
+      <h2 className="customer-account__section-title">{t("customer.account.title")}</h2>
+      <p>{t("customer.account.intro")}</p>
 
       {error && <div className="auth-card__error">{error}</div>}
       {ok && <p className="auth-card__hint">{ok}</p>}
 
       <form className="glass customer-search" onSubmit={save}>
         <label>
-          UPI ID
+          {t("customer.account.upiId")}
           <input value={upi} onChange={(e) => setUpi(e.target.value)} placeholder="priya@okaxis" />
         </label>
         <label>
-          Bank account number
+          {t("customer.account.bankAccount")}
           <input
             value={bankAccount}
             onChange={(e) => setBankAccount(e.target.value)}
@@ -127,30 +127,30 @@ export function CustomerAccountPage() {
           />
         </label>
         <label>
-          IFSC
+          {t("customer.account.ifsc")}
           <input value={bankIfsc} onChange={(e) => setBankIfsc(e.target.value)} placeholder="HDFC0001234" />
         </label>
         <label>
-          Account holder name
+          {t("customer.account.accountHolder")}
           <input value={bankName} onChange={(e) => setBankName(e.target.value)} placeholder="Priya Customer" />
         </label>
         <button type="submit" className="btn btn--primary btn--lg" disabled={busy}>
-          {busy ? "Saving…" : "Save payout details"}
+          {busy ? t("customer.account.saving") : t("customer.account.savePayout")}
         </button>
       </form>
 
       <section className="glass customer-search" style={{ marginTop: "1.25rem" }}>
-        <h2>UPI QR / scanner image</h2>
-        <p>Optional — owners can use this when sending a direct UPI refund.</p>
+        <h2>{t("customer.account.upiQrTitle")}</h2>
+        <p>{t("customer.account.upiQrHint")}</p>
         {profile?.upi_qr_url && (
           <img
             src={profile.upi_qr_url}
-            alt="Your UPI QR"
+            alt={t("customer.account.upiQrTitle")}
             style={{ maxWidth: 220, width: "100%", borderRadius: 8, marginBottom: "0.75rem" }}
           />
         )}
         <label>
-          Upload image
+          {t("customer.account.uploadImage")}
           <input
             type="file"
             accept="image/jpeg,image/png,image/webp"

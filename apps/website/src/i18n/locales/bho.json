@@ -31,7 +31,8 @@
     "dashboard": "डैशबोर्ड के बा",
     "customerApp": "ग्राहक ऐप के बा",
     "kitchenOwner": "रसोई के मालिक →",
-    "ownerLogin": "मालिक के लॉगिन हो गइल बा"
+    "ownerLogin": "मालिक के लॉगिन हो गइल बा",
+    "adminLogin": "Super admin"
   },
   "status": {
     "received": "मिलल",
@@ -140,7 +141,8 @@
     "contactSubmit": "पहुँच के अनुरोध कइल जाला",
     "contactSending": "भेजत बानी...",
     "contactSent": "धन्यवाद — हमनी के जल्दीए हाथ बढ़ा देब जा।",
-    "contactError": "भेजल ना जा सकल. कृपया दोबारा कोशिश करीं।"
+    "contactError": "भेजल ना जा सकल. कृपया दोबारा कोशिश करीं।",
+    "navCities": "Cities"
   },
   "owner": {
     "nav": {
@@ -167,7 +169,8 @@
       "whatsapp": "व्हाट्सएप के बा",
       "paymentGateway": "भुगतान के गेटवे के बा",
       "gst": "जीएसटी एंड फाइनेंस के बा",
-      "setup": "किचन सेटअप के बा"
+      "setup": "किचन सेटअप के बा",
+      "bulkPrep": "Prep batches"
     },
     "shell": {
       "activeKitchen": "सक्रिय रसोईघर बा",
@@ -333,13 +336,16 @@
       "socialContinue": "सामाजिक के साथ जारी रखे के बा",
       "phone": "फोन",
       "sendOtp": "ओटीपी भेजल जाला",
-      "verify": "सत्यापित करीं"
+      "verify": "सत्यापित करीं",
+      "kitchenCodeHint": "Skip if you are browsing kitchens nearby",
+      "kitchenCodeOptional": "Kitchen code (optional)"
     },
     "discovery": {
       "title": "अपना पास घर के रसोईघर खोजीं",
       "searchPlaceholder": "रसोई, व्यंजन, पकवान के खोज करीं...",
       "useLocation": "हमार लोकेशन के इस्तेमाल करीं",
-      "noResults": "कवनो रसोईघर राउर फिल्टर से मेल ना खाला"
+      "noResults": "कवनो रसोईघर राउर फिल्टर से मेल ना खाला",
+      "lede": "Real dish photos, honest prep times, and fair delivery — order home taste."
     },
     "checkout": {
       "title": "चेकआउट कइल जाव",
@@ -375,13 +381,41 @@
       "tabComplaints": "समर्थन",
       "tabAddresses": "पता के बारे में बतावल गइल बा",
       "tabAccount": "खाता",
-      "tabPlans": "प्लान"
+      "tabPlans": "प्लान",
+      "findFood": "Find food nearby",
+      "moreTabs": "More",
+      "refundDetails": "Where refunds go",
+      "subtitle": "Orders, addresses, and support — simple tools for everyday ordering."
     },
     "account": {
       "title": "खाता",
       "addresses": "पता के बारे में बतावल गइल बा",
       "payout": "भुगतान वापसी के बा",
-      "save": "प्रोफाइल सेव कर लीं"
+      "save": "प्रोफाइल सेव कर लीं",
+      "accountHolder": "Account holder name",
+      "bankAccount": "Bank account number",
+      "ifsc": "IFSC",
+      "intro": "Add your UPI or bank so kitchens can send refunds to you quickly.",
+      "logOut": "Log out",
+      "myOrders": "My orders",
+      "mySpace": "My space",
+      "pageTitle": "Account",
+      "payoutSaved": "Payout details saved — kitchens can refund to this UPI or bank account.",
+      "qrUploaded": "UPI QR image uploaded.",
+      "savePayout": "Save payout details",
+      "saving": "Saving…",
+      "upiId": "UPI ID",
+      "upiQrHint": "Optional — owners can use this when sending a direct UPI refund.",
+      "upiQrTitle": "UPI QR / scanner image",
+      "uploadImage": "Upload image"
     }
+  },
+  "cities": {
+    "body": "{{count}}+ cities with live kitchens — more opening soon across India.",
+    "eyebrow": "Where we are",
+    "nav": "Cities",
+    "statusLive": "Live",
+    "statusSoon": "Coming soon",
+    "title": "Our presence in cities"
   }
 }

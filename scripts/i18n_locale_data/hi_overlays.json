@@ -1,0 +1,32 @@
+{
+  "common": {
+    "adminLogin": "सुपर एडमिन"
+  },
+  "cities": {
+    "eyebrow": "हम कहाँ हैं",
+    "title": "शहरों में हमारी उपस्थिति",
+    "body": "{{count}}+ शहरों में लाइव किचन — जल्द और शहर।",
+    "statusLive": "लाइव",
+    "statusSoon": "जल्द आ रहा है",
+    "nav": "शहर"
+  },
+  "portal": {
+    "navCities": "शहर"
+  },
+  "customer": {
+    "account": {
+      "pageTitle": "अकाउंट",
+      "upiId": "UPI ID",
+      "bankAccount": "बैंक खाता संख्या",
+      "ifsc": "IFSC",
+      "accountHolder": "खाताधारक का नाम",
+      "savePayout": "भुगतान विवरण सहेजें",
+      "saving": "सहेजा जा रहा है…",
+      "upiQrTitle": "UPI QR / स्कैनर छवि",
+      "upiQrHint": "वैकल्पिक — सीधा UPI रिफ़ंड भेजते समय ओनर इसका उपयोग कर सकते हैं।",
+      "uploadImage": "छवि अपलोड करें",
+      "payoutSaved": "भुगतान विवरण सहेजे गए — किचन इस UPI या बैंक पर रिफ़ंड भेज सकते हैं।",
+      "qrUploaded": "UPI QR छवि अपलोड हो गई।"
+    }
+  }
+}

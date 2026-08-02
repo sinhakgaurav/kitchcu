@@ -3,13 +3,16 @@
   "audience": "owner",
   "channel": ["portal", "whatsapp"],
   "header": "kitchCU owner assistant",
-  "body": "Choose an option (reply with the number):",
+  "body": "I can help with growing your cloud kitchen. Pick a topic (or type a question):",
   "options": [
     {"id": "1", "title": "Pricing & plans", "intent": "support.faq", "answer_id": "owner.pricing.plans"},
     {"id": "2", "title": "WhatsApp orders", "intent": "support.faq", "answer_id": "owner.whatsapp.orders"},
-    {"id": "3", "title": "Menu / live photos", "intent": "support.faq", "answer_id": "owner.menu.live_capture"},
-    {"id": "4", "title": "Import menu from WA", "intent": "menu.ingest.catalog"},
-    {"id": "5", "title": "Dashboard sections", "intent": "support.section.assist"},
-    {"id": "6", "title": "Raise a ticket", "intent": "support.ticket.start"}
+    {"id": "3", "title": "Menu & live photos", "intent": "support.faq", "answer_id": "owner.menu.live_capture"},
+    {"id": "4", "title": "Orders & refunds", "intent": "support.faq", "answer_id": "owner.orders.lifecycle"},
+    {"id": "5", "title": "Delivery & tracking", "intent": "support.faq", "answer_id": "owner.delivery.settings"},
+    {"id": "6", "title": "CRM, coupons, referrals", "intent": "support.faq", "answer_id": "owner.marketing.crm"},
+    {"id": "7", "title": "Billing & GST", "intent": "support.faq", "answer_id": "owner.billing.subscription"},
+    {"id": "8", "title": "Tiffin & stock", "intent": "support.faq", "answer_id": "owner.tiffin.plans"},
+    {"id": "9", "title": "Raise a ticket", "intent": "support.ticket.start"}
   ]
 }

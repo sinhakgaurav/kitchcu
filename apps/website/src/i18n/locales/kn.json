@@ -31,7 +31,8 @@
     "dashboard": "ಡಾಶ್ ಬೋರ್ಡ್",
     "customerApp": "ಗ್ರಾಹಕ ಆ್ಯಪ್",
     "kitchenOwner": "ಕಿಚನ್ ಮಾಲೀಕರು →",
-    "ownerLogin": "ಮಾಲೀಕರ ಲಾಗಿನ್"
+    "ownerLogin": "ಮಾಲೀಕರ ಲಾಗಿನ್",
+    "adminLogin": "Super admin"
   },
   "status": {
     "received": "ಸ್ವೀಕರಿಸಲಾಗಿರುವುದು",
@@ -140,7 +141,8 @@
     "contactSubmit": "ಪ್ರವೇಶವನ್ನು ವಿನಂತಿಸಿ",
     "contactSending": "ಕಳುಹಿಸಲಾಗುತ್ತಿದೆ...",
     "contactSent": "ಧನ್ಯವಾದಗಳು - ನಾವು ಶೀಘ್ರದಲ್ಲೇ ತಲುಪುತ್ತೇವೆ.",
-    "contactError": "ಕಳುಹಿಸಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ. ದಯವಿಟ್ಟು ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ."
+    "contactError": "ಕಳುಹಿಸಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ. ದಯವಿಟ್ಟು ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ.",
+    "navCities": "Cities"
   },
   "owner": {
     "nav": {
@@ -167,7 +169,8 @@
       "whatsapp": "WhatsApp",
       "paymentGateway": "ಪಾವತಿ ಗೇಟ್‌ವೇ",
       "gst": "ಜಿಎಸ್‌ಟಿ ಮತ್ತು ಹಣಕಾಸು",
-      "setup": "ಕಿಚನ್ ಸೆಟಪ್"
+      "setup": "ಕಿಚನ್ ಸೆಟಪ್",
+      "bulkPrep": "Prep batches"
     },
     "shell": {
       "activeKitchen": "ಸಕ್ರಿಯ ಅಡುಗೆಮನೆ",
@@ -333,13 +336,16 @@
       "socialContinue": "ಸಾಮಾಜಿಕವಾಗಿ ಮುಂದುವರಿಯಿರಿ",
       "phone": "ದೂರವಾಣಿ",
       "sendOtp": "ಒಟಿಪಿ ಕಳುಹಿಸಿ",
-      "verify": "ಪರಿಶೀಲಿಸಿ"
+      "verify": "ಪರಿಶೀಲಿಸಿ",
+      "kitchenCodeHint": "Skip if you are browsing kitchens nearby",
+      "kitchenCodeOptional": "Kitchen code (optional)"
     },
     "discovery": {
       "title": "ನಿಮ್ಮ ಹತ್ತಿರವಿರುವ ಮನೆಯ ಅಡುಗೆಮನೆಗಳನ್ನು ಹುಡುಕಿ",
       "searchPlaceholder": "ಅಡುಗೆಮನೆ, ಪಾಕಪದ್ಧತಿ, ಖಾದ್ಯವನ್ನು ಹುಡುಕಿ …",
       "useLocation": "ನನ್ನ ಸ್ಥಾನ",
-      "noResults": "ಯಾವುದೇ ಅಡಿಗೆಮನೆಗಳು ನಿಮ್ಮ ಫಿಲ್ಟರ್‌ಗಳಿಗೆ ಹೊಂದಿಕೆಯಾಗುವುದಿಲ್ಲ"
+      "noResults": "ಯಾವುದೇ ಅಡಿಗೆಮನೆಗಳು ನಿಮ್ಮ ಫಿಲ್ಟರ್‌ಗಳಿಗೆ ಹೊಂದಿಕೆಯಾಗುವುದಿಲ್ಲ",
+      "lede": "Real dish photos, honest prep times, and fair delivery — order home taste."
     },
     "checkout": {
       "title": "ಚೆಕ್ಟ್",
@@ -375,13 +381,41 @@
       "tabComplaints": "ಬೆಂಬಲ",
       "tabAddresses": "ವಿಳಾಸಗಳು",
       "tabAccount": "ಖಾತೆ",
-      "tabPlans": "ಯೋಜನೆಗಳು"
+      "tabPlans": "ಯೋಜನೆಗಳು",
+      "findFood": "Find food nearby",
+      "moreTabs": "More",
+      "refundDetails": "Where refunds go",
+      "subtitle": "Orders, addresses, and support — simple tools for everyday ordering."
     },
     "account": {
       "title": "ಖಾತೆ",
       "addresses": "ವಿಳಾಸಗಳು",
       "payout": "ಮರುಪಾವತಿ ಪಾವತಿ",
-      "save": "ಪ್ರೊಫೈಲ್ ಉಳಿಸಿ"
+      "save": "ಪ್ರೊಫೈಲ್ ಉಳಿಸಿ",
+      "accountHolder": "Account holder name",
+      "bankAccount": "Bank account number",
+      "ifsc": "IFSC",
+      "intro": "Add your UPI or bank so kitchens can send refunds to you quickly.",
+      "logOut": "Log out",
+      "myOrders": "My orders",
+      "mySpace": "My space",
+      "pageTitle": "Account",
+      "payoutSaved": "Payout details saved — kitchens can refund to this UPI or bank account.",
+      "qrUploaded": "UPI QR image uploaded.",
+      "savePayout": "Save payout details",
+      "saving": "Saving…",
+      "upiId": "UPI ID",
+      "upiQrHint": "Optional — owners can use this when sending a direct UPI refund.",
+      "upiQrTitle": "UPI QR / scanner image",
+      "uploadImage": "Upload image"
     }
+  },
+  "cities": {
+    "body": "{{count}}+ cities with live kitchens — more opening soon across India.",
+    "eyebrow": "Where we are",
+    "nav": "Cities",
+    "statusLive": "Live",
+    "statusSoon": "Coming soon",
+    "title": "Our presence in cities"
   }
 }

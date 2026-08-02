@@ -9,7 +9,7 @@
 4. Escalates to **tickets** with correct category + required fields  
 5. Assists owners across **all kitchen.kitchcu.in sections**
 
-This pack is the single source of truth for prompts, FAQs, option trees, and few-shot examples. Runtime code in `services/notification` / `services/order` should **load** from here (or stay keyword-KB until wired) — do not invent pricing, commissions, or POS features.
+This pack is the single source of truth for prompts, FAQs, option trees, and few-shot examples. **Portal support chat** (`services/notification/app/support.py`) loads FAQ + menus from here via `load.resolve_support_turn` (options-first chips). WhatsApp order parse remains in `services/order`. Do not invent pricing, commissions, or POS features.
 
 ---
 

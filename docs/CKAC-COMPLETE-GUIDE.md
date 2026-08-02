@@ -4,16 +4,17 @@
 
 | Field | Value |
 |-------|-------|
-| Version | **3.2.3** |
-| Status | Phase 1 **S1–S18** + post-S18 **P19–P40**; prod `*.kitchcu.com`; tracker [`ADVANCEMENT-TRACKER.md`](./ADVANCEMENT-TRACKER.md); solution depth [`PLATFORM-SOLUTION-BLUEPRINT.md`](./PLATFORM-SOLUTION-BLUEPRINT.md); **E1/E2** design pack only |
+| Version | **3.2.4** |
+| Status | Phase 1 **S1–S18** + post-S18 **P19–P40**; prod `*.kitchcu.com`; multi-city presence; i18n parity; portals/QA pack [`PRODUCTION-PORTALS-CREDENTIALS-QA.md`](./PRODUCTION-PORTALS-CREDENTIALS-QA.md); tracker [`ADVANCEMENT-TRACKER.md`](./ADVANCEMENT-TRACKER.md); **E1/E2** design pack only |
 | Audience | CEO, CPO, CTO, Product, Engineering, DBA, QA, Investors, AI coding agents |
-| Last updated | 2026-07-20 |
-| Supersedes | `CKAC-COMPLETE-GUIDE.md` v3.2.2 (July 2026) |
+| Last updated | 2026-08-02 |
+| Supersedes | `CKAC-COMPLETE-GUIDE.md` v3.2.3 (July 2026) |
 | Operating charter | [`.cursor/rules/kitchcu-executive-operating-charter.mdc`](../.cursor/rules/kitchcu-executive-operating-charter.mdc) — always-on, non-negotiable |
 | Engineering constitution | [`KITCHCU-ENGINEERING-STANDARDS.md`](./KITCHCU-ENGINEERING-STANDARDS.md) |
 | Agent quick spec | [`AGENTS.md`](../AGENTS.md) |
 | Design pack in flight | [`E1-E2-KITCHEN-QUALITY-LOOP-DESIGN.md`](./E1-E2-KITCHEN-QUALITY-LOOP-DESIGN.md) |
 | Full user journeys | [`CKAC-USERFLOWS.md`](./CKAC-USERFLOWS.md) · [`CKAC-USERFLOWS.pdf`](./CKAC-USERFLOWS.pdf) |
+| Production portals & feature QA | [`PRODUCTION-PORTALS-CREDENTIALS-QA.md`](./PRODUCTION-PORTALS-CREDENTIALS-QA.md) · [`PRODUCTION-PORTALS-CREDENTIALS-QA.pdf`](./PRODUCTION-PORTALS-CREDENTIALS-QA.pdf) |
 | Public API reference | [`API.md`](./API.md) · aggregated spec at gateway `/openapi.json`, `/docs`, `/redoc` · portal explorer `/openapi` |
 | UI reference screenshots | [`docs/assets/ui/`](./assets/ui/) |
 
@@ -160,7 +161,8 @@ KitchCu (repo/schema identifiers use the legacy short name **`ckac`** — CloudK
 |--------|-------|
 | Sprints shipped | **S1 – S18** (identity through live streaming) |
 | Microservices | Gateway + **13** domain services |
-| Public web surfaces | Portal · `customer.kitchcu.in` · `kitchen.kitchcu.in` · `admin.kitchcu.in` |
+| Public web surfaces | Prod: `kitchcu.com` · `customer` / `kitchen` / `admin` / `api.kitchcu.com` · Local: `*.kitchcu.in` ports 13000–13003 — see [`PRODUCTION-PORTALS-CREDENTIALS-QA.md`](./PRODUCTION-PORTALS-CREDENTIALS-QA.md) |
+| Cities presence | Live: Pune, Mumbai, Delhi, Gurugram, Noida, Lucknow, Kanpur, Prayagraj, Varanasi, Jhansi, Dehradun · Coming soon: Bengaluru, Hyderabad, Chennai, Kolkata — UI `#cities` on portal, customer home, kitchen landing |
 | Billing / GST | Payments, UPI intents, subscriptions, split settlements, **refunds (gateway/direct)**, **GST profiles + tax invoices + monthly audit + balance sheet** |
 | Delivery / timing | Dish **ready-within** (`max_time_min`); **delivery payer** (owner in-range / customer extended) + platform courier + Google Maps track |
 | Super admin | Customers, Refunds, **Control** (feature flags + application data journeys), kitchen suspend, subscription overrides |

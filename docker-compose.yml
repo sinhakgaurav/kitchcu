@@ -146,6 +146,7 @@ services:
       REDIS_URL: redis://redis:6379/0
       # Prefer mounted ckac-common over image site-packages (dev volume hot-reload)
       PYTHONPATH: /app/packages/ckac-common
+      AI_CONTEXT_ROOT: /app/packages/ai-context
       ORDER_SERVICE_URL: http://order:8003
     ports:
       - "18005:8005"

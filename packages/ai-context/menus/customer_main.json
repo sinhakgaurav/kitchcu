@@ -3,13 +3,16 @@
   "audience": "customer",
   "channel": ["portal", "whatsapp"],
   "header": "kitchCU customer help",
-  "body": "How can I help? Reply with a number:",
+  "body": "How can I help today? Pick a topic (or type your question):",
   "options": [
     {"id": "1", "title": "Find a kitchen", "intent": "support.faq", "answer_id": "customer.find.kitchen"},
-    {"id": "2", "title": "Order / checkout", "intent": "support.faq", "answer_id": "customer.order.checkout"},
-    {"id": "3", "title": "Live-capture photos", "intent": "support.faq", "answer_id": "customer.trust.live_capture"},
-    {"id": "4", "title": "Track my order", "intent": "order.status"},
+    {"id": "2", "title": "Order & checkout", "intent": "support.faq", "answer_id": "customer.order.checkout"},
+    {"id": "3", "title": "Track my order", "intent": "support.faq", "answer_id": "customer.order.track"},
+    {"id": "4", "title": "Payments", "intent": "support.faq", "answer_id": "customer.payment.options"},
     {"id": "5", "title": "Delivery fees", "intent": "support.faq", "answer_id": "customer.delivery.fees"},
-    {"id": "6", "title": "Support / ticket", "intent": "support.ticket.start"}
+    {"id": "6", "title": "Live-capture photos", "intent": "support.faq", "answer_id": "customer.trust.live_capture"},
+    {"id": "7", "title": "Ratings & reviews", "intent": "support.faq", "answer_id": "customer.ratings.home_taste"},
+    {"id": "8", "title": "Tiffin plans", "intent": "support.faq", "answer_id": "customer.tiffin.subscribe"},
+    {"id": "9", "title": "Support / ticket", "intent": "support.ticket.start"}
   ]
 }
