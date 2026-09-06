@@ -2,6 +2,7 @@ import uuid
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.deps import (
@@ -31,6 +32,7 @@ from app.schemas import (
 from ckac_common.database import get_db
 from ckac_common.event_bus import EventPublisher
 from ckac_common.openapi import RESP_400, auth_errors
+from ckac_common.platform_config import feature_http_status, require_kitchen_feature
 
 router = APIRouter()
 
@@ -72,6 +74,18 @@ async def create_order_ratings(
     publisher: Annotated[EventPublisher, Depends(get_publisher)],
 ) -> OrderRatingsCreateResponse:
     phone = await load_customer_phone(customer_id, session)
+    kitchen_id = (
+        await session.execute(
+            text("SELECT kitchen_id FROM ckac_orders.orders WHERE id = :oid LIMIT 1"),
+            {"oid": str(order_id)},
+        )
+    ).scalar_one_or_none()
+    if kitchen_id:
+        try:
+            await require_kitchen_feature(session, kitchen_id, "ratings")
+        except ValueError as exc:
+            code = feature_http_status(exc) or status.HTTP_403_FORBIDDEN
+            raise HTTPException(status_code=code, detail=str(exc)) from exc
     try:
         result = await submit_order_ratings(
             session, order_id, customer_id, phone, body, publisher

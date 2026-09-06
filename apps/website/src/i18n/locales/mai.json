@@ -32,7 +32,12 @@
     "customerApp": "ग्राहक ऐप",
     "kitchenOwner": "किचन मालिक →",
     "ownerLogin": "मालिक लॉगिन",
-    "adminLogin": "Super admin"
+    "adminLogin": "Super admin",
+    "adminCredentialsDev": "Email {{email}} · Password {{password}} (dev / seeded)",
+    "adminCredentialsHost": "Open the console on {{host}}.",
+    "adminCredentialsProd": "Email {{email}} — password from the VM ADMIN_PASSWORD secret, not this page",
+    "adminCredentialsTitle": "Super admin credentials",
+    "adminOpenConsole": "Open Super Admin"
   },
   "status": {
     "received": "प्राप्त कयल गेल",
@@ -142,7 +147,15 @@
     "contactSending": "भेज रहल छी...",
     "contactSent": "धन्यवाद — हम सब जल्दिये हाथ बढ़ा देब।",
     "contactError": "नहि पठा सकल। कृपया पुनः प्रयास करू।",
-    "navCities": "Cities"
+    "navCities": "Cities",
+    "ctaAdmin": "Super admin →",
+    "tileAdminBody": "Kitchens, employees, tickets, packages, and API keys — Super Admin only.",
+    "tileAdminCta": "Open Super Admin",
+    "tileAdminTitle": "Operate the platform",
+    "tileCustomerBody": "Nearby kitchens, live-capture menus, honest ETAs, and fair delivery fees.",
+    "tileCustomerTitle": "Order home-made food",
+    "tileKitchenBody": "WhatsApp orders, menu, tiffin plans, reports — zero food commission.",
+    "tileKitchenTitle": "Run your kitchen"
   },
   "owner": {
     "nav": {
@@ -170,7 +183,8 @@
       "paymentGateway": "भुगतान गेटवे",
       "gst": "जीएसटी एवं वित्त",
       "setup": "किचन सेटअप",
-      "bulkPrep": "Prep batches"
+      "bulkPrep": "Prep batches",
+      "ratings": "Ratings"
     },
     "shell": {
       "activeKitchen": "सक्रिय रसोईघर",
@@ -316,7 +330,8 @@
       "setup": "किचन सेटअप",
       "referrals": "रेफरल के लिये",
       "newOrder": "नया क्रम",
-      "addDish": "पकवान मिला दियौ"
+      "addDish": "पकवान मिला दियौ",
+      "ratings": "Ratings"
     }
   },
   "customer": {
@@ -328,7 +343,10 @@
       "myOrders": "हमर आदेश",
       "dashboard": "डैशबोर्ड",
       "account": "खाता",
-      "signIn": "ग्राहक साइन इन करू"
+      "signIn": "ग्राहक साइन इन करू",
+      "logout": "Log out",
+      "notifications": "Notifications",
+      "profile": "My profile"
     },
     "auth": {
       "title": "ग्राहक साइन इन करू",

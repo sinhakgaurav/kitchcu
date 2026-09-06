@@ -6,12 +6,13 @@ import { LanguageSwitcher } from "../i18n/LanguageSwitcher";
 import { CUSTOMER_HOST } from "../shared/brand";
 import { useCustomerAuth } from "../shared/customerAuth";
 import { kitchenUrl } from "../shared/urls";
+import { SuperAdminLink } from "./SuperAdminAccess";
 
 export function CustomerNavbar() {
   const { t } = useTranslation();
   const [scrolled, setScrolled] = useState(false);
   const [open, setOpen] = useState(false);
-  const { session } = useCustomerAuth();
+  const { session, logout } = useCustomerAuth();
   const location = useLocation();
 
   useEffect(() => {
@@ -52,13 +53,37 @@ export function CustomerNavbar() {
               <Link to="/dashboard" onClick={() => setOpen(false)}>
                 {t("customer.nav.dashboard")}
               </Link>
-              <Link
-                to="/dashboard"
-                className="btn btn--primary btn--sm nav__auth-btn"
-                onClick={() => setOpen(false)}
-              >
-                {accountLabel}
-              </Link>
+              <div className="nav__account">
+                <Link
+                  to="/dashboard?tab=account"
+                  className="btn btn--primary btn--sm nav__auth-btn"
+                  onClick={() => setOpen(false)}
+                >
+                  {accountLabel}
+                </Link>
+                <div className="nav__account-menu" role="menu" aria-label={t("customer.nav.account")}>
+                  <Link to="/dashboard?tab=account" role="menuitem" onClick={() => setOpen(false)}>
+                    {t("customer.nav.profile")}
+                  </Link>
+                  <Link
+                    to="/dashboard?tab=account#notifications"
+                    role="menuitem"
+                    onClick={() => setOpen(false)}
+                  >
+                    {t("customer.nav.notifications")}
+                  </Link>
+                  <button
+                    type="button"
+                    role="menuitem"
+                    onClick={() => {
+                      logout();
+                      setOpen(false);
+                    }}
+                  >
+                    {t("customer.nav.logout")}
+                  </button>
+                </div>
+              </div>
             </>
           ) : (
             <Link to="/login" className="btn btn--primary btn--sm nav__auth-btn" onClick={() => setOpen(false)}>
@@ -74,6 +99,7 @@ export function CustomerNavbar() {
           >
             {t("common.kitchenOwner")}
           </a>
+          <SuperAdminLink className="nav__owner-link" onClick={() => setOpen(false)} />
           <LanguageSwitcher className="lang-switcher--nav" />
         </nav>
 

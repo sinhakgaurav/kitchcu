@@ -56,6 +56,9 @@ class Customer(Base):
     bank_account_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
     password_hash: Mapped[str | None] = mapped_column(String(255), nullable=True)
     status: Mapped[str] = mapped_column(String(20), default="active")
+    notify_order_updates: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    notify_offers: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    notify_channel: Mapped[str] = mapped_column(String(16), default="whatsapp", nullable=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(UTC)
     )

@@ -26,6 +26,17 @@ export function useStaticMotion(): boolean {
   return staticMotion;
 }
 
+/** Scroll-driven hooks re-render on every animation frame, so skip them entirely where
+ *  parallax is not rendered anyway: small screens, touch, and reduced-motion. */
+function skipScrollWork(): boolean {
+  if (typeof window === "undefined") return true;
+  return (
+    window.matchMedia("(prefers-reduced-motion: reduce)").matches ||
+    window.matchMedia("(pointer: coarse)").matches ||
+    window.matchMedia("(max-width: 900px)").matches
+  );
+}
+
 export function useScrollProgress() {
   const [progress, setProgress] = useState(0);
   const [scrollY, setScrollY] = useState(0);
@@ -66,7 +77,7 @@ export function useSectionParallax(ref: RefObject<HTMLElement | null>) {
 
   useEffect(() => {
     const el = ref.current;
-    if (!el) return;
+    if (!el || skipScrollWork()) return;
 
     let raf = 0;
     const update = () => {
@@ -167,7 +178,7 @@ export function useSectionScrollProgress(ref: RefObject<HTMLElement | null>) {
 
   useEffect(() => {
     const el = ref.current;
-    if (!el) return;
+    if (!el || skipScrollWork()) return;
 
     let raf = 0;
     const update = () => {
@@ -203,7 +214,7 @@ export function useItemParallax(ref: RefObject<HTMLElement | null>, speed = 0.12
 
   useEffect(() => {
     const el = ref.current;
-    if (!el) return;
+    if (!el || skipScrollWork()) return;
 
     let raf = 0;
     const update = () => {

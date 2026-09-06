@@ -4,6 +4,7 @@ import pytest
 from pydantic import ValidationError
 
 from app.schemas import (
+    KitchenProfileUpdate,
     OwnerRegisterRequest,
     create_access_token,
     generate_kitchen_code,
@@ -100,3 +101,23 @@ async def test_generate_kitchen_code_ncr_and_up_cities():
         assert (await generate_kitchen_code(session, "Lucknow")).startswith("CKLKO")
         assert (await generate_kitchen_code(session, "Prayagraj")).startswith("CKIXD")
         assert (await generate_kitchen_code(session, "Jhansi")).startswith("CKJHS")
+
+
+class TestKitchenProfileUpdate:
+    def test_partial_name_only(self):
+        body = KitchenProfileUpdate(name="New Kitchen Name")
+        assert body.name == "New Kitchen Name"
+        assert body.latitude is None
+
+    def test_rejects_split_coordinates(self):
+        with pytest.raises(ValidationError):
+            KitchenProfileUpdate(latitude=18.5)
+
+    def test_rejects_invalid_latitude(self):
+        with pytest.raises(ValidationError):
+            KitchenProfileUpdate(latitude=99, longitude=73.8)
+
+    def test_accepts_paired_coordinates(self):
+        body = KitchenProfileUpdate(latitude=18.5362, longitude=73.8958)
+        assert body.latitude == pytest.approx(18.5362)
+        assert body.longitude == pytest.approx(73.8958)

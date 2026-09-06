@@ -3,8 +3,10 @@ import { OwnerPageShell, OwnerPanel } from "../../components/owner/OwnerPageShel
 import {
   clearKitchenPaymentGateway,
   fetchKitchenPaymentGateway,
+  fetchKitchenSettlements,
   upsertKitchenPaymentGateway,
   type KitchenPaymentGateway,
+  type Settlement,
 } from "../../lib/api";
 import { useKitchen } from "../../shared/kitchenContext";
 
@@ -20,6 +22,9 @@ export function PaymentGatewayPage() {
   const [ok, setOk] = useState("");
   const [busy, setBusy] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [settlements, setSettlements] = useState<Settlement[]>([]);
+  const [settleStatus, setSettleStatus] = useState("");
+  const [settleError, setSettleError] = useState("");
 
   const kitchenId = kitchen?.id;
 
@@ -36,6 +41,17 @@ export function PaymentGatewayPage() {
       .catch((e) => setError(e instanceof Error ? e.message : "Could not load payment gateway"))
       .finally(() => setLoading(false));
   }, [kitchenId]);
+
+  useEffect(() => {
+    if (!kitchenId) return;
+    setSettleError("");
+    fetchKitchenSettlements(kitchenId, {
+      status: settleStatus || undefined,
+      limit: 50,
+    })
+      .then(setSettlements)
+      .catch((e) => setSettleError(e instanceof Error ? e.message : "Could not load settlements"));
+  }, [kitchenId, settleStatus]);
 
   const onSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -171,6 +187,52 @@ export function PaymentGatewayPage() {
           subscription Razorpay keys and Meta WhatsApp App Secret live under Super Admin → API Keys
           — not here.
         </p>
+      </OwnerPanel>
+      <OwnerPanel
+        title="Route settlements"
+        description="Money transferred to this kitchen after multi-kitchen checkout. Platform food commission is always ₹0."
+        action={
+          <label className="od-settle__filter">
+            Status
+            <select value={settleStatus} onChange={(e) => setSettleStatus(e.target.value)}>
+              <option value="">All</option>
+              <option value="pending">Pending</option>
+              <option value="transferred">Transferred</option>
+            </select>
+          </label>
+        }
+      >
+        {settleError && <p className="auth-card__error">{settleError}</p>}
+        {settlements.length === 0 ? (
+          <p className="od-panel__empty">No settlements yet — they appear after a captured online / UPI split payment.</p>
+        ) : (
+          <table className="report-table od-settle__table">
+            <thead>
+              <tr>
+                <th>When</th>
+                <th>Gross</th>
+                <th>Delivery</th>
+                <th>Net to you</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {settlements.map((row) => (
+                <tr key={row.id}>
+                  <td>{row.settled_at ? new Date(row.settled_at).toLocaleDateString("en-IN") : "—"}</td>
+                  <td>₹{Math.round(row.gross_amount).toLocaleString("en-IN")}</td>
+                  <td>₹{Math.round(row.delivery_fee_amount).toLocaleString("en-IN")}</td>
+                  <td>₹{Math.round(row.net_to_owner).toLocaleString("en-IN")}</td>
+                  <td>
+                    <span className={`status-badge status-badge--${row.settlement_status}`}>
+                      {row.settlement_status}
+                    </span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
       </OwnerPanel>
     </OwnerPageShell>
   );

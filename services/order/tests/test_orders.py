@@ -139,6 +139,53 @@ async def test_list_orders_by_kitchen(client: AsyncClient, order_ctx, manual_ord
 
 
 @pytest.mark.asyncio
+async def test_list_orders_date_filters(client: AsyncClient, order_ctx):
+    from datetime import UTC, datetime, timedelta
+
+    from tests.test_analytics import _insert_order
+
+    _, kitchen_id, dish_id, _, token = order_ctx
+    now = datetime.now(UTC)
+    older_id = _insert_order(
+        kitchen_id,
+        total=199,
+        status="delivered",
+        created_at=now - timedelta(days=10),
+        dish_id=dish_id,
+    )
+    newer_id = _insert_order(
+        kitchen_id,
+        total=199,
+        status="delivered",
+        created_at=now - timedelta(days=1),
+        dish_id=dish_id,
+    )
+    headers = {"Authorization": f"Bearer {token}"}
+    after = (now - timedelta(days=5)).isoformat()
+    before = (now - timedelta(days=5)).isoformat()
+
+    recent = await client.get(
+        f"/api/v1/kitchens/{kitchen_id}/orders",
+        params={"created_after": after},
+        headers=headers,
+    )
+    assert recent.status_code == 200
+    recent_ids = {o["id"] for o in recent.json()["orders"]}
+    assert str(newer_id) in recent_ids
+    assert str(older_id) not in recent_ids
+
+    older = await client.get(
+        f"/api/v1/kitchens/{kitchen_id}/orders",
+        params={"created_before": before},
+        headers=headers,
+    )
+    assert older.status_code == 200
+    older_ids = {o["id"] for o in older.json()["orders"]}
+    assert str(older_id) in older_ids
+    assert str(newer_id) not in older_ids
+
+
+@pytest.mark.asyncio
 async def test_get_order_detail(client: AsyncClient, order_ctx, manual_order_payload):
     _, kitchen_id, _, _, token = order_ctx
     headers = {"Authorization": f"Bearer {token}"}

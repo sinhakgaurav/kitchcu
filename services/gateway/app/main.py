@@ -98,6 +98,8 @@ def resolve_service_url(path: str) -> str | None:
         or "/subscriptions" in path
     ):
         return settings.marketing_service_url
+    if path.startswith("/api/v1/admin/kitchens/") and "/stream/" in path:
+        return settings.streaming_service_url
     if any(path.startswith(p) for p in IDENTITY_PREFIXES):
         if path.startswith("/api/v1/admin/tickets"):
             return settings.notification_service_url

@@ -1,6 +1,6 @@
 import { BrandNavMark } from "./BrandNavMark";
 import { APP_NAME, SUPPORT_EMAIL } from "../shared/brand";
-import { customerUrl, kitchenUrl } from "../shared/urls";
+import { adminUrl, customerUrl, kitchenUrl } from "../shared/urls";
 
 export function PortalFooter() {
   return (
@@ -28,6 +28,9 @@ export function PortalFooter() {
           </a>
           <a href={kitchenUrl("/")} target="_blank" rel="noopener noreferrer">
             Kitchen app
+          </a>
+          <a href={adminUrl("/")} target="_blank" rel="noopener noreferrer">
+            Super admin
           </a>
         </div>
         <p className="footer__copy">

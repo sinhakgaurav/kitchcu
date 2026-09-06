@@ -1,4 +1,5 @@
 import uuid
+from datetime import datetime
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request, Response, status
@@ -37,6 +38,7 @@ from app.schemas import (
     OrderStatusUpdateRequest,
     OrderStockWarningsResponse,
     ParseMessageRequest,
+    UpdateDraftRequest,
     _draft_to_response,
     confirm_draft,
     create_customer_order,
@@ -47,6 +49,7 @@ from app.schemas import (
     get_order_stock_warnings,
     list_kitchen_drafts,
     list_kitchen_orders,
+    update_draft,
     list_customer_orders,
     master_order_to_response,
     order_to_response,
@@ -525,8 +528,9 @@ async def customer_order_repeat(
     summary="List a kitchen's orders (owner dashboard)",
     description=(
         "**Auth:** Owner JWT (Bearer) — caller must own `kitchen_id`.\n\n"
-        "**Query:** optional `status` (any status in the order lifecycle) and `source` "
-        "(`manual`, `customer_pwa`, `customer_pwa_multi`, `whatsapp`, `manual_message`) filters.\n\n"
+        "**Query:** optional `status` (any status in the order lifecycle), `source` "
+        "(`manual`, `customer_pwa`, `customer_pwa_multi`, `whatsapp`, `manual_message`), "
+        "`created_after`, and `created_before` (ISO datetimes, inclusive).\n\n"
         "**Response:** `OrderListResponse`, newest first."
     ),
     responses=auth_errors(include_403=True),
@@ -537,9 +541,18 @@ async def orders_list(
     session: Annotated[AsyncSession, Depends(get_db)],
     status_filter: Annotated[str | None, Query(alias="status")] = None,
     source: Annotated[str | None, Query()] = None,
+    created_after: Annotated[datetime | None, Query()] = None,
+    created_before: Annotated[datetime | None, Query()] = None,
 ) -> OrderListResponse:
     await verify_kitchen_owner(kitchen_id, owner_id, session)
-    orders = await list_kitchen_orders(session, kitchen_id, status=status_filter, source=source)
+    orders = await list_kitchen_orders(
+        session,
+        kitchen_id,
+        status=status_filter,
+        source=source,
+        created_after=created_after,
+        created_before=created_before,
+    )
     enriched = [await order_to_response(session, o) for o in orders]
     return OrderListResponse(kitchen_id=kitchen_id, orders=enriched, total=len(enriched))
 
@@ -775,6 +788,44 @@ async def drafts_list(
     )
 
 
+@router.patch(
+    "/kitchens/{kitchen_id}/orders/drafts/{draft_id}",
+    response_model=OrderDraftResponse,
+    tags=[TAG_OWNER_ORDERS],
+    summary="Remap a pending draft's parsed lines",
+    description=(
+        "**Auth:** Owner JWT (Bearer) — caller must own `kitchen_id`.\n\n"
+        "**Body:** `UpdateDraftRequest` — replacement `parsed_items` (`dish_id` set to match "
+        "a kitchen menu dish, or `null` to leave unmatched) and optional `customer_phone`.\n\n"
+        "**Behavior:** Draft must belong to this kitchen and still be `status=\"draft\"` "
+        "(`404` otherwise). Provided `dish_id` values are looked up on the kitchen's active "
+        "menu (`400` if unknown). Persists `parsed_items` JSON and emits `order.draft.updated`.\n\n"
+        "**Response:** Updated `OrderDraftResponse`."
+    ),
+    responses={**auth_errors(include_403=True, include_404=True), 400: RESP_400},
+)
+async def draft_update(
+    kitchen_id: uuid.UUID,
+    draft_id: uuid.UUID,
+    body: UpdateDraftRequest,
+    owner_id: Annotated[uuid.UUID, Depends(get_current_owner_id)],
+    session: Annotated[AsyncSession, Depends(get_db)],
+    publisher: Annotated[EventPublisher, Depends(get_publisher)],
+) -> OrderDraftResponse:
+    await verify_kitchen_owner(kitchen_id, owner_id, session)
+    try:
+        draft = await update_draft(session, kitchen_id, draft_id, body, publisher)
+        await session.commit()
+        await session.refresh(draft)
+    except LookupError as exc:
+        await session.rollback()
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except ValueError as exc:
+        await session.rollback()
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    return _draft_to_response(draft)
+
+
 @router.post(
     "/kitchens/{kitchen_id}/orders/drafts/{draft_id}/confirm",
     response_model=OrderResponse,
@@ -838,6 +889,68 @@ async def analytics_summary(
     if cached is not None:
         return analytics.RevenueSummary(**cached)
     result = await analytics.revenue_summary(session, kitchen_id, days)
+    await set_cached_json(redis_client, key, result.model_dump())
+    return result
+
+
+@router.get(
+    "/kitchens/{kitchen_id}/analytics/summary/compare",
+    response_model=analytics.RevenueSummaryCompare,
+    tags=[TAG_ANALYTICS],
+    summary="Compare revenue summary to the previous window",
+    description=(
+        "**Auth:** Owner JWT (Bearer) — caller must own `kitchen_id`.\n\n"
+        "**Query:** `days` — current window length (1-365, default 7). Previous window is the "
+        "same length immediately before current.\n\n"
+        "**Response:** `RevenueSummaryCompare` — current vs previous `RevenueSummary` plus "
+        "`delta_pct` for revenue, completed orders, and AOV. Cached per kitchen + window."
+    ),
+    responses=auth_errors(include_403=True),
+)
+async def analytics_summary_compare(
+    kitchen_id: uuid.UUID,
+    owner_id: Annotated[uuid.UUID, Depends(get_current_owner_id)],
+    session: Annotated[AsyncSession, Depends(get_db)],
+    days: Annotated[int, Query(ge=1, le=365)] = 7,
+) -> analytics.RevenueSummaryCompare:
+    await verify_kitchen_owner(kitchen_id, owner_id, session)
+    redis_client = get_redis()
+    key = analytics_cache_key(kitchen_id, "summary-compare", days)
+    cached = await get_cached_json(redis_client, key)
+    if cached is not None:
+        return analytics.RevenueSummaryCompare(**cached)
+    result = await analytics.revenue_summary_compare(session, kitchen_id, days)
+    await set_cached_json(redis_client, key, result.model_dump())
+    return result
+
+
+@router.get(
+    "/kitchens/{kitchen_id}/analytics/payment-mix",
+    response_model=analytics.PaymentMix,
+    tags=[TAG_ANALYTICS],
+    summary="Payment-method revenue mix",
+    description=(
+        "**Auth:** Owner JWT (Bearer) — caller must own `kitchen_id`.\n\n"
+        "**Query:** `days` — trailing window in days (1-365, default 30).\n\n"
+        "**Behavior:** Splits non-cancelled order revenue and counts by `payment_method` "
+        "(`cod`, `online`, `upi`, other). Cached per kitchen + window.\n\n"
+        "**Response:** `PaymentMix`."
+    ),
+    responses=auth_errors(include_403=True),
+)
+async def analytics_payment_mix(
+    kitchen_id: uuid.UUID,
+    owner_id: Annotated[uuid.UUID, Depends(get_current_owner_id)],
+    session: Annotated[AsyncSession, Depends(get_db)],
+    days: Annotated[int, Query(ge=1, le=365)] = 30,
+) -> analytics.PaymentMix:
+    await verify_kitchen_owner(kitchen_id, owner_id, session)
+    redis_client = get_redis()
+    key = analytics_cache_key(kitchen_id, "payment-mix", days)
+    cached = await get_cached_json(redis_client, key)
+    if cached is not None:
+        return analytics.PaymentMix(**cached)
+    result = await analytics.payment_mix(session, kitchen_id, days)
     await set_cached_json(redis_client, key, result.model_dump())
     return result
 

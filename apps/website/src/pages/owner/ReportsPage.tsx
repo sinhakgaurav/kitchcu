@@ -2,14 +2,20 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import {
   fetchCustomerSegments,
+  fetchOwnerRatingSummaries,
+  fetchPaymentMix,
   fetchPeakHours,
   fetchRevenueSummary,
+  fetchRevenueSummaryCompare,
   fetchRevenueTimeseries,
   fetchSubscriptionSummary,
   fetchTopDishes,
   type CustomerSegments,
+  type DishRatingSummary,
+  type PaymentMix,
   type PeakHours,
   type RevenueSummary,
+  type RevenueSummaryCompare,
   type RevenueTimeseries,
   type SubscriptionSummary,
   type TopDishes,
@@ -24,6 +30,7 @@ const RANGES = [
 
 const inr = (n: number) => `₹${Math.round(n).toLocaleString("en-IN")}`;
 const pct = (n: number) => `${(n * 100).toFixed(1)}%`;
+const deltaPct = (n: number) => `${n > 0 ? "+" : ""}${n.toFixed(1)}% vs prior period`;
 
 function chartDayLabel(isoDate: string): string {
   const d = new Date(isoDate);
@@ -57,6 +64,9 @@ export function ReportsPage() {
   const [peak, setPeak] = useState<PeakHours | null>(null);
   const [customers, setCustomers] = useState<CustomerSegments | null>(null);
   const [tiffin, setTiffin] = useState<SubscriptionSummary | null>(null);
+  const [mix, setMix] = useState<PaymentMix | null>(null);
+  const [compare, setCompare] = useState<RevenueSummaryCompare | null>(null);
+  const [ratings, setRatings] = useState<DishRatingSummary[]>([]);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -74,14 +84,20 @@ export function ReportsPage() {
       fetchPeakHours(kitchen.id, days),
       fetchCustomerSegments(kitchen.id, Math.max(days, 90), 8),
       fetchSubscriptionSummary(kitchen.id).catch(() => null),
+      fetchPaymentMix(kitchen.id, days).catch(() => null),
+      fetchRevenueSummaryCompare(kitchen.id, days).catch(() => null),
+      fetchOwnerRatingSummaries(kitchen.id).catch(() => ({ summaries: [] })),
     ])
-      .then(([s, t, d, p, c, tf]) => {
+      .then(([s, t, d, p, c, tf, payMix, cmp, rate]) => {
         setSummary(s);
         setSeries(t);
         setDishes(d);
         setPeak(p);
         setCustomers(c);
         setTiffin(tf);
+        setMix(payMix);
+        setCompare(cmp);
+        setRatings(rate.summaries);
       })
       .catch((err) => setError(err instanceof Error ? err.message : "Failed to load reports"))
       .finally(() => {
@@ -102,6 +118,10 @@ export function ReportsPage() {
   const maxDishRevenue = useMemo(
     () => Math.max(1, ...(dishes?.dishes.map((d) => d.revenue) ?? [1])),
     [dishes],
+  );
+  const ratingByDish = useMemo(
+    () => Object.fromEntries(ratings.map((r) => [r.dish_id, r])),
+    [ratings],
   );
 
   if (!kitchen) return null;
@@ -130,6 +150,7 @@ export function ReportsPage() {
               </button>
             ))}
           </div>
+                  <Link to="/dashboard/ratings" className="btn btn--ghost btn--sm">Ratings →</Link>
           <Link to="/dashboard/crm" className="btn btn--ghost btn--sm">Open CRM →</Link>
           <Link to="/dashboard/tiffin" className="btn btn--ghost btn--sm">Tiffin plans →</Link>
         </div>
@@ -166,7 +187,11 @@ export function ReportsPage() {
               <div>
                 <strong>{inr(summary.gross_revenue)}</strong>
                 <span>Revenue ({summary.window_days}d)</span>
-                <em>{summary.completed_orders} completed orders</em>
+                <em>
+                  {compare
+                    ? deltaPct(compare.delta_pct.revenue)
+                    : `${summary.completed_orders} completed orders`}
+                </em>
               </div>
             </div>
             <div className="od-kpi dash-card">
@@ -174,7 +199,9 @@ export function ReportsPage() {
               <div>
                 <strong>{summary.completed_orders}</strong>
                 <span>Orders</span>
-                <em>{summary.active_orders} still active</em>
+                <em>
+                  {compare ? deltaPct(compare.delta_pct.orders) : `${summary.active_orders} still active`}
+                </em>
               </div>
             </div>
             <div className="od-kpi dash-card">
@@ -182,7 +209,7 @@ export function ReportsPage() {
               <div>
                 <strong>{inr(summary.avg_order_value)}</strong>
                 <span>Avg order value</span>
-                <em>Per completed order</em>
+                <em>{compare ? deltaPct(compare.delta_pct.aov) : "Per completed order"}</em>
               </div>
             </div>
             <div className="od-kpi dash-card">
@@ -210,6 +237,39 @@ export function ReportsPage() {
               </div>
             </div>
           </div>
+
+          {mix && (
+            <div className="od-board__kpi-grid od-reports__kpis">
+              <div className="od-kpi dash-card">
+                <div>
+                  <strong>{inr(mix.cod_revenue)}</strong>
+                  <span>COD</span>
+                  <em>{mix.cod_orders} orders</em>
+                </div>
+              </div>
+              <div className="od-kpi dash-card">
+                <div>
+                  <strong>{inr(mix.upi_revenue)}</strong>
+                  <span>UPI</span>
+                  <em>{mix.upi_orders} orders</em>
+                </div>
+              </div>
+              <div className="od-kpi dash-card">
+                <div>
+                  <strong>{inr(mix.online_revenue)}</strong>
+                  <span>Online / card</span>
+                  <em>{mix.online_orders} orders</em>
+                </div>
+              </div>
+              <div className="od-kpi dash-card">
+                <div>
+                  <strong>{inr(mix.other_revenue)}</strong>
+                  <span>Other</span>
+                  <em>{mix.other_orders} orders</em>
+                </div>
+              </div>
+            </div>
+          )}
 
           <section className="dash-card od-panel report-card">
             <header className="od-panel__head">
@@ -257,7 +317,12 @@ export function ReportsPage() {
                           style={{ width: `${(d.revenue / maxDishRevenue) * 100}%` }}
                         />
                       </div>
-                      <span className="report-rank__meta">{d.quantity} sold · {d.order_count} orders</span>
+                      <span className="report-rank__meta">
+                        {d.quantity} sold · {d.order_count} orders
+                        {ratingByDish[d.dish_id]
+                          ? ` · ${ratingByDish[d.dish_id].overall_rating.toFixed(1)}★ home taste`
+                          : ""}
+                      </span>
                     </li>
                   ))}
                 </ul>

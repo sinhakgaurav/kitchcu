@@ -1,6 +1,8 @@
 import { FormEvent, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { OwnerPageShell, OwnerPanel } from "../../components/owner/OwnerPageShell";
+import { PhoneField } from "../../components/PhoneField";
+import { phoneInputValue, toE164, validateNationalPhone } from "../../shared/validation";
 import {
   fetchKitchenWhatsAppIntegration,
   fetchMessagingWallet,
@@ -20,6 +22,7 @@ export function WhatsAppIntegrationPage() {
   const [ok, setOk] = useState("");
   const [busy, setBusy] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [displayPhoneError, setDisplayPhoneError] = useState<string>();
 
   const kitchenId = kitchen?.id;
 
@@ -34,7 +37,7 @@ export function WhatsAppIntegrationPage() {
       .then(([wa, bal]) => {
         setCfg(wa);
         setPhoneId(wa.whatsapp_phone_id ?? "");
-        setDisplayPhone(wa.whatsapp_display_phone ?? "");
+        setDisplayPhone(phoneInputValue(wa.whatsapp_display_phone ?? ""));
         setWallet(bal);
       })
       .catch((e) => setError(e instanceof Error ? e.message : "Could not load WhatsApp settings"))
@@ -44,13 +47,19 @@ export function WhatsAppIntegrationPage() {
   const onSubmit = async (e: FormEvent) => {
     e.preventDefault();
     if (!kitchenId) return;
+    const phoneMessage = validateNationalPhone(displayPhone, undefined, { required: false });
+    setDisplayPhoneError(phoneMessage ?? undefined);
+    if (phoneMessage) {
+      setError(phoneMessage);
+      return;
+    }
     setError("");
     setOk("");
     setBusy(true);
     try {
       const next = await upsertKitchenWhatsAppIntegration(kitchenId, {
         whatsapp_phone_id: phoneId.trim() || null,
-        whatsapp_display_phone: displayPhone.trim() || null,
+        whatsapp_display_phone: displayPhone ? toE164(displayPhone) : null,
       });
       setCfg(next);
       setOk("WhatsApp Business linked. Inbound Meta webhooks will route to this kitchen.");
@@ -135,15 +144,16 @@ export function WhatsAppIntegrationPage() {
               required={!cfg?.connected}
             />
           </label>
-          <label>
-            Display phone (E.164)
-            <input
-              value={displayPhone}
-              onChange={(e) => setDisplayPhone(e.target.value)}
-              placeholder="+919876543210"
-              autoComplete="tel"
-            />
-          </label>
+          <PhoneField
+            label="Display phone"
+            value={displayPhone}
+            onChange={(national) => {
+              setDisplayPhone(national);
+              setDisplayPhoneError(undefined);
+            }}
+            error={displayPhoneError}
+            hint="The WhatsApp Business number customers see"
+          />
           <div className="owner-forms__actions">
             <button type="submit" className="btn btn--primary" disabled={busy}>
               {busy ? "Saving…" : cfg?.connected ? "Update connection" : "Connect WhatsApp"}

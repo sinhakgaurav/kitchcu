@@ -5,12 +5,21 @@ from typing import Literal
 
 from geoalchemy2.elements import WKTElement
 from jose import jwt
-from pydantic import BaseModel, EmailStr, Field, field_validator
+from pydantic import BaseModel, EmailStr, Field, field_validator, model_validator
 from sqlalchemy import func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import Kitchen, Owner
 from ckac_common.config import get_settings
+
+# Contact rules live in the shared library so identity, order, notification, and
+# the rest apply the same ones; re-exported here because the whole service (and
+# customer_schemas / referral) imports them from `app.schemas`.
+from ckac_common.validators import (  # noqa: F401
+    normalize_india_phone,
+    normalize_optional_email,
+    normalize_person_name,
+)
 
 settings = get_settings()
 
@@ -36,41 +45,6 @@ CITY_CODES: dict[str, str] = {
     "chennai": "MAA",
     "kolkata": "CCU",
 }
-
-
-def normalize_india_phone(v: str) -> str:
-    """Normalize India mobile to E.164 ``+91XXXXXXXXXX`` (exactly 10 national digits).
-
-    Accepts ``9876543210``, ``919876543210``, or ``+919876543210``.
-    Rejects 11+/non-91 longer nationals (e.g. ``987654321011``).
-    """
-    digits = re.sub(r"\D", "", v or "")
-    if len(digits) == 10:
-        national = digits
-    elif len(digits) == 12 and digits.startswith("91"):
-        national = digits[2:]
-    else:
-        raise ValueError("Phone must be a 10-digit India mobile or +91XXXXXXXXXX")
-    if not re.fullmatch(r"[6-9]\d{9}", national):
-        raise ValueError("Phone must be a valid 10-digit India mobile number")
-    return f"+91{national}"
-
-
-_NAME_OK = re.compile(r"^[\w.\-'\s]+$", re.UNICODE)
-
-
-def normalize_person_name(v: str) -> str:
-    """Display name: letters (incl. Unicode), spaces, apostrophe/hyphen/dot — not digits-only."""
-    cleaned = (v or "").strip()
-    if len(cleaned) < 2:
-        raise ValueError("Name must be at least 2 characters")
-    if not _NAME_OK.fullmatch(cleaned):
-        raise ValueError("Name may only contain letters, spaces, apostrophes, hyphens, or dots")
-    if not any(ch.isalpha() for ch in cleaned):
-        raise ValueError("Name must include at least one letter")
-    if re.search(r"\d", cleaned):
-        raise ValueError("Name must not contain digits")
-    return cleaned
 
 
 class OwnerRegisterRequest(BaseModel):
@@ -112,9 +86,7 @@ class OwnerRegisterRequest(BaseModel):
     @field_validator("email")
     @classmethod
     def normalize_email(cls, v: EmailStr | None) -> str | None:
-        if v is None:
-            return None
-        return str(v).strip().lower() or None
+        return normalize_optional_email(v)
 
 
 class OwnerResponse(BaseModel):
@@ -167,6 +139,35 @@ class KitchenCreateRequest(BaseModel):
     tracking_notify_interval_min: int = Field(
         default=5, ge=1, le=60, description="Minutes between owner→customer delivery tracking notifications.", examples=[5]
     )
+
+
+class KitchenProfileUpdate(BaseModel):
+    """Partial-update body for `PATCH /kitchens/{kitchen_id}/profile`. Kitchen code is immutable."""
+
+    name: str | None = Field(
+        default=None, min_length=2, max_length=255, description="Kitchen brand name shown to customers."
+    )
+    description: str | None = Field(default=None, description="Short kitchen bio. Omit to leave unchanged.")
+    address_line: str | None = Field(
+        default=None, min_length=1, max_length=255, description="Street address. Omit to leave unchanged."
+    )
+    city: str | None = Field(
+        default=None, min_length=1, max_length=80, description="City label only — does not change kitchen code."
+    )
+    state: str | None = Field(default=None, min_length=1, max_length=80, description="State / region.")
+    pincode: str | None = Field(default=None, max_length=12, description="Postal PIN. Empty string clears.")
+    latitude: float | None = Field(
+        default=None, ge=-90, le=90, description="Kitchen latitude (WGS84). Must be sent with longitude."
+    )
+    longitude: float | None = Field(
+        default=None, ge=-180, le=180, description="Kitchen longitude (WGS84). Must be sent with latitude."
+    )
+
+    @model_validator(mode="after")
+    def coordinates_must_be_paired(self) -> "KitchenProfileUpdate":
+        if (self.latitude is None) ^ (self.longitude is None):
+            raise ValueError("latitude and longitude must be sent together")
+        return self
 
 
 class KitchenDeliverySettingsUpdate(BaseModel):
@@ -621,6 +622,30 @@ async def create_kitchen(
     return kitchen
 
 
+async def update_kitchen_profile(
+    session: AsyncSession, kitchen: Kitchen, data: KitchenProfileUpdate
+) -> Kitchen:
+    """Correct name, address, and map pin. Kitchen code stays stable even if city changes."""
+    if data.name is not None:
+        kitchen.name = data.name
+    if "description" in data.model_fields_set:
+        kitchen.description = data.description
+    if data.address_line is not None:
+        kitchen.address_line = data.address_line
+    if data.city is not None:
+        kitchen.city = data.city
+    if data.state is not None:
+        kitchen.state = data.state
+    if "pincode" in data.model_fields_set:
+        kitchen.pincode = data.pincode or None
+    if data.latitude is not None and data.longitude is not None:
+        kitchen.location = WKTElement(
+            f"POINT({data.longitude} {data.latitude})", srid=4326
+        )
+    await session.flush()
+    return kitchen
+
+
 def branded_page_from_settings(settings_blob: dict | None) -> KitchenBrandedPageSettings:
     blob = settings_blob if isinstance(settings_blob, dict) else {}
     raw = blob.get("branded_page") if isinstance(blob.get("branded_page"), dict) else {}
@@ -645,7 +670,7 @@ def kitchen_to_public_response(kitchen: Kitchen) -> KitchenPublicResponse:
     )
 
 
-async def kitchen_to_response(session: AsyncSession, kitchen: Kitchen) -> KitchenResponse:
+async def kitchen_coordinates(session: AsyncSession, kitchen: Kitchen) -> tuple[float, float]:
     result = await session.execute(
         text(
             "SELECT ST_Y(location::geometry) AS lat, ST_X(location::geometry) AS lng "
@@ -654,6 +679,11 @@ async def kitchen_to_response(session: AsyncSession, kitchen: Kitchen) -> Kitche
         {"id": kitchen.id},
     )
     row = result.one()
+    return float(row.lat), float(row.lng)
+
+
+async def kitchen_to_response(session: AsyncSession, kitchen: Kitchen) -> KitchenResponse:
+    lat, lng = await kitchen_coordinates(session, kitchen)
     return KitchenResponse(
         id=kitchen.id,
         owner_id=kitchen.owner_id,
@@ -677,8 +707,8 @@ async def kitchen_to_response(session: AsyncSession, kitchen: Kitchen) -> Kitche
         porter_auto_book_delay_min=int(getattr(kitchen, "porter_auto_book_delay_min", 15) or 15),
         address_line=kitchen.address_line,
         pincode=kitchen.pincode,
-        latitude=float(row.lat),
-        longitude=float(row.lng),
+        latitude=lat,
+        longitude=lng,
         branded_page=branded_page_from_settings(
             kitchen.settings if isinstance(kitchen.settings, dict) else {}
         ),
@@ -899,6 +929,9 @@ async def list_kitchens_nearby(
                       AND st.live_sharing_enabled = true
               )
         """
+    from ckac_common.platform_config import hard_mode_missing_feature_sql
+
+    diet_filter += hard_mode_missing_feature_sql("ckac_identity.kitchens.id", "discovery")
 
     result = await session.execute(
         text(

@@ -110,6 +110,87 @@ async def test_full_onboarding_flow(client: AsyncClient, unique_phone: str):
 
 
 @pytest.mark.asyncio
+async def test_update_kitchen_profile_requires_auth(client: AsyncClient):
+    response = await client.patch(
+        f"/api/v1/kitchens/{uuid.uuid4()}/profile",
+        json={"name": "Moved Kitchen"},
+    )
+    assert response.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_update_kitchen_profile_owner_can_fix_pin(client: AsyncClient, auth_headers: dict):
+    created = await client.post("/api/v1/kitchens", json=KITCHEN_PAYLOAD, headers=auth_headers)
+    assert created.status_code == 201
+    kitchen_id = created.json()["id"]
+    code = created.json()["code"]
+
+    response = await client.patch(
+        f"/api/v1/kitchens/{kitchen_id}/profile",
+        json={
+            "name": "Raj Home Kitchen Koregaon",
+            "address_line": "Lane 7, Koregaon Park",
+            "city": "Mumbai",
+            "state": "Maharashtra",
+            "pincode": "400001",
+            "latitude": 19.0760,
+            "longitude": 72.8777,
+        },
+        headers=auth_headers,
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert data["name"] == "Raj Home Kitchen Koregaon"
+    assert data["address_line"] == "Lane 7, Koregaon Park"
+    assert data["city"] == "Mumbai"
+    assert data["pincode"] == "400001"
+    assert data["code"] == code
+    assert data["latitude"] == pytest.approx(19.0760, rel=1e-4)
+    assert data["longitude"] == pytest.approx(72.8777, rel=1e-4)
+
+
+@pytest.mark.asyncio
+async def test_update_kitchen_profile_tenant_isolated(
+    client: AsyncClient, auth_headers: dict
+):
+    created = await client.post("/api/v1/kitchens", json=KITCHEN_PAYLOAD, headers=auth_headers)
+    assert created.status_code == 201
+    kitchen_id = created.json()["id"]
+
+    other_phone = str(uuid.uuid4().int % 4_000_000_000 + 6_000_000_000)
+    reg = await client.post(
+        "/api/v1/owners/register",
+        json={"phone": other_phone, "name": "Other Owner"},
+    )
+    assert reg.status_code == 201
+    await client.post("/api/v1/auth/otp/request", json={"phone": reg.json()["phone"]})
+    token_resp = await client.post(
+        "/api/v1/auth/otp/verify",
+        json={"phone": reg.json()["phone"], "otp": "123456"},
+    )
+    other_headers = {"Authorization": f"Bearer {token_resp.json()['access_token']}"}
+
+    response = await client.patch(
+        f"/api/v1/kitchens/{kitchen_id}/profile",
+        json={"name": "Hijacked"},
+        headers=other_headers,
+    )
+    assert response.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_update_kitchen_profile_invalid_coordinates(client: AsyncClient, auth_headers: dict):
+    created = await client.post("/api/v1/kitchens", json=KITCHEN_PAYLOAD, headers=auth_headers)
+    kitchen_id = created.json()["id"]
+    response = await client.patch(
+        f"/api/v1/kitchens/{kitchen_id}/profile",
+        json={"latitude": 999, "longitude": 73.8},
+        headers=auth_headers,
+    )
+    assert response.status_code == 422
+
+
+@pytest.mark.asyncio
 async def test_nearby_kitchens_empty(client: AsyncClient):
     resp = await client.get(
         "/api/v1/kitchens/public/nearby",

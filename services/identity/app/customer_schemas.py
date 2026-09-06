@@ -38,9 +38,47 @@ class CustomerResponse(BaseModel):
     bank_ifsc: str | None = Field(default=None, description="Bank IFSC for refunds.")
     bank_account_name: str | None = Field(default=None, description="Account holder name.")
     has_password: bool = Field(default=False, description="True when an optional account password is set.")
+    notify_order_updates: bool = Field(
+        default=True, description="Receive order status updates (received → delivered)."
+    )
+    notify_offers: bool = Field(
+        default=False, description="Receive kitchen offers and daily menu pushes."
+    )
+    notify_channel: str = Field(
+        default="whatsapp", description="Delivery channel for notifications.", examples=["whatsapp"]
+    )
     status: str = Field(..., description="Customer account status.", examples=["active"])
 
     model_config = {"from_attributes": True}
+
+
+# WhatsApp is the only channel the platform actually delivers on today; adding "sms"
+# here before an SMS provider exists would promise a message that never arrives.
+NOTIFY_CHANNELS = ("whatsapp", "none")
+
+
+class CustomerNotificationPrefsRequest(BaseModel):
+    """Body for `PATCH /customers/me/notifications` — per-customer notification consent."""
+
+    notify_order_updates: bool | None = Field(
+        default=None, description="Order status updates. Omit to leave unchanged."
+    )
+    notify_offers: bool | None = Field(
+        default=None, description="Marketing offers and daily menu pushes. Omit to leave unchanged."
+    )
+    notify_channel: str | None = Field(
+        default=None, description=f"One of {', '.join(NOTIFY_CHANNELS)}. Omit to leave unchanged."
+    )
+
+    @field_validator("notify_channel")
+    @classmethod
+    def validate_channel(cls, v: str | None) -> str | None:
+        if v is None:
+            return None
+        channel = v.strip().lower()
+        if channel not in NOTIFY_CHANNELS:
+            raise ValueError(f"notify_channel must be one of {', '.join(NOTIFY_CHANNELS)}")
+        return channel
 
 
 class CustomerPayoutUpdateRequest(BaseModel):
@@ -168,6 +206,9 @@ def customer_to_response(customer: Customer) -> CustomerResponse:
         bank_ifsc=customer.bank_ifsc,
         bank_account_name=customer.bank_account_name,
         has_password=bool(customer.password_hash),
+        notify_order_updates=customer.notify_order_updates,
+        notify_offers=customer.notify_offers,
+        notify_channel=customer.notify_channel,
         status=customer.status,
     )
 
@@ -190,6 +231,22 @@ def update_customer_payout(customer: Customer, body: CustomerPayoutUpdateRequest
         customer.bank_ifsc = body.bank_ifsc
     if body.bank_account_name is not None:
         customer.bank_account_name = body.bank_account_name.strip() or None
+    return customer
+
+
+def update_customer_notification_prefs(
+    customer: Customer, body: CustomerNotificationPrefsRequest
+) -> Customer:
+    if body.notify_order_updates is not None:
+        customer.notify_order_updates = body.notify_order_updates
+    if body.notify_offers is not None:
+        customer.notify_offers = body.notify_offers
+    if body.notify_channel is not None:
+        customer.notify_channel = body.notify_channel
+        # Silencing the channel silences every message — keep the stored flags honest.
+        if body.notify_channel == "none":
+            customer.notify_order_updates = False
+            customer.notify_offers = False
     return customer
 
 

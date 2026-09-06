@@ -13,6 +13,7 @@ from app.discovery import DiscoveryHomeResponse, build_discovery_home
 from app.schemas import (
     KitchenCreateRequest,
     KitchenDeliverySettingsUpdate,
+    KitchenProfileUpdate,
     KitchenNearbyListResponse,
     KitchenBrandedPageUpdate,
     KitchenPublicResponse,
@@ -33,6 +34,7 @@ from app.schemas import (
     register_owner,
     update_kitchen_branded_page,
     update_kitchen_delivery_settings,
+    update_kitchen_profile,
     update_kitchen_whatsapp_integration,
 )
 from ckac_common.auth import stream_key
@@ -275,6 +277,53 @@ async def kitchens_me(
 
 
 @router.patch(
+    "/kitchens/{kitchen_id}/profile",
+    response_model=KitchenResponse,
+    summary="Update kitchen name, address, and map pin",
+    description=(
+        "Corrects the kitchen profile after onboarding so discovery and delivery quotes "
+        "use the real pin. Kitchen **code does not change** when city is edited.\n\n"
+        "**Auth:** owner JWT required; the kitchen must belong to the caller.\n\n"
+        "**Response 200:** the updated kitchen. Publishes `kitchen.updated` on "
+        "`ckac:identity:kitchen`."
+    ),
+    responses={**auth_errors(include_404=True), 400: RESP_400, 422: RESP_422},
+    tags=["Kitchens"],
+)
+async def kitchen_profile_update(
+    kitchen_id: uuid.UUID,
+    body: KitchenProfileUpdate,
+    owner: Annotated[Owner, Depends(get_current_owner)],
+    session: Annotated[AsyncSession, Depends(get_db)],
+    publisher: Annotated[EventPublisher, Depends(get_publisher)],
+) -> KitchenResponse:
+    result = await session.execute(
+        select(Kitchen).where(Kitchen.id == kitchen_id, Kitchen.owner_id == owner.id)
+    )
+    kitchen = result.scalar_one_or_none()
+    if not kitchen:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Kitchen not found")
+    kitchen = await update_kitchen_profile(session, kitchen, body)
+    event = EventPublisher.build(
+        event_type="kitchen.updated",
+        aggregate_type="kitchen",
+        aggregate_id=str(kitchen.id),
+        producer="identity-service",
+        payload={
+            "kitchen_id": str(kitchen.id),
+            "owner_id": str(owner.id),
+            "code": kitchen.code,
+            "city": kitchen.city,
+            "name": kitchen.name,
+            "actor": "owner",
+        },
+    )
+    await publisher.publish(stream_key("identity", "kitchen"), event, session=session)
+    await session.commit()
+    return await kitchen_to_response(session, kitchen)
+
+
+@router.patch(
     "/kitchens/{kitchen_id}/delivery-settings",
     response_model=KitchenResponse,
     summary="Update a kitchen's delivery fee/radius settings",
@@ -465,6 +514,12 @@ async def discovery_home(
     longitude: float = Query(..., ge=-180, le=180, examples=[73.8567]),
     max_km: float = Query(25.0, gt=0, le=200, examples=[25.0]),
     section_limit: int = Query(12, ge=1, le=30, examples=[12]),
+    q: str | None = Query(
+        None,
+        max_length=120,
+        description="Free-text search across kitchen name/code/city, dish name, and cuisine.",
+        examples=["samosa"],
+    ),
 ) -> DiscoveryHomeResponse:
     return await build_discovery_home(
         session,
@@ -472,6 +527,7 @@ async def discovery_home(
         longitude=longitude,
         max_km=max_km,
         section_limit=section_limit,
+        q=q,
     )
 
 

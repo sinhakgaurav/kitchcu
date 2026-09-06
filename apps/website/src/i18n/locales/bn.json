@@ -32,7 +32,12 @@
     "customerApp": "গ্রাহক অ্যাপ",
     "kitchenOwner": "রান্নাঘরের মালিক →",
     "ownerLogin": "মালিক লগইন",
-    "adminLogin": "Super admin"
+    "adminLogin": "Super admin",
+    "adminCredentialsDev": "Email {{email}} · Password {{password}} (dev / seeded)",
+    "adminCredentialsHost": "Open the console on {{host}}.",
+    "adminCredentialsProd": "Email {{email}} — password from the VM ADMIN_PASSWORD secret, not this page",
+    "adminCredentialsTitle": "Super admin credentials",
+    "adminOpenConsole": "Open Super Admin"
   },
   "status": {
     "received": "গৃহীত",
@@ -142,7 +147,15 @@
     "contactSending": "পাঠানো হচ্ছে...",
     "contactSent": "ধন্যবাদ — আমরা শীঘ্রই যোগাযোগ করব।",
     "contactError": "পাঠাতে পারিনি। আবার চেষ্টা করুন.",
-    "navCities": "Cities"
+    "navCities": "Cities",
+    "ctaAdmin": "Super admin →",
+    "tileAdminBody": "Kitchens, employees, tickets, packages, and API keys — Super Admin only.",
+    "tileAdminCta": "Open Super Admin",
+    "tileAdminTitle": "Operate the platform",
+    "tileCustomerBody": "Nearby kitchens, live-capture menus, honest ETAs, and fair delivery fees.",
+    "tileCustomerTitle": "Order home-made food",
+    "tileKitchenBody": "WhatsApp orders, menu, tiffin plans, reports — zero food commission.",
+    "tileKitchenTitle": "Run your kitchen"
   },
   "owner": {
     "nav": {
@@ -170,7 +183,8 @@
       "paymentGateway": "পেমেন্ট গেটওয়ে",
       "gst": "GST এবং ফাইন্যান্স",
       "setup": "রান্নাঘর সেটআপ",
-      "bulkPrep": "Prep batches"
+      "bulkPrep": "Prep batches",
+      "ratings": "Ratings"
     },
     "shell": {
       "activeKitchen": "সক্রিয় রান্নাঘর",
@@ -316,7 +330,8 @@
       "setup": "রান্নাঘর সেটআপ",
       "referrals": "রেফারেল",
       "newOrder": "নতুন অর্ডার",
-      "addDish": "থালা যোগ করুন"
+      "addDish": "থালা যোগ করুন",
+      "ratings": "Ratings"
     }
   },
   "customer": {
@@ -328,7 +343,10 @@
       "myOrders": "আমার নির্দেশনা",
       "dashboard": "ড্যাশবোর্ড",
       "account": "অ্যাকাউন্ট",
-      "signIn": "গ্রাহক সাইন ইন করুন"
+      "signIn": "গ্রাহক সাইন ইন করুন",
+      "logout": "Log out",
+      "notifications": "Notifications",
+      "profile": "My profile"
     },
     "auth": {
       "title": "গ্রাহক সাইন ইন করুন",

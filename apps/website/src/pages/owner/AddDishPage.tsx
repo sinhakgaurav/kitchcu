@@ -1,4 +1,4 @@
-import { FormEvent, useEffect, useRef, useState } from "react";
+import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { LiveCapturePhotoField } from "../../components/LiveCapturePhotoField";
 import { RichTextEditor } from "../../components/RichTextEditor";
@@ -35,23 +35,39 @@ export function AddDishPage() {
   const [bulkBusy, setBulkBusy] = useState(false);
   const [bulkError, setBulkError] = useState("");
   const [bulkResult, setBulkResult] = useState<BulkDishImportResult | null>(null);
+  const [metaBusy, setMetaBusy] = useState(false);
   const sheetRef = useRef<HTMLInputElement>(null);
   const imagesRef = useRef<HTMLInputElement>(null);
   const zipRef = useRef<HTMLInputElement>(null);
 
-  useEffect(() => {
+  const loadMetadata = useCallback(() => {
     if (!kitchen) return;
+    setMetaBusy(true);
     Promise.all([fetchCategories(kitchen.id), fetchCuisines(kitchen.id)])
       .then(([cats, cuis]) => {
         setCategories(cats);
         setCuisines(cuis);
+        setError("");
       })
-      .catch(() => {});
+      .catch((err) => {
+        setCategories([]);
+        setCuisines([]);
+        setError(err instanceof Error ? err.message : "Could not load categories and cuisines");
+      })
+      .finally(() => setMetaBusy(false));
   }, [kitchen]);
+
+  useEffect(() => {
+    loadMetadata();
+  }, [loadMetadata]);
 
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!kitchen) return;
+    if (!categories.length || !cuisines.length) {
+      setError("Categories and cuisines are still loading. Retry if this persists.");
+      return;
+    }
     if (!heroUrl) {
       setError("Add a live-capture hero photo before saving.");
       return;
@@ -253,6 +269,14 @@ export function AddDishPage() {
           Add one dish
         </h2>
         {error && <div className="auth-card__error">{error}</div>}
+        {(!categories.length || !cuisines.length) && (
+          <p className="owner-muted">
+            {metaBusy ? "Loading categories and cuisines…" : "Menu metadata did not load."}{" "}
+            <button type="button" className="btn btn--ghost btn--sm" onClick={loadMetadata} disabled={metaBusy}>
+              Retry
+            </button>
+          </p>
+        )}
         <label>Dish name<input name="name" required placeholder="Butter Chicken" /></label>
         <div className="form-row">
           <label>Price (₹)<input name="price" type="number" min="1" step="1" required /></label>
@@ -371,7 +395,11 @@ export function AddDishPage() {
         <p className="auth-card__hint">
           Menu hierarchy: cuisine → veg/non-veg → dish. Hero images must be live-capture.
         </p>
-        <button type="submit" className="btn btn--primary btn--lg" disabled={busy || !heroUrl}>
+        <button
+          type="submit"
+          className="btn btn--primary btn--lg"
+          disabled={busy || !heroUrl || !categories.length || !cuisines.length}
+        >
           {busy ? "Saving..." : "Add to menu"}
         </button>
       </form>

@@ -32,7 +32,12 @@
     "customerApp": "కస్టమర్ యాప్",
     "kitchenOwner": "కిచెన్ యజమాని →",
     "ownerLogin": "యజమాని లాగిన్",
-    "adminLogin": "Super admin"
+    "adminLogin": "Super admin",
+    "adminCredentialsDev": "Email {{email}} · Password {{password}} (dev / seeded)",
+    "adminCredentialsHost": "Open the console on {{host}}.",
+    "adminCredentialsProd": "Email {{email}} — password from the VM ADMIN_PASSWORD secret, not this page",
+    "adminCredentialsTitle": "Super admin credentials",
+    "adminOpenConsole": "Open Super Admin"
   },
   "status": {
     "received": "అందుకుంది",
@@ -142,7 +147,15 @@
     "contactSending": "పంపుతోంది...",
     "contactSent": "ధన్యవాదాలు — మేము త్వరలో చేరుకుంటాము.",
     "contactError": "పంపడం సాధ్యం కాలేదు. దయచేసి మళ్లీ ప్రయత్నించండి.",
-    "navCities": "Cities"
+    "navCities": "Cities",
+    "ctaAdmin": "Super admin →",
+    "tileAdminBody": "Kitchens, employees, tickets, packages, and API keys — Super Admin only.",
+    "tileAdminCta": "Open Super Admin",
+    "tileAdminTitle": "Operate the platform",
+    "tileCustomerBody": "Nearby kitchens, live-capture menus, honest ETAs, and fair delivery fees.",
+    "tileCustomerTitle": "Order home-made food",
+    "tileKitchenBody": "WhatsApp orders, menu, tiffin plans, reports — zero food commission.",
+    "tileKitchenTitle": "Run your kitchen"
   },
   "owner": {
     "nav": {
@@ -170,7 +183,8 @@
       "paymentGateway": "చెల్లింపు గేట్ ‌ వే",
       "gst": "GST & ఫైనాన్స్",
       "setup": "కిచెన్ సెటప్",
-      "bulkPrep": "Prep batches"
+      "bulkPrep": "Prep batches",
+      "ratings": "Ratings"
     },
     "shell": {
       "activeKitchen": "చురుకైన వంటగది",
@@ -316,7 +330,8 @@
       "setup": "కిచెన్ సెటప్",
       "referrals": "రెఫరల్స్",
       "newOrder": "కొత్త ఆర్డర్",
-      "addDish": "డిష్ జోడించండి"
+      "addDish": "డిష్ జోడించండి",
+      "ratings": "Ratings"
     }
   },
   "customer": {
@@ -328,7 +343,10 @@
       "myOrders": "నా ఆర్డర్లు",
       "dashboard": "డాష్‌బోర్డ్",
       "account": "ఖాతా",
-      "signIn": "కస్టమర్ సైన్ ఇన్ చేయండి"
+      "signIn": "కస్టమర్ సైన్ ఇన్ చేయండి",
+      "logout": "Log out",
+      "notifications": "Notifications",
+      "profile": "My profile"
     },
     "auth": {
       "title": "కస్టమర్ సైన్ ఇన్ చేయండి",

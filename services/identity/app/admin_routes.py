@@ -27,12 +27,15 @@ from app.schemas import (
     KitchenBrandedPageSettings,
     KitchenBrandedPageUpdate,
     KitchenDeliverySettingsUpdate,
+    KitchenProfileUpdate,
     KitchenWhatsAppIntegrationResponse,
     KitchenWhatsAppIntegrationUpdate,
     branded_page_from_settings,
     kitchen_whatsapp_to_response,
+    kitchen_coordinates,
     update_kitchen_branded_page,
     update_kitchen_delivery_settings,
+    update_kitchen_profile,
     update_kitchen_whatsapp_integration,
 )
 from ckac_common.secret_box import decrypt_secret, encrypt_secret, mask_secret
@@ -333,6 +336,8 @@ class AdminKitchenDetail(AdminKitchenRow):
         default=15,
         description="Minutes after accept before first Porter auto-book attempt.",
     )
+    latitude: float | None = Field(default=None, description="Kitchen latitude (WGS84), if set.")
+    longitude: float | None = Field(default=None, description="Kitchen longitude (WGS84), if set.")
     platform_secrets_note: str = Field(
         default=(
             "Meta App Secret / Verify Token and platform Razorpay (SaaS) live under Super Admin → API Keys. "
@@ -450,6 +455,8 @@ def _admin_kitchen_detail(
     last_order_at: datetime | None = None,
     open_ticket_count: int = 0,
     open_refund_count: int = 0,
+    latitude: float | None = None,
+    longitude: float | None = None,
 ) -> AdminKitchenDetail:
     wa = kitchen_whatsapp_to_response(kitchen)
     base = _admin_kitchen_row(
@@ -473,6 +480,8 @@ def _admin_kitchen_detail(
         ),
         porter_auto_book_enabled=bool(getattr(kitchen, "porter_auto_book_enabled", True)),
         porter_auto_book_delay_min=int(getattr(kitchen, "porter_auto_book_delay_min", 15) or 15),
+        latitude=latitude,
+        longitude=longitude,
     )
 
 
@@ -867,6 +876,7 @@ async def admin_kitchen_detail(
     gateway_ids = await _payment_gateway_kitchen_ids(session, [kitchen.id])
     health = await _kitchen_health_map(session, [kitchen.id])
     h = health.get(kitchen.id, {})
+    lat, lng = await kitchen_coordinates(session, kitchen)
     return _admin_kitchen_detail(
         kitchen,
         owner,
@@ -874,6 +884,86 @@ async def admin_kitchen_detail(
         last_order_at=h.get("last_order_at"),  # type: ignore[arg-type]
         open_ticket_count=int(h.get("open_ticket_count") or 0),
         open_refund_count=int(h.get("open_refund_count") or 0),
+        latitude=lat,
+        longitude=lng,
+    )
+
+
+@router.patch(
+    "/kitchens/{kitchen_id}/profile",
+    response_model=AdminKitchenDetail,
+    summary="Correct kitchen name, address, and map pin (super admin)",
+    description=(
+        "Ops override when an owner pinned the wrong GPS or address at onboarding. "
+        "Kitchen code stays stable. Publishes `kitchen.updated` and writes an admin audit row."
+    ),
+    responses=auth_errors(include_404=True),
+    tags=["Admin"],
+)
+async def admin_kitchen_profile(
+    kitchen_id: uuid.UUID,
+    body: KitchenProfileUpdate,
+    admin: Annotated[PlatformAdmin, Depends(get_current_admin)],
+    session: Annotated[AsyncSession, Depends(get_db)],
+    publisher: Annotated[EventPublisher, Depends(get_publisher)],
+) -> AdminKitchenDetail:
+    from app.admin_audit import record_admin_audit
+    from app.rbac import assert_admin_permission
+    from ckac_common.auth import stream_key
+    from ckac_common.event_bus import EventPublisher as EventBus
+
+    await assert_admin_permission(session, role=admin.role, permission="kitchens:write")
+    result = await session.execute(
+        select(Kitchen, Owner)
+        .join(Owner, Owner.id == Kitchen.owner_id)
+        .where(Kitchen.id == kitchen_id)
+    )
+    row = result.first()
+    if not row:
+        raise HTTPException(status_code=404, detail="Kitchen not found")
+    kitchen, owner = row
+    kitchen = await update_kitchen_profile(session, kitchen, body)
+    event = EventBus.build(
+        event_type="kitchen.updated",
+        aggregate_type="kitchen",
+        aggregate_id=str(kitchen.id),
+        producer="identity-service",
+        payload={
+            "kitchen_id": str(kitchen.id),
+            "owner_id": str(owner.id),
+            "code": kitchen.code,
+            "city": kitchen.city,
+            "name": kitchen.name,
+            "actor": "admin",
+        },
+    )
+    await publisher.publish(stream_key("identity", "kitchen"), event, session=session)
+    lat, lng = await kitchen_coordinates(session, kitchen)
+    await record_admin_audit(
+        session,
+        actor=admin,
+        action="kitchen.profile.update",
+        resource_type="kitchen",
+        resource_id=str(kitchen_id),
+        kitchen_id=kitchen_id,
+        summary=f"{kitchen.code} profile updated",
+        after={
+            "name": kitchen.name,
+            "city": kitchen.city,
+            "pincode": kitchen.pincode,
+            "latitude": lat,
+            "longitude": lng,
+        },
+    )
+    await session.commit()
+    await session.refresh(kitchen)
+    gateway_ids = await _payment_gateway_kitchen_ids(session, [kitchen.id])
+    return _admin_kitchen_detail(
+        kitchen,
+        owner,
+        payment_gateway_configured=kitchen.id in gateway_ids,
+        latitude=lat,
+        longitude=lng,
     )
 
 
@@ -1376,11 +1466,24 @@ async def admin_customer_status(
     from app.rbac import assert_admin_permission
 
     await assert_admin_permission(session, role=admin.role, permission="customers:write")
-    _ = admin
     customer = await session.get(Customer, customer_id)
     if not customer:
         raise HTTPException(status_code=404, detail="Customer not found")
+    before_status = customer.status
     customer.status = body.status
+    from app.admin_audit import record_admin_audit
+
+    phone_tail = str(customer.phone or "")[-4:]
+    await record_admin_audit(
+        session,
+        actor=admin,
+        action="customer.status.updated",
+        resource_type="customer",
+        resource_id=str(customer_id),
+        summary=f"Customer status updated (**{phone_tail})",
+        before={"status": before_status},
+        after={"status": customer.status},
+    )
     await session.flush()
     addr_count = (
         await session.execute(
@@ -1413,11 +1516,23 @@ async def admin_customer_clear_password(
     from app.rbac import assert_admin_permission
 
     await assert_admin_permission(session, role=admin.role, permission="customers:write")
-    _ = admin
     customer = await session.get(Customer, customer_id)
     if not customer:
         raise HTTPException(status_code=404, detail="Customer not found")
     customer.password_hash = None
+    from app.admin_audit import record_admin_audit
+
+    phone_tail = str(customer.phone or "")[-4:]
+    await record_admin_audit(
+        session,
+        actor=admin,
+        action="customer.password_cleared",
+        resource_type="customer",
+        resource_id=str(customer_id),
+        summary=f"Customer password cleared (**{phone_tail})",
+        before={"has_password": True},
+        after={"has_password": False},
+    )
     await session.flush()
     return await admin_customer_detail(customer_id, admin, session)
 

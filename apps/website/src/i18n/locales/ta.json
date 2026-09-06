@@ -32,7 +32,12 @@
     "customerApp": "வாடிக்கையாளர் செயலி",
     "kitchenOwner": "கிச்சன் உரிமையாளர் →",
     "ownerLogin": "உரிமையாளர் உள்நுழைவு",
-    "adminLogin": "Super admin"
+    "adminLogin": "Super admin",
+    "adminCredentialsDev": "Email {{email}} · Password {{password}} (dev / seeded)",
+    "adminCredentialsHost": "Open the console on {{host}}.",
+    "adminCredentialsProd": "Email {{email}} — password from the VM ADMIN_PASSWORD secret, not this page",
+    "adminCredentialsTitle": "Super admin credentials",
+    "adminOpenConsole": "Open Super Admin"
   },
   "status": {
     "received": "பெறப்பட்டது",
@@ -142,7 +147,15 @@
     "contactSending": "அனுப்புகிறது…",
     "contactSent": "நன்றி - விரைவில் தொடர்புகொள்வோம்.",
     "contactError": "அனுப்ப முடியவில்லை. மீண்டும் முயற்சிக்கவும்.",
-    "navCities": "Cities"
+    "navCities": "Cities",
+    "ctaAdmin": "Super admin →",
+    "tileAdminBody": "Kitchens, employees, tickets, packages, and API keys — Super Admin only.",
+    "tileAdminCta": "Open Super Admin",
+    "tileAdminTitle": "Operate the platform",
+    "tileCustomerBody": "Nearby kitchens, live-capture menus, honest ETAs, and fair delivery fees.",
+    "tileCustomerTitle": "Order home-made food",
+    "tileKitchenBody": "WhatsApp orders, menu, tiffin plans, reports — zero food commission.",
+    "tileKitchenTitle": "Run your kitchen"
   },
   "owner": {
     "nav": {
@@ -170,7 +183,8 @@
       "paymentGateway": "பேமெண்ட் கேட்வே",
       "gst": "GST & நிதி",
       "setup": "கிச்சன் அமைப்பு",
-      "bulkPrep": "Prep batches"
+      "bulkPrep": "Prep batches",
+      "ratings": "Ratings"
     },
     "shell": {
       "activeKitchen": "செயலில் உள்ள கிச்சன்",
@@ -316,7 +330,8 @@
       "setup": "சமையலறை அமைப்பு",
       "referrals": "பரிந்துரைகள்",
       "newOrder": "புதிய ஆர்டர்",
-      "addDish": "டிஷ் சேர்க்கவும்"
+      "addDish": "டிஷ் சேர்க்கவும்",
+      "ratings": "Ratings"
     }
   },
   "customer": {
@@ -328,7 +343,10 @@
       "myOrders": "என் ஆர்டர்கள்",
       "dashboard": "டாஷ்போர்டு",
       "account": "கணக்கு",
-      "signIn": "வாடிக்கையாளர் உள்நுழைவு"
+      "signIn": "வாடிக்கையாளர் உள்நுழைவு",
+      "logout": "Log out",
+      "notifications": "Notifications",
+      "profile": "My profile"
     },
     "auth": {
       "title": "வாடிக்கையாளர் உள்நுழைவு",

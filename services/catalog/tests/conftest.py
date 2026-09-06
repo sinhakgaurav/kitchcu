@@ -125,6 +125,11 @@ def kitchen_ctx() -> tuple[uuid.UUID, uuid.UUID, str]:
     return _seed_owner_kitchen()
 
 
+@pytest.fixture
+def kitchen_ctx_other() -> tuple[uuid.UUID, uuid.UUID, str]:
+    return _seed_owner_kitchen()
+
+
 DISH_PAYLOAD_BASE = {
     "name": "Paneer Tikka",
     "price": 199.0,

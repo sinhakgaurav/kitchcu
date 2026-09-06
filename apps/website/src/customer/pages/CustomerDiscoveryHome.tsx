@@ -1,19 +1,15 @@
-import {
-  FormEvent,
-  useCallback,
-  useEffect,
-  useMemo,
-  useState,
-  type ReactNode,
-} from "react";
+import { FormEvent, useCallback, useEffect, useState, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { BrandLogo } from "../../components/BrandLogo";
+import { NearbyKitchensList } from "../../components/NearbyKitchensList";
+import { SuperAdminLink } from "../../components/SuperAdminAccess";
 import { CitiesPresence } from "../../components/CitiesPresence";
 import { images } from "../../data/content";
 import { useGeolocation } from "../../hooks/useGeolocation";
 import { DEMO } from "../../shared/demo";
-import type { KitchenPublic } from "../../shared/api";
+import type { KitchenPublic, LiveKitchenSummary } from "../../shared/api";
+import { fetchLiveKitchens } from "../../shared/api";
 import { useCustomerAuth } from "../../shared/customerAuth";
 import { saveKitchenToSession } from "../../shared/customerSession";
 import {
@@ -77,11 +73,66 @@ function KitchenCard({
           {kitchen.city ? ` · ${kitchen.city}` : ""}
           {kitchen.avg_rating != null ? ` · ★ ${kitchen.avg_rating.toFixed(1)}` : ""}
         </span>
+        <span className="disc-card__badges">
+          {kitchen.has_veg ? <span className="disc-card__badge">Veg</span> : null}
+          {kitchen.has_live_capture ? <span className="disc-card__badge">Live photo</span> : null}
+        </span>
         <span className="disc-card__price">
           {kitchen.min_dish_price != null ? `From ${formatPrice(kitchen.min_dish_price)}` : kitchen.code}
         </span>
       </div>
     </button>
+  );
+}
+
+function LiveRailCard({
+  kitchen,
+  sessionId,
+  onMenu,
+  onWatch,
+}: {
+  kitchen: DiscoveryKitchenCard;
+  sessionId?: string;
+  onMenu: (k: DiscoveryKitchenCard) => void;
+  onWatch: (sessionId: string) => void;
+}) {
+  const primary = () => {
+    if (sessionId) onWatch(sessionId);
+    else onMenu(kitchen);
+  };
+  return (
+    <article className="disc-card disc-card--live">
+      <button type="button" className="disc-card__media" onClick={primary}>
+        <img
+          src={kitchen.logo_url || fallbackFood(kitchen.id || kitchen.code || kitchen.name)}
+          alt=""
+          loading="lazy"
+          className={kitchen.logo_url ? undefined : "disc-card__fallback"}
+        />
+        <span className="disc-card__live">LIVE</span>
+      </button>
+      <div className="disc-card__body">
+        <strong>{kitchen.name}</strong>
+        <span className="disc-card__meta">
+          {formatKm(kitchen.distance_km)}
+          {kitchen.city ? ` · ${kitchen.city}` : ""}
+        </span>
+        <span className="disc-card__badges">
+          {kitchen.has_veg ? <span className="disc-card__badge">Veg</span> : null}
+          {kitchen.has_live_capture ? <span className="disc-card__badge">Live photo</span> : null}
+        </span>
+        <div className="disc-card__actions">
+          {sessionId ? (
+            <button type="button" className="btn btn--primary btn--sm" onClick={() => onWatch(sessionId)}>
+              Watch live
+            </button>
+          ) : null}
+          <button type="button" className="btn btn--ghost btn--sm" onClick={() => onMenu(kitchen)}>
+            Menu
+          </button>
+        </div>
+      </div>
+    </article>
   );
 }
 
@@ -149,9 +200,11 @@ export function CustomerDiscoveryHome() {
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState("");
   const [query, setQuery] = useState("");
+  const [activeQuery, setActiveQuery] = useState("");
   const [code, setCode] = useState("");
   const [codeError, setCodeError] = useState("");
   const [codeBusy, setCodeBusy] = useState(false);
+  const [liveByKitchen, setLiveByKitchen] = useState<Record<string, LiveKitchenSummary>>({});
 
   const kmFromDemo = distanceKm(coords, DEMO.defaultLocation);
   const farFromDemo = kmFromDemo > 80;
@@ -160,24 +213,42 @@ export function CustomerDiscoveryHome() {
     setLoading(true);
     setFetchError("");
     try {
-      const data = await fetchDiscoveryHome({
-        latitude: coords.latitude,
-        longitude: coords.longitude,
-        max_km: maxKm,
-        section_limit: 12,
-      });
+      const [data, liveRes] = await Promise.all([
+        fetchDiscoveryHome({
+          latitude: coords.latitude,
+          longitude: coords.longitude,
+          max_km: maxKm,
+          section_limit: 12,
+          q: activeQuery || undefined,
+        }),
+        fetchLiveKitchens().catch(() => ({ kitchens: [] as LiveKitchenSummary[], total: 0 })),
+      ]);
       setFeed(data);
+      const map: Record<string, LiveKitchenSummary> = {};
+      for (const live of liveRes.kitchens) {
+        map[live.kitchen_id] = live;
+      }
+      setLiveByKitchen(map);
     } catch (err) {
       setFeed(null);
       setFetchError(err instanceof Error ? err.message : "Could not load kitchens near you");
     } finally {
       setLoading(false);
     }
-  }, [coords.latitude, coords.longitude, maxKm]);
+  }, [coords.latitude, coords.longitude, maxKm, activeQuery]);
 
   useEffect(() => {
     void load();
   }, [load]);
+
+  // Search runs server-side across every kitchen in radius, so typing (not just Enter)
+  // is enough — the client only debounces to keep the request rate sane.
+  useEffect(() => {
+    const trimmed = query.trim();
+    if (trimmed === activeQuery) return;
+    const timer = setTimeout(() => setActiveQuery(trimmed), 350);
+    return () => clearTimeout(timer);
+  }, [query, activeQuery]);
 
   const openKitchen = (kitchen: {
     id: string;
@@ -208,52 +279,39 @@ export function CustomerDiscoveryHome() {
     });
   };
 
-  const filterKitchens = useCallback(
-    (list: DiscoveryKitchenCard[]) => {
-      const q = query.trim().toLowerCase();
-      if (!q) return list;
-      const dishHits = new Set(
-        (feed?.cheapest_dishes ?? [])
-          .filter(
-            (d) =>
-              d.dish_name.toLowerCase().includes(q) ||
-              d.kitchen_name.toLowerCase().includes(q) ||
-              d.kitchen_code.toLowerCase().includes(q),
-          )
-          .map((d) => d.kitchen_id),
-      );
-      return list.filter((k) => {
-        const hay = [k.name, k.code, k.city || "", k.tagline || ""].join(" ").toLowerCase();
-        if (hay.includes(q)) return true;
-        if (dishHits.has(k.id)) return true;
-        if ((q === "veg" || q.includes("vegetarian")) && k.has_veg) return true;
-        if (
-          (q.includes("non-veg") || q.includes("nonveg") || q.includes("non veg") || q.includes("chicken")) &&
-          k.has_non_veg
-        ) {
-          return true;
-        }
-        return false;
+  // The feed is already scoped to the search term by the API — filtering again here
+  // would only re-narrow the 12-item rail slices and hide real matches.
+  const nearYou = feed?.near_you ?? [];
+  const featured = feed?.featured ?? [];
+  const mostLiked = feed?.most_liked ?? [];
+  const liveNow = (() => {
+    const fromFeed = feed?.live_now ?? [];
+    const byId = new Map(fromFeed.map((k) => [k.id, k]));
+    for (const live of Object.values(liveByKitchen)) {
+      if (byId.has(live.kitchen_id)) continue;
+      byId.set(live.kitchen_id, {
+        id: live.kitchen_id,
+        code: live.kitchen_code,
+        name: live.kitchen_name,
+        city: null,
+        distance_km: 0,
+        latitude: 0,
+        longitude: 0,
+        has_veg: false,
+        has_non_veg: false,
+        has_live_capture: false,
+        is_live_now: true,
+        is_featured: false,
+        avg_rating: null,
+        rating_count: 0,
+        min_dish_price: null,
+        tagline: live.dish_name ?? null,
+        logo_url: null,
       });
-    },
-    [query, feed?.cheapest_dishes],
-  );
-
-  const nearYou = useMemo(() => filterKitchens(feed?.near_you ?? []), [feed, filterKitchens]);
-  const featured = useMemo(() => filterKitchens(feed?.featured ?? []), [feed, filterKitchens]);
-  const mostLiked = useMemo(() => filterKitchens(feed?.most_liked ?? []), [feed, filterKitchens]);
-  const liveNow = useMemo(() => filterKitchens(feed?.live_now ?? []), [feed, filterKitchens]);
-  const cheapest = useMemo(() => {
-    const list = feed?.cheapest_dishes ?? [];
-    const q = query.trim().toLowerCase();
-    if (!q) return list;
-    return list.filter(
-      (d) =>
-        d.dish_name.toLowerCase().includes(q) ||
-        d.kitchen_name.toLowerCase().includes(q) ||
-        d.kitchen_code.toLowerCase().includes(q),
-    );
-  }, [feed, query]);
+    }
+    return [...byId.values()];
+  })();
+  const cheapest = feed?.cheapest_dishes ?? [];
 
   const onCodeSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -294,12 +352,18 @@ export function CustomerDiscoveryHome() {
               : t("customer.discovery.title")}
           </h1>
           <p className="disc-home__lede">{t("customer.discovery.lede")}</p>
+          <p className="disc-home__ops">
+            <SuperAdminLink className="disc-home__ops-link" />
+          </p>
 
           <form
             className="disc-home__search"
             onSubmit={(e) => {
               e.preventDefault();
-              void load();
+              const trimmed = query.trim();
+              // Enter should not wait out the debounce.
+              if (trimmed === activeQuery) void load();
+              else setActiveQuery(trimmed);
             }}
           >
             <label className="disc-home__search-field">
@@ -342,28 +406,57 @@ export function CustomerDiscoveryHome() {
           {geoError ? <p className="disc-home__hint">{geoError}</p> : null}
           {!loading && !fetchError && (feed?.total_kitchens ?? 0) === 0 ? (
             <div className="disc-home__banner">
-              <p>
-                {farFromDemo
-                  ? "No kitchens near this GPS pin (demo data is clustered in Pune). Jump to the demo map."
-                  : "No kitchens in this radius. Widen the search or use the Pune demo cluster."}
-              </p>
-              <button type="button" className="btn btn--primary btn--sm" onClick={useDemoPin}>
-                Show demo kitchens
-              </button>
+              {activeQuery ? (
+                <>
+                  <p>
+                    Nothing matches “{activeQuery}” within {maxKm} km. Try a kitchen name, a dish
+                    like Samosa, or a cuisine.
+                  </p>
+                  <button
+                    type="button"
+                    className="btn btn--primary btn--sm"
+                    onClick={() => {
+                      setQuery("");
+                      setActiveQuery("");
+                    }}
+                  >
+                    Clear search
+                  </button>
+                </>
+              ) : farFromDemo ? (
+                <>
+                  {/* Widening cannot help here — the nearest kitchens are hundreds of km away. */}
+                  <p>
+                    We are not live near this location yet. Browse our demo kitchens in Pune to see
+                    how kitchCU works.
+                  </p>
+                  <button type="button" className="btn btn--primary btn--sm" onClick={useDemoPin}>
+                    Show demo kitchens
+                  </button>
+                </>
+              ) : (
+                <>
+                  <p>No kitchens within {maxKm} km of you yet.</p>
+                  {maxKm < 100 ? (
+                    <button
+                      type="button"
+                      className="btn btn--primary btn--sm"
+                      onClick={() => setMaxKm(maxKm < 25 ? 25 : maxKm < 50 ? 50 : 100)}
+                    >
+                      Search wider
+                    </button>
+                  ) : null}
+                  <button type="button" className="btn btn--ghost btn--sm" onClick={useDemoPin}>
+                    Show demo kitchens
+                  </button>
+                </>
+              )}
             </div>
-          ) : null}
-          {!loading &&
-          query.trim() &&
-          nearYou.length === 0 &&
-          featured.length === 0 &&
-          cheapest.length === 0 &&
-          (feed?.total_kitchens ?? 0) > 0 ? (
-            <p className="disc-home__hint">
-              No kitchens or dishes match “{query.trim()}”. Try a kitchen name, dish (e.g. Samosa), or clear search.
-            </p>
           ) : null}
         </div>
       </header>
+
+      <NearbyKitchensList />
 
       <div className="container disc-home__body">
         {session && session.savedKitchens.length > 0 ? (
@@ -440,7 +533,13 @@ export function CustomerDiscoveryHome() {
               empty="No kitchens live nearby right now."
             >
               {liveNow.map((k) => (
-                <KitchenCard key={`live-${k.id}`} kitchen={k} onOpen={openDiscoveryKitchen} />
+                <LiveRailCard
+                  key={`live-${k.id}`}
+                  kitchen={k}
+                  sessionId={liveByKitchen[k.id]?.session_id}
+                  onMenu={openDiscoveryKitchen}
+                  onWatch={(sessionId) => navigate(`/live/${sessionId}`)}
+                />
               ))}
             </Rail>
 

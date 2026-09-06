@@ -169,4 +169,12 @@ if { [ "$RUN_SEED" = "1" ] || [ "$RUN_SEED" = "true" ]; } && [ ! -f "$SEED_MARKE
   fi
 fi
 
+# --- 7. Weekly QA cohort seed timer -------------------------------------------------
+# Fresh owner + customer test accounts every Monday; earlier cohorts stay untouched.
+install -m 0644 infra/gcp-vm/kitchcu-weekly-seed.service /etc/systemd/system/
+install -m 0644 infra/gcp-vm/kitchcu-weekly-seed.timer /etc/systemd/system/
+systemctl daemon-reload
+systemctl enable --now kitchcu-weekly-seed.timer
+echo "Weekly seed timer: $(systemctl list-timers kitchcu-weekly-seed --no-pager --no-legend || true)"
+
 echo "=== ckac startup done: $(date -u) ==="

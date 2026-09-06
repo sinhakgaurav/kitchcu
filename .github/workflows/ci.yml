@@ -182,3 +182,8 @@ jobs:
           REDIS_URL: redis://localhost:6379/0
         working-directory: services/gateway
         run: pytest -q
+
+      # The weekly QA cohort cron seeds production QA data unattended; its
+      # identifier scheme is validated here against the real phone validator.
+      - name: Run seed script tests
+        run: pytest scripts/tests -q

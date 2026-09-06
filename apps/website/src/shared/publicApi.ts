@@ -1,6 +1,16 @@
 /** Unauthenticated customer-facing API (no owner JWT). */
 
 import type { KitchenNearbyList, Menu } from "./api";
+import { getCustomerToken } from "./customerApi";
+
+export type PublicActivePromotion = {
+  promotion_id: string;
+  name: string;
+  dish_id: string;
+  dish_name: string;
+  special_price: number;
+  segment: string;
+};
 
 export type DiscoveryKitchenCard = {
   id: string;
@@ -110,12 +120,23 @@ export async function fetchDiscoveryHome(params: {
   longitude: number;
   max_km?: number;
   section_limit?: number;
+  q?: string;
 }): Promise<DiscoveryHome> {
-  const q = new URLSearchParams({
+  const query = new URLSearchParams({
     latitude: String(params.latitude),
     longitude: String(params.longitude),
   });
-  if (params.max_km != null) q.set("max_km", String(params.max_km));
-  if (params.section_limit != null) q.set("section_limit", String(params.section_limit));
-  return publicFetch(`/api/v1/discovery/home?${q.toString()}`);
+  if (params.max_km != null) query.set("max_km", String(params.max_km));
+  if (params.section_limit != null) query.set("section_limit", String(params.section_limit));
+  if (params.q?.trim()) query.set("q", params.q.trim());
+  return publicFetch(`/api/v1/discovery/home?${query.toString()}`);
+}
+
+export async function fetchPublicActivePromotions(
+  kitchenId: string,
+): Promise<{ promotions: PublicActivePromotion[] }> {
+  const token = getCustomerToken();
+  return publicFetch(`/api/v1/kitchens/${kitchenId}/promotions/active`, {
+    headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+  });
 }

@@ -32,7 +32,12 @@
     "customerApp": "ग्राहक ऐप",
     "kitchenOwner": "किचन ओनर →",
     "ownerLogin": "ओनर लॉगिन",
-    "adminLogin": "सुपर एडमिन"
+    "adminLogin": "सुपर एडमिन",
+    "adminCredentialsDev": "Email {{email}} · Password {{password}} (dev / seeded)",
+    "adminCredentialsHost": "Open the console on {{host}}.",
+    "adminCredentialsProd": "Email {{email}} — password from the VM ADMIN_PASSWORD secret, not this page",
+    "adminCredentialsTitle": "Super admin credentials",
+    "adminOpenConsole": "Open Super Admin"
   },
   "status": {
     "received": "प्राप्त",
@@ -142,7 +147,15 @@
     "contactSending": "भेजा जा रहा है…",
     "contactSent": "धन्यवाद — हम जल्द संपर्क करेंगे।",
     "contactError": "भेज नहीं सके। कृपया फिर कोशिश करें।",
-    "navCities": "शहर"
+    "navCities": "शहर",
+    "ctaAdmin": "Super admin →",
+    "tileAdminBody": "Kitchens, employees, tickets, packages, and API keys — Super Admin only.",
+    "tileAdminCta": "Open Super Admin",
+    "tileAdminTitle": "Operate the platform",
+    "tileCustomerBody": "Nearby kitchens, live-capture menus, honest ETAs, and fair delivery fees.",
+    "tileCustomerTitle": "Order home-made food",
+    "tileKitchenBody": "WhatsApp orders, menu, tiffin plans, reports — zero food commission.",
+    "tileKitchenTitle": "Run your kitchen"
   },
   "owner": {
     "nav": {
@@ -170,7 +183,8 @@
       "whatsapp": "WhatsApp",
       "paymentGateway": "भुगतान",
       "gst": "GST और बिल",
-      "setup": "किचन सेटअप"
+      "setup": "किचन सेटअप",
+      "ratings": "Ratings"
     },
     "shell": {
       "activeKitchen": "सक्रिय किचन",
@@ -316,7 +330,8 @@
       "setup": "किचन सेटअप",
       "referrals": "रेफ़रल",
       "newOrder": "नया ऑर्डर",
-      "addDish": "डिश जोड़ें"
+      "addDish": "डिश जोड़ें",
+      "ratings": "Ratings"
     }
   },
   "customer": {
@@ -328,7 +343,10 @@
       "myOrders": "मेरे ऑर्डर",
       "dashboard": "मेरी जगह",
       "account": "अकाउंट",
-      "signIn": "साइन इन"
+      "signIn": "साइन इन",
+      "logout": "Log out",
+      "notifications": "Notifications",
+      "profile": "My profile"
     },
     "auth": {
       "title": "ऑर्डर करने के लिए साइन इन",

@@ -495,16 +495,23 @@ async def end_live(
     return await _session_response(session, live)
 
 
-async def get_current_session(session: AsyncSession, kitchen_id: uuid.UUID) -> LiveSessionResponse | None:
+async def get_current_session(
+    session: AsyncSession,
+    kitchen_id: uuid.UUID,
+    *,
+    include_publisher_token: bool = True,
+) -> LiveSessionResponse | None:
     live = await _active_session(session, kitchen_id)
     if not live:
         return None
-    token = await build_livekit_token(
-        room_name=live.room_name,
-        identity=publisher_identity(kitchen_id),
-        can_publish=True,
-        session=session,
-    )
+    token = None
+    if include_publisher_token:
+        token = await build_livekit_token(
+            room_name=live.room_name,
+            identity=publisher_identity(kitchen_id),
+            can_publish=True,
+            session=session,
+        )
     return await _session_response(session, live, publisher_token=token)
 
 

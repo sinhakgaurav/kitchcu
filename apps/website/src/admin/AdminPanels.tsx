@@ -232,7 +232,7 @@ export function AdminApiKeysPanel() {
   );
 }
 
-export function AdminCustomers() {
+export function AdminCustomers({ canWrite = false }: { canWrite?: boolean } = {}) {
   const [rows, setRows] = useState<AdminCustomer[]>([]);
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<AdminCustomerDetail | null>(null);
@@ -417,6 +417,8 @@ export function AdminCustomers() {
               </ul>
             )}
             <div className="admin-detail__actions">
+              {canWrite ? (
+                <>
               <button
                 type="button"
                 className="btn btn--primary btn--sm"
@@ -455,6 +457,10 @@ export function AdminCustomers() {
                 >
                   Clear password
                 </button>
+              )}
+                </>
+              ) : (
+                <p className="report-hint">Needs customers:write to change account status.</p>
               )}
               <button type="button" className="btn btn--ghost btn--sm" onClick={() => setSelected(null)}>
                 Close
@@ -1233,7 +1239,7 @@ export function AdminEmployeesPanel() {
   );
 }
 
-export function AdminPackagesPanel() {
+export function AdminPackagesPanel({ canWrite = false }: { canWrite?: boolean } = {}) {
   const [packages, setPackages] = useState<AdminPackage[]>([]);
   const [features, setFeatures] = useState<AdminFeature[]>([]);
   const [error, setError] = useState("");
@@ -1344,18 +1350,22 @@ export function AdminPackagesPanel() {
                     <td>{p.feature_keys.length}</td>
                     <td>{p.plan_tiers.join(", ") || "—"}</td>
                     <td>
+                      {canWrite ? (
                       <button type="button" className="btn btn--sm btn--ghost" onClick={() => startEdit(p)}>
                         Edit
                       </button>
+                      ) : null}
                     </td>
                   </tr>
                 ))}
               </tbody>
             </table>
           )}
+          {canWrite && (
           <button type="button" className="btn btn--primary btn--sm" style={{ margin: "1rem" }} onClick={() => startEdit(null)}>
             New package
           </button>
+          )}
         </div>
         <section className="glass admin-detail">
           <h3>{editing ? `Edit ${editing.code}` : "New package"}</h3>
@@ -1397,9 +1407,13 @@ export function AdminPackagesPanel() {
                 </label>
               ))}
             </fieldset>
+            {canWrite ? (
             <button type="submit" className="btn btn--primary" disabled={busy}>
               {busy ? "Saving…" : "Save package"}
             </button>
+            ) : (
+              <p className="report-hint">Needs packages:write to create or edit packages.</p>
+            )}
           </form>
         </section>
       </div>

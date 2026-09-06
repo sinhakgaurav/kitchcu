@@ -16,6 +16,7 @@ from sqlalchemy.orm import Mapped, mapped_column
 from ckac_common.auth import stream_key
 from ckac_common.database import Base
 from ckac_common.event_bus import EventPublisher
+from ckac_common.validators import normalize_india_phone
 
 CHANNELS = ("whatsapp", "email")
 _VAR_RE = re.compile(r"\{\{\s*([a-zA-Z_][a-zA-Z0-9_]*)\s*\}\}")
@@ -216,6 +217,11 @@ class TemplateSendRequest(BaseModel):
     phones: list[str] = Field(default_factory=list, max_length=50)
     dry_run: bool = False
     sample_vars: dict[str, str] = Field(default_factory=dict)
+
+    @field_validator("phones")
+    @classmethod
+    def normalize_phones(cls, phones: list[str]) -> list[str]:
+        return [normalize_india_phone(p) for p in phones if str(p).strip()]
 
 
 class TemplateSendResponse(BaseModel):

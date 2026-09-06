@@ -225,6 +225,13 @@ class DishResponse(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class DishListResponse(BaseModel):
+    """Owner dish list — includes inactive drafts the public menu hides."""
+
+    dishes: list[DishResponse] = Field(..., description="Kitchen dishes, newest first.")
+    total: int = Field(..., description="Number of dishes in this response.")
+
+
 class MenuHighlightSections(BaseModel):
     """Customer-facing merchandising buckets for the kitchen menu."""
 
@@ -564,6 +571,20 @@ async def get_menu(session: AsyncSession, kitchen_id: uuid.UUID) -> list[Dish]:
         select(Dish).where(Dish.kitchen_id == kitchen_id, Dish.is_active.is_(True))
     )
     return list(result.scalars().all())
+
+
+async def list_owner_dishes(
+    session: AsyncSession,
+    kitchen_id: uuid.UUID,
+    *,
+    is_active: bool | None = None,
+) -> DishListResponse:
+    stmt = select(Dish).where(Dish.kitchen_id == kitchen_id).order_by(Dish.name)
+    if is_active is not None:
+        stmt = stmt.where(Dish.is_active.is_(is_active))
+    rows = list((await session.execute(stmt)).scalars().all())
+    dishes = [await dish_with_media(session, row) for row in rows]
+    return DishListResponse(dishes=dishes, total=len(dishes))
 
 
 async def dish_with_media(session: AsyncSession, dish: Dish) -> DishResponse:

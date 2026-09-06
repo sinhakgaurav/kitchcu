@@ -3,6 +3,7 @@ import { DataTable, type DataColumn } from "../components/DataTable";
 import {
   adminLogin,
   clearAdminKitchenPaymentGateway,
+  ADMIN_SESSION_EXPIRED,
   clearAdminToken,
   fetchAdminLoginHint,
   fetchAdminKitchen,
@@ -18,8 +19,10 @@ import {
   fetchAdminKitchenGstProfile,
   downloadAdminKitchenGstExcel,
   downloadAdminKitchenGstPdf,
+  fetchAdminKitchenStreamSummary,
   fetchAdminKitchenWhatsApp,
   updateAdminKitchenDeliverySettings,
+  updateAdminKitchenProfile,
   updateAdminKitchenBrandedPage,
   uploadAdminKitchenBrandMedia,
   fetchAdminMe,
@@ -55,6 +58,7 @@ import {
   type AdminKitchenModuleFlags,
   type AdminKitchenPackage,
   type AdminKitchenPaymentGateway,
+  type AdminKitchenStreamSummary,
   type AdminKitchenWhatsApp,
   type AdminPackage,
   type AdminMe,
@@ -81,11 +85,14 @@ import {
   buildTierBreakdown,
   buildTopKitchens,
 } from "./adminCharts";
+import { roleHasPermission } from "./rbac";
 import { ADMIN_DEV_EMAIL, ADMIN_HOST, CUSTOMER_HOST, KITCHEN_HOST } from "../shared/brand";
 import { DEMO_OWNERS, adminLoginDefaults } from "../shared/demo";
 import { AuthLoginHighlights } from "../components/AuthLoginHighlights";
 import { BrandAuthArt, BrandLogo } from "../components/BrandLogo";
 import { BrandNavMark } from "../components/BrandNavMark";
+import { PhoneField } from "../components/PhoneField";
+import { phoneInputValue, toE164, validateNationalPhone } from "../shared/validation";
 import { customerUrl, kitchenUrl } from "../shared/urls";
 import "../owner-app.css";
 
@@ -273,6 +280,15 @@ export default function AdminApp() {
     return () => window.removeEventListener("kitchcu-admin-nav", onNav);
   }, []);
 
+  useEffect(() => {
+    const onExpired = () => {
+      setToken(null);
+      setMe(null);
+    };
+    window.addEventListener(ADMIN_SESSION_EXPIRED, onExpired);
+    return () => window.removeEventListener(ADMIN_SESSION_EXPIRED, onExpired);
+  }, []);
+
   // Deep-link: ?tab=kitchens&kitchen=<id>
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -370,14 +386,20 @@ export default function AdminApp() {
             <AdminKitchens
               focusKitchenId={focusKitchenId}
               onFocusConsumed={() => setFocusKitchenId(null)}
+              canWriteKitchen={roleHasPermission(me?.permissions, "kitchens:write")}
+              canWritePackages={roleHasPermission(me?.permissions, "packages:write")}
             />
           )}
           {tab === "owners" && <AdminOwners />}
-          {tab === "customers" && <AdminCustomers />}
+          {tab === "customers" && (
+            <AdminCustomers canWrite={roleHasPermission(me?.permissions, "customers:write")} />
+          )}
           {tab === "orders" && <AdminOrders />}
           {tab === "refunds" && <AdminRefunds initialSearch={refundSearch} />}
           {tab === "tickets" && <AdminTickets />}
-          {tab === "packages" && <AdminPackagesPanel />}
+          {tab === "packages" && (
+            <AdminPackagesPanel canWrite={roleHasPermission(me?.permissions, "packages:write")} />
+          )}
           {tab === "employees" && <AdminEmployeesPanel />}
           {tab === "api-keys" && <AdminApiKeysPanel />}
           {tab === "referrals" && <AdminReferralsPanel />}
@@ -873,9 +895,13 @@ function AdminLogin({ onSuccess }: { onSuccess: (token: string) => void }) {
 function AdminKitchens({
   focusKitchenId,
   onFocusConsumed,
+  canWriteKitchen = false,
+  canWritePackages = false,
 }: {
   focusKitchenId?: string | null;
   onFocusConsumed?: () => void;
+  canWriteKitchen?: boolean;
+  canWritePackages?: boolean;
 } = {}) {
   const [rows, setRows] = useState<AdminKitchen[]>([]);
   const [loading, setLoading] = useState(true);
@@ -906,6 +932,7 @@ function AdminKitchens({
   const [porterDelayMin, setPorterDelayMin] = useState(15);
   const [tiffinSummary, setTiffinSummary] = useState<AdminTiffinSummary | null>(null);
   const [tiffinSubs, setTiffinSubs] = useState<AdminTiffinSubscription[]>([]);
+  const [streamSummary, setStreamSummary] = useState<AdminKitchenStreamSummary | null>(null);
   const [gstProfile, setGstProfile] = useState<AdminGstProfile | null>(null);
   const [gstReport, setGstReport] = useState<AdminGstMonthlyReport | null>(null);
   const gstNow = useMemo(() => new Date(), []);
@@ -914,8 +941,16 @@ function AdminKitchens({
   const [error, setError] = useState("");
   const [ok, setOk] = useState("");
   const [busy, setBusy] = useState(false);
+  const [profileName, setProfileName] = useState("");
+  const [profileAddress, setProfileAddress] = useState("");
+  const [profileCity, setProfileCity] = useState("");
+  const [profileState, setProfileState] = useState("");
+  const [profilePincode, setProfilePincode] = useState("");
+  const [profileLat, setProfileLat] = useState("");
+  const [profileLng, setProfileLng] = useState("");
   const [phoneId, setPhoneId] = useState("");
   const [displayPhone, setDisplayPhone] = useState("");
+  const [displayPhoneError, setDisplayPhoneError] = useState<string>();
   const [brandTagline, setBrandTagline] = useState("");
   const [brandAccent, setBrandAccent] = useState("#0F766E");
   const [brandLogoUrl, setBrandLogoUrl] = useState<string | null>(null);
@@ -938,7 +973,7 @@ function AdminKitchens({
     setOk("");
     setPanelTab("profile");
     try {
-      const [d, w, p, m, pkg, pkgs, tmpl, tf, subs] = await Promise.all([
+      const [d, w, p, m, pkg, pkgs, tmpl, tf, subs, stream] = await Promise.all([
         fetchAdminKitchen(id),
         fetchAdminKitchenWhatsApp(id),
         fetchAdminKitchenPaymentGateway(id),
@@ -951,14 +986,23 @@ function AdminKitchens({
           subscriptions: [] as AdminTiffinSubscription[],
           total: 0,
         })),
+        fetchAdminKitchenStreamSummary(id).catch(() => null),
       ]);
       setDetail(d);
+      setProfileName(d.name);
+      setProfileAddress(d.address_line ?? "");
+      setProfileCity(d.city ?? "");
+      setProfileState(d.state ?? "");
+      setProfilePincode(d.pincode ?? "");
+      setProfileLat(d.latitude != null ? String(d.latitude) : "");
+      setProfileLng(d.longitude != null ? String(d.longitude) : "");
       setWa(w);
       setKitchenPkg(pkg);
       setAllPackages(pkgs);
       setTemplates(tmpl);
       setTiffinSummary(tf);
       setTiffinSubs(subs.subscriptions);
+      setStreamSummary(stream);
       setGstProfile(null);
       setGstReport(null);
       setKitchenOrders([]);
@@ -971,7 +1015,8 @@ function AdminKitchens({
       setPorterAutoBook(d.porter_auto_book_enabled !== false);
       setPorterDelayMin(d.porter_auto_book_delay_min ?? 15);
       setPhoneId(w.whatsapp_phone_id ?? "");
-      setDisplayPhone(w.whatsapp_display_phone ?? "");
+      setDisplayPhone(phoneInputValue(w.whatsapp_display_phone ?? ""));
+      setDisplayPhoneError(undefined);
       setBrandTagline(d.branded_page?.tagline ?? "");
       setBrandAccent(d.branded_page?.accent_color ?? "#0F766E");
       setBrandLogoUrl(d.branded_page?.logo_url ?? null);
@@ -1162,12 +1207,18 @@ function AdminKitchens({
   const saveWhatsApp = async (e: FormEvent) => {
     e.preventDefault();
     if (!selectedId) return;
+    const phoneMessage = validateNationalPhone(displayPhone, undefined, { required: false });
+    setDisplayPhoneError(phoneMessage ?? undefined);
+    if (phoneMessage) {
+      setError(phoneMessage);
+      return;
+    }
     setBusy(true);
     setError("");
     try {
       const next = await upsertAdminKitchenWhatsApp(selectedId, {
         whatsapp_phone_id: phoneId.trim() || null,
-        whatsapp_display_phone: displayPhone.trim() || null,
+        whatsapp_display_phone: displayPhone ? toE164(displayPhone) : null,
       });
       setWa(next);
       await reloadList();
@@ -1187,6 +1238,7 @@ function AdminKitchens({
       setWa(next);
       setPhoneId("");
       setDisplayPhone("");
+      setDisplayPhoneError(undefined);
       await reloadList();
       setOk("WhatsApp disconnected for this kitchen.");
     } catch (err) {
@@ -1319,12 +1371,12 @@ function AdminKitchens({
                 >
                   Close
                 </button>
-                {detail.status !== "active" && (
+                {canWriteKitchen && detail.status !== "active" && (
                   <button type="button" className="btn btn--sm btn--primary" disabled={busy} onClick={() => setStatus(selectedId, "active")}>
                     Activate
                   </button>
                 )}
-                {detail.status === "active" && (
+                {canWriteKitchen && detail.status === "active" && (
                   <button type="button" className="btn btn--sm btn--ghost" disabled={busy} onClick={() => setStatus(selectedId, "suspended")}>
                     Suspend
                   </button>
@@ -1430,12 +1482,11 @@ function AdminKitchens({
             )}
 
             {panelTab === "profile" && (
-              <div className="admin-kitchen-panel__body">
+              <div className="admin-kitchen-panel__body owner-forms">
                 <p className="report-hint">{detail.platform_secrets_note}</p>
                 <dl className="admin-kv">
                   <div><dt>Owner phone</dt><dd>{detail.owner_phone}</dd></div>
-                  <div><dt>Address</dt><dd>{detail.address_line ?? "—"}</dd></div>
-                  <div><dt>State / PIN</dt><dd>{detail.state ?? "—"} / {detail.pincode ?? "—"}</dd></div>
+                  <div><dt>Kitchen code</dt><dd><code>{detail.code}</code> (permanent)</dd></div>
                   <div><dt>WhatsApp</dt><dd>{detail.whatsapp_connected ? "Linked" : "Not linked"}</dd></div>
                   <div><dt>Payment gateway</dt><dd>{detail.payment_gateway_configured ? "Configured" : "Not set"}</dd></div>
                   <div>
@@ -1459,6 +1510,84 @@ function AdminKitchens({
                     <dd>{detail.open_refund_count ?? 0}</dd>
                   </div>
                 </dl>
+                <form
+                  className="owner-form owner-form--wide"
+                  onSubmit={async (e) => {
+                    e.preventDefault();
+                    const lat = Number(profileLat);
+                    const lng = Number(profileLng);
+                    if (!Number.isFinite(lat) || !Number.isFinite(lng) || Math.abs(lat) > 90 || Math.abs(lng) > 180) {
+                      setError("Enter a valid latitude and longitude.");
+                      return;
+                    }
+                    setBusy(true);
+                    setError("");
+                    setOk("");
+                    try {
+                      const next = await updateAdminKitchenProfile(detail.id, {
+                        name: profileName.trim(),
+                        address_line: profileAddress.trim(),
+                        city: profileCity.trim(),
+                        state: profileState.trim(),
+                        pincode: profilePincode.trim() || null,
+                        latitude: lat,
+                        longitude: lng,
+                      });
+                      setDetail(next);
+                      setRows((current) =>
+                        current.map((row) =>
+                          row.id === next.id ? { ...row, name: next.name, city: next.city } : row,
+                        ),
+                      );
+                      setOk("Kitchen profile and map pin saved.");
+                    } catch (err) {
+                      setError(err instanceof Error ? err.message : "Could not save kitchen profile");
+                    } finally {
+                      setBusy(false);
+                    }
+                  }}
+                >
+                  <label>
+                    Kitchen name
+                    <input value={profileName} onChange={(e) => setProfileName(e.target.value)} required minLength={2} />
+                  </label>
+                  <label>
+                    Street address
+                    <input value={profileAddress} onChange={(e) => setProfileAddress(e.target.value)} required />
+                  </label>
+                  <div className="form-row">
+                    <label>
+                      City
+                      <input value={profileCity} onChange={(e) => setProfileCity(e.target.value)} required />
+                    </label>
+                    <label>
+                      State
+                      <input value={profileState} onChange={(e) => setProfileState(e.target.value)} required />
+                    </label>
+                  </div>
+                  <label>
+                    PIN
+                    <input value={profilePincode} onChange={(e) => setProfilePincode(e.target.value)} inputMode="numeric" maxLength={6} />
+                  </label>
+                  <div className="form-row">
+                    <label>
+                      Latitude
+                      <input value={profileLat} onChange={(e) => setProfileLat(e.target.value)} inputMode="decimal" required />
+                    </label>
+                    <label>
+                      Longitude
+                      <input value={profileLng} onChange={(e) => setProfileLng(e.target.value)} inputMode="decimal" required />
+                    </label>
+                  </div>
+                  <p className="report-hint">Changing city does not rename the kitchen code. Pin drives discovery and delivery quotes.</p>
+                  {canWriteKitchen ? (
+                    <button type="submit" className="btn btn--primary" disabled={busy}>
+                      {busy ? "Saving…" : "Save profile and map pin"}
+                    </button>
+                  ) : (
+                    <p className="report-hint">Needs kitchens:write to edit this kitchen.</p>
+                  )}
+                </form>
               </div>
             )}
 
@@ -1584,6 +1713,7 @@ function AdminKitchens({
                     placeholder="#0F766E"
                   />
                 </label>
+                {canWriteKitchen ? (
                 <div className="owner-forms__actions">
                   <button
                     type="button"
@@ -1612,6 +1742,9 @@ function AdminKitchens({
                     </button>
                   )}
                 </div>
+                ) : (
+                  <p className="report-hint">Needs kitchens:write to change brand content.</p>
+                )}
               </div>
             )}
 
@@ -1627,12 +1760,22 @@ function AdminKitchens({
                   Meta phone_number_id
                   <input value={phoneId} onChange={(e) => setPhoneId(e.target.value)} placeholder="1099…" autoComplete="off" />
                 </label>
-                <label>
-                  Display phone (E.164)
-                  <input value={displayPhone} onChange={(e) => setDisplayPhone(e.target.value)} placeholder="+91…" autoComplete="off" />
-                </label>
+                <PhoneField
+                  label="Display phone"
+                  value={displayPhone}
+                  onChange={(national) => {
+                    setDisplayPhone(national);
+                    setDisplayPhoneError(undefined);
+                  }}
+                  error={displayPhoneError}
+                  hint="The WhatsApp Business number customers see"
+                />
                 <div className="owner-forms__actions">
-                  <button type="submit" className="btn btn--primary" disabled={busy}>Save WhatsApp</button>
+                  {canWriteKitchen ? (
+                    <button type="submit" className="btn btn--primary" disabled={busy}>Save WhatsApp</button>
+                  ) : (
+                    <p className="report-hint">Needs kitchens:write to change WhatsApp IDs.</p>
+                  )}
                   {wa.connected && (
                     <button type="button" className="btn btn--ghost" disabled={busy} onClick={clearWhatsApp}>
                       Disconnect
@@ -1692,6 +1835,7 @@ function AdminKitchens({
                   <input type="checkbox" checked={pgwActive} onChange={(e) => setPgwActive(e.target.checked)} />
                   Active for this kitchen
                 </label>
+                {canWriteKitchen ? (
                 <div className="owner-forms__actions">
                   <button type="submit" className="btn btn--primary" disabled={busy}>Save payments</button>
                   {(pgw.key_id || pgw.key_secret_configured || pgw.linked_account_id) && (
@@ -1700,6 +1844,9 @@ function AdminKitchens({
                     </button>
                   )}
                 </div>
+                ) : (
+                  <p className="report-hint">Needs kitchens:write to change Razorpay keys.</p>
+                )}
               </form>
             )}
 
@@ -1725,6 +1872,7 @@ function AdminKitchens({
                     ))}
                   </select>
                 </label>
+                {canWritePackages ? (
                 <button
                   type="button"
                   className="btn btn--primary"
@@ -1749,6 +1897,9 @@ function AdminKitchens({
                 >
                   Assign & sync modules
                 </button>
+                ) : (
+                  <p className="report-hint">Needs packages:write to assign a package.</p>
+                )}
               </div>
             )}
 
@@ -1789,9 +1940,59 @@ function AdminKitchens({
             {panelTab === "streaming" && modules && (
               <div className="admin-kitchen-panel__body">
                 <p className="report-hint">
-                  Per-dish go-live (ingredients → prep → prepared) lives on the owner Stream page.
-                  Toggle streaming / livekit modules here for ops kill-switch.
+                  Live session summary for support (no publisher token). Kill-switch is the module
+                  flags below — owner go-live lives on the kitchen Stream page.
                 </p>
+                {streamSummary ? (
+                  <dl className="admin-kv">
+                    <div>
+                      <dt>Owner opt-in</dt>
+                      <dd>{streamSummary.settings.live_sharing_enabled ? "On" : "Off"}</dd>
+                    </div>
+                    <div>
+                      <dt>Live now</dt>
+                      <dd>{streamSummary.settings.is_live ? "Yes" : "No"}</dd>
+                    </div>
+                    <div>
+                      <dt>LiveKit configured</dt>
+                      <dd>{streamSummary.settings.livekit_configured ? "Yes" : "No"}</dd>
+                    </div>
+                    <div>
+                      <dt>Q&A</dt>
+                      <dd>{streamSummary.settings.q_and_a_enabled ? "On" : "Off"}</dd>
+                    </div>
+                    {streamSummary.current_session ? (
+                      <>
+                        <div>
+                          <dt>Session</dt>
+                          <dd>{streamSummary.current_session.title}</dd>
+                        </div>
+                        <div>
+                          <dt>Status</dt>
+                          <dd>{streamSummary.current_session.status}</dd>
+                        </div>
+                        <div>
+                          <dt>Viewers</dt>
+                          <dd>{streamSummary.current_session.viewer_count}</dd>
+                        </div>
+                        <div>
+                          <dt>Dish / phase</dt>
+                          <dd>
+                            {streamSummary.current_session.dish_name ?? "—"} ·{" "}
+                            {streamSummary.current_session.showcase_phase}
+                          </dd>
+                        </div>
+                      </>
+                    ) : (
+                      <div>
+                        <dt>Session</dt>
+                        <dd>No live session</dd>
+                      </div>
+                    )}
+                  </dl>
+                ) : (
+                  <p className="report-hint">Stream summary unavailable (needs streaming:read).</p>
+                )}
                 <ul className="report-rank">
                   {modules.modules
                     .filter((m) => m.module_key === "streaming" || m.module_key === "livekit")
@@ -1799,14 +2000,18 @@ function AdminKitchens({
                       <li key={m.module_key}>
                         <div className="report-rank__row">
                           <span><strong>{m.module_key}</strong></span>
-                          <button
-                            type="button"
-                            className={`btn btn--sm ${m.enabled ? "btn--ghost" : "btn--primary"}`}
-                            disabled={busy}
-                            onClick={() => toggleModule(m.module_key, !m.enabled)}
-                          >
-                            {m.enabled ? "Disable" : "Enable"}
-                          </button>
+                          {canWriteKitchen ? (
+                            <button
+                              type="button"
+                              className={`btn btn--sm ${m.enabled ? "btn--ghost" : "btn--primary"}`}
+                              disabled={busy}
+                              onClick={() => toggleModule(m.module_key, !m.enabled)}
+                            >
+                              {m.enabled ? "Disable" : "Enable"}
+                            </button>
+                          ) : (
+                            <span>{m.enabled ? "Enabled" : "Disabled"}</span>
+                          )}
                         </div>
                       </li>
                     ))}
@@ -1825,6 +2030,7 @@ function AdminKitchens({
                   <li key={m.module_key}>
                     <div className="report-rank__row">
                       <span><strong>{m.module_key}</strong></span>
+                      {canWriteKitchen ? (
                       <button
                         type="button"
                         className={`btn btn--sm ${m.enabled ? "btn--ghost" : "btn--primary"}`}
@@ -1833,6 +2039,9 @@ function AdminKitchens({
                       >
                         {m.enabled ? "Disable" : "Enable"}
                       </button>
+                      ) : (
+                        <span>{m.enabled ? "Enabled" : "Disabled"}</span>
+                      )}
                     </div>
                   </li>
                 ))}
@@ -1873,6 +2082,8 @@ function AdminKitchens({
                           </span>
                         </div>
                         <div className="owner-actions">
+                          {canWriteKitchen && (
+                          <>
                           <button
                             type="button"
                             className="btn btn--sm btn--primary"
@@ -1933,6 +2144,8 @@ function AdminKitchens({
                           >
                             Deny
                           </button>
+                          </>
+                          )}
                         </div>
                       </li>
                     ))}
@@ -2131,6 +2344,7 @@ function AdminKitchens({
                     onChange={(e) => setPorterDelayMin(Number(e.target.value) || 15)}
                   />
                 </label>
+                {canWriteKitchen ? (
                 <button
                   type="button"
                   className="btn btn--primary btn--sm"
@@ -2155,6 +2369,9 @@ function AdminKitchens({
                 >
                   Save delivery settings
                 </button>
+                ) : (
+                  <p className="report-hint">Needs kitchens:write to change delivery settings.</p>
+                )}
               </div>
             )}
           </section>

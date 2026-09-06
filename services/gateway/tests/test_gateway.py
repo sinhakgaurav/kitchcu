@@ -11,7 +11,6 @@ os.environ.setdefault("RATINGS_SERVICE_URL", "http://ratings:8007")
 os.environ.setdefault("GROWTH_SERVICE_URL", "http://growth:8008")
 os.environ.setdefault("DELIVERY_SERVICE_URL", "http://delivery:8009")
 
-import json
 from unittest.mock import AsyncMock
 
 import pytest
@@ -70,6 +69,8 @@ def test_resolve_service_url_catalog():
     assert resolve_service_url("/api/v1/kitchens/abc/prep-batches") == settings.catalog_service_url
     assert resolve_service_url("/api/v1/kitchens/abc/stock-settings") == settings.catalog_service_url
     assert resolve_service_url("/api/v1/kitchens/me") == settings.identity_service_url
+    assert resolve_service_url("/api/v1/kitchens/abc/profile") == settings.identity_service_url
+    assert resolve_service_url("/api/v1/admin/kitchens/abc/profile") == settings.identity_service_url
 
 
 def test_resolve_service_url_order():
@@ -160,6 +161,20 @@ def test_resolve_service_url_marketing():
     )
 
 
+def test_resolve_service_url_streaming_admin():
+    from ckac_common.config import get_settings
+
+    settings = get_settings()
+    assert (
+        resolve_service_url("/api/v1/admin/kitchens/abc/stream/summary")
+        == settings.streaming_service_url
+    )
+    assert (
+        resolve_service_url("/api/v1/kitchens/abc/stream/settings")
+        == settings.streaming_service_url
+    )
+
+
 def test_resolve_service_url_ratings():
     from ckac_common.config import get_settings
 
@@ -169,7 +184,7 @@ def test_resolve_service_url_ratings():
         == settings.ratings_service_url
     )
     assert (
-        resolve_service_url(f"/api/v1/kitchens/abc/dishes/xyz/ratings/summary")
+        resolve_service_url("/api/v1/kitchens/abc/dishes/xyz/ratings/summary")
         == settings.ratings_service_url
     )
     assert resolve_service_url("/api/v1/kitchens/abc/suggestions") == settings.ratings_service_url

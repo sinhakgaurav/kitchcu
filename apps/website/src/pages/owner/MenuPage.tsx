@@ -8,7 +8,7 @@ import { OwnerEmpty, OwnerPageShell } from "../../components/owner/OwnerPageShel
 import {
   fetchGoldenRecipes,
   fetchGrowthSuggestions,
-  fetchMenu,
+  fetchOwnerDishes,
   updateDish,
   type Dish,
   type GoldenRecipePin,
@@ -38,7 +38,7 @@ export function MenuPage() {
   const reload = async () => {
     if (!kitchen) return;
     const [m, sug, pins] = await Promise.all([
-      fetchMenu(kitchen.id),
+      fetchOwnerDishes(kitchen.id),
       fetchGrowthSuggestions(kitchen.id).catch(() => ({ suggestions: [] as GrowthSuggestion[] })),
       fetchGoldenRecipes(kitchen.id).catch(() => ({ pins: [] as GoldenRecipePin[] })),
     ]);

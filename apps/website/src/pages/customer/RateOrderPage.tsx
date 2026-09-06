@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import type { Order } from "../../shared/api";
 import { getCustomerToken } from "../../shared/customerApi";
 import { useCustomerAuth } from "../../shared/customerAuth";
-import { fetchMyOrders } from "../../shared/customerCheckoutApi";
+import { fetchMyOrder } from "../../shared/customerCheckoutApi";
 import { submitOrderRatings, type DishRatingInput } from "../../shared/customerRatingsApi";
 
 type ItemRating = {
@@ -27,10 +27,8 @@ export function RateOrderPage() {
 
   useEffect(() => {
     if (!token || !orderId) return;
-    fetchMyOrders()
-      .then(({ orders }) => {
-        const found = orders.find((o) => o.id === orderId);
-        if (!found) throw new Error("Order not found");
+    fetchMyOrder(orderId)
+      .then((found) => {
         if (found.status !== "delivered") throw new Error("Only delivered orders can be rated");
         setOrder(found);
         setRatings(
@@ -46,7 +44,10 @@ export function RateOrderPage() {
       .catch((err) => setError(err instanceof Error ? err.message : "Could not load order"));
   }, [token, orderId]);
 
-  if (!loading && !token) {
+  if (loading) {
+    return <p className="app-loading">Checking sign-in…</p>;
+  }
+  if (!token) {
     return <Navigate to={`/login?next=/orders/${orderId}/rate`} replace />;
   }
 

@@ -67,6 +67,34 @@ async def test_kitchen_created_writes_outbox(client: AsyncClient, auth_headers: 
 
 
 @pytest.mark.asyncio
+async def test_kitchen_updated_publishes_redis_event(client: AsyncClient, auth_headers: dict):
+    from app.main import redis_client
+
+    created = await client.post("/api/v1/kitchens", json=KITCHEN_PAYLOAD, headers=auth_headers)
+    assert created.status_code == 201
+    kitchen_id = created.json()["id"]
+
+    if redis_client:
+        await redis_client.delete("ckac:identity:kitchen")
+
+    response = await client.patch(
+        f"/api/v1/kitchens/{kitchen_id}/profile",
+        json={"name": "Updated Event Kitchen", "city": "Pune"},
+        headers=auth_headers,
+    )
+    assert response.status_code == 200
+
+    assert redis_client is not None
+    messages = await redis_client.xread({"ckac:identity:kitchen": "0-0"}, count=10)
+    assert len(messages) >= 1
+    _stream, entries = messages[0]
+    event_data = json.loads(entries[-1][1]["data"])
+    assert event_data["event_type"] == "kitchen.updated"
+    assert event_data["aggregate_id"] == kitchen_id
+    assert event_data["payload"]["name"] == "Updated Event Kitchen"
+
+
+@pytest.mark.asyncio
 async def test_kitchen_whatsapp_updated_publishes_event(client: AsyncClient, auth_headers: dict):
     from app.main import redis_client
 

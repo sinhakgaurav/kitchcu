@@ -12,6 +12,15 @@ import {
   type SupportChatOption,
   type TicketCategory,
 } from "../lib/supportApi";
+import { PhoneField } from "./PhoneField";
+import {
+  firstError,
+  toE164,
+  validateEmail,
+  validateNationalPhone,
+  validatePersonName,
+  validateText,
+} from "../shared/validation";
 
 type Message = {
   id: string;
@@ -35,6 +44,14 @@ function greeting(audience: ChatAudience): Message {
   };
 }
 
+type TicketErrors = {
+  subject?: string;
+  description?: string;
+  name?: string;
+  phone?: string;
+  email?: string;
+};
+
 const CATEGORIES: { value: TicketCategory; label: string }[] = [
   { value: "order_issue", label: "Order issue" },
   { value: "delivery", label: "Delivery" },
@@ -57,6 +74,8 @@ export function SupportChat() {
   const [showTicketForm, setShowTicketForm] = useState(false);
   const [ticketDone, setTicketDone] = useState<string | null>(null);
   const [activeOptions, setActiveOptions] = useState<SupportChatOption[]>(starterOptions("owner"));
+  const [ticketPhone, setTicketPhone] = useState("");
+  const [ticketErrors, setTicketErrors] = useState<TicketErrors>({});
   const listRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -127,18 +146,35 @@ export function SupportChat() {
 
   const handleTicketSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    const fd = new FormData(e.currentTarget);
+    const subject = String(fd.get("subject") || "").trim();
+    const description = String(fd.get("description") || "").trim();
+    const name = String(fd.get("name") || "").trim();
+    const email = String(fd.get("email") || "").trim();
+    const nextErrors: TicketErrors = {
+      subject: validateText(subject, "a subject", { min: 3, max: 120 }) ?? undefined,
+      description: validateText(description, "a message", { min: 10, max: 2000 }) ?? undefined,
+      name: validatePersonName(name, { required: false }) ?? undefined,
+      phone: validateNationalPhone(ticketPhone, undefined, { required: false }) ?? undefined,
+      email: validateEmail(email, { required: false }) ?? undefined,
+    };
+    setTicketErrors(nextErrors);
+    const firstMessage = firstError(nextErrors);
+    if (firstMessage) {
+      setError(firstMessage);
+      return;
+    }
     setBusy(true);
     setError("");
-    const fd = new FormData(e.currentTarget);
     try {
       const ticket = await createSupportTicket({
         audience,
         category: (fd.get("category") as TicketCategory) || suggestedCategory,
-        subject: String(fd.get("subject")),
-        description: String(fd.get("description")),
-        customer_name: String(fd.get("name") || "") || undefined,
-        customer_phone: String(fd.get("phone") || "") || undefined,
-        customer_email: String(fd.get("email") || "") || undefined,
+        subject,
+        description,
+        customer_name: name || undefined,
+        customer_phone: ticketPhone ? toE164(ticketPhone) : undefined,
+        customer_email: email || undefined,
         order_code: String(fd.get("order_code") || "") || undefined,
         chat_history: messages
           .filter((m) => m.id !== "greeting")
@@ -147,6 +183,8 @@ export function SupportChat() {
       setTicketDone(ticket.ticket_number);
       setShowTicketForm(false);
       setSuggestTicket(false);
+      setTicketPhone("");
+      setTicketErrors({});
       setMessages((prev) => [
         ...prev,
         {
@@ -268,13 +306,30 @@ export function SupportChat() {
                 <input
                   name="subject"
                   required
+                  maxLength={120}
                   placeholder="Brief summary"
                   defaultValue={messages.filter((m) => m.role === "user").at(-1)?.content.slice(0, 80)}
+                  className={ticketErrors.subject ? "input-invalid" : undefined}
+                  aria-invalid={Boolean(ticketErrors.subject)}
                 />
+                {ticketErrors.subject ? (
+                  <span className="field-error">{ticketErrors.subject}</span>
+                ) : null}
               </label>
               <label>
                 Details
-                <textarea name="description" required rows={3} placeholder="Describe the issue..." />
+                <textarea
+                  name="description"
+                  required
+                  rows={3}
+                  maxLength={2000}
+                  placeholder="Describe the issue..."
+                  className={ticketErrors.description ? "input-invalid" : undefined}
+                  aria-invalid={Boolean(ticketErrors.description)}
+                />
+                {ticketErrors.description ? (
+                  <span className="field-error">{ticketErrors.description}</span>
+                ) : null}
               </label>
               <label>
                 Order code (if order-related)
@@ -282,15 +337,36 @@ export function SupportChat() {
               </label>
               <label>
                 Your name
-                <input name="name" placeholder="Optional" />
+                <input
+                  name="name"
+                  placeholder="Optional"
+                  className={ticketErrors.name ? "input-invalid" : undefined}
+                  aria-invalid={Boolean(ticketErrors.name)}
+                />
+                {ticketErrors.name ? <span className="field-error">{ticketErrors.name}</span> : null}
               </label>
-              <label>
-                Phone
-                <input name="phone" placeholder="+91..." />
-              </label>
+              <PhoneField
+                label="Phone"
+                value={ticketPhone}
+                onChange={(national) => {
+                  setTicketPhone(national);
+                  setTicketErrors((f) => ({ ...f, phone: undefined }));
+                }}
+                error={ticketErrors.phone}
+                hint="Optional — helps support call you back"
+              />
               <label>
                 Email
-                <input name="email" type="email" placeholder="Optional" />
+                <input
+                  name="email"
+                  type="email"
+                  placeholder="Optional"
+                  className={ticketErrors.email ? "input-invalid" : undefined}
+                  aria-invalid={Boolean(ticketErrors.email)}
+                />
+                {ticketErrors.email ? (
+                  <span className="field-error">{ticketErrors.email}</span>
+                ) : null}
               </label>
               <div className="support-chat__ticket-actions">
                 <button type="button" className="btn btn--ghost btn--sm" onClick={() => setShowTicketForm(false)}>

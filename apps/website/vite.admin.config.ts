@@ -2,6 +2,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
+import { spaIndex } from "./viteSpaIndex";
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 
@@ -14,7 +15,7 @@ const apiProxy = {
 
 export default defineConfig({
   envDir: repoRoot,
-  plugins: [react()],
+  plugins: [react(), spaIndex("admin.html")],
   server: {
     port: 13003,
     strictPort: true,

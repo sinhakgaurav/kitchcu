@@ -105,8 +105,12 @@ async def client() -> AsyncClient:
 
 @pytest.fixture
 def unique_phone() -> str:
-    """10-digit local number — normalized to +91 by API."""
-    return str(uuid.uuid4().int % 9000000000 + 1000000000)
+    """10-digit local number — normalized to +91 by API.
+
+    India mobiles start with 6-9, which the register/OTP validators enforce, so the
+    random number must stay inside that block.
+    """
+    return str(uuid.uuid4().int % 4_000_000_000 + 6_000_000_000)
 
 
 @pytest.fixture

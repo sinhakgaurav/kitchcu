@@ -4,19 +4,25 @@ import { useTranslation } from "react-i18next";
 import { AnimatedMesh } from "../components/AnimatedMesh";
 import { AuthLoginHighlights } from "../components/AuthLoginHighlights";
 import { BrandAuthArt, BrandLogo } from "../components/BrandLogo";
+import { PhoneField } from "../components/PhoneField";
 import { PolicyAgreement } from "../components/PolicyAgreement";
 import { DEMO, DEMO_OWNERS, type DemoOwnerAccount } from "../shared/demo";
+import { showDemoCredentials } from "../shared/env";
+import { registerOwner, requestOtp, verifyOtp } from "../shared/api";
 import {
-  normalizeEmail,
-  normalizePersonName,
-  normalizePhone,
-  registerOwner,
-  requestOtp,
-  verifyOtp,
-} from "../shared/api";
+  firstError,
+  otpInputValue,
+  phoneInputValue,
+  toE164,
+  validateEmail,
+  validateNationalPhone,
+  validateOtp,
+  validatePersonName,
+} from "../shared/validation";
 import { KITCHEN_HOST, CUSTOMER_HOST } from "../shared/brand";
 import { useKitchenAuth } from "../shared/kitchenAuth";
 import { customerUrl } from "../shared/urls";
+import { SuperAdminCredentials } from "../components/SuperAdminAccess";
 
 type Mode = "login" | "register";
 
@@ -36,8 +42,14 @@ export function LoginPage() {
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [busyPhone, setBusyPhone] = useState<string | null>(null);
+  const demoVisible = showDemoCredentials();
   const [policiesAgreed, setPoliciesAgreed] = useState(false);
-  const [fieldErrors, setFieldErrors] = useState<{ name?: string; phone?: string; email?: string }>({});
+  const [fieldErrors, setFieldErrors] = useState<{
+    name?: string;
+    phone?: string;
+    email?: string;
+    otp?: string;
+  }>({});
 
   if (token) return <Navigate to={nextPath.startsWith("/") ? nextPath : "/dashboard"} replace />;
 
@@ -48,33 +60,22 @@ export function LoginPage() {
       return;
     }
     setError("");
-    const nextErrors: typeof fieldErrors = {};
-    try {
-      normalizePersonName(name);
-    } catch (err) {
-      nextErrors.name = err instanceof Error ? err.message : "Invalid name";
-    }
-    try {
-      normalizePhone(phone);
-    } catch (err) {
-      nextErrors.phone = err instanceof Error ? err.message : "Invalid phone";
-    }
-    if (email.trim()) {
-      try {
-        normalizeEmail(email);
-      } catch (err) {
-        nextErrors.email = err instanceof Error ? err.message : "Invalid email";
-      }
-    }
+    const nextErrors: typeof fieldErrors = {
+      name: validatePersonName(name) ?? undefined,
+      phone: validateNationalPhone(phone) ?? undefined,
+      email: validateEmail(email, { required: false }) ?? undefined,
+    };
     setFieldErrors(nextErrors);
-    if (Object.keys(nextErrors).length) {
-      setError(Object.values(nextErrors)[0] || "Fix the highlighted fields");
+    const firstMessage = firstError(nextErrors);
+    if (firstMessage) {
+      setError(firstMessage);
       return;
     }
     setBusy(true);
     try {
-      await registerOwner({ phone, name, email: email || undefined });
-      await requestOtp(normalizePhone(phone));
+      const e164 = toE164(phone);
+      await registerOwner({ phone: e164, name, email: email || undefined });
+      await requestOtp(e164);
       setOtpSent(true);
       setMode("login");
     } catch (err) {
@@ -87,18 +88,15 @@ export function LoginPage() {
   const handleRequestOtp = async (e: FormEvent) => {
     e.preventDefault();
     setError("");
-    try {
-      normalizePhone(phone);
-      setFieldErrors({});
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : "Invalid phone";
-      setFieldErrors({ phone: msg });
-      setError(msg);
+    const phoneMessage = validateNationalPhone(phone);
+    setFieldErrors(phoneMessage ? { phone: phoneMessage } : {});
+    if (phoneMessage) {
+      setError(phoneMessage);
       return;
     }
     setBusy(true);
     try {
-      await requestOtp(normalizePhone(phone));
+      await requestOtp(toE164(phone));
       setOtpSent(true);
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Could not send OTP";
@@ -115,11 +113,21 @@ export function LoginPage() {
   const handleVerify = async (e: FormEvent) => {
     e.preventDefault();
     setError("");
+    const nextErrors: typeof fieldErrors = {
+      phone: validateNationalPhone(phone) ?? undefined,
+      otp: validateOtp(otp) ?? undefined,
+    };
+    setFieldErrors(nextErrors);
+    const firstMessage = firstError(nextErrors);
+    if (firstMessage) {
+      setError(firstMessage);
+      return;
+    }
     setBusy(true);
     try {
-      const { access_token } = await verifyOtp(normalizePhone(phone), otp);
+      const { access_token } = await verifyOtp(toE164(phone), otp);
       await login(access_token);
-      navigate(nextPath.startsWith("/") ? nextPath : "/dashboard");
+      navigate(nextPath.startsWith("/") ? nextPath : "/dashboard/orders");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Invalid OTP");
     } finally {
@@ -132,14 +140,15 @@ export function LoginPage() {
     setBusy(true);
     setBusyPhone(account.phone);
     setMode("login");
-    setPhone(account.phone);
+    setPhone(phoneInputValue(account.phone));
     setOtp(DEMO.otp);
+    setFieldErrors({});
     try {
       await requestOtp(account.phone);
       setOtpSent(true);
       const { access_token } = await verifyOtp(account.phone, DEMO.otp);
       await login(access_token);
-      navigate(nextPath.startsWith("/") ? nextPath : "/dashboard");
+      navigate(nextPath.startsWith("/") ? nextPath : "/dashboard/orders");
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Demo login failed";
       const backendDown =
@@ -210,9 +219,16 @@ export function LoginPage() {
                 <input
                   value={name}
                   onChange={(e) => {
-                    setName(e.target.value);
-                    setFieldErrors((f) => ({ ...f, name: undefined }));
+                    const next = e.target.value;
+                    setName(next);
+                    setFieldErrors((f) => ({
+                      ...f,
+                      name: next.trim() ? validatePersonName(next) ?? undefined : undefined,
+                    }));
                   }}
+                  onBlur={() =>
+                    setFieldErrors((f) => ({ ...f, name: validatePersonName(name) ?? undefined }))
+                  }
                   required
                   placeholder="Raj Sharma"
                   className={fieldErrors.name ? "input-invalid" : undefined}
@@ -220,32 +236,47 @@ export function LoginPage() {
                 />
                 {fieldErrors.name ? <span className="field-error">{fieldErrors.name}</span> : null}
               </label>
-              <label>
-                {t("owner.auth.phone")}
-                <input
-                  value={phone}
-                  onChange={(e) => {
-                    setPhone(e.target.value);
-                    setFieldErrors((f) => ({ ...f, phone: undefined }));
-                  }}
-                  required
-                  placeholder={DEMO.phone}
-                  inputMode="numeric"
-                  autoComplete="tel"
-                  className={fieldErrors.phone ? "input-invalid" : undefined}
-                  aria-invalid={Boolean(fieldErrors.phone)}
-                />
-                {fieldErrors.phone ? <span className="field-error">{fieldErrors.phone}</span> : null}
-              </label>
+              <PhoneField
+                label={t("owner.auth.phone")}
+                value={phone}
+                onChange={(national) => {
+                  setPhone(national);
+                  setFieldErrors((f) => ({
+                    ...f,
+                    phone: national ? validateNationalPhone(national) ?? undefined : undefined,
+                  }));
+                }}
+                onBlur={() =>
+                  setFieldErrors((f) => ({
+                    ...f,
+                    phone: validateNationalPhone(phone) ?? undefined,
+                  }))
+                }
+                error={fieldErrors.phone}
+                required
+                placeholder={DEMO.phone}
+              />
               <label>
                 {t("owner.auth.email")}
                 <input
                   type="email"
                   value={email}
                   onChange={(e) => {
-                    setEmail(e.target.value);
-                    setFieldErrors((f) => ({ ...f, email: undefined }));
+                    const next = e.target.value;
+                    setEmail(next);
+                    setFieldErrors((f) => ({
+                      ...f,
+                      email: next.trim()
+                        ? validateEmail(next, { required: false }) ?? undefined
+                        : undefined,
+                    }));
                   }}
+                  onBlur={() =>
+                    setFieldErrors((f) => ({
+                      ...f,
+                      email: validateEmail(email, { required: false }) ?? undefined,
+                    }))
+                  }
                   placeholder={DEMO.email}
                   className={fieldErrors.email ? "input-invalid" : undefined}
                   aria-invalid={Boolean(fieldErrors.email)}
@@ -268,30 +299,49 @@ export function LoginPage() {
           ) : (
             <form onSubmit={otpSent ? handleVerify : handleRequestOtp}>
               <h2>{t("owner.auth.titleLogin")}</h2>
-              <p className="auth-card__hint">
-                {t("owner.auth.demoHint", { otp: DEMO.otp })}
-              </p>
-              <label>
-                {t("owner.auth.phone")}
-                <input
-                  value={phone}
-                  onChange={(e) => {
-                    setPhone(e.target.value);
-                    setFieldErrors((f) => ({ ...f, phone: undefined }));
-                  }}
-                  required
-                  placeholder={DEMO.phone}
-                  inputMode="numeric"
-                  autoComplete="tel"
-                  className={fieldErrors.phone ? "input-invalid" : undefined}
-                  aria-invalid={Boolean(fieldErrors.phone)}
-                />
-                {fieldErrors.phone ? <span className="field-error">{fieldErrors.phone}</span> : null}
-              </label>
+              {demoVisible ? (
+                <p className="auth-card__hint">
+                  {t("owner.auth.demoHint", { otp: DEMO.otp })}
+                </p>
+              ) : null}
+              <PhoneField
+                label={t("owner.auth.phone")}
+                value={phone}
+                onChange={(national) => {
+                  setPhone(national);
+                  setFieldErrors((f) => ({
+                    ...f,
+                    phone: national ? validateNationalPhone(national) ?? undefined : undefined,
+                  }));
+                }}
+                onBlur={() =>
+                  setFieldErrors((f) => ({
+                    ...f,
+                    phone: validateNationalPhone(phone) ?? undefined,
+                  }))
+                }
+                error={fieldErrors.phone}
+                required
+                placeholder={DEMO.phone}
+              />
               {otpSent && (
                 <label>
                   {t("owner.auth.otp")}
-                  <input value={otp} onChange={(e) => setOtp(e.target.value)} required placeholder={DEMO.otp} maxLength={6} />
+                  <input
+                    value={otp}
+                    onChange={(e) => {
+                      setOtp(otpInputValue(e.target.value));
+                      setFieldErrors((f) => ({ ...f, otp: undefined }));
+                    }}
+                    required
+                    inputMode="numeric"
+                    autoComplete="one-time-code"
+                    placeholder={DEMO.otp}
+                    maxLength={6}
+                    className={fieldErrors.otp ? "input-invalid" : undefined}
+                    aria-invalid={Boolean(fieldErrors.otp)}
+                  />
+                  {fieldErrors.otp ? <span className="field-error">{fieldErrors.otp}</span> : null}
                 </label>
               )}
               <button type="submit" className="btn btn--primary btn--lg" disabled={busy}>
@@ -305,6 +355,7 @@ export function LoginPage() {
             </form>
           )}
 
+          {demoVisible ? (
           <details className="auth-card__demo">
             <summary>Demo owner accounts · OTP <code>{DEMO.otp}</code></summary>
             <p className="auth-card__demo-otp">One-click sign-in for local / GCP demos</p>
@@ -334,6 +385,9 @@ export function LoginPage() {
               Requires healthy API (<code>identity:true</code>). Seed only after that.
             </p>
           </details>
+          ) : null}
+
+          <SuperAdminCredentials />
 
           <p className="auth-card__demo-note">
             Looking for menus? <a href={customerUrl("/")} target="_blank" rel="noopener noreferrer">Go to {CUSTOMER_HOST} →</a>

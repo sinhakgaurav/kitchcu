@@ -17,8 +17,10 @@ from app.schemas import (
     build_menu_grouped,
     create_dish,
     dish_with_media,
+    DishListResponse,
     list_categories,
     list_cuisines,
+    list_owner_dishes,
     get_menu,
     update_dish,
 )
@@ -208,6 +210,28 @@ async def menu_get(
         diet_categories=base.diet_categories,
         highlight_sections=build_highlight_sections(filtered),
     )
+
+
+@router.get(
+    "/kitchens/{kitchen_id}/dishes",
+    response_model=DishListResponse,
+    tags=[TAG_DISHES],
+    summary="List kitchen dishes (owner, includes hidden)",
+    description=(
+        "Owner-only — every dish for this kitchen, including inactive drafts that the "
+        "public menu hides (bulk import / drinks with no live-capture hero yet). "
+        "Filter with `is_active=true|false`."
+    ),
+    responses=auth_errors(include_403=True),
+)
+async def dish_list(
+    kitchen_id: uuid.UUID,
+    owner_id: Annotated[uuid.UUID, Depends(get_current_owner_id)],
+    session: Annotated[AsyncSession, Depends(get_db)],
+    is_active: Annotated[bool | None, Query()] = None,
+) -> DishListResponse:
+    await verify_kitchen_owner(kitchen_id, owner_id, session)
+    return await list_owner_dishes(session, kitchen_id, is_active=is_active)
 
 
 @router.post(

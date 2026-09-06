@@ -1,5 +1,5 @@
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
-import { Link, Navigate } from "react-router-dom";
+import { Link, Navigate, useNavigate, useSearchParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import {
   fetchCustomerProfile,
@@ -8,14 +8,17 @@ import {
   type CustomerProfile,
 } from "../../shared/customerApi";
 import {
+  cancelMySubscription,
   changeMyPassword,
   createMyTicket,
   deleteAddress,
   fetchCustomerDashboard,
   fetchMyAddresses,
   fetchMyRefunds,
+  fetchMySubscriptions,
   fetchMyTickets,
   saveAddress,
+  updateMyNotificationPrefs,
   updateMyProfile,
   type CustomerAddress,
   type CustomerDashboard,
@@ -32,11 +35,22 @@ import {
   uploadCustomerReferralCsv,
   type ReferralDashboard,
 } from "../../shared/referralApi";
+import type { CustomerKitchenSubscription } from "../../shared/api";
+import { useCustomerAuth } from "../../shared/customerAuth";
+import { addItemsToCart, kitchenFromOrderCode } from "../../shared/customerCart";
+import { PhoneField } from "../../components/PhoneField";
 import {
-  cancelMySubscription,
-  fetchMySubscriptions,
-  type CustomerKitchenSubscription,
-} from "../../shared/api";
+  firstError,
+  otpInputValue,
+  pincodeInputValue,
+  toE164,
+  validateEmail,
+  validateNationalPhone,
+  validateOtp,
+  validatePersonName,
+  validatePincode,
+  validateText,
+} from "../../shared/validation";
 
 type Tab =
   | "overview"
@@ -54,19 +68,34 @@ const PRIMARY_TABS: { id: Tab; labelKey: string }[] = [
   { id: "overview", labelKey: "customer.dashboard.tabOverview" },
   { id: "orders", labelKey: "customer.dashboard.tabOrders" },
   { id: "addresses", labelKey: "customer.dashboard.tabAddresses" },
-  { id: "complaints", labelKey: "customer.dashboard.tabComplaints" },
+  { id: "account", labelKey: "customer.dashboard.tabAccount" },
 ];
 
 const MORE_TABS: { id: Tab; labelKey: string }[] = [
+  { id: "complaints", labelKey: "customer.dashboard.tabComplaints" },
   { id: "plans", labelKey: "customer.dashboard.tabPlans" },
   { id: "savings", labelKey: "customer.dashboard.tabSavings" },
   { id: "referrals", labelKey: "customer.dashboard.tabReferrals" },
   { id: "health", labelKey: "customer.dashboard.tabHealth" },
   { id: "refunds", labelKey: "customer.dashboard.tabRefunds" },
-  { id: "account", labelKey: "customer.dashboard.tabAccount" },
 ];
 
-const TABS = [...PRIMARY_TABS, ...MORE_TABS];
+const ALL_TABS: Tab[] = [
+  "overview",
+  "orders",
+  "plans",
+  "savings",
+  "referrals",
+  "health",
+  "refunds",
+  "complaints",
+  "addresses",
+  "account",
+];
+
+function isTab(value: string | null): value is Tab {
+  return Boolean(value && ALL_TABS.includes(value as Tab));
+}
 
 const inr = (n: number) => `₹${Math.round(n).toLocaleString("en-IN")}`;
 
@@ -85,7 +114,11 @@ function formatWhen(iso: string): string {
 export function CustomerDashboardPage() {
   const { t } = useTranslation();
   const token = getCustomerToken();
-  const [tab, setTab] = useState<Tab>("overview");
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [tab, setTab] = useState<Tab>(() => {
+    const requested = searchParams.get("tab");
+    return isTab(requested) ? requested : "overview";
+  });
   const [dash, setDash] = useState<CustomerDashboard | null>(null);
   const [diet, setDiet] = useState("");
   const [cuisine, setCuisine] = useState("");
@@ -146,6 +179,30 @@ export function CustomerDashboardPage() {
     loadDash().catch(() => undefined);
   }, [diet, cuisine, liveOnly]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  useEffect(() => {
+    const requested = searchParams.get("tab");
+    if (isTab(requested) && requested !== tab) setTab(requested);
+  }, [searchParams, tab]);
+
+  useEffect(() => {
+    if (tab !== "account") return;
+    if (window.location.hash !== "#notifications") return;
+    document.getElementById("notifications")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [tab, loading]);
+
+  const selectTab = (next: Tab) => {
+    setTab(next);
+    setSearchParams(
+      (prev) => {
+        const nextParams = new URLSearchParams(prev);
+        if (next === "overview") nextParams.delete("tab");
+        else nextParams.set("tab", next);
+        return nextParams;
+      },
+      { replace: true },
+    );
+  };
+
   if (!token) {
     return <Navigate to="/login?next=/dashboard" replace />;
   }
@@ -178,7 +235,7 @@ export function CustomerDashboardPage() {
             key={item.id}
             type="button"
             className={tab === item.id ? "active" : ""}
-            onClick={() => setTab(item.id)}
+            onClick={() => selectTab(item.id)}
           >
             {t(item.labelKey)}
           </button>
@@ -189,7 +246,7 @@ export function CustomerDashboardPage() {
             value={MORE_TABS.some((m) => m.id === tab) ? tab : ""}
             onChange={(e) => {
               const next = e.target.value as Tab;
-              if (next) setTab(next);
+              if (next) selectTab(next);
             }}
             aria-label={t("customer.dashboard.moreTabs")}
           >
@@ -407,10 +464,24 @@ function OrderCard({
   row: DashboardOrder;
   onRaiseIssue: (orderCode: string) => void;
 }) {
+  const navigate = useNavigate();
   const media = useMemo(
     () => row.items.flatMap((i) => i.media.filter((m) => m.url)).slice(0, 6),
     [row.items],
   );
+  const onRepeat = () => {
+    if (!row.items.length || row.order.status === "cancelled") return;
+    addItemsToCart(
+      kitchenFromOrderCode(row.order.kitchen_id, row.order.order_code),
+      row.items.map((item) => ({
+        dish_id: item.dish_id,
+        dish_name: item.dish_name,
+        quantity: item.quantity,
+        unit_price: item.unit_price,
+      })),
+    );
+    navigate("/checkout");
+  };
   return (
     <li className="glass customer-dash__order">
       <div className="customer-dash__order-head">
@@ -428,8 +499,16 @@ function OrderCard({
           </span>
         </div>
         <div className="customer-dash__order-actions">
+          <button
+            type="button"
+            className="btn btn--primary btn--sm"
+            disabled={row.order.status === "cancelled" || row.items.length === 0}
+            onClick={onRepeat}
+          >
+            Repeat
+          </button>
           {row.can_rate && (
-            <Link className="btn btn--primary btn--sm" to={`/orders/${row.order.id}/rate`}>
+            <Link className="btn btn--ghost btn--sm" to={`/orders/${row.order.id}/rate`}>
               Rate
             </Link>
           )}
@@ -471,6 +550,46 @@ function OrderCard({
   );
 }
 
+type ReferralRow = {
+  kitchen_name: string;
+  contact_name: string;
+  contact_phone: string;
+  contact_email: string;
+  city: string;
+  notes: string;
+};
+type ReferralRowErrors = Partial<Record<keyof ReferralRow, string>>;
+
+const REFERRAL_FIELDS = [
+  "kitchen_name",
+  "contact_name",
+  "contact_phone",
+  "contact_email",
+  "city",
+  "notes",
+] as const;
+
+const emptyReferralRow = (): ReferralRow => ({
+  kitchen_name: "",
+  contact_name: "",
+  contact_phone: "",
+  contact_email: "",
+  city: "",
+  notes: "",
+});
+
+const isBlankReferralRow = (row: ReferralRow) =>
+  REFERRAL_FIELDS.every((key) => !row[key].trim());
+
+const validateReferralRow = (row: ReferralRow): ReferralRowErrors => ({
+  kitchen_name: validateText(row.kitchen_name, "the kitchen name", { max: 120 }) ?? undefined,
+  contact_name: validatePersonName(row.contact_name, { required: false }) ?? undefined,
+  contact_phone: validateNationalPhone(row.contact_phone) ?? undefined,
+  contact_email: validateEmail(row.contact_email, { required: false }) ?? undefined,
+  city: validateText(row.city, "a city", { required: false, max: 80 }) ?? undefined,
+  notes: validateText(row.notes, "a note", { required: false, max: 500 }) ?? undefined,
+});
+
 function ReferralsPanel({
   setError,
   busy,
@@ -481,10 +600,13 @@ function ReferralsPanel({
   setBusy: (v: boolean) => void;
 }) {
   const [dash, setDash] = useState<ReferralDashboard | null>(null);
-  const [rows, setRows] = useState([
-    { kitchen_name: "", contact_name: "", contact_phone: "", contact_email: "", city: "", notes: "" },
-    { kitchen_name: "", contact_name: "", contact_phone: "", contact_email: "", city: "", notes: "" },
-  ]);
+  const [rows, setRows] = useState<ReferralRow[]>([emptyReferralRow(), emptyReferralRow()]);
+  const [rowErrors, setRowErrors] = useState<ReferralRowErrors[]>([]);
+
+  const updateRow = (index: number, key: keyof ReferralRow, value: string) => {
+    setRows((prev) => prev.map((r, i) => (i === index ? { ...r, [key]: value } : r)));
+    setRowErrors((prev) => prev.map((e, i) => (i === index ? { ...e, [key]: undefined } : e)));
+  };
 
   const reload = useCallback(async () => {
     try {
@@ -499,19 +621,29 @@ function ReferralsPanel({
   }, [reload]);
 
   const submit = async () => {
+    const filled = rows.filter((r) => !isBlankReferralRow(r));
+    if (filled.length === 0) {
+      setError("Add at least one kitchen with a mobile number");
+      return;
+    }
+    const nextRowErrors = rows.map((r) => (isBlankReferralRow(r) ? {} : validateReferralRow(r)));
+    setRowErrors(nextRowErrors);
+    const firstMessage = nextRowErrors.map(firstError).find(Boolean);
+    if (firstMessage) {
+      setError(firstMessage);
+      return;
+    }
     setBusy(true);
     setError("");
     try {
-      const payload = rows
-        .filter((r) => r.contact_phone.trim() && r.kitchen_name.trim())
-        .map((r) => ({
-          kitchen_name: r.kitchen_name.trim(),
-          contact_name: r.contact_name || undefined,
-          contact_phone: r.contact_phone.trim(),
-          contact_email: r.contact_email || undefined,
-          city: r.city || undefined,
-          notes: r.notes || undefined,
-        }));
+      const payload = filled.map((r) => ({
+        kitchen_name: r.kitchen_name.trim(),
+        contact_name: r.contact_name.trim() || undefined,
+        contact_phone: toE164(r.contact_phone),
+        contact_email: r.contact_email.trim() || undefined,
+        city: r.city.trim() || undefined,
+        notes: r.notes.trim() || undefined,
+      }));
       if (payload.length === 1) {
         await submitCustomerKitchenReferral(payload[0]);
       } else {
@@ -598,19 +730,7 @@ function ReferralsPanel({
         <button
           type="button"
           className="btn btn--ghost btn--sm"
-          onClick={() =>
-            setRows((r) => [
-              ...r,
-              {
-                kitchen_name: "",
-                contact_name: "",
-                contact_phone: "",
-                contact_email: "",
-                city: "",
-                notes: "",
-              },
-            ])
-          }
+          onClick={() => setRows((r) => [...r, emptyReferralRow()])}
         >
           Add row
         </button>
@@ -630,26 +750,31 @@ function ReferralsPanel({
           <tbody>
             {rows.map((row, i) => (
               <tr key={i}>
-                {(
-                  [
-                    "kitchen_name",
-                    "contact_name",
-                    "contact_phone",
-                    "contact_email",
-                    "city",
-                    "notes",
-                  ] as const
-                ).map((key) => (
+                {REFERRAL_FIELDS.map((key) => (
                   <td key={key}>
-                    <input
-                      className="owner-input"
-                      value={row[key]}
-                      onChange={(e) =>
-                        setRows((prev) =>
-                          prev.map((r, idx) => (idx === i ? { ...r, [key]: e.target.value } : r)),
-                        )
-                      }
-                    />
+                    {key === "contact_phone" ? (
+                      <PhoneField
+                        className="phone-field--bare"
+                        label="Phone"
+                        value={row.contact_phone}
+                        onChange={(national) => updateRow(i, key, national)}
+                        error={rowErrors[i]?.contact_phone}
+                      />
+                    ) : (
+                      <>
+                        <input
+                          className={
+                            rowErrors[i]?.[key] ? "owner-input input-invalid" : "owner-input"
+                          }
+                          value={row[key]}
+                          onChange={(e) => updateRow(i, key, e.target.value)}
+                          aria-invalid={Boolean(rowErrors[i]?.[key])}
+                        />
+                        {rowErrors[i]?.[key] ? (
+                          <span className="field-error">{rowErrors[i][key]}</span>
+                        ) : null}
+                      </>
+                    )}
                   </td>
                 ))}
               </tr>
@@ -990,6 +1115,12 @@ function AddressesPanel({
   const [pincode, setPincode] = useState("");
   const [lat, setLat] = useState<number | null>(18.5204);
   const [lng, setLng] = useState<number | null>(73.8567);
+  const [fieldErrors, setFieldErrors] = useState<{
+    label?: string;
+    line?: string;
+    city?: string;
+    pincode?: string;
+  }>({});
 
   const pinHere = () => {
     if (!navigator.geolocation) {
@@ -1007,6 +1138,18 @@ function AddressesPanel({
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();
+    const nextErrors = {
+      label: validateText(label, "a label", { max: 40 }) ?? undefined,
+      line: validateText(line, "the address", { min: 5, max: 240 }) ?? undefined,
+      city: validateText(city, "a city", { max: 80 }) ?? undefined,
+      pincode: validatePincode(pincode, { required: false }) ?? undefined,
+    };
+    setFieldErrors(nextErrors);
+    const firstMessage = firstError(nextErrors);
+    if (firstMessage) {
+      setError(firstMessage);
+      return;
+    }
     setBusy(true);
     setError("");
     try {
@@ -1036,15 +1179,48 @@ function AddressesPanel({
         <h2>Add address with map pin</h2>
         <label>
           Label
-          <input value={label} onChange={(e) => setLabel(e.target.value)} required />
+          <input
+            value={label}
+            onChange={(e) => {
+              setLabel(e.target.value);
+              setFieldErrors((f) => ({ ...f, label: undefined }));
+            }}
+            required
+            maxLength={40}
+            className={fieldErrors.label ? "input-invalid" : undefined}
+            aria-invalid={Boolean(fieldErrors.label)}
+          />
+          {fieldErrors.label ? <span className="field-error">{fieldErrors.label}</span> : null}
         </label>
         <label>
           Address line
-          <input value={line} onChange={(e) => setLine(e.target.value)} required />
+          <input
+            value={line}
+            onChange={(e) => {
+              setLine(e.target.value);
+              setFieldErrors((f) => ({ ...f, line: undefined }));
+            }}
+            required
+            maxLength={240}
+            className={fieldErrors.line ? "input-invalid" : undefined}
+            aria-invalid={Boolean(fieldErrors.line)}
+          />
+          {fieldErrors.line ? <span className="field-error">{fieldErrors.line}</span> : null}
         </label>
         <label>
           City
-          <input value={city} onChange={(e) => setCity(e.target.value)} required />
+          <input
+            value={city}
+            onChange={(e) => {
+              setCity(e.target.value);
+              setFieldErrors((f) => ({ ...f, city: undefined }));
+            }}
+            required
+            maxLength={80}
+            className={fieldErrors.city ? "input-invalid" : undefined}
+            aria-invalid={Boolean(fieldErrors.city)}
+          />
+          {fieldErrors.city ? <span className="field-error">{fieldErrors.city}</span> : null}
         </label>
         <label>
           State
@@ -1052,7 +1228,19 @@ function AddressesPanel({
         </label>
         <label>
           Pincode
-          <input value={pincode} onChange={(e) => setPincode(e.target.value)} />
+          <input
+            value={pincode}
+            onChange={(e) => {
+              setPincode(pincodeInputValue(e.target.value));
+              setFieldErrors((f) => ({ ...f, pincode: undefined }));
+            }}
+            inputMode="numeric"
+            maxLength={6}
+            placeholder="411001"
+            className={fieldErrors.pincode ? "input-invalid" : undefined}
+            aria-invalid={Boolean(fieldErrors.pincode)}
+          />
+          {fieldErrors.pincode ? <span className="field-error">{fieldErrors.pincode}</span> : null}
         </label>
         <div className="customer-dash__pin-actions">
           <button type="button" className="btn btn--ghost btn--sm" onClick={pinHere}>
@@ -1132,15 +1320,32 @@ function AccountPanel({
   setBusy: (v: boolean) => void;
   setError: (v: string) => void;
 }) {
+  const { logout } = useCustomerAuth();
+  const navigate = useNavigate();
   const [name, setName] = useState(profile.name);
   const [email, setEmail] = useState(profile.email ?? "");
   const [password, setPassword] = useState("");
   const [currentPassword, setCurrentPassword] = useState("");
   const [otp, setOtp] = useState("");
   const [otpSent, setOtpSent] = useState(false);
+  const [fieldErrors, setFieldErrors] = useState<{
+    name?: string;
+    email?: string;
+    otp?: string;
+  }>({});
 
   const saveProfile = async (e: FormEvent) => {
     e.preventDefault();
+    const nextErrors = {
+      name: validatePersonName(name) ?? undefined,
+      email: validateEmail(email, { required: false }) ?? undefined,
+    };
+    setFieldErrors(nextErrors);
+    const firstMessage = firstError(nextErrors);
+    if (firstMessage) {
+      setError(firstMessage);
+      return;
+    }
     setBusy(true);
     setError("");
     try {
@@ -1171,6 +1376,13 @@ function AccountPanel({
 
   const savePassword = async (e: FormEvent) => {
     e.preventDefault();
+    // The OTP is only required on the first password set; skip the check when blank.
+    const otpMessage = otp ? validateOtp(otp) : null;
+    setFieldErrors((f) => ({ ...f, otp: otpMessage ?? undefined }));
+    if (otpMessage) {
+      setError(otpMessage);
+      return;
+    }
     setBusy(true);
     setError("");
     try {
@@ -1190,17 +1402,53 @@ function AccountPanel({
     }
   };
 
+  const saveNotifications = async (patch: {
+    notify_order_updates?: boolean;
+    notify_offers?: boolean;
+    notify_channel?: string;
+  }) => {
+    setBusy(true);
+    setError("");
+    try {
+      setProfile(await updateMyNotificationPrefs(patch));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not save notification settings");
+    } finally {
+      setBusy(false);
+    }
+  };
+
   return (
     <div className="customer-dash__split">
       <form className="glass customer-dash__card" onSubmit={saveProfile}>
-        <h2>Change details</h2>
+        <h2>My profile</h2>
         <label>
           Name
-          <input value={name} onChange={(e) => setName(e.target.value)} required />
+          <input
+            value={name}
+            onChange={(e) => {
+              setName(e.target.value);
+              setFieldErrors((f) => ({ ...f, name: undefined }));
+            }}
+            required
+            className={fieldErrors.name ? "input-invalid" : undefined}
+            aria-invalid={Boolean(fieldErrors.name)}
+          />
+          {fieldErrors.name ? <span className="field-error">{fieldErrors.name}</span> : null}
         </label>
         <label>
           Email
-          <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
+          <input
+            type="email"
+            value={email}
+            onChange={(e) => {
+              setEmail(e.target.value);
+              setFieldErrors((f) => ({ ...f, email: undefined }));
+            }}
+            className={fieldErrors.email ? "input-invalid" : undefined}
+            aria-invalid={Boolean(fieldErrors.email)}
+          />
+          {fieldErrors.email ? <span className="field-error">{fieldErrors.email}</span> : null}
         </label>
         <p className="auth-card__hint">Phone: {profile.phone || "not linked — use WhatsApp login"}</p>
         <button type="submit" className="btn btn--primary" disabled={busy}>
@@ -1235,7 +1483,20 @@ function AccountPanel({
         </label>
         <label>
           WhatsApp OTP {otpSent ? "(sent)" : ""}
-          <input value={otp} onChange={(e) => setOtp(e.target.value)} placeholder="123456" maxLength={6} />
+          <input
+            value={otp}
+            onChange={(e) => {
+              setOtp(otpInputValue(e.target.value));
+              setFieldErrors((f) => ({ ...f, otp: undefined }));
+            }}
+            inputMode="numeric"
+            autoComplete="one-time-code"
+            placeholder="123456"
+            maxLength={6}
+            className={fieldErrors.otp ? "input-invalid" : undefined}
+            aria-invalid={Boolean(fieldErrors.otp)}
+          />
+          {fieldErrors.otp ? <span className="field-error">{fieldErrors.otp}</span> : null}
         </label>
         <div className="customer-dash__pin-actions">
           <button type="button" className="btn btn--ghost btn--sm" onClick={sendOtp} disabled={busy}>
@@ -1246,6 +1507,61 @@ function AccountPanel({
           </button>
         </div>
       </form>
+
+      <section id="notifications" className="glass customer-dash__card">
+        <h2>Notifications</h2>
+        <p className="auth-card__hint">
+          Choose what reaches you. Order updates keep you posted from kitchen to doorstep; offers
+          are the kitchen&apos;s daily menu and deals.
+        </p>
+        <label className="customer-dash__toggle">
+          <input
+            type="checkbox"
+            checked={profile.notify_order_updates}
+            disabled={busy || profile.notify_channel === "none"}
+            onChange={(e) => saveNotifications({ notify_order_updates: e.target.checked })}
+          />
+          <span>Order updates</span>
+        </label>
+        <label className="customer-dash__toggle">
+          <input
+            type="checkbox"
+            checked={profile.notify_offers}
+            disabled={busy || profile.notify_channel === "none"}
+            onChange={(e) => saveNotifications({ notify_offers: e.target.checked })}
+          />
+          <span>Offers and daily menus</span>
+        </label>
+        <label>
+          Send them on
+          <select
+            value={profile.notify_channel}
+            disabled={busy}
+            onChange={(e) => saveNotifications({ notify_channel: e.target.value })}
+          >
+            <option value="whatsapp">WhatsApp</option>
+            <option value="none">Nothing — mute all</option>
+          </select>
+        </label>
+      </section>
+
+      <section className="glass customer-dash__card">
+        <h2>Sign out</h2>
+        <p className="auth-card__hint">
+          Signs you out on this device. Your orders, addresses, and saved kitchens stay on your
+          account.
+        </p>
+        <button
+          type="button"
+          className="btn btn--ghost"
+          onClick={() => {
+            logout();
+            navigate("/login", { replace: true });
+          }}
+        >
+          Log out
+        </button>
+      </section>
     </div>
   );
 }

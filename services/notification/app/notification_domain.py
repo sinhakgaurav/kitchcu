@@ -5,7 +5,7 @@ from __future__ import annotations
 import uuid
 from datetime import UTC, datetime, timedelta
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -13,6 +13,7 @@ from app.notification_models import TRACKING_ACTIVE_STATUSES, NotificationLog, T
 from ckac_common.auth import stream_key
 from ckac_common.config import get_settings
 from ckac_common.event_bus import EventPublisher
+from ckac_common.validators import normalize_india_phone, normalize_optional_india_phone
 
 settings = get_settings()
 
@@ -38,6 +39,11 @@ class OrderPlacedNotifyRequest(BaseModel):
     total: float = Field(default=0, description="Order total in INR, shown in the confirmation message.")
     tracking_token: str | None = Field(default=None, description="Opaque public tracking token, if issued (delivery orders only).")
 
+    @field_validator("customer_phone")
+    @classmethod
+    def normalize_phone(cls, v: str | None) -> str | None:
+        return normalize_optional_india_phone(v)
+
 
 class OrderStatusChangedNotifyRequest(BaseModel):
     """Internal request from the order service on any status transition (F29/F45)."""
@@ -49,6 +55,11 @@ class OrderStatusChangedNotifyRequest(BaseModel):
     from_status: str = Field(..., description="Previous order status.")
     to_status: str = Field(..., description="New order status.")
     tracking_token: str | None = Field(default=None, description="Public tracking token, if issued.")
+
+    @field_validator("customer_phone")
+    @classmethod
+    def normalize_phone(cls, v: str | None) -> str | None:
+        return normalize_optional_india_phone(v)
 
 
 class DeliveryFeeDeniedNotifyRequest(BaseModel):
@@ -62,6 +73,11 @@ class DeliveryFeeDeniedNotifyRequest(BaseModel):
     fee: float = Field(..., description="Delivery fee the customer denied, in INR.")
     subtotal: float = Field(default=0, description="Cart subtotal at the time of denial, in INR.")
     customer_phone: str | None = Field(default=None, description="Customer phone, if known, for owner callback.")
+
+    @field_validator("customer_phone")
+    @classmethod
+    def normalize_phone(cls, v: str | None) -> str | None:
+        return normalize_optional_india_phone(v)
 
 
 class DailyMenuBlastRequest(BaseModel):
@@ -135,6 +151,11 @@ class OtpNotifyRequest(BaseModel):
         default="login",
         description="'owner_login' | 'customer_login' | 'login'.",
     )
+
+    @field_validator("phone")
+    @classmethod
+    def normalize_phone(cls, v: str) -> str:
+        return normalize_india_phone(v)
 
 
 class OtpNotifyResponse(BaseModel):

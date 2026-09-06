@@ -32,7 +32,12 @@
     "customerApp": "ગ્રાહક એપ્લિકેશન",
     "kitchenOwner": "રસોડાના માલિક →",
     "ownerLogin": "માલિક લૉગિન",
-    "adminLogin": "Super admin"
+    "adminLogin": "Super admin",
+    "adminCredentialsDev": "Email {{email}} · Password {{password}} (dev / seeded)",
+    "adminCredentialsHost": "Open the console on {{host}}.",
+    "adminCredentialsProd": "Email {{email}} — password from the VM ADMIN_PASSWORD secret, not this page",
+    "adminCredentialsTitle": "Super admin credentials",
+    "adminOpenConsole": "Open Super Admin"
   },
   "status": {
     "received": "મળેલ",
@@ -142,7 +147,15 @@
     "contactSending": "મોકલી રહ્યું છે...",
     "contactSent": "આભાર - અમે ટૂંક સમયમાં સંપર્ક કરીશું.",
     "contactError": "મોકલી શકાયું નથી. કૃપા કરીને ફરી પ્રયાસ કરો.",
-    "navCities": "Cities"
+    "navCities": "Cities",
+    "ctaAdmin": "Super admin →",
+    "tileAdminBody": "Kitchens, employees, tickets, packages, and API keys — Super Admin only.",
+    "tileAdminCta": "Open Super Admin",
+    "tileAdminTitle": "Operate the platform",
+    "tileCustomerBody": "Nearby kitchens, live-capture menus, honest ETAs, and fair delivery fees.",
+    "tileCustomerTitle": "Order home-made food",
+    "tileKitchenBody": "WhatsApp orders, menu, tiffin plans, reports — zero food commission.",
+    "tileKitchenTitle": "Run your kitchen"
   },
   "owner": {
     "nav": {
@@ -170,7 +183,8 @@
       "paymentGateway": "ચુકવણી ગેટવે",
       "gst": "જીએસટી અને ફાઇનાન્સ",
       "setup": "કિચન સેટઅપ",
-      "bulkPrep": "Prep batches"
+      "bulkPrep": "Prep batches",
+      "ratings": "Ratings"
     },
     "shell": {
       "activeKitchen": "સક્રિય રસોડું",
@@ -316,7 +330,8 @@
       "setup": "કિચન સેટઅપ",
       "referrals": "રેફરલ્સ",
       "newOrder": "નવો ઓર્ડર",
-      "addDish": "વાનગી ઉમેરો"
+      "addDish": "વાનગી ઉમેરો",
+      "ratings": "Ratings"
     }
   },
   "customer": {
@@ -328,7 +343,10 @@
       "myOrders": "મારા ઓર્ડર,",
       "dashboard": "ડેશબોર્ડ",
       "account": "એકાઉન્ટ",
-      "signIn": "ગ્રાહક સાઇન ઇન"
+      "signIn": "ગ્રાહક સાઇન ઇન",
+      "logout": "Log out",
+      "notifications": "Notifications",
+      "profile": "My profile"
     },
     "auth": {
       "title": "ગ્રાહક સાઇન ઇન",

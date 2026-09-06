@@ -1,6 +1,7 @@
 /** Customer dashboard APIs — orders insights, refunds, tickets, addresses, profile. */
 
 import { getCustomerToken, type CustomerProfile } from "./customerApi";
+import type { CustomerKitchenSubscription } from "./api";
 
 async function dashFetch<T>(path: string, init?: RequestInit): Promise<T> {
   const token = getCustomerToken();
@@ -129,6 +130,42 @@ export async function fetchCustomerDashboard(params?: {
 
 export async function fetchMyRefunds(): Promise<CustomerRefund[]> {
   return dashFetch("/api/v1/billing/refunds/customer/me");
+}
+
+export async function updateMyNotificationPrefs(data: {
+  notify_order_updates?: boolean;
+  notify_offers?: boolean;
+  notify_channel?: string;
+}): Promise<CustomerProfile> {
+  return dashFetch("/api/v1/customers/me/notifications", {
+    method: "PATCH",
+    body: JSON.stringify(data),
+  });
+}
+
+export async function fetchMySubscriptions(): Promise<{
+  subscriptions: CustomerKitchenSubscription[];
+  total: number;
+}> {
+  return dashFetch("/api/v1/customers/me/subscriptions");
+}
+
+export async function cancelMySubscription(subId: string): Promise<CustomerKitchenSubscription> {
+  return dashFetch(`/api/v1/customers/me/subscriptions/${subId}/cancel`, {
+    method: "POST",
+    body: JSON.stringify({}),
+  });
+}
+
+export async function requestKitchenSubscription(
+  kitchenId: string,
+  planId: string,
+  data: { customer_name?: string; note?: string } = {},
+): Promise<CustomerKitchenSubscription> {
+  return dashFetch(`/api/v1/kitchens/${kitchenId}/subscription-plans/${planId}/subscribe`, {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
 }
 
 export async function fetchMyTickets(): Promise<{ tickets: CustomerTicket[]; total: number }> {

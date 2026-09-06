@@ -15,6 +15,8 @@ export function clearAdminToken(): void {
   localStorage.removeItem(TOKEN_KEY);
 }
 
+export const ADMIN_SESSION_EXPIRED = "kitchcu-admin-session-expired";
+
 async function adminFetch<T>(path: string, init?: RequestInit): Promise<T> {
   const token = getAdminToken();
   const headers = apiHeaders({
@@ -23,6 +25,10 @@ async function adminFetch<T>(path: string, init?: RequestInit): Promise<T> {
   if (token) headers.Authorization = `Bearer ${token}`;
   const res = await fetch(path, { ...init, headers });
   const body = await res.json().catch(() => ({}));
+  if (res.status === 401 && token && !path.includes("/admin/auth/login")) {
+    clearAdminToken();
+    window.dispatchEvent(new CustomEvent(ADMIN_SESSION_EXPIRED));
+  }
   if (!res.ok) throw new Error(typeof body.detail === "string" ? body.detail : "Request failed");
   return body as T;
 }
@@ -41,10 +47,13 @@ export type PlatformStats = {
 };
 
 export async function adminLogin(email: string, password: string) {
-  return adminFetch<{ access_token: string }>("/api/v1/admin/auth/login", {
-    method: "POST",
-    body: JSON.stringify({ email, password }),
-  });
+  return adminFetch<{ access_token: string; token_type?: string; expires_in: number }>(
+    "/api/v1/admin/auth/login",
+    {
+      method: "POST",
+      body: JSON.stringify({ email, password }),
+    },
+  );
 }
 
 export type AdminLoginHint = {
@@ -353,6 +362,8 @@ export type AdminKitchenDetail = AdminKitchen & {
   address_line: string | null;
   state: string | null;
   pincode: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
   whatsapp_phone_id: string | null;
   whatsapp_display_phone: string | null;
   branded_page?: AdminKitchenBrandedPage;
@@ -502,6 +513,54 @@ export async function updateAdminKitchenModuleFlag(
   return adminFetch<{ module_key: string; enabled: boolean; updated_at: string }>(
     `/api/v1/admin/kitchens/${kitchenId}/module-flags/${moduleKey}`,
     { method: "PATCH", body: JSON.stringify({ enabled }) },
+  );
+}
+
+export async function updateAdminKitchenProfile(
+  kitchenId: string,
+  data: {
+    name?: string;
+    address_line?: string;
+    city?: string;
+    state?: string;
+    pincode?: string | null;
+    latitude?: number;
+    longitude?: number;
+  },
+) {
+  return adminFetch<AdminKitchenDetail>(`/api/v1/admin/kitchens/${kitchenId}/profile`, {
+    method: "PATCH",
+    body: JSON.stringify(data),
+  });
+}
+
+export type AdminKitchenStreamSession = {
+  id: string;
+  kitchen_id: string;
+  title: string;
+  room_name: string;
+  status: string;
+  dish_name: string | null;
+  showcase_phase: string;
+  viewer_count: number;
+  started_at: string;
+  ended_at: string | null;
+};
+
+export type AdminKitchenStreamSummary = {
+  settings: {
+    kitchen_id: string;
+    live_sharing_enabled: boolean;
+    q_and_a_enabled: boolean;
+    is_live: boolean;
+    livekit_configured: boolean;
+  };
+  current_session: AdminKitchenStreamSession | null;
+};
+
+export async function fetchAdminKitchenStreamSummary(kitchenId: string) {
+  return adminFetch<AdminKitchenStreamSummary>(
+    `/api/v1/admin/kitchens/${kitchenId}/stream/summary`,
   );
 }
 

@@ -11,6 +11,7 @@ import {
   KITCHEN_HOST,
 } from "../shared/brand";
 import { customerUrl } from "../shared/urls";
+import { SuperAdminLink } from "./SuperAdminAccess";
 
 type Props = {
   variant: "customer" | "kitchen";
@@ -62,6 +63,7 @@ export function Hero({ variant }: Props) {
                   <a href={customerUrl("/")} className="btn btn--ghost btn--lg" target="_blank" rel="noopener noreferrer">
                     Customer app →
                   </a>
+                  <SuperAdminLink className="hero__ops-link" />
                 </>
               ) : (
                 <>
@@ -71,6 +73,7 @@ export function Hero({ variant }: Props) {
                   <Link to="/login" className="btn btn--ghost btn--lg">
                     Sign in →
                   </Link>
+                  <SuperAdminLink className="hero__ops-link" />
                 </>
               )}
             </div>

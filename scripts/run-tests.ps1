@@ -83,16 +83,19 @@ conn.close()
 Write-Host "Running identity service tests..."
 Push-Location "$PSScriptRoot\..\services\identity"
 python -m pytest -q
+if ($LASTEXITCODE -ne 0) { Pop-Location; exit $LASTEXITCODE }
 Pop-Location
 
 Write-Host "Running catalog service tests..."
 Push-Location "$PSScriptRoot\..\services\catalog"
 python -m pytest -q
+if ($LASTEXITCODE -ne 0) { Pop-Location; exit $LASTEXITCODE }
 Pop-Location
 
 Write-Host "Running order service tests..."
 Push-Location "$PSScriptRoot\..\services\order"
 python -m pytest -q
+if ($LASTEXITCODE -ne 0) { Pop-Location; exit $LASTEXITCODE }
 Pop-Location
 
 Write-Host "Running billing service tests..."
@@ -157,6 +160,14 @@ Pop-Location
 Write-Host "Running gateway tests..."
 Push-Location "$PSScriptRoot\..\services\gateway"
 python -m pytest -q
+if ($LASTEXITCODE -ne 0) { Pop-Location; exit $LASTEXITCODE }
+Pop-Location
+
+# The weekly QA cohort cron runs unattended on the VM — its identifier scheme is
+# covered here so a bad cohort cannot reach production seeding unnoticed.
+Write-Host "Running seed script tests..."
+Push-Location "$PSScriptRoot\.."
+python -m pytest scripts/tests -q
 if ($LASTEXITCODE -ne 0) { Pop-Location; exit $LASTEXITCODE }
 Pop-Location
 

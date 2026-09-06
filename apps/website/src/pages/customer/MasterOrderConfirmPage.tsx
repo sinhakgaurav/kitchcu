@@ -1,6 +1,7 @@
 import { Link, useLocation, useParams } from "react-router-dom";
 import { useEffect, useState } from "react";
 import {
+  captureMasterPayment,
   downloadCustomerMasterBillPdf,
   fetchMyMasterOrder,
 } from "../../shared/customerCheckoutApi";
@@ -11,7 +12,19 @@ type ConfirmState = {
   master: MasterOrder;
   paymentMethod?: string;
   settlements?: Settlement[];
+  paymentId?: string | null;
 };
+
+function masterUpiUri(master: MasterOrder): string {
+  const params = new URLSearchParams({
+    pa: "kitchcu@kitchCU",
+    pn: "kitchCU",
+    am: master.total.toFixed(2),
+    cu: "INR",
+    tn: `Order ${master.master_order_code}`,
+  });
+  return `upi://pay?${params.toString()}`;
+}
 
 export function MasterOrderConfirmPage() {
   const { masterOrderId } = useParams<{ masterOrderId: string }>();
@@ -21,14 +34,17 @@ export function MasterOrderConfirmPage() {
   const [master, setMaster] = useState<MasterOrder | null>(
     navState?.master && navState.master.id === masterOrderId ? navState.master : null,
   );
-  const [settlements] = useState<Settlement[] | undefined>(navState?.settlements);
+  const [settlements, setSettlements] = useState<Settlement[] | undefined>(navState?.settlements);
   const [paymentMethod, setPaymentMethod] = useState(
     navState?.paymentMethod ?? navState?.master?.payment_method ?? "cod",
   );
+  const [paymentId] = useState<string | null>(navState?.paymentId ?? null);
+  const [payStatus, setPayStatus] = useState(navState?.paymentId ? "created" : "");
   const [loading, setLoading] = useState(!master && Boolean(masterOrderId));
   const [loadError, setLoadError] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [capturing, setCapturing] = useState(false);
   const loginNext = encodeURIComponent(location.pathname);
 
   useEffect(() => {
@@ -57,6 +73,21 @@ export function MasterOrderConfirmPage() {
       cancelled = true;
     };
   }, [masterOrderId, master]);
+
+  const onMarkPaid = async () => {
+    if (!paymentId) return;
+    setCapturing(true);
+    setError("");
+    try {
+      const captured = await captureMasterPayment(paymentId);
+      setPayStatus(captured.payment.status);
+      setSettlements(captured.settlements);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not confirm payment yet");
+    } finally {
+      setCapturing(false);
+    }
+  };
 
   const onDownload = async () => {
     if (!master) return;
@@ -114,7 +145,8 @@ export function MasterOrderConfirmPage() {
     );
   }
 
-  const method = (paymentMethod || master.payment_method || "cod").toUpperCase();
+  const method = (paymentMethod || master.payment_method || "cod").toLowerCase();
+  const upiUri = method === "upi" ? masterUpiUri(master) : "";
 
   return (
     <div className="container customer-confirm">
@@ -129,7 +161,7 @@ export function MasterOrderConfirmPage() {
         <div className="customer-confirm__total-row">
           <div>
             <strong>₹{Math.round(master.total)}</strong>
-            <span>{method}</span>
+            <span>{method.toUpperCase()}</span>
           </div>
           <p>
             {master.orders.length} kitchen{master.orders.length === 1 ? "" : "s"} will update
@@ -149,6 +181,45 @@ export function MasterOrderConfirmPage() {
           </ul>
         )}
       </section>
+
+      {method === "upi" && paymentId && (
+        <section className="customer-confirm__card">
+          <h2>Complete UPI payment</h2>
+          <p>
+            Amount <strong>₹{Math.round(master.total)}</strong> · status{" "}
+            <strong>{payStatus || "created"}</strong>
+          </p>
+          {payStatus === "captured" ? (
+            <p className="customer-confirm__hint">Payment captured and split to each kitchen. Thank you.</p>
+          ) : (
+            <>
+              <p className="customer-confirm__hint">
+                Scan with any UPI app, or open the payment link. After you pay, tap “I’ve paid”.
+              </p>
+              <img
+                className="upi-qr"
+                alt="UPI payment QR"
+                width={200}
+                height={200}
+                src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(upiUri)}`}
+              />
+              <div className="customer-confirm__actions customer-confirm__actions--inline">
+                <a className="btn btn--primary" href={upiUri}>
+                  Pay with UPI app
+                </a>
+                <button
+                  type="button"
+                  className="btn btn--ghost"
+                  disabled={capturing}
+                  onClick={onMarkPaid}
+                >
+                  {capturing ? "Confirming…" : "I’ve paid"}
+                </button>
+              </div>
+            </>
+          )}
+        </section>
+      )}
 
       {master.orders.map((order) => (
         <section key={order.id} className="customer-confirm__card">

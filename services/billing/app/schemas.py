@@ -226,6 +226,29 @@ def subscription_to_response(sub: OwnerSubscription) -> SubscriptionResponse:
     )
 
 
+async def list_kitchen_settlements(
+    session: AsyncSession,
+    kitchen_id: uuid.UUID,
+    *,
+    status_filter: str | None = None,
+    limit: int = 50,
+    offset: int = 0,
+) -> list[SettlementResponse]:
+    limit = max(1, min(limit, 200))
+    offset = max(0, offset)
+    stmt = (
+        select(Settlement)
+        .where(Settlement.kitchen_id == kitchen_id)
+        .order_by(Settlement.created_at.desc())
+        .offset(offset)
+        .limit(limit)
+    )
+    if status_filter:
+        stmt = stmt.where(Settlement.settlement_status == status_filter)
+    rows = list((await session.execute(stmt)).scalars().all())
+    return [settlement_to_response(s) for s in rows]
+
+
 def settlement_to_response(settlement: Settlement) -> SettlementResponse:
     return SettlementResponse(
         id=settlement.id,

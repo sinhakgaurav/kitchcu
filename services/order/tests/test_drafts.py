@@ -85,6 +85,148 @@ async def test_draft_created_publishes_event(client: AsyncClient, order_ctx):
     assert draft_events[0]["event_type"] == "order.draft.created"
 
 
+UNMATCHED_PAYLOAD = {
+    "message_text": "2 Mystery Stew",
+    "source": "manual_message",
+    "customer_phone": "+919876543210",
+}
+
+
+@pytest.mark.asyncio
+async def test_patch_draft_requires_auth(client: AsyncClient, order_ctx):
+    _, kitchen_id, dish_id, _, token = order_ctx
+    headers = {"Authorization": f"Bearer {token}"}
+    create = await client.post(
+        f"/api/v1/kitchens/{kitchen_id}/orders/parse-message",
+        json=UNMATCHED_PAYLOAD,
+        headers=headers,
+    )
+    draft_id = create.json()["id"]
+    response = await client.patch(
+        f"/api/v1/kitchens/{kitchen_id}/orders/drafts/{draft_id}",
+        json={
+            "parsed_items": [
+                {"raw": "2 Mystery Stew", "dish_id": str(dish_id), "quantity": 2},
+            ]
+        },
+    )
+    assert response.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_owner_can_remap_unmatched_line_to_dish(client: AsyncClient, order_ctx):
+    _, kitchen_id, dish_id, _, token = order_ctx
+    headers = {"Authorization": f"Bearer {token}"}
+    create = await client.post(
+        f"/api/v1/kitchens/{kitchen_id}/orders/parse-message",
+        json=UNMATCHED_PAYLOAD,
+        headers=headers,
+    )
+    assert create.status_code == 201
+    draft = create.json()
+    assert draft["parsed_items"][0]["matched"] is False
+    draft_id = draft["id"]
+
+    response = await client.patch(
+        f"/api/v1/kitchens/{kitchen_id}/orders/drafts/{draft_id}",
+        json={
+            "parsed_items": [
+                {"raw": "2 Mystery Stew", "dish_id": str(dish_id), "quantity": 2},
+            ],
+            "customer_phone": "+919111111111",
+        },
+        headers=headers,
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert data["id"] == draft_id
+    assert data["status"] == "draft"
+    assert data["customer_phone"] == "+919111111111"
+    assert data["parsed_items"][0]["matched"] is True
+    assert data["parsed_items"][0]["dish_id"] == str(dish_id)
+    assert data["parsed_items"][0]["dish_name"] == "Paneer Tikka"
+    assert data["parsed_items"][0]["quantity"] == 2
+    assert data["parsed_items"][0]["unit_price"] == 199.0
+    assert data["unmatched_lines"] == []
+
+
+@pytest.mark.asyncio
+async def test_patch_draft_other_kitchen_404(client: AsyncClient, order_ctx):
+    import uuid
+
+    import psycopg2
+
+    from tests.conftest import SYNC_DB_URL
+
+    owner_id, kitchen_id, dish_id, _, token = order_ctx
+    headers = {"Authorization": f"Bearer {token}"}
+    create = await client.post(
+        f"/api/v1/kitchens/{kitchen_id}/orders/parse-message",
+        json=UNMATCHED_PAYLOAD,
+        headers=headers,
+    )
+    draft_id = create.json()["id"]
+
+    other_kitchen_id = uuid.uuid4()
+    conn = psycopg2.connect(SYNC_DB_URL)
+    conn.autocommit = True
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            INSERT INTO ckac_identity.kitchens
+            (id, owner_id, code, name, location, status)
+            VALUES (
+                %s::uuid, %s::uuid, %s, 'Other Kitchen',
+                ST_SetSRID(ST_MakePoint(73.8958, 18.5362), 4326)::geography,
+                'active'
+            )
+            """,
+            (str(other_kitchen_id), str(owner_id), f"CKOTH{owner_id.hex[:4].upper()}"),
+        )
+    conn.close()
+
+    response = await client.patch(
+        f"/api/v1/kitchens/{other_kitchen_id}/orders/drafts/{draft_id}",
+        json={
+            "parsed_items": [
+                {"raw": "2 Mystery Stew", "dish_id": str(dish_id), "quantity": 2},
+            ]
+        },
+        headers=headers,
+    )
+    assert response.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_confirm_draft_works_after_remap(client: AsyncClient, order_ctx):
+    _, kitchen_id, dish_id, _, token = order_ctx
+    headers = {"Authorization": f"Bearer {token}"}
+    create = await client.post(
+        f"/api/v1/kitchens/{kitchen_id}/orders/parse-message",
+        json=UNMATCHED_PAYLOAD,
+        headers=headers,
+    )
+    draft_id = create.json()["id"]
+    patched = await client.patch(
+        f"/api/v1/kitchens/{kitchen_id}/orders/drafts/{draft_id}",
+        json={
+            "parsed_items": [
+                {"raw": "2 Mystery Stew", "dish_id": str(dish_id), "quantity": 2},
+            ]
+        },
+        headers=headers,
+    )
+    assert patched.status_code == 200
+
+    confirm = await client.post(
+        f"/api/v1/kitchens/{kitchen_id}/orders/drafts/{draft_id}/confirm",
+        headers=headers,
+    )
+    assert confirm.status_code == 201
+    assert confirm.json()["source"] == "manual_message"
+    assert confirm.json()["subtotal"] == 398.0
+
+
 @pytest.mark.asyncio
 async def test_whatsapp_internal_intake(client: AsyncClient, order_ctx):
     _, kitchen_id, _, _, _ = order_ctx

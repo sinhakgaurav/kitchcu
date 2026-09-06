@@ -3,10 +3,10 @@ import { Link, useNavigate } from "react-router-dom";
 import { KitchenLocationMap } from "../../components/owner/KitchenLocationMap";
 import { OwnerPageShell, OwnerPanel } from "../../components/owner/OwnerPageShell";
 import { useGeolocation } from "../../hooks/useGeolocation";
-import { formatKitchenAddress } from "../../lib/locationMaps";
-import { createKitchen, updateKitchenDeliverySettings } from "../../lib/api";
+import { createKitchen, updateKitchenDeliverySettings, updateKitchenProfile } from "../../lib/api";
 import { useKitchen } from "../../lib/kitchen";
 import { customerUrl } from "../../shared/urls";
+import { firstError, pincodeInputValue, validatePincode, validateText } from "../../shared/validation";
 
 const PUNE_DEFAULT = { latitude: 18.5362, longitude: 73.8958 };
 
@@ -17,13 +17,35 @@ export function KitchenSetupPage() {
   const [error, setError] = useState("");
   const [saveMsg, setSaveMsg] = useState("");
   const [busy, setBusy] = useState(false);
+  const [fieldErrors, setFieldErrors] = useState<{
+    name?: string;
+    address?: string;
+    city?: string;
+    state?: string;
+    pincode?: string;
+  }>({});
   const [draftLat, setDraftLat] = useState(String(PUNE_DEFAULT.latitude));
   const [draftLng, setDraftLng] = useState(String(PUNE_DEFAULT.longitude));
+  const [locateRequested, setLocateRequested] = useState(false);
 
   useEffect(() => {
+    if (kitchen?.latitude == null || kitchen?.longitude == null) return;
+    setDraftLat(Number(kitchen.latitude).toFixed(6));
+    setDraftLng(Number(kitchen.longitude).toFixed(6));
+  }, [kitchen?.id]);
+
+  useEffect(() => {
+    if (kitchen) return;
     setDraftLat(coords.latitude.toFixed(6));
     setDraftLng(coords.longitude.toFixed(6));
-  }, [coords.latitude, coords.longitude]);
+  }, [kitchen, coords.latitude, coords.longitude]);
+
+  useEffect(() => {
+    if (!kitchen || !locateRequested || geoStatus === "loading") return;
+    setDraftLat(coords.latitude.toFixed(6));
+    setDraftLng(coords.longitude.toFixed(6));
+    setLocateRequested(false);
+  }, [kitchen, locateRequested, geoStatus, coords.latitude, coords.longitude]);
 
   const draftLatitude = Number(draftLat);
   const draftLongitude = Number(draftLng);
@@ -36,6 +58,19 @@ export function KitchenSetupPage() {
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const fd = new FormData(e.currentTarget);
+    const nextErrors = {
+      name: validateText(String(fd.get("name") || ""), "a kitchen name", { min: 2, max: 120 }) ?? undefined,
+      address: validateText(String(fd.get("address") || ""), "a street address", { min: 5, max: 200 }) ?? undefined,
+      city: validateText(String(fd.get("city") || ""), "a city", { min: 2, max: 80 }) ?? undefined,
+      state: validateText(String(fd.get("state") || ""), "a state", { min: 2, max: 80 }) ?? undefined,
+      pincode: validatePincode(String(fd.get("pincode") || ""), { required: false }) ?? undefined,
+    };
+    setFieldErrors(nextErrors);
+    const firstMessage = firstError(nextErrors);
+    if (firstMessage) {
+      setError(firstMessage);
+      return;
+    }
     if (!draftCoordsValid) {
       setError("Enter valid latitude and longitude.");
       return;
@@ -53,9 +88,52 @@ export function KitchenSetupPage() {
         pincode: String(fd.get("pincode") || "") || undefined,
       });
       await reloadKitchens();
-      navigate("/dashboard/brand");
+      navigate("/dashboard/menu/new");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to create kitchen");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleProfileSave = async (e: FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (!kitchen) return;
+    const fd = new FormData(e.currentTarget);
+    const nextErrors = {
+      name: validateText(String(fd.get("name") || ""), "a kitchen name", { min: 2, max: 120 }) ?? undefined,
+      address: validateText(String(fd.get("address") || ""), "a street address", { min: 5, max: 200 }) ?? undefined,
+      city: validateText(String(fd.get("city") || ""), "a city", { min: 2, max: 80 }) ?? undefined,
+      state: validateText(String(fd.get("state") || ""), "a state", { min: 2, max: 80 }) ?? undefined,
+      pincode: validatePincode(String(fd.get("pincode") || ""), { required: false }) ?? undefined,
+    };
+    setFieldErrors(nextErrors);
+    const firstMessage = firstError(nextErrors);
+    if (firstMessage) {
+      setError(firstMessage);
+      return;
+    }
+    if (!draftCoordsValid) {
+      setError("Enter valid latitude and longitude.");
+      return;
+    }
+    setError("");
+    setSaveMsg("");
+    setBusy(true);
+    try {
+      await updateKitchenProfile(kitchen.id, {
+        name: String(fd.get("name")),
+        address_line: String(fd.get("address")),
+        city: String(fd.get("city")),
+        state: String(fd.get("state")),
+        pincode: String(fd.get("pincode") || "") || null,
+        latitude: draftLatitude,
+        longitude: draftLongitude,
+      });
+      await reloadKitchens();
+      setSaveMsg("Kitchen profile and map pin saved. Discovery will use this location.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to save kitchen profile");
     } finally {
       setBusy(false);
     }
@@ -101,20 +179,124 @@ export function KitchenSetupPage() {
     >
       {kitchen ? (
         <>
-          <OwnerPanel title="Kitchen profile">
-            <div className="owner-kitchen-info">
-              <p><strong>Name:</strong> {kitchen.name}</p>
-              <p><strong>Code:</strong> {kitchen.code}</p>
-              <p>
-                <strong>Address:</strong>{" "}
-                {formatKitchenAddress({
-                  addressLine: kitchen.address_line,
-                  city: kitchen.city,
-                  state: kitchen.state,
-                  pincode: kitchen.pincode,
-                }) || "—"}
-              </p>
-            </div>
+          <OwnerPanel
+            title="Kitchen profile"
+            description={`Code ${kitchen.code} is permanent. City can change without renaming the code.`}
+          >
+            <form className="owner-form owner-form--wide" onSubmit={handleProfileSave}>
+              {error && <div className="auth-card__error">{error}</div>}
+              {saveMsg && <p className="owner-muted">{saveMsg}</p>}
+              <label>
+                Kitchen name
+                <input
+                  name="name"
+                  required
+                  defaultValue={kitchen.name}
+                  key={`${kitchen.id}-name`}
+                  aria-invalid={Boolean(fieldErrors.name)}
+                  className={fieldErrors.name ? "input-invalid" : undefined}
+                />
+                {fieldErrors.name ? <span className="field-error">{fieldErrors.name}</span> : null}
+              </label>
+              <label>
+                Street address
+                <input
+                  name="address"
+                  required
+                  defaultValue={kitchen.address_line ?? ""}
+                  key={`${kitchen.id}-address`}
+                  aria-invalid={Boolean(fieldErrors.address)}
+                  className={fieldErrors.address ? "input-invalid" : undefined}
+                />
+                {fieldErrors.address ? <span className="field-error">{fieldErrors.address}</span> : null}
+              </label>
+              <div className="form-row">
+                <label>
+                  City
+                  <input
+                    name="city"
+                    required
+                    defaultValue={kitchen.city ?? ""}
+                    key={`${kitchen.id}-city`}
+                    aria-invalid={Boolean(fieldErrors.city)}
+                    className={fieldErrors.city ? "input-invalid" : undefined}
+                  />
+                  {fieldErrors.city ? <span className="field-error">{fieldErrors.city}</span> : null}
+                </label>
+                <label>
+                  State
+                  <input
+                    name="state"
+                    required
+                    defaultValue={kitchen.state ?? ""}
+                    key={`${kitchen.id}-state`}
+                    aria-invalid={Boolean(fieldErrors.state)}
+                    className={fieldErrors.state ? "input-invalid" : undefined}
+                  />
+                  {fieldErrors.state ? <span className="field-error">{fieldErrors.state}</span> : null}
+                </label>
+              </div>
+              <label>
+                Pincode
+                <input
+                  name="pincode"
+                  defaultValue={kitchen.pincode ?? ""}
+                  key={`${kitchen.id}-pincode`}
+                  inputMode="numeric"
+                  maxLength={6}
+                  aria-invalid={Boolean(fieldErrors.pincode)}
+                  className={fieldErrors.pincode ? "input-invalid" : undefined}
+                  onChange={(e) => {
+                    e.target.value = pincodeInputValue(e.target.value);
+                    setFieldErrors((f) => ({ ...f, pincode: undefined }));
+                  }}
+                />
+                {fieldErrors.pincode ? <span className="field-error">{fieldErrors.pincode}</span> : null}
+              </label>
+              <div className="form-row">
+                <label>
+                  Latitude
+                  <input
+                    value={draftLat}
+                    onChange={(e) => setDraftLat(e.target.value)}
+                    inputMode="decimal"
+                  />
+                </label>
+                <label>
+                  Longitude
+                  <input
+                    value={draftLng}
+                    onChange={(e) => setDraftLng(e.target.value)}
+                    inputMode="decimal"
+                  />
+                </label>
+              </div>
+              <div className="owner-kitchen-map__locate">
+                <button
+                  type="button"
+                  className="btn btn--ghost btn--sm"
+                  onClick={() => {
+                    setLocateRequested(true);
+                    refreshGeo();
+                  }}
+                >
+                  {geoStatus === "loading" ? "Locating…" : "Use my current location"}
+                </button>
+                {geoError ? <p className="owner-muted">{geoError}</p> : null}
+              </div>
+              <KitchenLocationMap
+                latitude={draftCoordsValid ? draftLatitude : kitchen.latitude}
+                longitude={draftCoordsValid ? draftLongitude : kitchen.longitude}
+                name={kitchen.name}
+                addressLine={kitchen.address_line}
+                city={kitchen.city}
+                state={kitchen.state}
+                pincode={kitchen.pincode}
+              />
+              <button type="submit" className="btn btn--primary" disabled={busy}>
+                {busy ? "Saving…" : "Save profile and map pin"}
+              </button>
+            </form>
           </OwnerPanel>
 
           <OwnerPanel
@@ -242,31 +424,74 @@ export function KitchenSetupPage() {
             </form>
           </OwnerPanel>
 
-          <OwnerPanel
-            title="Location on map"
-            description="Customers use this pin for nearby discovery and delivery distance"
-          >
-            <KitchenLocationMap
-              latitude={kitchen.latitude}
-              longitude={kitchen.longitude}
-              name={kitchen.name}
-              addressLine={kitchen.address_line}
-              city={kitchen.city}
-              state={kitchen.state}
-              pincode={kitchen.pincode}
-            />
-          </OwnerPanel>
         </>
       ) : (
         <form className="dash-card owner-form owner-form--wide" onSubmit={handleSubmit}>
           {error && <div className="auth-card__error">{error}</div>}
-          <label>Kitchen name<input name="name" required placeholder="Raj Home Kitchen" /></label>
-          <label>Street address<input name="address" required placeholder="Koregaon Park, Lane 5" /></label>
+          <label>
+            Kitchen name
+            <input
+              name="name"
+              required
+              placeholder="Raj Home Kitchen"
+              aria-invalid={Boolean(fieldErrors.name)}
+              className={fieldErrors.name ? "input-invalid" : undefined}
+            />
+            {fieldErrors.name ? <span className="field-error">{fieldErrors.name}</span> : null}
+          </label>
+          <label>
+            Street address
+            <input
+              name="address"
+              required
+              placeholder="Koregaon Park, Lane 5"
+              aria-invalid={Boolean(fieldErrors.address)}
+              className={fieldErrors.address ? "input-invalid" : undefined}
+            />
+            {fieldErrors.address ? <span className="field-error">{fieldErrors.address}</span> : null}
+          </label>
           <div className="form-row">
-            <label>City<input name="city" required placeholder="Pune" defaultValue="Pune" /></label>
-            <label>State<input name="state" required placeholder="Maharashtra" defaultValue="Maharashtra" /></label>
+            <label>
+              City
+              <input
+                name="city"
+                required
+                placeholder="Pune"
+                defaultValue="Pune"
+                aria-invalid={Boolean(fieldErrors.city)}
+                className={fieldErrors.city ? "input-invalid" : undefined}
+              />
+              {fieldErrors.city ? <span className="field-error">{fieldErrors.city}</span> : null}
+            </label>
+            <label>
+              State
+              <input
+                name="state"
+                required
+                placeholder="Maharashtra"
+                defaultValue="Maharashtra"
+                aria-invalid={Boolean(fieldErrors.state)}
+                className={fieldErrors.state ? "input-invalid" : undefined}
+              />
+              {fieldErrors.state ? <span className="field-error">{fieldErrors.state}</span> : null}
+            </label>
           </div>
-          <label>Pincode<input name="pincode" placeholder="411001" /></label>
+          <label>
+            Pincode
+            <input
+              name="pincode"
+              placeholder="411001"
+              inputMode="numeric"
+              maxLength={6}
+              aria-invalid={Boolean(fieldErrors.pincode)}
+              className={fieldErrors.pincode ? "input-invalid" : undefined}
+              onChange={(e) => {
+                e.target.value = pincodeInputValue(e.target.value);
+                setFieldErrors((f) => ({ ...f, pincode: undefined }));
+              }}
+            />
+            {fieldErrors.pincode ? <span className="field-error">{fieldErrors.pincode}</span> : null}
+          </label>
 
           <div className="owner-kitchen-map__locate">
             <div>

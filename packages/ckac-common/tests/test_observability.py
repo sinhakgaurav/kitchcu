@@ -4,7 +4,6 @@ contextvar for the duration of the request; `EventPublisher.build()` reads it so
 event published during that request carries the same correlation ID without every
 domain/schema function needing to thread it through as a parameter."""
 
-import pytest
 from starlette.applications import Starlette
 from starlette.responses import JSONResponse
 from starlette.routing import Route

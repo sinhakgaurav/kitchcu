@@ -17,6 +17,9 @@ export type CustomerProfile = {
   bank_ifsc: string | null;
   bank_account_name: string | null;
   has_password?: boolean;
+  notify_order_updates: boolean;
+  notify_offers: boolean;
+  notify_channel: string;
   status: string;
 };
 

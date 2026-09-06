@@ -338,6 +338,39 @@ gcloud compute ssh ckac-vm --zone=asia-south1-a --command="cd /opt/ckac && CKAC_
 
 **Demo logins after seed:** owner `9876543210` / OTP `123456`, customers `9123456789` etc. / OTP `123456`.
 
+### 11.7b Weekly QA cohort seed (automatic)
+
+`startup.sh` installs a systemd timer that seeds a **fresh cohort every Monday 03:30
+IST**, leaving earlier cohorts untouched. It never wipes data and is safe to re-run:
+every identifier is derived from the ISO year+week, so a repeat run within the same
+week reuses the same accounts and only tops orders up to the target count.
+
+Each run seeds **5 owners** (kitchen + full menu each), **10 customers**, and **10
+delivered, rated orders per kitchen** drawn from a mix of this week's new diners and
+last week's returning ones. It also rotates marketing — this week's `QA{cohort}` coupon
+and promotion go live while the previous cohort's are deactivated — and adds a tiffin
+plan with a subscriber, a CRM refresh, growth suggestions mined from the week's orders,
+and one open support ticket.
+
+Accounts follow `{prefix}{YY}{WW}{index}` — owners start with `7`, customers with `8`.
+Week 2026-W36 therefore gives owners `7263600001…5` and customers `8263600001…10`,
+all with OTP `123456`.
+
+```bash
+# Status / next run
+gcloud compute ssh ckac-vm --zone=asia-south1-a --command="systemctl list-timers kitchcu-weekly-seed --no-pager"
+
+# Run it now (e.g. to hand QA a cohort mid-week)
+gcloud compute ssh ckac-vm --zone=asia-south1-a --command="sudo systemctl start kitchcu-weekly-seed.service"
+
+# This week's accounts + last run log
+gcloud compute ssh ckac-vm --zone=asia-south1-a --command="sudo cat /var/lib/ckac/weekly-cohort.json; sudo tail -n 40 /var/log/ckac-weekly-seed.log"
+```
+
+Locally: `python scripts/weekly_test_data.py --dry-run` prints the cohort without
+calling the API; `--week 2026-W40`, `--owners`, `--customers`, and
+`--orders-per-kitchen` override the defaults.
+
 ### 11.8 Redeploy after a code change (typical update path)
 
 **Prereq:** changes merged/pushed to `origin/main` (VM pulls hard-reset from GitHub).

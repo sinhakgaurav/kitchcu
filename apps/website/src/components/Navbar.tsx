@@ -4,6 +4,7 @@ import { BrandNavMark } from "./BrandNavMark";
 import { APP_TAGLINE } from "../shared/brand";
 import { useAuth } from "../lib/auth";
 import { customerUrl } from "../shared/urls";
+import { SuperAdminLink } from "./SuperAdminAccess";
 
 const links = [
   { href: "/#for-owners", label: "Owners" },
@@ -52,6 +53,7 @@ export function Navbar() {
           >
             {token ? "Dashboard" : "Owner Login"}
           </Link>
+          <SuperAdminLink className="nav__owner-link" onClick={() => setOpen(false)} />
         </nav>
 
         <button type="button" className="nav__toggle" aria-label="Toggle menu" aria-expanded={open} onClick={() => setOpen(!open)}>

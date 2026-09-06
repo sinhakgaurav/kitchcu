@@ -1,7 +1,14 @@
+from datetime import UTC, datetime
+
 import pytest
 from httpx import AsyncClient
 
 from tests.conftest import VALID_GSTIN, _mark_order_delivered, _seed_owner_with_order
+
+# Invoices are synced from orders created "now", so reports must target the current
+# period — a hardcoded month silently reports zero invoices once the calendar moves on.
+_NOW = datetime.now(UTC)
+PERIOD = f"year={_NOW.year}&month={_NOW.month}"
 
 
 def _profile_payload(**overrides):
@@ -116,7 +123,7 @@ async def test_monthly_report_and_balance_sheet(client: AsyncClient, billing_ctx
     await client.post(f"/api/v1/kitchens/{kitchen_id}/gst/sync", headers=headers)
 
     report = await client.get(
-        f"/api/v1/kitchens/{kitchen_id}/gst/reports/monthly?year=2026&month=7",
+        f"/api/v1/kitchens/{kitchen_id}/gst/reports/monthly?{PERIOD}",
         headers=headers,
     )
     assert report.status_code == 200
@@ -127,7 +134,7 @@ async def test_monthly_report_and_balance_sheet(client: AsyncClient, billing_ctx
     assert report_data["audit_status"] == "open"
 
     sheet = await client.get(
-        f"/api/v1/kitchens/{kitchen_id}/gst/reports/balance-sheet?year=2026&month=7",
+        f"/api/v1/kitchens/{kitchen_id}/gst/reports/balance-sheet?{PERIOD}",
         headers=headers,
     )
     assert sheet.status_code == 200
@@ -149,7 +156,7 @@ async def test_close_monthly_audit(client: AsyncClient, billing_ctx):
     await client.post(f"/api/v1/kitchens/{kitchen_id}/gst/sync", headers=headers)
 
     close = await client.post(
-        f"/api/v1/kitchens/{kitchen_id}/gst/audit/close?year=2026&month=7",
+        f"/api/v1/kitchens/{kitchen_id}/gst/audit/close?{PERIOD}",
         headers=headers,
     )
     assert close.status_code == 200
@@ -159,7 +166,7 @@ async def test_close_monthly_audit(client: AsyncClient, billing_ctx):
     assert audit["closed_at"] is not None
 
     again = await client.post(
-        f"/api/v1/kitchens/{kitchen_id}/gst/audit/close?year=2026&month=7",
+        f"/api/v1/kitchens/{kitchen_id}/gst/audit/close?{PERIOD}",
         headers=headers,
     )
     assert again.status_code == 400
@@ -179,7 +186,7 @@ async def test_monthly_gst_excel_and_pdf_exports(client: AsyncClient, billing_ct
     await client.post(f"/api/v1/kitchens/{kitchen_id}/gst/sync", headers=headers)
 
     xlsx = await client.get(
-        f"/api/v1/kitchens/{kitchen_id}/gst/reports/monthly/export.xlsx?year=2026&month=7",
+        f"/api/v1/kitchens/{kitchen_id}/gst/reports/monthly/export.xlsx?{PERIOD}",
         headers=headers,
     )
     assert xlsx.status_code == 200, xlsx.text
@@ -191,7 +198,7 @@ async def test_monthly_gst_excel_and_pdf_exports(client: AsyncClient, billing_ct
     assert "attachment" in xlsx.headers.get("content-disposition", "")
 
     pdf = await client.get(
-        f"/api/v1/kitchens/{kitchen_id}/gst/reports/monthly/export.pdf?year=2026&month=7",
+        f"/api/v1/kitchens/{kitchen_id}/gst/reports/monthly/export.pdf?{PERIOD}",
         headers=headers,
     )
     assert pdf.status_code == 200, pdf.text

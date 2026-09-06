@@ -4,13 +4,12 @@ import { ListingToolbar } from "../../components/ListingToolbar";
 import { useBrandedStorefront } from "../../customer/BrandedStorefront";
 import { RichHtml } from "../../components/RichTextEditor";
 import type { CuisineMenuGroup, Dish, KitchenMealPlan, Menu } from "../../shared/api";
-import {
-  fetchPublicSubscriptionPlans,
-  requestKitchenSubscription,
-} from "../../shared/api";
+import { fetchPublicSubscriptionPlans } from "../../shared/api";
+import { requestKitchenSubscription } from "../../shared/customerDashboardApi";
 import { fetchKitchenRatingSummaries, type DishRatingSummary } from "../../shared/customerRatingsApi";
-import { fetchPublicMenu } from "../../shared/publicApi";
+import { fetchPublicActivePromotions, fetchPublicMenu, type PublicActivePromotion } from "../../shared/publicApi";
 import {
+  CART_CHANGED_EVENT,
   addToCart,
   cartItemCount,
   getCart,
@@ -58,6 +57,7 @@ export function KitchenMenuPage() {
   const [sort, setSort] = useState<DishSort>("name_asc");
   const [highlights, setHighlights] = useState<DishHighlight[]>([]);
   const [diet, setDiet] = useState("");
+  const [promos, setPromos] = useState<PublicActivePromotion[]>([]);
   const checkoutHref = branded ? `${branded.basePath}/checkout` : "/checkout";
 
   useEffect(() => {
@@ -91,6 +91,9 @@ export function KitchenMenuPage() {
         setRatingMap(map);
       })
       .catch(() => {});
+    fetchPublicActivePromotions(kitchenId)
+      .then((r) => setPromos(r.promotions))
+      .catch(() => setPromos([]));
     const refreshCart = () => {
       const cart = getCart();
       setCartLines(cartItemCount(cart, kitchenId));
@@ -99,7 +102,11 @@ export function KitchenMenuPage() {
     };
     refreshCart();
     window.addEventListener("storage", refreshCart);
-    return () => window.removeEventListener("storage", refreshCart);
+    window.addEventListener(CART_CHANGED_EVENT, refreshCart);
+    return () => {
+      window.removeEventListener("storage", refreshCart);
+      window.removeEventListener(CART_CHANGED_EVENT, refreshCart);
+    };
   }, [kitchenId, branded]);
 
   const dietChips = useMemo(() => {
@@ -194,6 +201,18 @@ export function KitchenMenuPage() {
             {!branded && <h1>{kitchenName || "Kitchen Menu"}</h1>}
             <p>{menu.dishes.length} dishes · live-capture when marked</p>
           </header>
+
+          {promos.length > 0 && (
+            <div className="customer-menu__promo glass">
+              {promos.map((p) => (
+                <p key={p.promotion_id}>
+                  <strong>{p.name}</strong>
+                  {" — "}
+                  {p.dish_name} at ₹{Math.round(p.special_price)}
+                </p>
+              ))}
+            </div>
+          )}
 
           <ListingToolbar
             className="customer-menu__toolbar"
@@ -294,9 +313,14 @@ export function KitchenMenuPage() {
             </section>
           ))}
 
-          {filteredDishes.length === 0 && (
+          {menu.dishes.length === 0 ? (
+            <p className="owner-muted">
+              This kitchen hasn’t published dishes yet.{" "}
+              {!branded ? <Link to="/">Discover other kitchens</Link> : "Check back after the owner adds a live-capture menu."}
+            </p>
+          ) : filteredDishes.length === 0 ? (
             <p className="owner-muted">No dishes match these filters.</p>
-          )}
+          ) : null}
 
           {cartLines > 0 && kitchenId && (
             <div className="customer-cart-bar glass">

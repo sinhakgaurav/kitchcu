@@ -20,7 +20,7 @@ async def test_owner_register_blocked_when_flag_disabled(client: AsyncClient):
     cur.close()
     conn.close()
     try:
-        phone = str(uuid.uuid4().int % 9000000000 + 1000000000)
+        phone = str(uuid.uuid4().int % 4_000_000_000 + 6_000_000_000)
         res = await client.post(
             "/api/v1/owners/register",
             json={"phone": phone, "name": "Blocked Owner"},

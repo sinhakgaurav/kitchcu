@@ -26,13 +26,14 @@ import uuid
 from datetime import UTC, datetime, timedelta
 from typing import Literal
 
-from pydantic import BaseModel, Field, model_validator
-from sqlalchemy import func, select, text
+from pydantic import BaseModel, Field, field_validator, model_validator
+from sqlalchemy import func, or_, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import MasterOrder, Order, OrderItem, OrderStatusEvent, can_transition
 from ckac_common.auth import stream_key
 from ckac_common.event_bus import EventPublisher
+from ckac_common.validators import normalize_display_name, normalize_optional_india_phone
 
 
 class OrderItemInput(BaseModel):
@@ -124,6 +125,19 @@ class ManualOrderCreateRequest(BaseModel):
         description="Optional kitchen coupon code applied at order create.",
     )
 
+    @field_validator("customer_phone")
+    @classmethod
+    def normalize_phone(cls, v: str | None) -> str | None:
+        return normalize_optional_india_phone(v)
+
+    @field_validator("customer_name")
+    @classmethod
+    def normalize_name(cls, v: str | None) -> str | None:
+        # Customer and master checkout rebuild this request server-side with the
+        # name on the customer's profile, which is a `Customer 0481` label for
+        # OTP signups — so digits have to stay legal here.
+        return normalize_display_name(v)
+
 
 class CustomerOrderCreateRequest(BaseModel):
     """Customer PWA checkout order for a single kitchen (customer identity comes from the JWT)."""
@@ -174,6 +188,11 @@ class CustomerOrderCreateRequest(BaseModel):
         max_length=32,
         description="Optional kitchen coupon code — validated server-side against marketing coupons.",
     )
+
+    @field_validator("customer_phone")
+    @classmethod
+    def normalize_phone(cls, v: str | None) -> str | None:
+        return normalize_optional_india_phone(v)
 
 
 class MasterOrderGroupInput(BaseModel):
@@ -562,22 +581,43 @@ async def _get_kitchen_code(session: AsyncSession, kitchen_id: uuid.UUID) -> str
     return code
 
 
+def _bill_seq_suffix(value: str | None) -> int:
+    """Last `-NNNN` segment of a bill_id or order_code, or 0 if unreadable."""
+    if not value:
+        return 0
+    suffix = value.rsplit("-", 1)[-1]
+    return int(suffix) if suffix.isdigit() else 0
+
+
 async def _next_bill_id(session: AsyncSession, kitchen_id: uuid.UUID) -> tuple[str, str]:
+    """Allocate the next daily bill without reusing a gap or a recycled kitchen code.
+
+    `COUNT(*) + 1` reissues a code the moment any of today's orders is deleted.
+    Kitchen codes are also recycled after a reset while old orders keep their
+    `order_code`, so the lock and the max must be keyed on the public kitchen
+    code — not just the current kitchen row.
+    """
     today = datetime.now(UTC).strftime("%Y%m%d")
     prefix = f"BILL-{today}-"
+    kitchen_code = await _get_kitchen_code(session, kitchen_id)
     await session.execute(
         text("SELECT pg_advisory_xact_lock(hashtext(:lock_key))"),
-        {"lock_key": f"bill_seq:{kitchen_id}:{today}"},
+        {"lock_key": f"bill_seq:{kitchen_code}:{today}"},
     )
     result = await session.execute(
-        select(func.count(Order.id)).where(
-            Order.kitchen_id == kitchen_id,
+        select(Order.bill_id, Order.order_code).where(
+            or_(
+                Order.kitchen_id == kitchen_id,
+                Order.order_code.like(f"{kitchen_code}-{prefix}%"),
+            ),
             Order.bill_id.like(f"{prefix}%"),
         )
     )
-    seq = (result.scalar_one() or 0) + 1
+    max_seq = 0
+    for bill_id, order_code in result.all():
+        max_seq = max(max_seq, _bill_seq_suffix(bill_id), _bill_seq_suffix(order_code))
+    seq = max_seq + 1
     bill_id = f"{prefix}{seq:04d}"
-    kitchen_code = await _get_kitchen_code(session, kitchen_id)
     order_code = f"{kitchen_code}-{bill_id}"
     return bill_id, order_code
 
@@ -1315,15 +1355,50 @@ async def list_kitchen_orders(
     *,
     status: str | None = None,
     source: str | None = None,
+    created_after: datetime | None = None,
+    created_before: datetime | None = None,
 ) -> list[Order]:
     query = select(Order).where(Order.kitchen_id == kitchen_id)
     if status:
         query = query.where(Order.status == status)
     if source:
         query = query.where(Order.source == source)
+    if created_after:
+        query = query.where(Order.created_at >= created_after)
+    if created_before:
+        query = query.where(Order.created_at <= created_before)
     query = query.order_by(Order.created_at.desc())
     result = await session.execute(query)
     return list(result.scalars().all())
+
+
+class DraftItemUpdate(BaseModel):
+    """One draft line the owner wants to keep, remap, or leave unmatched."""
+
+    raw: str = Field(..., min_length=1, description="Original text of this line, unmodified.")
+    dish_id: uuid.UUID | None = Field(
+        default=None,
+        description="Kitchen dish UUID to match this line to, or `null` to leave unmatched.",
+    )
+    quantity: int = Field(..., gt=0, description="Quantity for this line. Must be a positive integer.")
+
+
+class UpdateDraftRequest(BaseModel):
+    """Owner remap of a pending draft's parsed lines (and optional customer phone)."""
+
+    parsed_items: list[DraftItemUpdate] = Field(
+        ...,
+        min_length=1,
+        description="Replacement parsed lines. `dish_id` must belong to this kitchen when set.",
+    )
+    customer_phone: str | None = Field(
+        default=None, description="Updated customer phone, or `null` to clear."
+    )
+
+    @field_validator("customer_phone")
+    @classmethod
+    def normalize_phone(cls, v: str | None) -> str | None:
+        return normalize_optional_india_phone(v)
 
 
 class ParseMessageRequest(BaseModel):
@@ -1336,6 +1411,11 @@ class ParseMessageRequest(BaseModel):
         default="manual_message", description="Origin of the message. Set to 'whatsapp' automatically on the internal WhatsApp intake route."
     )
     customer_phone: str | None = Field(default=None, description="Customer phone associated with the message, if known.")
+
+    @field_validator("customer_phone")
+    @classmethod
+    def normalize_phone(cls, v: str | None) -> str | None:
+        return normalize_optional_india_phone(v)
 
 
 class ParsedItemResponse(BaseModel):
@@ -1482,6 +1562,87 @@ async def list_kitchen_drafts(session: AsyncSession, kitchen_id: uuid.UUID) -> l
         .order_by(OrderDraft.created_at.desc())
     )
     return list(result.scalars().all())
+
+
+async def update_draft(
+    session: AsyncSession,
+    kitchen_id: uuid.UUID,
+    draft_id: uuid.UUID,
+    data: UpdateDraftRequest,
+    publisher: EventPublisher | None,
+):
+    from app.models import OrderDraft
+
+    result = await session.execute(
+        select(OrderDraft).where(
+            OrderDraft.id == draft_id,
+            OrderDraft.kitchen_id == kitchen_id,
+            OrderDraft.status == "draft",
+        )
+    )
+    draft = result.scalar_one_or_none()
+    if not draft:
+        raise LookupError("Draft not found")
+
+    menu = await _load_kitchen_menu(session, kitchen_id)
+    menu_by_id = {str(d["id"]): d for d in menu}
+
+    parsed_items: list[dict] = []
+    unmatched_lines: list[str] = []
+    for item in data.parsed_items:
+        if item.dish_id is None:
+            parsed_items.append(
+                {
+                    "raw": item.raw,
+                    "dish_id": None,
+                    "dish_name": None,
+                    "quantity": item.quantity,
+                    "matched": False,
+                    "unit_price": None,
+                    "prep_time_min": None,
+                }
+            )
+            unmatched_lines.append(item.raw)
+            continue
+        dish = menu_by_id.get(str(item.dish_id))
+        if not dish:
+            raise ValueError("Dish not found on kitchen menu")
+        parsed_items.append(
+            {
+                "raw": item.raw,
+                "dish_id": str(dish["id"]),
+                "dish_name": dish["name"],
+                "quantity": item.quantity,
+                "matched": True,
+                "unit_price": dish["price"],
+                "prep_time_min": dish.get("prep_time_min", 30),
+            }
+        )
+
+    draft.parsed_items = parsed_items
+    draft.unmatched_lines = unmatched_lines
+    if "customer_phone" in data.model_fields_set:
+        draft.customer_phone = data.customer_phone
+    draft.updated_at = datetime.now(UTC)
+    await session.flush()
+
+    if publisher:
+        event = EventPublisher.build(
+            event_type="order.draft.updated",
+            aggregate_type="order_draft",
+            aggregate_id=str(draft.id),
+            producer="order-service",
+            payload={
+                "kitchen_id": str(kitchen_id),
+                "draft_id": str(draft.id),
+                "source": draft.source,
+                "matched_count": sum(1 for p in parsed_items if p["matched"]),
+                "unmatched_count": len(unmatched_lines),
+            },
+        )
+        await publisher.publish(stream_key("orders", "draft"), event, session=session)
+
+    return draft
 
 
 async def confirm_draft(

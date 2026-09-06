@@ -23,13 +23,14 @@ import {
   projectKitchenDeliveryMin,
   projectKitchenPrepMin,
   projectKitchenReadyMin,
+  updateLineInstructions,
   updateLineQuantity,
   type CustomerCart,
   type KitchenCartGroup,
 } from "../../shared/customerCart";
 import { APP_STORAGE_PREFIX } from "../../shared/brand";
 import { denyDeliveryFee, fetchDeliveryQuote, type DeliveryQuote } from "../../shared/api";
-import { fetchMyAddresses, type CustomerAddress } from "../../shared/customerDashboardApi";
+import { fetchMyAddresses, saveAddress, type CustomerAddress } from "../../shared/customerDashboardApi";
 
 type DeliveryType = "pickup" | "delivery";
 type PaymentMethod = "cod" | "online" | "upi";
@@ -76,6 +77,7 @@ function buildGroupPayload(
     items: kitchen.lines.map((line) => ({
       dish_id: line.dishId,
       quantity: line.quantity,
+      special_instructions: line.special_instructions || undefined,
     })),
     delivery_type: deliveryType,
     delivery_mode: isDelivery ? deliveryMode : undefined,
@@ -111,6 +113,9 @@ export function CheckoutPage() {
   const [couponDiscount, setCouponDiscount] = useState(0);
   const [couponMsg, setCouponMsg] = useState("");
   const [couponBusy, setCouponBusy] = useState(false);
+  const [addrLine, setAddrLine] = useState("");
+  const [addrCity, setAddrCity] = useState("");
+  const [addrBusy, setAddrBusy] = useState(false);
 
   const requiresPrepaid = useMemo(() => {
     if (!cart) return false;
@@ -242,7 +247,10 @@ export function CheckoutPage() {
   const loginNext = branded ? `${branded.basePath}/checkout` : "/checkout";
   const menuBack = branded ? `${branded.basePath}/menu` : "/#near-you";
 
-  if (!loading && !token) {
+  if (loading) {
+    return <p className="app-loading">{t("common.loading")}</p>;
+  }
+  if (!token) {
     return <Navigate to={`/login?next=${encodeURIComponent(loginNext)}`} replace />;
   }
 
@@ -349,7 +357,11 @@ export function CheckoutPage() {
         );
 
         let settlements;
-        if (paymentMethod === "online" || paymentMethod === "upi") {
+        let paymentId: string | undefined;
+        if (paymentMethod === "upi") {
+          const payment = await createMasterPayment(master.id, "upi");
+          paymentId = payment.id;
+        } else if (paymentMethod === "online") {
           const payment = await createMasterPayment(master.id, paymentMethod);
           const captured = await captureMasterPayment(payment.id);
           settlements = captured.settlements;
@@ -360,7 +372,7 @@ export function CheckoutPage() {
           branded
             ? `${branded.basePath}/master-orders/${master.id}/confirm`
             : `/master-orders/${master.id}/confirm`,
-          { state: { master, paymentMethod, settlements } },
+          { state: { master, paymentMethod, settlements, paymentId } },
         );
         return;
       }
@@ -430,7 +442,7 @@ export function CheckoutPage() {
         </div>
       </header>
 
-      {addresses.length > 0 && (
+      {addresses.length > 0 ? (
         <section className="customer-checkout__card">
           <label>
             Delivery address
@@ -457,6 +469,63 @@ export function CheckoutPage() {
           <Link to="/dashboard" className="btn btn--ghost btn--sm">
             Manage addresses
           </Link>
+        </section>
+      ) : (
+        <section className="customer-checkout__card">
+          <h2>Add a delivery address</h2>
+          <p className="customer-checkout__hint">
+            Save a pin for accurate delivery fees — or continue with GPS.
+          </p>
+          <label>
+            Address
+            <input
+              value={addrLine}
+              onChange={(e) => setAddrLine(e.target.value)}
+              placeholder="Flat / street"
+              maxLength={240}
+            />
+          </label>
+          <label>
+            City
+            <input
+              value={addrCity}
+              onChange={(e) => setAddrCity(e.target.value)}
+              placeholder="Pune"
+              maxLength={80}
+            />
+          </label>
+          <button
+            type="button"
+            className="btn btn--ghost btn--sm"
+            disabled={addrBusy || addrLine.trim().length < 5 || !addrCity.trim()}
+            onClick={async () => {
+              setAddrBusy(true);
+              setError("");
+              try {
+                const saved = await saveAddress({
+                  label: "Home",
+                  address_line: addrLine.trim(),
+                  city: addrCity.trim(),
+                  state: null,
+                  pincode: null,
+                  landmark: null,
+                  latitude: coords.latitude,
+                  longitude: coords.longitude,
+                  is_default: true,
+                });
+                setAddresses([saved]);
+                setSelectedAddressId(saved.id);
+                setAddrLine("");
+                setAddrCity("");
+              } catch (err) {
+                setError(err instanceof Error ? err.message : "Could not save address");
+              } finally {
+                setAddrBusy(false);
+              }
+            }}
+          >
+            {addrBusy ? "Saving…" : "Save address"}
+          </button>
         </section>
       )}
 
@@ -513,6 +582,17 @@ export function CheckoutPage() {
                     <em className="customer-line-eta">
                       {" "}· ready ≤{line.maxTimeMin || line.prepTimeMin}m
                     </em>
+                    <input
+                      type="text"
+                      className="customer-line-note"
+                      placeholder="Note for kitchen (optional)"
+                      maxLength={160}
+                      value={line.special_instructions ?? ""}
+                      onChange={(event) => {
+                        const next = updateLineInstructions(line.dishId, event.target.value);
+                        setCart(next);
+                      }}
+                    />
                   </span>
                   <span>₹{(line.unitPrice * line.quantity).toFixed(0)}</span>
                 </li>
@@ -704,7 +784,12 @@ export function CheckoutPage() {
             Prepaid required for shared or pay-first delivery fees — capture UPI/online before Porter is booked.
           </p>
         )}
-        {isMultiKitchen && paymentMethod !== "cod" && (
+        {isMultiKitchen && paymentMethod === "upi" && (
+          <p className="customer-checkout__hint">
+            UPI is not captured here — complete payment on the next screen, then tap “I’ve paid”.
+          </p>
+        )}
+        {isMultiKitchen && paymentMethod === "online" && (
           <p className="customer-checkout__hint">
             One payment is captured at checkout and split to each kitchen via Razorpay Route.
           </p>

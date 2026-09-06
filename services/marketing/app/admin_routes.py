@@ -24,6 +24,7 @@ from app.subscriptions import (
     subscription_to_response,
 )
 from app.templates import TemplateResponse, list_templates
+from ckac_common.admin_rbac import assert_admin_permission
 from ckac_common.config import get_settings
 from ckac_common.database import get_db
 from ckac_common.event_bus import EventPublisher
@@ -76,20 +77,7 @@ async def get_current_admin(
 
 
 async def _assert_perm(session: AsyncSession, role: str, permission: str) -> None:
-    rows = (
-        await session.execute(
-            text(
-                "SELECT permission_code FROM ckac_identity.admin_role_permissions WHERE role = :role"
-            ),
-            {"role": role},
-        )
-    ).scalars().all()
-    grants = {str(r) for r in rows}
-    if "*" in grants or permission in grants:
-        return
-    if permission.endswith(":read") and permission[:-5] + ":write" in grants:
-        return
-    raise HTTPException(status_code=403, detail=f"Missing permission: {permission}")
+    await assert_admin_permission(session, role=role, permission=permission)
 
 
 @router.get(

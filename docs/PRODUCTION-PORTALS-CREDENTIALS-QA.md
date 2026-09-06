@@ -36,6 +36,37 @@ Local equivalents (dev): portal `:13000` · customer `:13001` · kitchen `:13002
 
 Seed: `.\scripts\seed-all.ps1` (includes multi-city kitchens: Delhi, Gurugram, Noida, Dehradun, Prayagraj, Varanasi, Kanpur, Lucknow, Jhansi, Mumbai).
 
+### 2.1b Weekly QA cohort (fresh accounts every Monday)
+
+A systemd timer on the VM seeds a new set of test accounts each ISO week and leaves
+earlier cohorts intact, so QA never has to reuse dirty accounts. Numbers are derived
+from the ISO year + week — `{prefix}{YY}{WW}{index}`, owners `7…`, customers `8…`.
+
+| Persona | Login pattern | Example (2026-W36) | Secret |
+|---------|---------------|--------------------|--------|
+| **Owner** (5/week) | `7{YY}{WW}{00001…}` | `7263600001` … `7263600005` | OTP `123456` |
+| **Customer** (10/week) | `8{YY}{WW}{00001…}` | `8263600001` … `8263600010` | OTP `123456` |
+
+Each run also produces, per cohort kitchen:
+
+| Data | Volume | Why QA needs it |
+|------|--------|-----------------|
+| Kitchen + full menu | 1 kitchen, rotating city | Discovery, menu, and storefront screens |
+| Delivered orders | 10 per kitchen | Owner inbox, analytics, revenue, receipts |
+| Diner mix | ~⅔ this week's new, ~⅓ last week's returning | CRM `repeat`/`vip` segments are non-empty |
+| Ratings | one per delivered order | Home-taste aggregates, dish scores |
+| Coupon | `QA{cohort}` (e.g. `QAW2636`) | Checkout discount path; earlier QA codes are deactivated so only one is live |
+| Promotion | `QA cohort {tag} special`, 7-day window | Targeted-promo surfaces; previous cohort's promo is ended |
+| Tiffin plan + subscription | 1 plan, 1 subscriber | Owner subscription inbox, customer subscriptions tab |
+| Growth suggestions | generated from the week's orders | Combos, patterns, suggestion cards |
+| Support ticket | 1 open | Support triage queue |
+
+The current week's cohort and per-kitchen totals are written to
+`/var/lib/ckac/weekly-cohort.json` on the VM.
+
+Preview locally without touching the API: `python scripts/weekly_test_data.py --dry-run`.
+Override volumes with `--owners`, `--customers`, `--orders-per-kitchen`, `--week 2026-W40`.
+
 ### 2.2 Production (`*.kitchcu.com`)
 
 | Persona | Login | Secret | Notes |
@@ -162,7 +193,7 @@ Legend: **O** = Owner · **C** = Customer · **A** = Admin · **P** = Platform/s
 |------|-----------------|------------|
 | Identity / OTP | Auth for O/C | Request + verify OTP; invalid phone rejected |
 | Admin RBAC | Platform ops | Admin login; Control rate limits; no owner JWT on admin APIs |
-| Gateway rate limits | Abuse protection | Burst OTP → 429; admin preset for test phase |
+| Gateway rate limits | Abuse protection | Burst OTP from a browser → 429; admin preset for test phase. On-host ops traffic (seed scripts hitting `127.0.0.1:18000` with no `X-Forwarded-For`) is exempt — anything arriving through Caddy is not |
 | i18n | Language switcher | Switch hi/en on portal + customer; labels update |
 | Support AI | FAQ / tickets | Portal chat options → answer; raise ticket |
 | Cities presence | Expansion signal | Portal / kitchen / customer show Live + Coming soon chips |

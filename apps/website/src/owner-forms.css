@@ -15,6 +15,11 @@
   --kc-control-pad-x: 1rem;
   --kc-control-pad-y: 0.75rem;
   --kc-btn-min-h: 2.85rem;
+  --kc-field-error: #e57373;
+}
+
+html.theme-brand-light {
+  --kc-field-error: #dc2626;
 }
 
 /* ── Text inputs, selects, textareas ─────────────────────── */
@@ -254,6 +259,228 @@ select.owner-input,
   color: var(--text-muted);
   line-height: 1.4;
   margin: 0;
+}
+
+/* ── Inline field feedback (all surfaces, not just .auth-card) ── */
+
+.field-error {
+  display: block;
+  margin-top: 0.35rem;
+  font-size: 0.78rem;
+  font-weight: 500;
+  line-height: 1.35;
+  color: var(--kc-field-error);
+}
+
+.field-hint {
+  display: block;
+  margin-top: 0.3rem;
+  font-size: 0.75rem;
+  font-weight: 500;
+  line-height: 1.4;
+  color: var(--text-muted);
+}
+
+.input-invalid {
+  border-color: var(--kc-field-error) !important;
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--kc-field-error) 25%, transparent);
+}
+
+/* ── Phone entry: fixed dial adornment + 10-digit capped input ── */
+
+/* Surfaces that paint their own fields (auth cards, contact form, chat widget)
+   only re-point these `--pf-*` properties. Keeping the overrides on custom
+   properties instead of the paint declarations leaves the invalid state — which
+   carries no surface context — free to win on its own. */
+.phone-field {
+  --pf-bg: var(--kc-field-bg);
+  --pf-bg-hover: var(--kc-field-bg-hover);
+  --pf-border: var(--kc-field-border);
+  --pf-border-w: 1px;
+  --pf-border-hover: var(--kc-field-border-hover);
+  --pf-border-focus: var(--kc-field-border-focus);
+  --pf-shadow-focus: var(--kc-field-shadow-focus);
+  --pf-radius: var(--kc-field-radius);
+  --pf-fg: var(--text);
+  display: flex;
+  flex-direction: column;
+  gap: var(--kc-label-control-gap);
+  width: 100%;
+  max-width: 100%;
+  margin: 0;
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--text-muted);
+}
+
+.phone-field__label {
+  display: block;
+  line-height: 1.35;
+}
+
+/* The dial adornment and the input read as one control: the shell owns the
+   border and radius, the input contributes nothing but text. */
+.phone-field__control {
+  display: flex;
+  align-items: stretch;
+  width: 100%;
+  box-sizing: border-box;
+  min-height: var(--kc-field-h);
+  border: var(--pf-border-w) solid var(--pf-border);
+  border-radius: var(--pf-radius);
+  background: var(--pf-bg);
+  overflow: hidden;
+  transition: border-color 0.2s, box-shadow 0.2s, background 0.2s;
+}
+
+.phone-field__control:hover {
+  border-color: var(--pf-border-hover);
+  background: var(--pf-bg-hover);
+}
+
+.phone-field__control:focus-within {
+  border-color: var(--pf-border-focus);
+  box-shadow: var(--pf-shadow-focus);
+  background: var(--pf-bg-hover);
+}
+
+.phone-field__control--invalid,
+.phone-field__control--invalid:hover,
+.phone-field__control--invalid:focus-within {
+  border-color: var(--kc-field-error);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--kc-field-error) 25%, transparent);
+}
+
+.phone-field__dial {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0 0.7rem 0 0.9rem;
+  border-right: var(--pf-border-w) solid var(--pf-border);
+  background: color-mix(in srgb, var(--pf-fg) 6%, transparent);
+  color: var(--pf-fg);
+  font-size: 0.95rem;
+  font-weight: 600;
+  letter-spacing: 0;
+  white-space: nowrap;
+  user-select: none;
+}
+
+.phone-field__input {
+  flex: 1 1 auto;
+  /* Lets the input shrink inside the shell instead of overflowing narrow (360px) screens. */
+  min-width: 0;
+  min-height: var(--kc-field-h);
+  padding: var(--kc-control-pad-y) var(--kc-control-pad-x);
+  color: var(--pf-fg);
+  font-family: var(--font-body);
+  font-size: 1rem;
+  line-height: 1.4;
+  /* The generic `.owner-form input:not(…)` / `.owner-forms input` rules outrank any
+     class chain here, so merging the input into the shell has to be forced. */
+  border: none !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+.phone-field__input:focus {
+  outline: none;
+}
+
+.phone-field__input:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.phone-field__input::placeholder {
+  color: rgba(156, 163, 175, 0.75);
+  letter-spacing: 0;
+}
+
+/* Table rows already carry a column header, so the label is screen-reader only. */
+.phone-field--bare > .phone-field__label {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.owner-table td .phone-field {
+  min-width: 11rem;
+}
+
+.owner-table .phone-field__control,
+.owner-table .phone-field__input {
+  /* Compact for tables, but never below the 44px tap target. */
+  min-height: 2.75rem;
+}
+
+.owner-table .phone-field__input {
+  font-size: 0.9rem;
+  padding-left: 0.65rem;
+  padding-right: 0.65rem;
+}
+
+.owner-table .phone-field__dial {
+  padding: 0 0.5rem 0 0.6rem;
+  font-size: 0.85rem;
+}
+
+/* Auth cards paint brand-cream fields (see brand-ux.css) rather than using the
+   dashboard field tokens, so the phone shell follows that palette instead. */
+.auth-page .auth-card .phone-field,
+.admin-login__card .phone-field {
+  --pf-bg: var(--brand-cream);
+  --pf-bg-hover: #fff;
+  --pf-border: rgba(11, 27, 50, 0.12);
+  --pf-border-w: 1.5px;
+  --pf-border-hover: rgba(11, 27, 50, 0.18);
+  --pf-border-focus: var(--brand-teal);
+  --pf-shadow-focus: 0 0 0 3px rgba(46, 196, 182, 0.2);
+  --pf-radius: 14px;
+  --pf-fg: var(--brand-ink);
+}
+
+/* Compact chat widget fields — follow the widget shell without dropping the tap target. */
+.support-chat__ticket-form .phone-field {
+  --pf-bg: var(--veil-4);
+  --pf-bg-hover: var(--veil-4);
+  --pf-border: var(--surface-border);
+  --pf-radius: 8px;
+}
+
+.support-chat__ticket-form .phone-field__control,
+.support-chat__ticket-form .phone-field__input {
+  min-height: 2.75rem;
+}
+
+.support-chat__ticket-form .phone-field__dial {
+  padding: 0 0.55rem;
+  font-size: 0.8rem;
+}
+
+/* The portal contact form styles its own fields instead of the shared tokens,
+   so the phone shell has to follow its siblings on both themes. */
+.contact__form .phone-field {
+  --pf-bg: rgba(0, 0, 0, 0.3);
+  --pf-bg-hover: rgba(0, 0, 0, 0.3);
+  --pf-border: var(--surface-border);
+  --pf-radius: 10px;
+}
+
+html.theme-brand-light .contact__form .phone-field {
+  --pf-bg: #fff;
+  --pf-bg-hover: #fff;
+  --pf-border: rgba(11, 27, 50, 0.16);
+  --pf-fg: var(--brand-ink);
 }
 
 /* Form column rhythm — fields + submit buttons */

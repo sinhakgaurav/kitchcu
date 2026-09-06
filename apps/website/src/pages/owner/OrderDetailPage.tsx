@@ -25,6 +25,7 @@ import {
 } from "../../lib/api";
 import { googleMapsDirectionsEmbedUrl, googleMapsRouteUrl } from "../../lib/locationMaps";
 import { useKitchen } from "../../lib/kitchen";
+import { customerUrl } from "../../shared/urls";
 
 const inr = (n: number) => `₹${Math.round(n).toLocaleString("en-IN")}`;
 
@@ -48,6 +49,7 @@ export function OrderDetailPage() {
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [cancelReason, setCancelReason] = useState("");
+  const [statusNote, setStatusNote] = useState("");
   const [payment, setPayment] = useState<Payment | null>(null);
   const [upiIntent, setUpiIntent] = useState<UpiIntent | null>(null);
   const [payError, setPayError] = useState("");
@@ -96,9 +98,11 @@ export function OrderDetailPage() {
     try {
       const updated = await updateOrderStatus(order.id, {
         status,
+        note: statusNote.trim() || undefined,
         cancel_reason: status === "cancelled" ? cancelReason || "Cancelled by owner" : undefined,
       });
       setOrder(updated);
+      setStatusNote("");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Update failed");
     } finally {
@@ -406,15 +410,57 @@ export function OrderDetailPage() {
               </li>
             ))}
           </ul>
-          <div className="owner-detail-total">
-            <span>Total</span>
-            <strong>{inr(order.total)}</strong>
+          <div className="owner-detail-breakdown">
+            <div>
+              <span>Subtotal</span>
+              <span>{inr(order.subtotal)}</span>
+            </div>
+            {(order.discount_amount ?? 0) > 0 && (
+              <div>
+                <span>Coupon{order.coupon_code ? ` · ${order.coupon_code}` : ""}</span>
+                <span>−{inr(order.discount_amount ?? 0)}</span>
+              </div>
+            )}
+            {order.coupon_code && !(order.discount_amount ?? 0) && (
+              <div>
+                <span>Coupon</span>
+                <span>{order.coupon_code}</span>
+              </div>
+            )}
+            {order.delivery_fee > 0 && (
+              <div>
+                <span>Delivery</span>
+                <span>{inr(order.delivery_fee)}</span>
+              </div>
+            )}
+            <div className="owner-detail-total">
+              <span>Total</span>
+              <strong>{inr(order.total)}</strong>
+            </div>
           </div>
           {(order.customer_name || order.customer_phone) && (
             <p className="od-order-detail__customer">
               <strong>Customer:</strong> {order.customer_name ?? "—"} {order.customer_phone ?? ""}
             </p>
           )}
+          {order.tracking_token ? (
+            <p className="od-order-detail__customer">
+              <strong>Tracking:</strong>{" "}
+              <a href={customerUrl(`/t/${order.tracking_token}`)} target="_blank" rel="noopener noreferrer">
+                Open customer track link
+              </a>
+              {" · "}
+              <button
+                type="button"
+                className="btn btn--ghost btn--sm"
+                onClick={() => {
+                  void navigator.clipboard.writeText(customerUrl(`/t/${order.tracking_token}`));
+                }}
+              >
+                Copy
+              </button>
+            </p>
+          ) : null}
           {kitchen && order.status !== "cancelled" && order.status !== "delivered" && (
             <div className="owner-recipe-guide-list">
               <h3>Prep guides</h3>
@@ -641,6 +687,15 @@ export function OrderDetailPage() {
               </div>
             </header>
             {error && <div className="auth-card__error">{error}</div>}
+            <label className="kc-field">
+              <span className="kc-field__label">Note for customer (optional)</span>
+              <input
+                className="kc-input"
+                value={statusNote}
+                onChange={(e) => setStatusNote(e.target.value)}
+                placeholder="e.g. Ready in 10 min, rider on the way"
+              />
+            </label>
             <div className="owner-status-actions">
               {next.filter((s) => s !== "cancelled").map((s) => (
                 <button key={s} type="button" className="btn btn--primary" disabled={busy} onClick={() => advance(s)}>

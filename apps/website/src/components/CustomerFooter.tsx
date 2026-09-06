@@ -2,6 +2,7 @@ import { Link } from "react-router-dom";
 import { BrandNavMark } from "./BrandNavMark";
 import { APP_NAME, CUSTOMER_HOST } from "../shared/brand";
 import { kitchenUrl } from "../shared/urls";
+import { SuperAdminLink } from "./SuperAdminAccess";
 
 export function CustomerFooter() {
   return (
@@ -19,6 +20,7 @@ export function CustomerFooter() {
           <a href="/#by-code">Kitchen code</a>
           <Link to="/login">Customer sign in</Link>
           <a href={kitchenUrl("/login")} target="_blank" rel="noopener noreferrer">Kitchen owner login</a>
+          <SuperAdminLink />
         </div>
         <p className="footer__copy">
           © {new Date().getFullYear()} {APP_NAME} · Customer

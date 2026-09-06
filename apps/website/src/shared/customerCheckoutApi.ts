@@ -43,7 +43,7 @@ export async function validateCheckoutCoupon(data: {
 export async function createCustomerOrder(
   kitchenId: string,
   data: {
-    items: { dish_id: string; quantity: number }[];
+    items: { dish_id: string; quantity: number; special_instructions?: string }[];
     delivery_type: "pickup" | "delivery";
     payment_method: "cod" | "online" | "upi";
     delivery_fee?: number;
@@ -67,7 +67,7 @@ export async function createMasterOrder(
   data: {
     groups: {
       kitchen_id: string;
-      items: { dish_id: string; quantity: number }[];
+      items: { dish_id: string; quantity: number; special_instructions?: string }[];
       delivery_type: "pickup" | "delivery";
       delivery_fee: number;
       distance_km?: number;

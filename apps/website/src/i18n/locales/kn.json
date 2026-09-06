@@ -32,7 +32,12 @@
     "customerApp": "ಗ್ರಾಹಕ ಆ್ಯಪ್",
     "kitchenOwner": "ಕಿಚನ್ ಮಾಲೀಕರು →",
     "ownerLogin": "ಮಾಲೀಕರ ಲಾಗಿನ್",
-    "adminLogin": "Super admin"
+    "adminLogin": "Super admin",
+    "adminCredentialsDev": "Email {{email}} · Password {{password}} (dev / seeded)",
+    "adminCredentialsHost": "Open the console on {{host}}.",
+    "adminCredentialsProd": "Email {{email}} — password from the VM ADMIN_PASSWORD secret, not this page",
+    "adminCredentialsTitle": "Super admin credentials",
+    "adminOpenConsole": "Open Super Admin"
   },
   "status": {
     "received": "ಸ್ವೀಕರಿಸಲಾಗಿರುವುದು",
@@ -142,7 +147,15 @@
     "contactSending": "ಕಳುಹಿಸಲಾಗುತ್ತಿದೆ...",
     "contactSent": "ಧನ್ಯವಾದಗಳು - ನಾವು ಶೀಘ್ರದಲ್ಲೇ ತಲುಪುತ್ತೇವೆ.",
     "contactError": "ಕಳುಹಿಸಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ. ದಯವಿಟ್ಟು ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ.",
-    "navCities": "Cities"
+    "navCities": "Cities",
+    "ctaAdmin": "Super admin →",
+    "tileAdminBody": "Kitchens, employees, tickets, packages, and API keys — Super Admin only.",
+    "tileAdminCta": "Open Super Admin",
+    "tileAdminTitle": "Operate the platform",
+    "tileCustomerBody": "Nearby kitchens, live-capture menus, honest ETAs, and fair delivery fees.",
+    "tileCustomerTitle": "Order home-made food",
+    "tileKitchenBody": "WhatsApp orders, menu, tiffin plans, reports — zero food commission.",
+    "tileKitchenTitle": "Run your kitchen"
   },
   "owner": {
     "nav": {
@@ -170,7 +183,8 @@
       "paymentGateway": "ಪಾವತಿ ಗೇಟ್‌ವೇ",
       "gst": "ಜಿಎಸ್‌ಟಿ ಮತ್ತು ಹಣಕಾಸು",
       "setup": "ಕಿಚನ್ ಸೆಟಪ್",
-      "bulkPrep": "Prep batches"
+      "bulkPrep": "Prep batches",
+      "ratings": "Ratings"
     },
     "shell": {
       "activeKitchen": "ಸಕ್ರಿಯ ಅಡುಗೆಮನೆ",
@@ -316,7 +330,8 @@
       "setup": "ಕಿಚನ್ ಸೆಟಪ್",
       "referrals": "ಉಲ್ಲೇಖಗಳು",
       "newOrder": "ಹೊಸ ಆದೇಶ",
-      "addDish": "ಭಕ್ಷ್ಯವನ್ನು ಸೇರಿಸಿ"
+      "addDish": "ಭಕ್ಷ್ಯವನ್ನು ಸೇರಿಸಿ",
+      "ratings": "Ratings"
     }
   },
   "customer": {
@@ -328,7 +343,10 @@
       "myOrders": "ನನ್ನ ಆರ್ಡರ್‌ಗಳು",
       "dashboard": "ಡಾಶ್ ಬೋರ್ಡ್",
       "account": "ಖಾತೆ",
-      "signIn": "ಗ್ರಾಹಕರು ಸೈನ್ ಇನ್ ಮಾಡಿ"
+      "signIn": "ಗ್ರಾಹಕರು ಸೈನ್ ಇನ್ ಮಾಡಿ",
+      "logout": "Log out",
+      "notifications": "Notifications",
+      "profile": "My profile"
     },
     "auth": {
       "title": "ಗ್ರಾಹಕರು ಸೈನ್ ಇನ್ ಮಾಡಿ",

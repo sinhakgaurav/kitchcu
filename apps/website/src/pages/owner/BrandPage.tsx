@@ -94,7 +94,7 @@ export function BrandPage() {
 
   const enabled = kitchen.branded_page?.enabled ?? false;
   const brandedLink = customerUrl(`/k/${kitchen.code}`);
-  const discoverLink = customerUrl(`/kitchen/${kitchen.id}/menu`);
+  const discoverLink = customerUrl(`/k/${kitchen.code}/menu`);
   const templateHint =
     `Hi {{customer_name}} — order from {{kitchen_name}} (${kitchen.code}): {{storefront_url}}. {{tagline}}`;
 

@@ -1,6 +1,7 @@
 import { Link, useNavigate } from "react-router-dom";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { ListingToolbar } from "../../components/ListingToolbar";
+import { PhoneField } from "../../components/PhoneField";
 import { OwnerPageShell, OwnerPanel } from "../../components/owner/OwnerPageShell";
 import { createManualOrder, fetchMenu, type Dish } from "../../lib/api";
 import { useKitchen } from "../../lib/kitchen";
@@ -9,6 +10,12 @@ import {
   type DishHighlight,
   type DishSort,
 } from "../../shared/listingControls";
+import {
+  firstError,
+  toE164,
+  validateNationalPhone,
+  validatePersonName,
+} from "../../shared/validation";
 
 type Line = { dish_id: string; quantity: number };
 
@@ -22,6 +29,9 @@ export function NewOrderPage() {
   const [search, setSearch] = useState("");
   const [sort, setSort] = useState<DishSort>("name_asc");
   const [highlights, setHighlights] = useState<DishHighlight[]>([]);
+  const [customerName, setCustomerName] = useState("");
+  const [customerPhone, setCustomerPhone] = useState("");
+  const [fieldErrors, setFieldErrors] = useState<{ name?: string; phone?: string }>({});
 
   useEffect(() => {
     if (!kitchen) return;
@@ -57,6 +67,16 @@ export function NewOrderPage() {
       return;
     }
     const fd = new FormData(e.currentTarget);
+    const nextErrors = {
+      name: validatePersonName(customerName, { required: false }) ?? undefined,
+      phone: validateNationalPhone(customerPhone, undefined, { required: false }) ?? undefined,
+    };
+    setFieldErrors(nextErrors);
+    const firstMessage = firstError(nextErrors);
+    if (firstMessage) {
+      setError(firstMessage);
+      return;
+    }
     setError("");
     setBusy(true);
     try {
@@ -64,8 +84,8 @@ export function NewOrderPage() {
         items: lines,
         delivery_type: fd.get("delivery_type") as "pickup" | "delivery",
         payment_method: fd.get("payment_method") as "cod" | "online" | "upi",
-        customer_name: String(fd.get("customer_name") || "") || undefined,
-        customer_phone: String(fd.get("customer_phone") || "") || undefined,
+        customer_name: customerName.trim() || undefined,
+        customer_phone: customerPhone ? toE164(customerPhone) : undefined,
         delivery_fee: Number(fd.get("delivery_fee") || 0),
       });
       navigate(`/dashboard/orders/${order.id}`);
@@ -129,8 +149,30 @@ export function NewOrderPage() {
             </ul>
           )}
           {error && <div className="auth-card__error">{error}</div>}
-          <label>Customer name<input name="customer_name" placeholder="Optional" /></label>
-          <label>Customer phone<input name="customer_phone" placeholder="Optional" /></label>
+          <label>
+            Customer name
+            <input
+              value={customerName}
+              onChange={(e) => {
+                setCustomerName(e.target.value);
+                setFieldErrors((f) => ({ ...f, name: undefined }));
+              }}
+              placeholder="Optional"
+              className={fieldErrors.name ? "input-invalid" : undefined}
+              aria-invalid={Boolean(fieldErrors.name)}
+            />
+            {fieldErrors.name ? <span className="field-error">{fieldErrors.name}</span> : null}
+          </label>
+          <PhoneField
+            label="Customer phone"
+            value={customerPhone}
+            onChange={(national) => {
+              setCustomerPhone(national);
+              setFieldErrors((f) => ({ ...f, phone: undefined }));
+            }}
+            error={fieldErrors.phone}
+            hint="Optional — used for order updates"
+          />
           <div className="form-row">
             <label>Delivery
               <select name="delivery_type" defaultValue="pickup">

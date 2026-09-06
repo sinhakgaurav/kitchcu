@@ -8,6 +8,8 @@ from pydantic import BaseModel, Field
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from ckac_common.platform_config import hard_mode_missing_feature_sql
+
 
 class DiscoveryKitchenCard(BaseModel):
     id: uuid.UUID
@@ -77,6 +79,47 @@ def _card_from_row(row) -> DiscoveryKitchenCard:
     )
 
 
+def _search_term(q: str | None) -> str | None:
+    """Normalize a free-text query into an ILIKE pattern, or None when empty."""
+    cleaned = (q or "").strip()
+    if not cleaned:
+        return None
+    # Escape LIKE wildcards so a literal % or _ does not match everything.
+    escaped = cleaned.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+    return f"%{escaped}%"
+
+
+# Kitchen matches on its own fields, or on any active dish / cuisine / diet it serves.
+_KITCHEN_SEARCH_SQL = """
+              AND (
+                k.name ILIKE :q
+                OR k.code ILIKE :q
+                OR COALESCE(k.city, '') ILIKE :q
+                OR COALESCE(k.settings->'branded_page'->>'tagline', '') ILIKE :q
+                OR EXISTS (
+                    SELECT 1 FROM ckac_catalog.dishes sd
+                    LEFT JOIN ckac_catalog.cuisines sc ON sc.id = sd.cuisine_id
+                    LEFT JOIN ckac_catalog.categories scat ON scat.id = sd.category_id
+                    WHERE sd.kitchen_id = k.id AND sd.is_active = true
+                      AND (
+                        sd.name ILIKE :q
+                        OR COALESCE(sc.name, '') ILIKE :q
+                        OR COALESCE(scat.name, '') ILIKE :q
+                      )
+                )
+              )
+"""
+
+_DISH_SEARCH_SQL = """
+          AND (
+            d.name ILIKE :q
+            OR k.name ILIKE :q
+            OR COALESCE(dc.name, '') ILIKE :q
+            OR COALESCE(dcat.name, '') ILIKE :q
+          )
+"""
+
+
 async def build_discovery_home(
     session: AsyncSession,
     *,
@@ -84,10 +127,14 @@ async def build_discovery_home(
     longitude: float,
     max_km: float = 25.0,
     section_limit: int = 12,
+    q: str | None = None,
 ) -> DiscoveryHomeResponse:
     max_m = max_km * 1000.0
     section_limit = min(max(section_limit, 1), 30)
-    params = {"lat": latitude, "lng": longitude, "max_m": max_m, "lim": section_limit}
+    term = _search_term(q)
+    params: dict = {"lat": latitude, "lng": longitude, "max_m": max_m, "lim": section_limit}
+    if term:
+        params["q"] = term
 
     kitchen_sql = """
         WITH nearby AS (
@@ -152,13 +199,17 @@ async def build_discovery_home(
                     ST_SetSRID(ST_MakePoint(:lng, :lat), 4326)::geography,
                     :max_m
                   )
+              {search}
+              {discovery}
         )
         SELECT
             *,
             (branded_enabled OR has_featured_dish) AS is_featured
         FROM nearby
         ORDER BY distance_km ASC
-    """
+    """.replace("{search}", _KITCHEN_SEARCH_SQL if term else "").replace(
+        "{discovery}", hard_mode_missing_feature_sql("k.id", "discovery")
+    )
 
     kitchen_rows = (await session.execute(text(kitchen_sql), params)).all()
     cards = [_card_from_row(r) for r in kitchen_rows]
@@ -205,6 +256,8 @@ async def build_discovery_home(
             ) AS image_url
         FROM ckac_catalog.dishes d
         INNER JOIN ckac_identity.kitchens k ON k.id = d.kitchen_id
+        LEFT JOIN ckac_catalog.cuisines dc ON dc.id = d.cuisine_id
+        LEFT JOIN ckac_catalog.categories dcat ON dcat.id = d.category_id
         WHERE k.status = 'active'
           AND d.is_active = true
           AND ST_DWithin(
@@ -212,9 +265,13 @@ async def build_discovery_home(
                 ST_SetSRID(ST_MakePoint(:lng, :lat), 4326)::geography,
                 :max_m
               )
+          {search}
+          {discovery}
         ORDER BY d.price ASC, distance_km ASC
         LIMIT :lim
-    """
+    """.replace("{search}", _DISH_SEARCH_SQL if term else "").replace(
+        "{discovery}", hard_mode_missing_feature_sql("k.id", "discovery")
+    )
     dish_rows = (await session.execute(text(dish_sql), params)).all()
     cheapest = [
         DiscoveryDishCard(

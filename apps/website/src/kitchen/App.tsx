@@ -29,6 +29,7 @@ import { PaymentGatewayPage } from "../pages/owner/PaymentGatewayPage";
 import { WhatsAppIntegrationPage } from "../pages/owner/WhatsAppIntegrationPage";
 import { GstFinancePage } from "../pages/owner/GstFinancePage";
 import { BrandPage } from "../pages/owner/BrandPage";
+import { RatingsPage } from "../pages/owner/RatingsPage";
 
 export default function KitchenApp() {
   return (
@@ -57,6 +58,7 @@ export default function KitchenApp() {
             <Route path="menu/new" element={<AddDishPage />} />
             <Route path="brand" element={<BrandPage />} />
             <Route path="reports" element={<ReportsPage />} />
+            <Route path="ratings" element={<RatingsPage />} />
             <Route path="growth" element={<GrowthPage />} />
             <Route path="ingredients" element={<IngredientsPage />} />
             <Route path="prep" element={<PrepBatchesPage />} />

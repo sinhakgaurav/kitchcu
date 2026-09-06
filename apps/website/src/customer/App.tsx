@@ -15,7 +15,7 @@ import { TrackOrderPage } from "../pages/customer/TrackOrderPage";
 import { CustomerAccountPage } from "../pages/customer/CustomerAccountPage";
 import { CustomerDashboardPage } from "../pages/customer/CustomerDashboardPage";
 import { LiveWatchPage } from "../pages/customer/LiveWatchPage";
-import { CustomerBrowsePage } from "../pages/customer/CustomerBrowsePage";
+import { CustomerCartDrawer } from "../components/CustomerCartDrawer";
 import { BrandedMenuRedirect, BrandedStorefrontLayout } from "./BrandedStorefront";
 
 function CustomerShell({ children }: { children: React.ReactNode }) {
@@ -23,6 +23,7 @@ function CustomerShell({ children }: { children: React.ReactNode }) {
     <div className="customer-app">
       <CustomerNavbar />
       <main>{children}</main>
+      <CustomerCartDrawer />
       <CustomerFooter />
     </div>
   );
@@ -42,7 +43,7 @@ export default function CustomerApp() {
             }
           />
           <Route path="/login" element={<CustomerLoginPage />} />
-          <Route path="/browse" element={<CustomerBrowsePage />} />
+          <Route path="/browse" element={<Navigate to="/" replace />} />
           <Route path="/oauth/callback" element={<CustomerOAuthCallbackPage />} />
           <Route
             path="/kitchen/:kitchenId/menu"

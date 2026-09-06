@@ -42,6 +42,34 @@ class RevenueSummary(BaseModel):
     repeat_rate: float
 
 
+class SummaryDeltaPct(BaseModel):
+    revenue: float
+    orders: float
+    aov: float
+
+
+class RevenueSummaryCompare(BaseModel):
+    days: int
+    kitchen_id: uuid.UUID
+    current: RevenueSummary
+    previous: RevenueSummary
+    delta_pct: SummaryDeltaPct
+
+
+class PaymentMix(BaseModel):
+    days: int
+    kitchen_id: uuid.UUID
+    cod_revenue: float
+    online_revenue: float
+    upi_revenue: float
+    other_revenue: float
+    cod_orders: int
+    online_orders: int
+    upi_orders: int
+    other_orders: int
+    total_revenue: float
+
+
 class RevenuePoint(BaseModel):
     date: date
     revenue: float
@@ -98,12 +126,31 @@ def _window_start(days: int) -> datetime:
     return datetime.now(UTC) - timedelta(days=days)
 
 
-async def revenue_summary(session: AsyncSession, kitchen_id: uuid.UUID, days: int) -> RevenueSummary:
-    since = _window_start(days)
+def _delta_pct(current: float, previous: float) -> float:
+    if previous == 0:
+        return 0.0 if current == 0 else 100.0
+    return round((current - previous) / previous * 100, 2)
+
+
+async def revenue_summary(
+    session: AsyncSession,
+    kitchen_id: uuid.UUID,
+    days: int,
+    *,
+    since: datetime | None = None,
+    until: datetime | None = None,
+) -> RevenueSummary:
+    if since is None:
+        since = _window_start(days)
+    params: dict = {"kid": kitchen_id, "since": since}
+    until_sql = ""
+    if until is not None:
+        until_sql = " AND created_at < :until"
+        params["until"] = until
     row = (
         await session.execute(
             text(
-                """
+                f"""
                 SELECT
                     COUNT(*) AS total_orders,
                     COUNT(*) FILTER (WHERE status <> 'cancelled') AS completed_orders,
@@ -117,22 +164,22 @@ async def revenue_summary(session: AsyncSession, kitchen_id: uuid.UUID, days: in
                         WHERE status <> 'cancelled' AND customer_phone IS NOT NULL
                     ) AS unique_customers
                 FROM ckac_orders.orders
-                WHERE kitchen_id = :kid AND created_at >= :since
+                WHERE kitchen_id = :kid AND created_at >= :since{until_sql}
                 """
             ),
-            {"kid": kitchen_id, "since": since},
+            params,
         )
     ).mappings().one()
 
     repeat = (
         await session.execute(
             text(
-                """
+                f"""
                 SELECT COUNT(*) AS repeat_customers FROM (
                     SELECT customer_phone
                     FROM ckac_orders.orders
                     WHERE kitchen_id = :kid
-                      AND created_at >= :since
+                      AND created_at >= :since{until_sql}
                       AND status <> 'cancelled'
                       AND customer_phone IS NOT NULL
                     GROUP BY customer_phone
@@ -140,7 +187,7 @@ async def revenue_summary(session: AsyncSession, kitchen_id: uuid.UUID, days: in
                 ) repeat_buyers
                 """
             ),
-            {"kid": kitchen_id, "since": since},
+            params,
         )
     ).scalar_one()
 
@@ -163,6 +210,74 @@ async def revenue_summary(session: AsyncSession, kitchen_id: uuid.UUID, days: in
         unique_customers=unique_customers,
         repeat_customers=int(repeat),
         repeat_rate=round(int(repeat) / unique_customers, 4) if unique_customers else 0.0,
+    )
+
+
+async def payment_mix(session: AsyncSession, kitchen_id: uuid.UUID, days: int) -> PaymentMix:
+    since = _window_start(days)
+    row = (
+        await session.execute(
+            text(
+                """
+                SELECT
+                    COALESCE(SUM(total) FILTER (WHERE payment_method = 'cod'), 0) AS cod_revenue,
+                    COALESCE(SUM(total) FILTER (WHERE payment_method = 'online'), 0) AS online_revenue,
+                    COALESCE(SUM(total) FILTER (WHERE payment_method = 'upi'), 0) AS upi_revenue,
+                    COALESCE(SUM(total) FILTER (
+                        WHERE payment_method NOT IN ('cod', 'online', 'upi')
+                    ), 0) AS other_revenue,
+                    COUNT(*) FILTER (WHERE payment_method = 'cod') AS cod_orders,
+                    COUNT(*) FILTER (WHERE payment_method = 'online') AS online_orders,
+                    COUNT(*) FILTER (WHERE payment_method = 'upi') AS upi_orders,
+                    COUNT(*) FILTER (
+                        WHERE payment_method NOT IN ('cod', 'online', 'upi')
+                    ) AS other_orders,
+                    COALESCE(SUM(total), 0) AS total_revenue
+                FROM ckac_orders.orders
+                WHERE kitchen_id = :kid
+                  AND created_at >= :since
+                  AND status <> 'cancelled'
+                """
+            ),
+            {"kid": kitchen_id, "since": since},
+        )
+    ).mappings().one()
+
+    return PaymentMix(
+        days=days,
+        kitchen_id=kitchen_id,
+        cod_revenue=round(float(row["cod_revenue"]), 2),
+        online_revenue=round(float(row["online_revenue"]), 2),
+        upi_revenue=round(float(row["upi_revenue"]), 2),
+        other_revenue=round(float(row["other_revenue"]), 2),
+        cod_orders=int(row["cod_orders"]),
+        online_orders=int(row["online_orders"]),
+        upi_orders=int(row["upi_orders"]),
+        other_orders=int(row["other_orders"]),
+        total_revenue=round(float(row["total_revenue"]), 2),
+    )
+
+
+async def revenue_summary_compare(
+    session: AsyncSession, kitchen_id: uuid.UUID, days: int
+) -> RevenueSummaryCompare:
+    now = datetime.now(UTC)
+    current_since = now - timedelta(days=days)
+    previous_since = now - timedelta(days=days * 2)
+    current = await revenue_summary(session, kitchen_id, days, since=current_since)
+    previous = await revenue_summary(
+        session, kitchen_id, days, since=previous_since, until=current_since
+    )
+    return RevenueSummaryCompare(
+        days=days,
+        kitchen_id=kitchen_id,
+        current=current,
+        previous=previous,
+        delta_pct=SummaryDeltaPct(
+            revenue=_delta_pct(current.gross_revenue, previous.gross_revenue),
+            orders=_delta_pct(float(current.completed_orders), float(previous.completed_orders)),
+            aov=_delta_pct(current.avg_order_value, previous.avg_order_value),
+        ),
     )
 
 

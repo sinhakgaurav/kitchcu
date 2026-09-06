@@ -44,6 +44,7 @@ const NAV_SECTIONS: { labelKey: string; items: NavItem[] }[] = [
     labelKey: "owner.nav.growth",
     items: [
       { to: "/dashboard/reports", labelKey: "owner.nav.reports" },
+      { to: "/dashboard/ratings", labelKey: "owner.nav.ratings" },
       { to: "/dashboard/growth", labelKey: "owner.nav.intelligence", minPackage: "growth" },
       { to: "/dashboard/crm", labelKey: "owner.nav.crm", feature: "loyalty_crm" },
       { to: "/dashboard/coupons", labelKey: "owner.nav.coupons", feature: "loyalty_crm" },
@@ -163,6 +164,12 @@ export function OwnerLayout() {
   );
   if (deepLinked && !itemAllowed(deepLinked)) {
     return <Navigate to="/dashboard" replace />;
+  }
+
+  // New owners land on setup before any ops screen — otherwise menu/orders
+  // render an empty shell and look broken.
+  if (!loading && kitchens.length === 0 && location.pathname !== "/dashboard/setup") {
+    return <Navigate to="/dashboard/setup" replace />;
   }
 
   return (

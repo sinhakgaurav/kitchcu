@@ -6,7 +6,18 @@ import { images, sampleDishImages } from "../../data/content";
 import { AuthLoginHighlights } from "../../components/AuthLoginHighlights";
 import { BrandAuthArt, BrandLogo } from "../../components/BrandLogo";
 import { DEMO, DEMO_CUSTOMERS, DEMO_OWNERS, type DemoCustomerAccount } from "../../shared/demo";
-import { normalizePersonName, normalizePhone } from "../../shared/api";
+import { showDemoCredentials } from "../../shared/env";
+import { PhoneField } from "../../components/PhoneField";
+import {
+  firstError,
+  normalizePersonName,
+  otpInputValue,
+  phoneInputValue,
+  toE164,
+  validateNationalPhone,
+  validateOtp,
+  validatePersonName,
+} from "../../shared/validation";
 import { fetchKitchenByCode } from "../../shared/publicApi";
 import { CUSTOMER_HOST, KITCHEN_HOST } from "../../shared/brand";
 import { CustomerSocialLogin } from "../../components/CustomerSocialLogin";
@@ -14,6 +25,7 @@ import { PolicyAgreement } from "../../components/PolicyAgreement";
 import { isCustomerSignedIn, useCustomerAuth } from "../../shared/customerAuth";
 import { saveKitchenToSession } from "../../shared/customerSession";
 import { kitchenUrl } from "../../shared/urls";
+import { SuperAdminCredentials } from "../../components/SuperAdminAccess";
 import { useInView } from "../../hooks/useParallax";
 import { AnimatedMesh } from "../../components/AnimatedMesh";
 import {
@@ -29,7 +41,7 @@ export function CustomerLoginPage() {
   const [searchParams] = useSearchParams();
   const nextPath = searchParams.get("next") || "/";
   const [name, setName] = useState(session?.name ?? "");
-  const [phone, setPhone] = useState(session?.phone ?? "");
+  const [phone, setPhone] = useState(phoneInputValue(session?.phone ?? ""));
   const [otp, setOtp] = useState("");
   const [otpSent, setOtpSent] = useState(false);
   const [code, setCode] = useState("");
@@ -37,7 +49,7 @@ export function CustomerLoginPage() {
   const [busy, setBusy] = useState(false);
   const [busyPhone, setBusyPhone] = useState<string | null>(null);
   const [policiesAgreed, setPoliciesAgreed] = useState(false);
-  const [fieldErrors, setFieldErrors] = useState<{ name?: string; phone?: string }>({});
+  const [fieldErrors, setFieldErrors] = useState<{ name?: string; phone?: string; otp?: string }>({});
 
   if (isCustomerSignedIn(session) && getCustomerToken()) {
     return <Navigate to={nextPath.startsWith("/") ? nextPath : "/"} replace />;
@@ -56,7 +68,7 @@ export function CustomerLoginPage() {
       try {
         const kitchen = await fetchKitchenByCode(kitchenCode);
         saveKitchenToSession(kitchen);
-        kitchenMenu = `/kitchen/${kitchen.id}/menu`;
+        kitchenMenu = `/k/${kitchen.code}/menu`;
       } catch {
         // Optional kitchen pin — don't block return to checkout/dashboard.
       }
@@ -73,26 +85,19 @@ export function CustomerLoginPage() {
     e.preventDefault();
     if (!requirePolicyAgreement()) return;
     setError("");
-    const nextErrors: { name?: string; phone?: string } = {};
-    try {
-      if (name.trim()) normalizePersonName(name);
-      else nextErrors.name = "Enter your name";
-    } catch (err) {
-      nextErrors.name = err instanceof Error ? err.message : "Invalid name";
-    }
-    try {
-      normalizePhone(phone);
-    } catch (err) {
-      nextErrors.phone = err instanceof Error ? err.message : "Invalid phone";
-    }
+    const nextErrors: typeof fieldErrors = {
+      name: validatePersonName(name) ?? undefined,
+      phone: validateNationalPhone(phone) ?? undefined,
+    };
     setFieldErrors(nextErrors);
-    if (Object.keys(nextErrors).length) {
-      setError(Object.values(nextErrors)[0] || "Fix the highlighted fields");
+    const firstMessage = firstError(nextErrors);
+    if (firstMessage) {
+      setError(firstMessage);
       return;
     }
     setBusy(true);
     try {
-      await requestCustomerWhatsAppOtp(normalizePhone(phone));
+      await requestCustomerWhatsAppOtp(toE164(phone));
       setOtpSent(true);
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Could not send OTP";
@@ -110,10 +115,21 @@ export function CustomerLoginPage() {
     e.preventDefault();
     if (!requirePolicyAgreement()) return;
     setError("");
+    const nextErrors: typeof fieldErrors = {
+      name: validatePersonName(name) ?? undefined,
+      phone: validateNationalPhone(phone) ?? undefined,
+      otp: validateOtp(otp) ?? undefined,
+    };
+    setFieldErrors(nextErrors);
+    const firstMessage = firstError(nextErrors);
+    if (firstMessage) {
+      setError(firstMessage);
+      return;
+    }
     setBusy(true);
     try {
-      const displayName = name.trim() ? normalizePersonName(name) : "";
-      const result = await verifyCustomerWhatsAppOtp(normalizePhone(phone), otp.trim());
+      const displayName = normalizePersonName(name);
+      const result = await verifyCustomerWhatsAppOtp(toE164(phone), otp);
       applyAuthResult({
         ...result,
         customer: {
@@ -131,10 +147,11 @@ export function CustomerLoginPage() {
 
   const fillDemo = (account: DemoCustomerAccount) => {
     setName(account.name);
-    setPhone(account.phone);
+    setPhone(phoneInputValue(account.phone));
     setCode(DEMO.kitchenCode);
     setOtp(DEMO.otp);
     setOtpSent(true);
+    setFieldErrors({});
   };
 
   const handleDemoWhatsApp = async (account: DemoCustomerAccount) => {
@@ -143,7 +160,7 @@ export function CustomerLoginPage() {
     setBusyPhone(account.phone);
     fillDemo(account);
     try {
-      const e164 = normalizePhone(account.phone);
+      const e164 = toE164(phoneInputValue(account.phone));
       await requestCustomerWhatsAppOtp(e164);
       const result = await verifyCustomerWhatsAppOtp(e164, DEMO.otp);
       applyAuthResult(result);
@@ -192,9 +209,16 @@ export function CustomerLoginPage() {
               <input
                 value={name}
                 onChange={(e) => {
-                  setName(e.target.value);
-                  setFieldErrors((f) => ({ ...f, name: undefined }));
+                  const next = e.target.value;
+                  setName(next);
+                  setFieldErrors((f) => ({
+                    ...f,
+                    name: next.trim() ? validatePersonName(next) ?? undefined : undefined,
+                  }));
                 }}
+                onBlur={() =>
+                  setFieldErrors((f) => ({ ...f, name: validatePersonName(name) ?? undefined }))
+                }
                 required
                 placeholder={DEMO.customerName}
                 className={fieldErrors.name ? "input-invalid" : undefined}
@@ -202,24 +226,27 @@ export function CustomerLoginPage() {
               />
               {fieldErrors.name ? <span className="field-error">{fieldErrors.name}</span> : null}
             </label>
-            <label>
-              {t("customer.auth.phone")}
-              <input
-                value={phone}
-                onChange={(e) => {
-                  setPhone(e.target.value);
-                  setFieldErrors((f) => ({ ...f, phone: undefined }));
-                }}
-                required
-                placeholder="9123456789"
-                inputMode="numeric"
-                autoComplete="tel"
-                disabled={otpSent}
-                className={fieldErrors.phone ? "input-invalid" : undefined}
-                aria-invalid={Boolean(fieldErrors.phone)}
-              />
-              {fieldErrors.phone ? <span className="field-error">{fieldErrors.phone}</span> : null}
-            </label>
+            <PhoneField
+              label={t("customer.auth.phone")}
+              value={phone}
+              onChange={(national) => {
+                setPhone(national);
+                setFieldErrors((f) => ({
+                  ...f,
+                  phone: national ? validateNationalPhone(national) ?? undefined : undefined,
+                }));
+              }}
+              onBlur={() =>
+                setFieldErrors((f) => ({
+                  ...f,
+                  phone: validateNationalPhone(phone) ?? undefined,
+                }))
+              }
+              error={fieldErrors.phone}
+              required
+              disabled={otpSent}
+              placeholder={DEMO.customerPhone}
+            />
             <label>
               {t("customer.auth.kitchenCodeOptional")}
               <input
@@ -234,11 +261,19 @@ export function CustomerLoginPage() {
                 {t("owner.auth.otp")}
                 <input
                   value={otp}
-                  onChange={(e) => setOtp(e.target.value)}
+                  onChange={(e) => {
+                    setOtp(otpInputValue(e.target.value));
+                    setFieldErrors((f) => ({ ...f, otp: undefined }));
+                  }}
                   required
+                  inputMode="numeric"
+                  autoComplete="one-time-code"
                   placeholder={DEMO.otp}
                   maxLength={6}
+                  className={fieldErrors.otp ? "input-invalid" : undefined}
+                  aria-invalid={Boolean(fieldErrors.otp)}
                 />
+                {fieldErrors.otp ? <span className="field-error">{fieldErrors.otp}</span> : null}
               </label>
             )}
             <PolicyAgreement
@@ -278,6 +313,7 @@ export function CustomerLoginPage() {
             onError={setError}
           />
 
+          {showDemoCredentials() ? (
           <details className="auth-card__demo">
             <summary>Demo customer accounts · OTP <code>{DEMO.otp}</code></summary>
             <p className="auth-card__demo-otp">One-click WhatsApp login for local / GCP demos</p>
@@ -304,6 +340,9 @@ export function CustomerLoginPage() {
               {DEMO_OWNERS.map((o) => o.phone).join(", ")}
             </p>
           </details>
+          ) : null}
+
+          <SuperAdminCredentials />
 
           <p className="auth-card__demo-note">
             Kitchen owner? <a href={kitchenUrl("/login")} target="_blank" rel="noopener noreferrer">Sign in on {KITCHEN_HOST} →</a>

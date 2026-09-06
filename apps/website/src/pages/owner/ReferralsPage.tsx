@@ -1,8 +1,17 @@
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { OwnerPageShell, OwnerPanel } from "../../components/owner/OwnerPageShell";
+import { PhoneField } from "../../components/PhoneField";
 import { useKitchen } from "../../shared/kitchenContext";
 import { getToken } from "../../shared/api";
+import {
+  firstError,
+  toE164,
+  validateEmail,
+  validateNationalPhone,
+  validatePersonName,
+  validateText,
+} from "../../shared/validation";
 import {
   bulkOwnerCustomerReferrals,
   fetchOwnerReferrals,
@@ -15,6 +24,9 @@ import {
 const inr = (n: number) => `₹${n.toLocaleString("en-IN", { maximumFractionDigits: 2 })}`;
 
 type Row = { contact_name: string; contact_phone: string; contact_email: string; city: string; notes: string };
+type RowErrors = Partial<Record<keyof Row, string>>;
+
+const ROW_FIELDS = ["contact_name", "contact_phone", "contact_email", "city", "notes"] as const;
 
 const emptyRow = (): Row => ({
   contact_name: "",
@@ -24,6 +36,16 @@ const emptyRow = (): Row => ({
   notes: "",
 });
 
+const isBlankRow = (row: Row) => ROW_FIELDS.every((key) => !row[key].trim());
+
+const validateRow = (row: Row): RowErrors => ({
+  contact_name: validatePersonName(row.contact_name, { required: false }) ?? undefined,
+  contact_phone: validateNationalPhone(row.contact_phone) ?? undefined,
+  contact_email: validateEmail(row.contact_email, { required: false }) ?? undefined,
+  city: validateText(row.city, "a city", { required: false, max: 80 }) ?? undefined,
+  notes: validateText(row.notes, "a note", { required: false, max: 500 }) ?? undefined,
+});
+
 export function ReferralsPage() {
   const { t } = useTranslation();
   const { kitchen } = useKitchen();
@@ -31,6 +53,12 @@ export function ReferralsPage() {
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [rows, setRows] = useState<Row[]>([emptyRow(), emptyRow()]);
+  const [rowErrors, setRowErrors] = useState<RowErrors[]>([]);
+
+  const updateRow = (index: number, key: keyof Row, value: string) => {
+    setRows((prev) => prev.map((r, i) => (i === index ? { ...r, [key]: value } : r)));
+    setRowErrors((prev) => prev.map((e, i) => (i === index ? { ...e, [key]: undefined } : e)));
+  };
 
   const reload = () =>
     fetchOwnerReferrals()
@@ -43,18 +71,28 @@ export function ReferralsPage() {
 
   const submitRows = async () => {
     if (!kitchen) return;
+    const filled = rows.filter((r) => !isBlankRow(r));
+    if (filled.length === 0) {
+      setError("Add at least one referral with a mobile number");
+      return;
+    }
+    const nextRowErrors = rows.map((r) => (isBlankRow(r) ? {} : validateRow(r)));
+    setRowErrors(nextRowErrors);
+    const firstMessage = nextRowErrors.map(firstError).find(Boolean);
+    if (firstMessage) {
+      setError(firstMessage);
+      return;
+    }
     setBusy(true);
     setError("");
     try {
-      const payload = rows
-        .filter((r) => r.contact_phone.trim())
-        .map((r) => ({
-          contact_name: r.contact_name || undefined,
-          contact_phone: r.contact_phone.trim(),
-          contact_email: r.contact_email || undefined,
-          city: r.city || undefined,
-          notes: r.notes || undefined,
-        }));
+      const payload = filled.map((r) => ({
+        contact_name: r.contact_name.trim() || undefined,
+        contact_phone: toE164(r.contact_phone),
+        contact_email: r.contact_email.trim() || undefined,
+        city: r.city.trim() || undefined,
+        notes: r.notes.trim() || undefined,
+      }));
       if (payload.length === 1) {
         await submitOwnerCustomerReferral({ kitchen_id: kitchen.id, ...payload[0] });
       } else {
@@ -64,6 +102,7 @@ export function ReferralsPage() {
         }
       }
       setRows([emptyRow(), emptyRow()]);
+      setRowErrors([]);
       await reload();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Submit failed");
@@ -176,22 +215,33 @@ export function ReferralsPage() {
             <tbody>
               {rows.map((row, i) => (
                 <tr key={i}>
-                  {(["contact_name", "contact_phone", "contact_email", "city", "notes"] as const).map(
-                    (key) => (
-                      <td key={key}>
-                        <input
-                          className="owner-input"
-                          value={row[key]}
-                          onChange={(e) =>
-                            setRows((prev) =>
-                              prev.map((r, idx) => (idx === i ? { ...r, [key]: e.target.value } : r)),
-                            )
-                          }
-                          placeholder={key === "contact_phone" ? "9876543210" : ""}
+                  {ROW_FIELDS.map((key) => (
+                    <td key={key}>
+                      {key === "contact_phone" ? (
+                        <PhoneField
+                          className="phone-field--bare"
+                          label="Phone"
+                          value={row.contact_phone}
+                          onChange={(national) => updateRow(i, key, national)}
+                          error={rowErrors[i]?.contact_phone}
                         />
-                      </td>
-                    ),
-                  )}
+                      ) : (
+                        <>
+                          <input
+                            className={
+                              rowErrors[i]?.[key] ? "owner-input input-invalid" : "owner-input"
+                            }
+                            value={row[key]}
+                            onChange={(e) => updateRow(i, key, e.target.value)}
+                            aria-invalid={Boolean(rowErrors[i]?.[key])}
+                          />
+                          {rowErrors[i]?.[key] ? (
+                            <span className="field-error">{rowErrors[i][key]}</span>
+                          ) : null}
+                        </>
+                      )}
+                    </td>
+                  ))}
                 </tr>
               ))}
             </tbody>

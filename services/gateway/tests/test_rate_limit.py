@@ -15,7 +15,7 @@ from unittest.mock import AsyncMock
 
 import pytest
 from fastapi import Request
-from httpx import ASGITransport, AsyncClient, Response
+from httpx import ASGITransport, AsyncClient
 
 from app import main as gateway_main
 from app.main import app
@@ -23,7 +23,7 @@ from app.rate_limit import (
     apply_config,
     check_rate_limit,
     client_ip,
-    is_loopback_client,
+    is_local_ops_client,
     reset_config_for_tests,
     resolve_rule,
 )
@@ -117,13 +117,38 @@ def test_client_ip_falls_back_to_direct_client():
     assert client_ip(req) == "10.0.0.1"
 
 
-def test_is_loopback_client():
-    assert is_loopback_client(_fake_request(ip="127.0.0.1")) is True
-    assert is_loopback_client(_fake_request(ip="::1")) is True
-    assert is_loopback_client(_fake_request(ip="1.2.3.4")) is False
-    # Spoofed XFF must not count as loopback
+def test_is_local_ops_client_accepts_loopback():
+    assert is_local_ops_client(_fake_request(ip="127.0.0.1")) is True
+    assert is_local_ops_client(_fake_request(ip="::1")) is True
+    assert is_local_ops_client(_fake_request(ip="1.2.3.4")) is False
+
+
+def test_is_local_ops_client_accepts_the_docker_bridge_peer():
+    """Seed scripts curl 127.0.0.1:18000, but Docker rewrites the peer to the bridge.
+
+    Without this the loopback exemption never fires in the compose deployment and
+    the VM seed scripts throttle themselves for hours on the OTP rule.
+    """
+    for bridge_ip in ("172.17.0.1", "172.24.0.1", "192.168.65.1", "10.0.0.5"):
+        assert is_local_ops_client(_fake_request(ip=bridge_ip)) is True, bridge_ip
+
+
+def test_is_local_ops_client_rejects_proxied_traffic():
+    """Caddy always sets X-Forwarded-For, so public traffic is never exempt.
+
+    This is the whole safety property: the gateway port is bound to 127.0.0.1 on the
+    VM, so the only way a public client reaches it is through Caddy — and that path
+    always carries the header.
+    """
+    proxied = _fake_request(ip="172.17.0.1", forwarded="203.0.113.9")
+    assert is_local_ops_client(proxied) is False
+    # A spoofed XFF claiming loopback must not win either.
     spoofed = _fake_request(ip="203.0.113.9", forwarded="127.0.0.1")
-    assert is_loopback_client(spoofed) is False
+    assert is_local_ops_client(spoofed) is False
+
+
+def test_is_local_ops_client_rejects_a_public_peer():
+    assert is_local_ops_client(_fake_request(ip="203.0.113.9")) is False
 
 
 @pytest.mark.asyncio
@@ -136,6 +161,29 @@ async def test_check_rate_limit_skips_loopback_even_when_over_limit():
     assert retry_after == 0
     assert rule_name == "otp_request"
     redis.incr.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_check_rate_limit_skips_docker_bridge_seed_traffic():
+    redis = AsyncMock()
+    redis.incr = AsyncMock(return_value=999)
+    req = _fake_request(method="POST", ip="172.17.0.1")
+    allowed, retry_after, _rule = await check_rate_limit(redis, req, "/api/v1/auth/otp/request")
+    assert allowed is True
+    assert retry_after == 0
+    redis.incr.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_check_rate_limit_still_limits_proxied_traffic_from_the_bridge():
+    redis = AsyncMock()
+    redis.incr = AsyncMock(return_value=6)
+    redis.ttl = AsyncMock(return_value=400)
+    req = _fake_request(method="POST", ip="172.17.0.1", forwarded="203.0.113.9")
+    allowed, retry_after, rule_name = await check_rate_limit(redis, req, "/api/v1/auth/otp/request")
+    assert allowed is False
+    assert retry_after == 400
+    assert rule_name == "otp_request"
 
 
 @pytest.mark.asyncio

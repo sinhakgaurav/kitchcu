@@ -6,7 +6,7 @@ import math
 import random
 from datetime import datetime, timezone
 
-from demo_data import CAPTURED_AT, DEMO_OTP, DEMO_OWNER, DEMO_OWNERS_EXTRA, FOOD_MEDIA_FILES, food_media
+from demo_data import CAPTURED_AT, DEMO_OTP, DEMO_OWNER, DEMO_OWNERS_EXTRA, food_media
 
 random.seed(42)
 
@@ -196,86 +196,89 @@ ORDER_STATUS_WEIGHTS: list[tuple[str, int]] = [
 ]
 
 
-# Keyword → local food asset (avoid round-robin mismatches like Bhel→meat).
-_DISH_MEDIA_KEYWORDS: list[tuple[str, str]] = [
-    ("biryani", "biryani.jpg"),
-    ("dosa", "dosa.jpg"),
-    ("idli", "dosa.jpg"),
-    ("sambar", "dosa.jpg"),
-    ("tikka", "skewers.jpg"),
-    ("skewer", "skewers.jpg"),
-    ("wings", "bbq.jpg"),
-    ("bbq", "bbq.jpg"),
-    ("grill", "bbq.jpg"),
-    ("fish", "bbq.jpg"),
-    ("mutton", "bbq.jpg"),
-    ("chicken", "restaurant.jpg"),
-    ("butter chicken", "restaurant.jpg"),
-    ("keema", "restaurant.jpg"),
-    ("egg", "bowls.jpg"),
-    ("bowl", "bowls.jpg"),
-    ("salad", "salad.jpg"),
-    ("buddha", "salad.jpg"),
-    ("tofu", "salad.jpg"),
-    ("vegan", "salad.jpg"),
-    ("samosa", "samosa.jpg"),
-    ("bhel", "samosa.jpg"),
-    ("pani puri", "samosa.jpg"),
-    ("vada pav", "samosa.jpg"),
-    ("pav bhaji", "dining.jpg"),
-    ("misal", "dining.jpg"),
-    ("fries", "burger.jpg"),
-    ("burger", "burger.jpg"),
-    ("pizza", "pizza.jpg"),
-    ("pasta", "pasta.jpg"),
-    ("thali", "rice.jpg"),
-    ("rice", "rice.jpg"),
-    ("lunch", "rice.jpg"),
-    ("feast", "dining.jpg"),
-    ("brunch", "dining.jpg"),
-    ("naan", "dining.jpg"),
-    ("roti", "dining.jpg"),
-    ("paneer", "bowls.jpg"),
-    ("dal", "bowls.jpg"),
-    ("aloo", "bowls.jpg"),
-    ("gobi", "bowls.jpg"),
-    ("bhindi", "bowls.jpg"),
-    ("chole", "dining.jpg"),
-    ("palak", "bowls.jpg"),
-    ("sabudana", "bowls.jpg"),
-    ("thepla", "dining.jpg"),
-    ("lassi", "dessert.jpg"),
-    ("chai", "dessert.jpg"),
-    ("coffee", "dessert.jpg"),
-    ("chocolate", "dessert.jpg"),
-    ("juice", "dessert.jpg"),
-    ("soda", "dessert.jpg"),
-    ("buttermilk", "dessert.jpg"),
-    ("tea", "dessert.jpg"),
-    ("gulab", "dessert.jpg"),
-    ("kheer", "dessert.jpg"),
-    ("rasmalai", "dessert.jpg"),
-    ("brownie", "dessert.jpg"),
-    ("halwa", "dessert.jpg"),
-    ("sweet", "dessert.jpg"),
-    ("pakora", "samosa.jpg"),
-    ("mango", "dessert.jpg"),
-]
+# Explicit dish → local food asset. This is the source of truth: keyword matching and
+# index round-robin both produced contradictory heroes (Bhel Puri showing grilled meat,
+# Aloo Gobi showing an unrelated plate).
+#
+# Two rules the seed data must respect:
+#   1. Never put a venue photo (kitchen/service/restaurant/dining) on a dish.
+#   2. When no asset honestly represents the dish — every drink, we have no beverage
+#      shot — seed no hero at all. A missing photo beats a misleading one.
+DISH_MEDIA_BY_NAME: dict[str, str | None] = {
+    # Veg mains
+    "Paneer Tikka": "skewers.jpg",
+    "Palak Paneer": "bowls.jpg",
+    "Dal Tadka": "bowls.jpg",
+    "Aloo Gobi": "bowls.jpg",
+    "Bhindi Masala": "bowls.jpg",
+    "Chole Bhature": "bowls.jpg",
+    "Masala Dosa": "dosa.jpg",
+    "Idli Sambar (4 pc)": "dosa.jpg",
+    "Veg Biryani": "biryani.jpg",
+    "Methi Thepla (3 pc)": "dosa.jpg",
+    "Jeera Rice": "rice.jpg",
+    "Garlic Naan (2 pc)": "dosa.jpg",
+    "Paneer Butter Masala": "bowls.jpg",
+    "Sabudana Khichdi": "bowls.jpg",
+    # Non-veg
+    "Chicken Biryani": "biryani.jpg",
+    "Butter Chicken": "bowls.jpg",
+    "Chicken Tikka": "skewers.jpg",
+    "Mutton Curry": "bowls.jpg",
+    "Fish Fry": "bbq.jpg",
+    "Egg Curry": "bowls.jpg",
+    "Chicken Keema Pav": "burger.jpg",
+    "Tandoori Roti (2 pc)": "dosa.jpg",
+    "Chicken Wings (6 pc)": "bbq.jpg",
+    # Vegan
+    "Tofu Stir Fry": "salad.jpg",
+    "Vegan Buddha Bowl": "salad.jpg",
+    "Coconut Curry (Vegan)": "bowls.jpg",
+    # Drinks — no beverage asset exists, so no hero.
+    "Mango Lassi": None,
+    "Sweet Lassi": None,
+    "Fresh Lime Soda": None,
+    "Buttermilk (Chaas)": None,
+    "Masala Chai": None,
+    "Filter Coffee": None,
+    "Hot Chocolate": None,
+    "Cold Coffee": None,
+    "Iced Tea": None,
+    "Watermelon Juice": None,
+    # Snacks
+    "Pav Bhaji": "bowls.jpg",
+    "Vada Pav (2 pc)": "burger.jpg",
+    "Samosa (2 pc)": "samosa.jpg",
+    "Bhel Puri": "samosa.jpg",
+    "French Fries": "burger.jpg",
+    "Misal Pav": "bowls.jpg",
+    # Desserts
+    "Gulab Jamun": "dessert.jpg",
+    "Kheer": "dessert.jpg",
+    "Rasmalai": "dessert.jpg",
+    "Chocolate Brownie": "dessert.jpg",
+    # Combos
+    "Veg Thali Combo": "rice.jpg",
+    "Non-Veg Thali": "rice.jpg",
+    "Office Lunch Box": "rice.jpg",
+    "Family Feast (4 pax)": "biryani.jpg",
+    # Seasonal
+    "Monsoon Pakora Platter": "samosa.jpg",
+    "Winter Gajar Halwa": "dessert.jpg",
+    "Summer Mango Special": "dessert.jpg",
+    "Festive Sweets Box": "dessert.jpg",
+    "Sunday Brunch Combo": "rice.jpg",
+}
 
 
-def _media_for_dish(name: str, index: int) -> str:
-    lower = name.lower()
-    for keyword, file in _DISH_MEDIA_KEYWORDS:
-        if keyword in lower:
-            return food_media(file)
-    return food_media(FOOD_MEDIA_FILES[index % len(FOOD_MEDIA_FILES)])
+def _media_for_dish(name: str) -> str | None:
+    """Return the hero URL for a seeded dish, or None when no honest asset exists."""
+    asset = DISH_MEDIA_BY_NAME.get(name.strip())
+    return food_media(asset) if asset else None
 
 
-def dish_with_media(dish: dict, index: int) -> dict:
-    if dish.get("media_url"):
-        media_url = dish["media_url"]
-    else:
-        media_url = _media_for_dish(str(dish.get("name", "")), index)
+def dish_with_media(dish: dict) -> dict:
+    media_url = dish.get("media_url") or _media_for_dish(str(dish.get("name", "")))
     return {
         **dish,
         "description": f"Home-style {dish['name']} — live-capture, made fresh to order.",
@@ -285,7 +288,7 @@ def dish_with_media(dish: dict, index: int) -> dict:
 
 
 def enriched_dishes() -> list[dict]:
-    return [dish_with_media(d, i) for i, d in enumerate(BULK_DISHES)]
+    return [dish_with_media(d) for d in BULK_DISHES]
 
 
 def kitchen_location(index: int, area: str) -> dict:

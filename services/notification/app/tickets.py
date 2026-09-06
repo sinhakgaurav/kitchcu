@@ -7,7 +7,7 @@ import uuid
 from datetime import UTC, datetime
 from typing import Literal
 
-from pydantic import BaseModel, EmailStr, Field, model_validator
+from pydantic import BaseModel, EmailStr, Field, field_validator, model_validator
 from sqlalchemy import func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -15,6 +15,11 @@ from app.models import SupportTicket, SupportTicketMessage
 from app.support import ChatMessage
 from ckac_common.auth import stream_key
 from ckac_common.event_bus import EventPublisher
+from ckac_common.validators import (
+    normalize_display_name,
+    normalize_optional_email,
+    normalize_optional_india_phone,
+)
 
 Audience = Literal["owner", "customer"]
 Category = Literal[
@@ -113,6 +118,24 @@ class TicketCreateRequest(BaseModel):
     kitchen_id: uuid.UUID | None = Field(default=None, description="Related kitchen UUID; auto-filled from `order_code` if omitted and the order resolves.")
     source: Literal["ai_chat", "web_form"] = Field(default="ai_chat", description="Where the ticket originated.")
     chat_history: list[ChatMessage] = Field(default_factory=list, max_length=30, description="Prior AI-chat turns for context (last 10 attached to the ticket timeline).")
+
+    @field_validator("customer_phone")
+    @classmethod
+    def normalize_phone(cls, v: str | None) -> str | None:
+        return normalize_optional_india_phone(v)
+
+    @field_validator("customer_name")
+    @classmethod
+    def normalize_name(cls, v: str | None) -> str | None:
+        # A signed-in reporter's name is prefilled from their profile, which for
+        # an OTP signup is a `Customer 0481` label — so only trim, do not reject
+        # digits.
+        return normalize_display_name(v)
+
+    @field_validator("customer_email")
+    @classmethod
+    def normalize_email(cls, v: EmailStr | None) -> str | None:
+        return normalize_optional_email(v)
 
 
 class TicketMessageResponse(BaseModel):

@@ -22,6 +22,7 @@ def _insert_order(
     dish_name: str = "Paneer Tikka",
     quantity: int = 1,
     unit_price: float = 199.0,
+    payment_method: str = "cod",
 ) -> uuid.UUID:
     order_id = uuid.uuid4()
     order_code = f"CKTST-BILL-{order_id.hex[:8].upper()}"
@@ -34,12 +35,12 @@ def _insert_order(
                 (id, kitchen_id, bill_id, order_code, status, source, delivery_type,
                  payment_method, customer_name, customer_phone, subtotal, delivery_fee,
                  total, created_at, updated_at)
-            VALUES (%s::uuid, %s::uuid, %s, %s, %s, 'manual', 'pickup', 'cod',
+            VALUES (%s::uuid, %s::uuid, %s, %s, %s, 'manual', 'pickup', %s,
                     %s, %s, %s, 0, %s, %s, %s)
             """,
             (
                 str(order_id), str(kitchen_id), order_code[:32], order_code, status,
-                customer_name, customer_phone, total, total, created_at, created_at,
+                payment_method, customer_name, customer_phone, total, total, created_at, created_at,
             ),
         )
         cur.execute(
@@ -187,3 +188,101 @@ async def test_customers_segments_and_churn_risk(client: AsyncClient, order_ctx)
     phones = [c["customer_phone"] for c in data["churn_risk"]]
     assert "+919222222222" in phones
     assert "+919111111111" not in phones
+
+
+@pytest.mark.asyncio
+async def test_payment_mix_requires_auth(client: AsyncClient, order_ctx):
+    _, kitchen_id, _, _, _ = order_ctx
+    r = await client.get(f"/api/v1/kitchens/{kitchen_id}/analytics/payment-mix")
+    assert r.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_payment_mix_splits_revenue_and_excludes_cancelled(
+    client: AsyncClient, order_ctx
+):
+    _, kitchen_id, dish_id, _, token = order_ctx
+    now = datetime.now(UTC)
+    _insert_order(
+        kitchen_id, total=200, status="delivered", created_at=now - timedelta(days=1),
+        dish_id=dish_id, payment_method="cod",
+    )
+    _insert_order(
+        kitchen_id, total=300, status="delivered", created_at=now - timedelta(days=1),
+        dish_id=dish_id, payment_method="online",
+    )
+    _insert_order(
+        kitchen_id, total=150, status="preparing", created_at=now - timedelta(days=2),
+        dish_id=dish_id, payment_method="upi",
+    )
+    _insert_order(
+        kitchen_id, total=80, status="delivered", created_at=now - timedelta(days=1),
+        dish_id=dish_id, payment_method="wallet",
+    )
+    _insert_order(
+        kitchen_id, total=999, status="cancelled", created_at=now - timedelta(days=1),
+        dish_id=dish_id, payment_method="cod",
+    )
+
+    r = await client.get(
+        f"/api/v1/kitchens/{kitchen_id}/analytics/payment-mix?days=30",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert r.status_code == 200
+    data = r.json()
+    assert data["days"] == 30
+    assert data["kitchen_id"] == str(kitchen_id)
+    assert data["cod_revenue"] == 200.0
+    assert data["online_revenue"] == 300.0
+    assert data["upi_revenue"] == 150.0
+    assert data["other_revenue"] == 80.0
+    assert data["cod_orders"] == 1
+    assert data["online_orders"] == 1
+    assert data["upi_orders"] == 1
+    assert data["other_orders"] == 1
+    assert data["total_revenue"] == 730.0
+
+
+@pytest.mark.asyncio
+async def test_summary_compare_requires_auth(client: AsyncClient, order_ctx):
+    _, kitchen_id, _, _, _ = order_ctx
+    r = await client.get(f"/api/v1/kitchens/{kitchen_id}/analytics/summary/compare?days=7")
+    assert r.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_summary_compare_current_previous_and_delta(client: AsyncClient, order_ctx):
+    _, kitchen_id, dish_id, _, token = order_ctx
+    now = datetime.now(UTC)
+    # Current window (last 7 days): 2 completed orders, 500 revenue, AOV 250
+    _insert_order(
+        kitchen_id, total=200, status="delivered", created_at=now - timedelta(days=1),
+        dish_id=dish_id,
+    )
+    _insert_order(
+        kitchen_id, total=300, status="delivered", created_at=now - timedelta(days=2),
+        dish_id=dish_id,
+    )
+    # Previous window (7–14 days ago): 1 completed order, 100 revenue, AOV 100
+    _insert_order(
+        kitchen_id, total=100, status="delivered", created_at=now - timedelta(days=10),
+        dish_id=dish_id,
+    )
+
+    r = await client.get(
+        f"/api/v1/kitchens/{kitchen_id}/analytics/summary/compare?days=7",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert r.status_code == 200
+    data = r.json()
+    assert data["days"] == 7
+    assert data["kitchen_id"] == str(kitchen_id)
+    assert data["current"]["gross_revenue"] == 500.0
+    assert data["current"]["completed_orders"] == 2
+    assert data["current"]["avg_order_value"] == 250.0
+    assert data["previous"]["gross_revenue"] == 100.0
+    assert data["previous"]["completed_orders"] == 1
+    assert data["previous"]["avg_order_value"] == 100.0
+    assert data["delta_pct"]["revenue"] == 400.0
+    assert data["delta_pct"]["orders"] == 100.0
+    assert data["delta_pct"]["aov"] == 150.0

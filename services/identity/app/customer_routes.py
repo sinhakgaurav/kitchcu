@@ -15,11 +15,13 @@ from ckac_common.storage import get_media_storage
 
 from app.customer_schemas import (
     CustomerAuthResponse,
+    CustomerNotificationPrefsRequest,
     CustomerPayoutUpdateRequest,
     CustomerPhoneRequest,
     CustomerPhoneVerifyRequest,
     CustomerResponse,
     customer_to_response,
+    update_customer_notification_prefs,
     update_customer_payout,
     OAuthCompleteRequest,
     OAuthStartResponse,
@@ -374,6 +376,28 @@ async def customer_profile_update(
     session: Annotated[AsyncSession, Depends(get_db)],
 ) -> CustomerResponse:
     await update_customer_profile(customer, body)
+    await session.flush()
+    return customer_to_response(customer)
+
+
+@router.patch(
+    "/customers/me/notifications",
+    response_model=CustomerResponse,
+    summary="Update notification preferences",
+    description=(
+        "Customer-only — choose which messages to receive and on which channel. "
+        "Order updates default on; offers stay off until the customer opts in. "
+        "Setting `notify_channel` to `none` silences both."
+    ),
+    responses={401: RESP_401, 422: RESP_422},
+    tags=["Customer Dashboard"],
+)
+async def customer_notification_prefs_update(
+    body: CustomerNotificationPrefsRequest,
+    customer: Annotated[Customer, Depends(get_current_customer)],
+    session: Annotated[AsyncSession, Depends(get_db)],
+) -> CustomerResponse:
+    update_customer_notification_prefs(customer, body)
     await session.flush()
     return customer_to_response(customer)
 

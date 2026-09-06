@@ -99,7 +99,7 @@ export function NearbyKitchensList() {
   const openKitchen = (kitchen: KitchenNearby) => {
     const next = saveKitchenToSession(kitchen);
     updateSession(next);
-    navigate(`/kitchen/${kitchen.id}/menu`);
+    navigate(kitchen.code ? `/k/${kitchen.code}/menu` : `/kitchen/${kitchen.id}/menu`);
   };
 
   const useDemoLocation = () => {

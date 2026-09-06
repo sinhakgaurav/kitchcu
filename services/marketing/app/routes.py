@@ -81,7 +81,11 @@ from app.templates import (
 from ckac_common.database import get_db
 from ckac_common.event_bus import EventPublisher
 from ckac_common.openapi import RESP_400, RESP_404, auth_errors
-from ckac_common.platform_config import require_kitchen_module
+from ckac_common.platform_config import (
+    feature_http_status,
+    require_kitchen_feature,
+    require_kitchen_module,
+)
 
 router = APIRouter()
 
@@ -96,6 +100,16 @@ def get_publisher() -> EventPublisher:
     from app.main import event_publisher
 
     return event_publisher
+
+
+async def _require_loyalty_crm(session: AsyncSession, kitchen_id: uuid.UUID) -> None:
+    try:
+        await require_kitchen_feature(session, kitchen_id, "loyalty_crm")
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=feature_http_status(exc) or status.HTTP_403_FORBIDDEN,
+            detail=str(exc),
+        ) from exc
 
 
 @router.get(
@@ -121,6 +135,7 @@ async def crm_list_customers(
     refresh: bool = Query(default=False),
 ) -> KitchenCustomerListResponse:
     await verify_kitchen_owner(kitchen_id, owner_id, session)
+    await _require_loyalty_crm(session, kitchen_id)
     return await list_kitchen_customers(session, kitchen_id, refresh=refresh, publisher=publisher)
 
 
@@ -146,6 +161,7 @@ async def crm_update_customer_tags(
     session: Annotated[AsyncSession, Depends(get_db)],
 ) -> KitchenCustomerResponse:
     await verify_kitchen_owner(kitchen_id, owner_id, session)
+    await _require_loyalty_crm(session, kitchen_id)
     try:
         row = await update_customer_tags(session, kitchen_id, customer_id, body)
     except ValueError as exc:
@@ -171,6 +187,7 @@ async def coupons_list(
     session: Annotated[AsyncSession, Depends(get_db)],
 ) -> CouponListResponse:
     await verify_kitchen_owner(kitchen_id, owner_id, session)
+    await _require_loyalty_crm(session, kitchen_id)
     return await list_coupons(session, kitchen_id)
 
 
@@ -197,6 +214,7 @@ async def coupons_create(
     publisher: Annotated[EventPublisher, Depends(get_publisher)],
 ) -> CouponResponse:
     await verify_kitchen_owner(kitchen_id, owner_id, session)
+    await _require_loyalty_crm(session, kitchen_id)
     try:
         coupon = await create_coupon(session, kitchen_id, body, publisher)
     except ValueError as exc:
@@ -226,6 +244,7 @@ async def coupons_update(
     session: Annotated[AsyncSession, Depends(get_db)],
 ) -> CouponResponse:
     await verify_kitchen_owner(kitchen_id, owner_id, session)
+    await _require_loyalty_crm(session, kitchen_id)
     try:
         coupon = await update_coupon(session, kitchen_id, coupon_id, body)
     except ValueError as exc:
@@ -277,6 +296,7 @@ async def promotions_list(
     session: Annotated[AsyncSession, Depends(get_db)],
 ) -> PromotionListResponse:
     await verify_kitchen_owner(kitchen_id, owner_id, session)
+    await _require_loyalty_crm(session, kitchen_id)
     return await list_promotions(session, kitchen_id)
 
 
@@ -304,6 +324,7 @@ async def promotions_create(
     publisher: Annotated[EventPublisher, Depends(get_publisher)],
 ) -> PromotionResponse:
     await verify_kitchen_owner(kitchen_id, owner_id, session)
+    await _require_loyalty_crm(session, kitchen_id)
     try:
         promo = await create_promotion(session, kitchen_id, body, publisher)
     except ValueError as exc:
@@ -333,6 +354,7 @@ async def promotions_update(
     publisher: Annotated[EventPublisher, Depends(get_publisher)],
 ) -> PromotionResponse:
     await verify_kitchen_owner(kitchen_id, owner_id, session)
+    await _require_loyalty_crm(session, kitchen_id)
     try:
         promo = await update_promotion(session, kitchen_id, promotion_id, body, publisher)
     except ValueError as exc:

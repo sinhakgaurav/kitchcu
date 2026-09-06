@@ -38,8 +38,10 @@ from app.schemas import (
     list_subscription_plans,
     load_master_order_for_customer,
     payment_to_response,
+    list_kitchen_settlements,
     settlement_to_response,
     subscription_to_response,
+    SettlementResponse,
 )
 from app.gst import (
     GstAuditResponse,
@@ -216,6 +218,35 @@ async def kitchen_entitlements_get(
 ) -> KitchenEntitlementsResponse:
     await verify_kitchen_owner(kitchen_id, owner_id, session)
     return await get_kitchen_entitlements(session, kitchen_id)
+
+
+@router.get(
+    "/billing/kitchens/{kitchen_id}/settlements",
+    response_model=list[SettlementResponse],
+    tags=[TAG_SETTLEMENTS],
+    summary="List settlements for a kitchen (owner)",
+    description=(
+        "Owner-only — Razorpay Route split settlements for this kitchen. "
+        "Filter by `status` (`pending` / `transferred`). Paginated via `limit` / `offset`."
+    ),
+    responses=auth_errors(include_403=True),
+)
+async def kitchen_settlements_list(
+    kitchen_id: uuid.UUID,
+    owner_id: Annotated[uuid.UUID, Depends(get_current_owner_id)],
+    session: Annotated[AsyncSession, Depends(get_db)],
+    status_filter: Annotated[str | None, Query(alias="status")] = None,
+    limit: Annotated[int, Query(ge=1, le=200)] = 50,
+    offset: Annotated[int, Query(ge=0)] = 0,
+) -> list[SettlementResponse]:
+    await verify_kitchen_owner(kitchen_id, owner_id, session)
+    return await list_kitchen_settlements(
+        session,
+        kitchen_id,
+        status_filter=status_filter,
+        limit=limit,
+        offset=offset,
+    )
 
 
 @router.get(

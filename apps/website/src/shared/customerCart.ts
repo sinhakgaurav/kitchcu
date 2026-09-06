@@ -8,7 +8,23 @@ export type CartLine = {
   prepTimeMin: number;
   deliveryTimeMin: number;
   maxTimeMin: number;
+  special_instructions?: string;
 };
+
+export const CART_CHANGED_EVENT = "kitchcu-cart-changed";
+
+function notifyCartChanged(): void {
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(new Event(CART_CHANGED_EVENT));
+}
+
+export function kitchenFromOrderCode(
+  kitchenId: string,
+  orderCode: string,
+): { id: string; name: string; code: string } {
+  const code = orderCode.split("-")[0] || "KITCHEN";
+  return { id: kitchenId, name: code, code };
+}
 
 export type KitchenCart = {
   kitchenId: string;
@@ -54,10 +70,12 @@ export function getCart(): CustomerCart | null {
 
 export function saveCart(cart: CustomerCart): void {
   localStorage.setItem(CART_KEY, JSON.stringify({ ...cart, updatedAt: new Date().toISOString() }));
+  notifyCartChanged();
 }
 
 export function clearCart(): void {
   localStorage.removeItem(CART_KEY);
+  notifyCartChanged();
 }
 
 export function kitchenCartSubtotal(cart: KitchenCart): number {
@@ -116,6 +134,7 @@ export function addToCart(
     delivery_time_min?: number | null;
     max_time_min?: number;
     projected_ready_min?: number;
+    special_instructions?: string;
   },
   quantity = 1,
 ): CustomerCart {
@@ -141,8 +160,10 @@ export function addToCart(
     cart.kitchens.push(kitchenCart);
   }
   const line = kitchenCart.lines.find((l) => l.dishId === dish.id);
+  const note = dish.special_instructions?.trim();
   if (line) {
     line.quantity += quantity;
+    if (note) line.special_instructions = note;
   } else {
     const delivery = dish.delivery_time_min ?? 0;
     const maxTime =
@@ -157,6 +178,7 @@ export function addToCart(
       prepTimeMin: dish.prep_time_min,
       deliveryTimeMin: delivery,
       maxTimeMin: maxTime,
+      ...(note ? { special_instructions: note } : {}),
     });
   }
   saveCart(cart);
@@ -183,4 +205,56 @@ export function updateLineQuantity(dishId: string, quantity: number): CustomerCa
   }
   saveCart(next);
   return next;
+}
+
+export function updateLineInstructions(
+  dishId: string,
+  specialInstructions: string,
+): CustomerCart | null {
+  const cart = getCart();
+  if (!cart) return null;
+  const note = specialInstructions.trim();
+  const next = {
+    ...cart,
+    kitchens: cart.kitchens.map((kitchen) => ({
+      ...kitchen,
+      lines: kitchen.lines.map((line) => {
+        if (line.dishId !== dishId) return line;
+        const updated: CartLine = { ...line };
+        if (note) updated.special_instructions = note;
+        else delete updated.special_instructions;
+        return updated;
+      }),
+    })),
+  };
+  saveCart(next);
+  return next;
+}
+
+export function addItemsToCart(
+  kitchen: { id: string; name: string; code: string },
+  items: Array<{
+    dish_id: string;
+    dish_name: string;
+    quantity: number;
+    unit_price: number;
+    prep_time_min?: number;
+    special_instructions?: string | null;
+  }>,
+): CustomerCart {
+  let cart: CustomerCart = getCart() ?? { kitchens: [], updatedAt: "" };
+  for (const item of items) {
+    cart = addToCart(
+      kitchen,
+      {
+        id: item.dish_id,
+        name: item.dish_name,
+        price: item.unit_price,
+        prep_time_min: item.prep_time_min ?? 20,
+        special_instructions: item.special_instructions ?? undefined,
+      },
+      item.quantity,
+    );
+  }
+  return cart;
 }

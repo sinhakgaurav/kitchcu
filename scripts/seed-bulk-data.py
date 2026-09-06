@@ -138,10 +138,40 @@ def ensure_dishes(
     dish_ids: dict[str, str] = {}
     menu = request("GET", f"/api/v1/kitchens/{kitchen_id}/menu")
     for d in menu.get("dishes", []):
-        dish_ids[d["name"]] = d["id"]
+        if d.get("is_active", True):
+            dish_ids[d["name"]] = d["id"]
 
     added = 0
     target = dishes[:limit] if limit else dishes
+
+    # Correct heroes seeded by the old keyword/round-robin mapping (e.g. Bhel Puri on a
+    # grilled-meat photo). Creation is skipped for existing dishes, so without this the
+    # wrong image would survive every re-seed.
+    intended_media = {d["name"]: d.get("media_url") for d in target}
+    resynced = 0
+    for d in menu.get("dishes", []):
+        want = intended_media.get(d["name"])
+        if not want:
+            continue
+        hero = next((m for m in d.get("media", []) if m.get("is_hero")), None)
+        if hero and hero.get("url") == want:
+            continue
+        request(
+            "PATCH",
+            f"/api/v1/kitchens/{kitchen_id}/dishes/{d['id']}",
+            {
+                "media": {
+                    "url": want,
+                    "is_hero": True,
+                    "is_live_capture": True,
+                    "captured_at": captured_at(),
+                }
+            },
+            token=token,
+        )
+        resynced += 1
+    if resynced:
+        log(f"  Resynced {resynced} dish heroes to the correct image.")
     for i, dish in enumerate(target):
         if dish["name"] in existing_names:
             continue
@@ -152,7 +182,8 @@ def ensure_dishes(
             captured_at=captured_at(),
         )
         resp = request("POST", f"/api/v1/kitchens/{kitchen_id}/dishes", payload, token=token)
-        dish_ids[dish["name"]] = resp["id"]
+        if payload.get("is_active", True) and payload.get("media"):
+            dish_ids[dish["name"]] = resp["id"]
         existing_names.add(dish["name"])
         added += 1
         if added % 10 == 0:

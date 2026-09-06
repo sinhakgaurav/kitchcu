@@ -5,9 +5,12 @@ import { ListingToolbar } from "../../components/ListingToolbar";
 import {
   confirmDraft,
   fetchDrafts,
+  fetchMenu,
   fetchOrders,
   parseMessage,
+  updateDraft,
   STATUS_LABELS,
+  type Dish,
   type Order,
   type OrderDraft,
 } from "../../lib/api";
@@ -48,20 +51,41 @@ export function OrdersPage() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [sort, setSort] = useState<"newest" | "name_asc" | "name_desc">("newest");
+  const [statusFilter, setStatusFilter] = useState("");
+  const [sourceFilter, setSourceFilter] = useState("");
+  const [dateFilter, setDateFilter] = useState<"all" | "today" | "7d">("all");
+  const [dishes, setDishes] = useState<Dish[]>([]);
+
+  const dateBounds = useMemo(() => {
+    if (dateFilter === "all") return {};
+    const before = new Date();
+    const after = new Date();
+    if (dateFilter === "today") after.setHours(0, 0, 0, 0);
+    else after.setDate(after.getDate() - 7);
+    return { created_after: after.toISOString(), created_before: before.toISOString() };
+  }, [dateFilter]);
 
   const load = useCallback(async () => {
     if (!kitchen) return;
     setLoading(true);
     try {
-      const [o, d] = await Promise.all([fetchOrders(kitchen.id), fetchDrafts(kitchen.id)]);
+      const [o, d, menu] = await Promise.all([
+        fetchOrders(kitchen.id, statusFilter || undefined, {
+          source: sourceFilter || undefined,
+          ...dateBounds,
+        }),
+        fetchDrafts(kitchen.id),
+        fetchMenu(kitchen.id).catch(() => null),
+      ]);
       setOrders(o.orders);
       setDrafts(d.drafts);
+      if (menu) setDishes(menu.dishes.filter((dish) => dish.is_active));
     } catch {
       setError("Could not load orders");
     } finally {
       setLoading(false);
     }
-  }, [kitchen]);
+  }, [kitchen, statusFilter, sourceFilter, dateBounds]);
 
   useEffect(() => {
     load().catch(() => {});
@@ -71,7 +95,13 @@ export function OrdersPage() {
   useEffect(() => {
     if (!kitchen) return;
     const tick = () => {
-      Promise.all([fetchOrders(kitchen.id), fetchDrafts(kitchen.id)])
+      Promise.all([
+        fetchOrders(kitchen.id, statusFilter || undefined, {
+          source: sourceFilter || undefined,
+          ...dateBounds,
+        }),
+        fetchDrafts(kitchen.id),
+      ])
         .then(([o, d]) => {
           setOrders(o.orders);
           setDrafts(d.drafts);
@@ -87,7 +117,7 @@ export function OrdersPage() {
       window.clearInterval(id);
       document.removeEventListener("visibilitychange", onVis);
     };
-  }, [kitchen]);
+  }, [kitchen, statusFilter, sourceFilter, dateBounds]);
 
   const activeOrders = useMemo(
     () => orders.filter((o) => !["delivered", "cancelled"].includes(o.status)),
@@ -180,6 +210,25 @@ export function OrdersPage() {
     }
   };
 
+  const handleRemap = async (draft: OrderDraft, index: number, dishId: string) => {
+    setBusy(true);
+    setError("");
+    try {
+      const next = await updateDraft(kitchen.id, draft.id, {
+        parsed_items: draft.parsed_items.map((item, i) => ({
+          raw: item.raw,
+          quantity: item.quantity,
+          dish_id: i === index ? (dishId || null) : item.dish_id,
+        })),
+      });
+      setDrafts((current) => current.map((row) => (row.id === next.id ? next : row)));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not update draft");
+    } finally {
+      setBusy(false);
+    }
+  };
+
   return (
     <div className="owner-screen od-board od-orders">
       <section className="od-board__hero dash-card">
@@ -255,6 +304,38 @@ export function OrdersPage() {
         ))}
       </div>
 
+      {tab !== "drafts" && (
+        <div className="od-orders__filters">
+          <label>
+            Status
+            <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
+              <option value="">All statuses</option>
+              {Object.entries(STATUS_LABELS).map(([value, label]) => (
+                <option key={value} value={value}>{label}</option>
+              ))}
+            </select>
+          </label>
+          <label>
+            Source
+            <select value={sourceFilter} onChange={(e) => setSourceFilter(e.target.value)}>
+              <option value="">All sources</option>
+              <option value="whatsapp">WhatsApp</option>
+              <option value="customer_pwa">Customer app</option>
+              <option value="manual">Manual</option>
+              <option value="customer_pwa_multi">Multi-kitchen</option>
+            </select>
+          </label>
+          <label>
+            Date
+            <select value={dateFilter} onChange={(e) => setDateFilter(e.target.value as "all" | "today" | "7d")}>
+              <option value="all">Any time</option>
+              <option value="today">Today</option>
+              <option value="7d">Last 7 days</option>
+            </select>
+          </label>
+        </div>
+      )}
+
       <ListingToolbar
         search={search}
         onSearchChange={setSearch}
@@ -313,13 +394,32 @@ export function OrdersPage() {
                   <li key={i} className={p.matched ? "" : "od-order-draft__item--bad"}>
                     <span>{p.quantity}× {p.dish_name ?? p.raw}</span>
                     <span>{p.matched ? inr((p.unit_price ?? 0) * p.quantity) : "Unmatched"}</span>
+                    {!p.matched && (
+                      <select
+                        aria-label={`Map ${p.raw} to a dish`}
+                        disabled={busy}
+                        value={p.dish_id ?? ""}
+                        onChange={(e) => void handleRemap(d, i, e.target.value)}
+                      >
+                        <option value="">Map to dish…</option>
+                        {dishes.map((dish) => (
+                          <option key={dish.id} value={dish.id}>{dish.name}</option>
+                        ))}
+                      </select>
+                    )}
                   </li>
                 ))}
               </ul>
               {d.unmatched_lines.length > 0 && (
                 <p className="od-order-draft__warn">Unmatched lines: {d.unmatched_lines.join(", ")}</p>
               )}
-              <button type="button" className="btn btn--primary btn--sm" disabled={busy} onClick={() => handleConfirm(d.id)}>
+              <button
+                type="button"
+                className="btn btn--primary btn--sm"
+                disabled={busy || !d.parsed_items.some((p) => p.matched)}
+                title={!d.parsed_items.some((p) => p.matched) ? "Map at least one dish before confirming" : undefined}
+                onClick={() => handleConfirm(d.id)}
+              >
                 Confirm order
               </button>
             </article>
@@ -366,6 +466,7 @@ export function OrdersPage() {
                     <div className="od-recent__cell od-recent__cell--meta">
                       <span className="od-recent__amount">{inr(o.total)}</span>
                       <span className="od-recent__meta">
+                        {o.distance_km != null ? `${o.distance_km.toFixed(1)} km · ` : ""}
                         {o.source} · {formatWhen(o.created_at)}
                       </span>
                     </div>

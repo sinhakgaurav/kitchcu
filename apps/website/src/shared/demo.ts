@@ -1,5 +1,8 @@
 /** Demo credentials — keep in sync with scripts/demo_data.py */
 
+import { ADMIN_PROD_EMAIL } from "./brand";
+import { isProductionHost } from "./env";
+
 export const DEMO_OTP = "123456";
 
 export const DEMO = {
@@ -83,16 +86,8 @@ export function adminLoginDefaults(): {
   password: string;
   isProductionHost: boolean;
 } {
-  if (typeof window === "undefined") {
-    return { email: DEMO_ADMIN.email, password: DEMO_ADMIN.password, isProductionHost: false };
-  }
-  const host = window.location.hostname.toLowerCase();
-  const isProductionHost =
-    host === "admin.kitchcu.com" ||
-    host.endsWith(".kitchcu.com") ||
-    host === "kitchcu.com";
-  if (isProductionHost) {
-    return { email: "admin@kitchcu.com", password: "", isProductionHost: true };
+  if (isProductionHost()) {
+    return { email: ADMIN_PROD_EMAIL, password: "", isProductionHost: true };
   }
   return { email: DEMO_ADMIN.email, password: DEMO_ADMIN.password, isProductionHost: false };
 }

@@ -21,6 +21,7 @@ Design:
 
 from __future__ import annotations
 
+import ipaddress
 import json
 import time
 from collections.abc import Callable
@@ -100,6 +101,12 @@ RULES: tuple[RateLimitRule, ...] = tuple(
     for name in _RULE_ORDER
 )
 
+# Docker bridge networks the on-host seed scripts appear to come from.
+_OPS_NETWORKS = tuple(
+    ipaddress.ip_network(cidr)
+    for cidr in ("10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16", "fd00::/8")
+)
+
 _config_cache: dict[str, Any] = {
     "loaded_at": 0.0,
     "enabled": True,
@@ -169,14 +176,36 @@ def client_ip(request: Request) -> str:
     return request.client.host if request.client else "unknown"
 
 
-def is_loopback_client(request: Request) -> bool:
-    """True when the TCP peer is localhost (VM seed / ops via 127.0.0.1).
+def is_local_ops_client(request: Request) -> bool:
+    """True for on-host ops traffic (VM seed scripts), false for anything proxied.
 
-    Uses ``request.client.host`` only — never ``X-Forwarded-For`` — so a
-    public client cannot spoof loopback to bypass limits.
+    Two conditions, both required:
+
+    1. The TCP peer is loopback or a private address. Seed scripts curl
+       ``127.0.0.1:18000``, but Docker's userland proxy rewrites the peer to the
+       bridge gateway (``172.17.0.1`` and friends), so a loopback-only check never
+       fires in the compose deployment — which left the VM seed scripts throttling
+       themselves for hours on the OTP rule.
+    2. There is no ``X-Forwarded-For`` header. Caddy is the only path a public
+       client has to the gateway (the port is bound to 127.0.0.1 on the VM) and it
+       always sets that header, so its presence marks the request as untrusted.
+
+    The peer is read from ``request.client.host`` only, never from a header, so a
+    public client cannot spoof its way into the exemption.
     """
     host = (request.client.host if request.client else "") or ""
-    return host in ("127.0.0.1", "::1", "localhost")
+    if request.headers.get("x-forwarded-for"):
+        return False
+    if host in ("127.0.0.1", "::1", "localhost"):
+        return True
+    try:
+        addr = ipaddress.ip_address(host)
+    except ValueError:
+        return False
+    # Explicit RFC1918 / loopback only. `ipaddress.is_private` is too broad here —
+    # it also covers documentation ranges like 203.0.113.0/24, which are routable
+    # from the internet's point of view and must stay rate limited.
+    return addr.is_loopback or any(addr in net for net in _OPS_NETWORKS)
 
 
 async def check_rate_limit(redis_client, request: Request, path: str) -> tuple[bool, int, str]:
@@ -184,14 +213,15 @@ async def check_rate_limit(redis_client, request: Request, path: str) -> tuple[b
 
     Fails open (``allowed=True``) when Redis is unavailable or returns an
     unexpected type — enforcement is best-effort, not a hard dependency.
-    Loopback peers are not limited so GCP ``seed-bulk-data.py`` can finish.
-    When admin disables limiting, all requests are allowed.
+    On-host ops traffic is not limited so the GCP seed scripts can finish; see
+    :func:`is_local_ops_client`. When admin disables limiting, all requests are
+    allowed.
     """
     await _refresh_config_from_redis(redis_client)
     rule = resolve_rule(request.method, path)
     if not _config_cache.get("enabled", True):
         return True, 0, rule.name
-    if is_loopback_client(request):
+    if is_local_ops_client(request):
         return True, 0, rule.name
     if redis_client is None:
         return True, 0, rule.name

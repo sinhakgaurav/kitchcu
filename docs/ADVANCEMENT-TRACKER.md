@@ -137,6 +137,19 @@ Run `.\scripts\seed-all.ps1` (or GCP `run-seed=1`) after migrations.
 | Platform features / seed packages | billing migration `008` seed | ✅ |
 | Learning trials / community | extras (`cover_url` on community recipe) | ✅ |
 | Tiffin plans (thali / single_dish / combo) | `ensure_tiffin_plans` | ✅ |
+| Weekly QA cohort (5 owners · 10 customers · 10 orders/kitchen · marketing rotation · growth) | `scripts/weekly_test_data.py` via `kitchcu-weekly-seed.timer` | ✅ |
+
+### Weekly QA cohort
+
+Systemd timer on the VM (`infra/gcp-vm/kitchcu-weekly-seed.{service,timer}`) runs every
+Monday 03:30 IST and adds a new cohort without touching earlier ones: **5 owners** with
+kitchens and menus, **10 customers**, **10 delivered + rated orders per kitchen** mixing
+new and returning diners, a rotated `QA{cohort}` coupon and promotion (previous cohort's
+deactivated), a tiffin plan with a subscriber, CRM refresh, growth suggestions, and a
+support ticket. Identifiers are derived from the ISO year+week
+(`{prefix}{YY}{WW}{index}`; owners `7…`, customers `8…`), so re-running inside the same
+week reuses the accounts and only tops orders up. Current cohort is written to
+`/var/lib/ckac/weekly-cohort.json`. See [DEPLOYMENT-GCP.md](./DEPLOYMENT-GCP.md) §11.7b.
 
 ---
 

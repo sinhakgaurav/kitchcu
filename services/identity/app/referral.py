@@ -22,7 +22,7 @@ from app.models import (
     ReferralLead,
     ReferralSettings,
 )
-from app.schemas import normalize_india_phone
+from app.schemas import normalize_india_phone, normalize_optional_email
 from ckac_common.auth import stream_key
 from ckac_common.event_bus import EventPublisher
 
@@ -95,6 +95,11 @@ class CustomerKitchenReferralCreate(BaseModel):
     def normalize_phone(cls, v: str) -> str:
         return normalize_india_phone(v)
 
+    @field_validator("contact_email")
+    @classmethod
+    def normalize_contact_email(cls, v: EmailStr | None) -> str | None:
+        return normalize_optional_email(v)
+
 
 class OwnerCustomerReferralCreate(BaseModel):
     kitchen_id: uuid.UUID
@@ -108,6 +113,11 @@ class OwnerCustomerReferralCreate(BaseModel):
     @classmethod
     def normalize_phone(cls, v: str) -> str:
         return normalize_india_phone(v)
+
+    @field_validator("contact_email")
+    @classmethod
+    def normalize_contact_email(cls, v: EmailStr | None) -> str | None:
+        return normalize_optional_email(v)
 
 
 class BulkReferralRow(BaseModel):
@@ -123,6 +133,11 @@ class BulkReferralRow(BaseModel):
     @classmethod
     def normalize_phone(cls, v: str) -> str:
         return normalize_india_phone(v)
+
+    @field_validator("contact_email")
+    @classmethod
+    def normalize_contact_email(cls, v: str | None) -> str | None:
+        return normalize_optional_email(v)
 
 
 class BulkReferralRequest(BaseModel):

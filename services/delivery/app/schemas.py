@@ -14,7 +14,7 @@ import os
 import uuid
 from datetime import datetime
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -23,6 +23,7 @@ from app.models import DeliveryQuote
 from app.platform_courier import quote_platform_delivery_fee
 from ckac_common.auth import stream_key
 from ckac_common.event_bus import EventPublisher
+from ckac_common.validators import normalize_optional_india_phone
 
 
 class DeliveryQuoteRequest(BaseModel):
@@ -78,6 +79,11 @@ class DeliveryFeeDenialRequest(BaseModel):
     customer_phone: str | None = Field(
         default=None, description="Customer phone (E.164), so the owner can call back."
     )
+
+    @field_validator("customer_phone")
+    @classmethod
+    def normalize_phone(cls, v: str | None) -> str | None:
+        return normalize_optional_india_phone(v)
 
 
 class DeliveryFeeDenialResponse(BaseModel):

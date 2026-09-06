@@ -307,7 +307,7 @@ def dish_create_payload(
     if not category_id or not cuisine_id:
         raise ApiError(f"Missing cuisine/category for dish {dish['name']}: {cuisine_slug}/{diet_slug}")
 
-    return {
+    payload = {
         "name": dish["name"],
         "price": dish["price"],
         "prep_time_min": dish["prep_time_min"],
@@ -315,10 +315,17 @@ def dish_create_payload(
         "ingredients_description": dish.get("ingredients_description", "Fresh ingredients"),
         "cuisine_id": cuisine_id,
         "category_id": category_id,
-        "media": {
+    }
+    # Dishes with no honest asset (e.g. drinks) seed without a hero rather than
+    # borrowing a photo of something else. Active dishes require a live-capture
+    # hero, so those stay drafts until an owner captures one.
+    if dish.get("media_url"):
+        payload["media"] = {
             "url": dish["media_url"],
             "is_hero": True,
             "is_live_capture": True,
             "captured_at": captured_at,
-        },
-    }
+        }
+    else:
+        payload["is_active"] = False
+    return payload

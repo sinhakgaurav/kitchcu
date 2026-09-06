@@ -18,6 +18,7 @@ from app.models import (
 )
 from ckac_common.auth import stream_key
 from ckac_common.event_bus import EventPublisher
+from ckac_common.validators import normalize_display_name
 
 MODULE_KEY = "tiffin_plans"
 
@@ -115,6 +116,13 @@ class SubscribeRequest(BaseModel):
     customer_name: str | None = Field(default=None, max_length=255)
     starts_on: date | None = None
     note: str | None = Field(default=None, max_length=500)
+
+    @field_validator("customer_name")
+    @classmethod
+    def normalize_name(cls, v: str | None) -> str | None:
+        # Only a fallback for the identity profile name, which is a machine
+        # label like `Customer 0481` for OTP signups — same field, same rules.
+        return normalize_display_name(v)
 
 
 class SubscriptionDecisionRequest(BaseModel):

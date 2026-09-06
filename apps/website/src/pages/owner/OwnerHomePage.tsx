@@ -140,6 +140,9 @@ export function OwnerHomePage() {
   const subTier = owner?.subscription_tier ?? "trial";
   const subStatus = owner?.subscription_status ?? "active";
 
+  const hasOrder = orders.length > 0 || draftCount > 0;
+  const hasAccepted = orders.some((o) => !["received", "cancelled"].includes(o.status));
+  const hasRevenue = (summary?.gross_revenue ?? 0) > 0;
   const day1Steps = [
     {
       id: "dishes",
@@ -148,18 +151,28 @@ export function OwnerHomePage() {
       to: "/dashboard/menu/new",
     },
     {
+      id: "order",
+      done: hasOrder,
+      label: hasOrder ? "First order is in" : "Create your first manual order",
+      to: "/dashboard/orders/new",
+    },
+    {
+      id: "accept",
+      done: hasAccepted,
+      label: hasAccepted ? "You accepted an order" : "Accept a received order in the inbox",
+      to: "/dashboard/orders",
+    },
+    {
       id: "brand",
       done: brandedEnabled,
       label: brandedEnabled ? "Your customer page is live" : "Publish your customer page",
       to: "/dashboard/brand",
     },
     {
-      id: "share",
-      done: brandedEnabled && dishCount >= 1,
-      label: brandedEnabled && dishCount >= 1
-        ? "Ready to share with customers"
-        : "Share your page link on WhatsApp",
-      to: "/dashboard/brand",
+      id: "reports",
+      done: hasRevenue,
+      label: hasRevenue ? "Same-day revenue is on Reports" : "Check today's revenue on Reports",
+      to: "/dashboard/reports",
     },
   ];
   const day1Done = day1Steps.filter((s) => s.done).length;
@@ -239,7 +252,7 @@ export function OwnerHomePage() {
         <section className="dash-card owner-day1">
           <h2>Get ready to take orders</h2>
           <p className="owner-muted">
-            {day1Done}/3 quick steps — add dishes, publish your page, share the link with customers.
+            {day1Done}/{day1Steps.length} steps — menu, first order, accept, publish, then check revenue.
           </p>
           <ul className="owner-day1__list">
             {day1Steps.map((step) => (
@@ -449,7 +462,17 @@ export function OwnerHomePage() {
               <Link to="/dashboard/orders" className="od-panel__link">{t("owner.home.viewAllOrders")}</Link>
             </header>
             {recentOrders.length === 0 ? (
-              <p className="od-panel__empty">{t("owner.home.noOrders")}</p>
+              <div className="od-panel__empty">
+                <p>{t("owner.home.noOrders")}</p>
+                <div className="od-board__hero-actions" style={{ marginTop: "0.75rem" }}>
+                  <Link to="/dashboard/orders/new" className="btn btn--primary btn--sm">
+                    New order
+                  </Link>
+                  <Link to="/dashboard/menu/new" className="btn btn--ghost btn--sm">
+                    Add a dish
+                  </Link>
+                </div>
+              </div>
             ) : (
               <>
                 <div className="od-recent__head" aria-hidden="true">

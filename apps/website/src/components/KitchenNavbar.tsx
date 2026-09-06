@@ -1,6 +1,8 @@
 import { Link, useLocation } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { BrandNavMark } from "./BrandNavMark";
+import { LanguageSwitcher } from "../i18n/LanguageSwitcher";
+import { SuperAdminLink } from "./SuperAdminAccess";
 import { KITCHEN_HOST } from "../shared/brand";
 import { useKitchenAuth } from "../shared/kitchenAuth";
 import { customerUrl } from "../shared/urls";
@@ -44,6 +46,8 @@ export function KitchenNavbar() {
           >
             {token ? "Dashboard" : "Owner sign in"}
           </Link>
+          <SuperAdminLink className="nav__owner-link" onClick={() => setOpen(false)} />
+          <LanguageSwitcher className="lang-switcher--nav" />
         </nav>
 
         <button

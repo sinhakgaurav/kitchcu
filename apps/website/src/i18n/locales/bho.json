@@ -32,7 +32,12 @@
     "customerApp": "ग्राहक ऐप के बा",
     "kitchenOwner": "रसोई के मालिक →",
     "ownerLogin": "मालिक के लॉगिन हो गइल बा",
-    "adminLogin": "Super admin"
+    "adminLogin": "Super admin",
+    "adminCredentialsDev": "Email {{email}} · Password {{password}} (dev / seeded)",
+    "adminCredentialsHost": "Open the console on {{host}}.",
+    "adminCredentialsProd": "Email {{email}} — password from the VM ADMIN_PASSWORD secret, not this page",
+    "adminCredentialsTitle": "Super admin credentials",
+    "adminOpenConsole": "Open Super Admin"
   },
   "status": {
     "received": "मिलल",
@@ -142,7 +147,15 @@
     "contactSending": "भेजत बानी...",
     "contactSent": "धन्यवाद — हमनी के जल्दीए हाथ बढ़ा देब जा।",
     "contactError": "भेजल ना जा सकल. कृपया दोबारा कोशिश करीं।",
-    "navCities": "Cities"
+    "navCities": "Cities",
+    "ctaAdmin": "Super admin →",
+    "tileAdminBody": "Kitchens, employees, tickets, packages, and API keys — Super Admin only.",
+    "tileAdminCta": "Open Super Admin",
+    "tileAdminTitle": "Operate the platform",
+    "tileCustomerBody": "Nearby kitchens, live-capture menus, honest ETAs, and fair delivery fees.",
+    "tileCustomerTitle": "Order home-made food",
+    "tileKitchenBody": "WhatsApp orders, menu, tiffin plans, reports — zero food commission.",
+    "tileKitchenTitle": "Run your kitchen"
   },
   "owner": {
     "nav": {
@@ -170,7 +183,8 @@
       "paymentGateway": "भुगतान के गेटवे के बा",
       "gst": "जीएसटी एंड फाइनेंस के बा",
       "setup": "किचन सेटअप के बा",
-      "bulkPrep": "Prep batches"
+      "bulkPrep": "Prep batches",
+      "ratings": "Ratings"
     },
     "shell": {
       "activeKitchen": "सक्रिय रसोईघर बा",
@@ -316,7 +330,8 @@
       "setup": "किचन सेटअप के बा",
       "referrals": "रेफरल के बारे में बतावल गइल बा",
       "newOrder": "नया क्रम के बा",
-      "addDish": "पकवान डाल दीं"
+      "addDish": "पकवान डाल दीं",
+      "ratings": "Ratings"
     }
   },
   "customer": {
@@ -328,7 +343,10 @@
       "myOrders": "हमार आदेश बा",
       "dashboard": "डैशबोर्ड के बा",
       "account": "खाता",
-      "signIn": "ग्राहक साइन इन कर लेत बाड़े"
+      "signIn": "ग्राहक साइन इन कर लेत बाड़े",
+      "logout": "Log out",
+      "notifications": "Notifications",
+      "profile": "My profile"
     },
     "auth": {
       "title": "ग्राहक साइन इन कर लेत बाड़े",

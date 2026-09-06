@@ -32,7 +32,12 @@
     "customerApp": "ਗਾਹਕ ਐਪ",
     "kitchenOwner": "ਰਸੋਈ ਮਾਲਕ →",
     "ownerLogin": "ਮਾਲਕ ਲਾਗਇਨ",
-    "adminLogin": "Super admin"
+    "adminLogin": "Super admin",
+    "adminCredentialsDev": "Email {{email}} · Password {{password}} (dev / seeded)",
+    "adminCredentialsHost": "Open the console on {{host}}.",
+    "adminCredentialsProd": "Email {{email}} — password from the VM ADMIN_PASSWORD secret, not this page",
+    "adminCredentialsTitle": "Super admin credentials",
+    "adminOpenConsole": "Open Super Admin"
   },
   "status": {
     "received": "ਮਿਲੇ:",
@@ -142,7 +147,15 @@
     "contactSending": "ਭੇਜਿਆ ਜਾ ਰਿਹਾ ਹੈ...",
     "contactSent": "ਧੰਨਵਾਦ - ਅਸੀਂ ਜਲਦੀ ਹੀ ਸੰਪਰਕ ਕਰਾਂਗੇ।",
     "contactError": "ਨਹੀਂ ਭੇਜ ਸਕਿਆ। ਕਿਰਪਾ ਕਰਕੇ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
-    "navCities": "Cities"
+    "navCities": "Cities",
+    "ctaAdmin": "Super admin →",
+    "tileAdminBody": "Kitchens, employees, tickets, packages, and API keys — Super Admin only.",
+    "tileAdminCta": "Open Super Admin",
+    "tileAdminTitle": "Operate the platform",
+    "tileCustomerBody": "Nearby kitchens, live-capture menus, honest ETAs, and fair delivery fees.",
+    "tileCustomerTitle": "Order home-made food",
+    "tileKitchenBody": "WhatsApp orders, menu, tiffin plans, reports — zero food commission.",
+    "tileKitchenTitle": "Run your kitchen"
   },
   "owner": {
     "nav": {
@@ -170,7 +183,8 @@
       "paymentGateway": "ਭੁਗਤਾਨ ਗੇਟਵੇ",
       "gst": "ਜੀਐਸਟੀ ਅਤੇ ਵਿੱਤ",
       "setup": "ਰਸੋਈ ਸੈੱਟਅੱਪ",
-      "bulkPrep": "Prep batches"
+      "bulkPrep": "Prep batches",
+      "ratings": "Ratings"
     },
     "shell": {
       "activeKitchen": "ਸਰਗਰਮ ਰਸੋਈ",
@@ -316,7 +330,8 @@
       "setup": "ਰਸੋਈ ਸੈੱਟਅੱਪ",
       "referrals": "ਰੈਫਰਲ",
       "newOrder": "ਨਵਾਂ ਆਰਡਰ",
-      "addDish": "ਪਕਵਾਨ ਸ਼ਾਮਲ ਕਰੋ"
+      "addDish": "ਪਕਵਾਨ ਸ਼ਾਮਲ ਕਰੋ",
+      "ratings": "Ratings"
     }
   },
   "customer": {
@@ -328,7 +343,10 @@
       "myOrders": "ਮੇਰੇ ਆਦੇਸ਼",
       "dashboard": "ਡੈਸ਼ਬੋਰਡ",
       "account": "ਅਕਾਊਂਟ",
-      "signIn": "ਗਾਹਕ ਸਾਈਨ ਇਨ ਕਰੋ"
+      "signIn": "ਗਾਹਕ ਸਾਈਨ ਇਨ ਕਰੋ",
+      "logout": "Log out",
+      "notifications": "Notifications",
+      "profile": "My profile"
     },
     "auth": {
       "title": "ਗਾਹਕ ਸਾਈਨ ਇਨ ਕਰੋ",

@@ -112,7 +112,7 @@ export function CustomerBrowsePage() {
           <article className="glass customer-benefit-card">
             <img src={sampleDishImages.thali} alt="" loading="lazy" />
             <h3>Order tracking</h3>
-            <p>Follow your order from kitchen to delivery (coming to customer app).</p>
+            <p>Follow every order from kitchen to door — live status and a shareable tracking link.</p>
           </article>
         </div>      </div>
     </div>

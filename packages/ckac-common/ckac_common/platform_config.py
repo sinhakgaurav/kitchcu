@@ -200,6 +200,8 @@ def feature_http_status(exc: BaseException) -> int | None:
     detail = str(exc)
     if detail.startswith("Feature '") and detail.endswith("' is disabled"):
         return 403
+    if detail.startswith("Feature '") and "is not included in this kitchen's package" in detail:
+        return 403
     if detail.startswith("Module '") and "is disabled for this kitchen" in detail:
         return 403
     return None
@@ -271,6 +273,64 @@ async def is_kitchen_module_enabled(
 async def require_kitchen_module(session: AsyncSession, kitchen_id, module_key: str) -> None:
     if not await is_kitchen_module_enabled(session, kitchen_id, module_key):
         raise ValueError(f"Module '{module_key}' is disabled for this kitchen")
+
+
+async def kitchen_has_feature(session: AsyncSession, kitchen_id, feature_key: str) -> bool:
+    """Soft mode (no assigned package): allow. Hard mode: key must be on the package."""
+    packaged = await kitchen_has_assigned_package(session, kitchen_id)
+    if not packaged:
+        return True
+    try:
+        row = (
+            await session.execute(
+                text(
+                    """
+                    SELECT 1
+                    FROM ckac_billing.kitchen_packages kp
+                    JOIN ckac_billing.package_features pf
+                      ON pf.package_id = kp.package_id
+                    WHERE kp.kitchen_id = CAST(:kid AS uuid)
+                      AND pf.feature_key = :fk
+                    LIMIT 1
+                    """
+                ),
+                {"kid": str(kitchen_id), "fk": feature_key},
+            )
+        ).scalar_one_or_none()
+        return row is not None
+    except Exception:
+        return True
+
+
+async def require_kitchen_feature(session: AsyncSession, kitchen_id, feature_key: str) -> None:
+    """Raise when a hard-mode kitchen package omits ``feature_key``."""
+    if not await kitchen_has_feature(session, kitchen_id, feature_key):
+        raise ValueError(f"Feature '{feature_key}' is not included in this kitchen's package")
+
+
+# SQL fragment: drop kitchens that have an assigned package without ``feature_key``.
+# Soft-mode kitchens (no kitchen_packages row) stay in the feed.
+HARD_MODE_MISSING_FEATURE_SQL = """
+              AND NOT EXISTS (
+                    SELECT 1 FROM ckac_billing.kitchen_packages kp
+                    WHERE kp.kitchen_id = {kitchen_id_sql}
+                      AND NOT EXISTS (
+                            SELECT 1 FROM ckac_billing.package_features pf
+                            WHERE pf.package_id = kp.package_id
+                              AND pf.feature_key = '{feature_key}'
+                      )
+              )
+"""
+
+
+def hard_mode_missing_feature_sql(kitchen_id_sql: str, feature_key: str) -> str:
+    """Return a SQL AND-clause that hides hard-mode kitchens missing ``feature_key``."""
+    if not feature_key.replace("_", "").isalnum():
+        raise ValueError("Invalid feature_key")
+    return HARD_MODE_MISSING_FEATURE_SQL.format(
+        kitchen_id_sql=kitchen_id_sql,
+        feature_key=feature_key,
+    )
 
 
 def verify_razorpay_webhook_signature(

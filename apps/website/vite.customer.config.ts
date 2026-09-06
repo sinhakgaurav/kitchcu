@@ -2,6 +2,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
+import { spaIndex } from "./viteSpaIndex";
 import { kitchcuPwaPlugin } from "./src/shared/vitePwa";
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
@@ -15,7 +16,7 @@ const apiProxy = {
 
 export default defineConfig({
   envDir: repoRoot,
-  plugins: [react(), kitchcuPwaPlugin("kitchCU Customer", "kitchCU")],
+  plugins: [react(), spaIndex("customer.html"), kitchcuPwaPlugin("kitchCU Customer", "kitchCU")],
   server: {
     port: 13001,
     host: true,

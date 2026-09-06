@@ -2,6 +2,7 @@
 
 import { APP_STORAGE_PREFIX } from "./brand";
 import { apiHeaders, correlationHeaders } from "./http";
+import { normalizeEmail, normalizePersonName, normalizePhone } from "./validation";
 
 const TOKEN_KEY = `${APP_STORAGE_PREFIX}_kitchen_token`;
 const KITCHEN_KEY = `${APP_STORAGE_PREFIX}_kitchen_active_id`;
@@ -297,6 +298,28 @@ export type RevenueSummary = {
   repeat_rate: number;
 };
 
+export type PaymentMix = {
+  days: number;
+  kitchen_id: string;
+  cod_revenue: number;
+  online_revenue: number;
+  upi_revenue: number;
+  other_revenue: number;
+  cod_orders: number;
+  online_orders: number;
+  upi_orders: number;
+  other_orders: number;
+  total_revenue: number;
+};
+
+export type RevenueSummaryCompare = {
+  days: number;
+  kitchen_id: string;
+  current: RevenueSummary;
+  previous: RevenueSummary;
+  delta_pct: { revenue: number; orders: number; aov: number };
+};
+
 export type RevenuePoint = { date: string; revenue: number; orders: number };
 export type RevenueTimeseries = { window_days: number; points: RevenuePoint[] };
 
@@ -370,37 +393,9 @@ export type OwnerSubscription = {
   created_at: string;
 };
 
-/** India mobile → E.164 ``+91XXXXXXXXXX``. Throws on invalid length / non-mobile. */
-export function normalizePhone(phone: string): string {
-  const digits = phone.replace(/\D/g, "");
-  let national = "";
-  if (digits.length === 10) national = digits;
-  else if (digits.length === 12 && digits.startsWith("91")) national = digits.slice(2);
-  else throw new Error("Enter a valid 10-digit India mobile number");
-  if (!/^[6-9]\d{9}$/.test(national)) {
-    throw new Error("Enter a valid 10-digit India mobile number");
-  }
-  return `+91${national}`;
-}
-
-/** Person display name — letters required; no digits. */
-export function normalizePersonName(name: string): string {
-  const cleaned = name.trim();
-  if (cleaned.length < 2) throw new Error("Name must be at least 2 characters");
-  if (!/^[\p{L}.\-'\s]+$/u.test(cleaned)) {
-    throw new Error("Name may only contain letters, spaces, apostrophes, hyphens, or dots");
-  }
-  if (/\d/.test(cleaned)) throw new Error("Name must not contain digits");
-  return cleaned;
-}
-
-export function normalizeEmail(email: string): string {
-  const cleaned = email.trim().toLowerCase();
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleaned)) {
-    throw new Error("Enter a valid email address");
-  }
-  return cleaned;
-}
+// Phone / name / email rules live in ./validation so forms and API payloads share
+// exactly one rule set. Re-exported here because callers import them from api.ts.
+export { normalizeEmail, normalizePersonName, normalizePhone };
 
 /** Authenticated owner API fetch — used by feature modules (referrals, etc.). */
 export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
@@ -419,8 +414,13 @@ export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> 
       (detail === "Invalid token" || detail === "Not authenticated" || detail === "Invalid token type")
     ) {
       clearToken();
-      const next = encodeURIComponent(window.location.pathname + window.location.search);
-      window.location.href = `/login?session=expired&next=${next}`;
+      // Only bounce a session that actually existed, and never from /login itself —
+      // otherwise a signed-in customer app hitting an owner route reloads forever.
+      const onLogin = window.location.pathname.startsWith("/login");
+      if (token && !onLogin) {
+        const next = encodeURIComponent(window.location.pathname + window.location.search);
+        window.location.href = `/login?session=expired&next=${next}`;
+      }
       throw new Error("Session expired — please sign in again");
     }
     throw new Error(detail);
@@ -510,6 +510,25 @@ export async function uploadKitchenBrandedMedia(
   return body as Kitchen;
 }
 
+export async function updateKitchenProfile(
+  kitchenId: string,
+  data: {
+    name?: string;
+    description?: string | null;
+    address_line?: string;
+    city?: string;
+    state?: string;
+    pincode?: string | null;
+    latitude?: number;
+    longitude?: number;
+  },
+): Promise<Kitchen> {
+  return apiFetch(`/api/v1/kitchens/${kitchenId}/profile`, {
+    method: "PATCH",
+    body: JSON.stringify(data),
+  });
+}
+
 export async function updateKitchenDeliverySettings(
   kitchenId: string,
   data: {
@@ -585,6 +604,16 @@ export async function fetchCategories(kitchenId: string): Promise<Category[]> {
 
 export async function fetchCuisines(kitchenId: string): Promise<Cuisine[]> {
   return apiFetch(`/api/v1/kitchens/${kitchenId}/cuisines`);
+}
+
+export async function fetchOwnerDishes(
+  kitchenId: string,
+  filters?: { is_active?: boolean },
+): Promise<{ dishes: Dish[]; total: number }> {
+  const params = new URLSearchParams();
+  if (filters?.is_active != null) params.set("is_active", String(filters.is_active));
+  const q = params.toString() ? `?${params.toString()}` : "";
+  return apiFetch(`/api/v1/kitchens/${kitchenId}/dishes${q}`);
 }
 
 export async function fetchMenu(
@@ -716,8 +745,17 @@ export async function updateDish(
   });
 }
 
-export async function fetchOrders(kitchenId: string, status?: string): Promise<{ orders: Order[]; total: number }> {
-  const q = status ? `?status=${status}` : "";
+export async function fetchOrders(
+  kitchenId: string,
+  status?: string,
+  filters?: { created_after?: string; created_before?: string; source?: string },
+): Promise<{ orders: Order[]; total: number }> {
+  const params = new URLSearchParams();
+  if (status) params.set("status", status);
+  if (filters?.source) params.set("source", filters.source);
+  if (filters?.created_after) params.set("created_after", filters.created_after);
+  if (filters?.created_before) params.set("created_before", filters.created_before);
+  const q = params.toString() ? `?${params.toString()}` : "";
   return apiFetch(`/api/v1/kitchens/${kitchenId}/orders${q}`);
 }
 
@@ -731,6 +769,20 @@ export async function fetchDrafts(kitchenId: string): Promise<{ drafts: OrderDra
 
 export async function confirmDraft(kitchenId: string, draftId: string): Promise<Order> {
   return apiFetch(`/api/v1/kitchens/${kitchenId}/orders/drafts/${draftId}/confirm`, { method: "POST" });
+}
+
+export async function updateDraft(
+  kitchenId: string,
+  draftId: string,
+  data: {
+    parsed_items: { raw: string; dish_id?: string | null; quantity: number }[];
+    customer_phone?: string | null;
+  },
+): Promise<OrderDraft> {
+  return apiFetch(`/api/v1/kitchens/${kitchenId}/orders/drafts/${draftId}`, {
+    method: "PATCH",
+    body: JSON.stringify(data),
+  });
 }
 
 export async function parseMessage(kitchenId: string, message_text: string): Promise<OrderDraft> {
@@ -769,6 +821,17 @@ export async function updateOrderStatus(
 
 export async function fetchRevenueSummary(kitchenId: string, days = 30): Promise<RevenueSummary> {
   return apiFetch(`/api/v1/kitchens/${kitchenId}/analytics/summary?days=${days}`);
+}
+
+export async function fetchRevenueSummaryCompare(
+  kitchenId: string,
+  days = 7,
+): Promise<RevenueSummaryCompare> {
+  return apiFetch(`/api/v1/kitchens/${kitchenId}/analytics/summary/compare?days=${days}`);
+}
+
+export async function fetchPaymentMix(kitchenId: string, days = 30): Promise<PaymentMix> {
+  return apiFetch(`/api/v1/kitchens/${kitchenId}/analytics/payment-mix?days=${days}`);
 }
 
 export async function fetchRevenueTimeseries(
@@ -831,6 +894,63 @@ export type KitchenPaymentGateway = {
 
 export async function fetchKitchenPaymentGateway(kitchenId: string): Promise<KitchenPaymentGateway> {
   return apiFetch(`/api/v1/billing/kitchens/${kitchenId}/payment-gateway`);
+}
+
+export async function fetchKitchenSettlements(
+  kitchenId: string,
+  filters?: { status?: string; limit?: number; offset?: number },
+): Promise<Settlement[]> {
+  const params = new URLSearchParams();
+  if (filters?.status) params.set("status", filters.status);
+  if (filters?.limit != null) params.set("limit", String(filters.limit));
+  if (filters?.offset != null) params.set("offset", String(filters.offset));
+  const q = params.toString() ? `?${params.toString()}` : "";
+  return apiFetch(`/api/v1/billing/kitchens/${kitchenId}/settlements${q}`);
+}
+
+export type DishRatingSummary = {
+  dish_id: string;
+  rating_count: number;
+  avg_home_taste: number;
+  avg_quality: number;
+  overall_rating: number;
+};
+
+export async function fetchOwnerRatingSummaries(
+  kitchenId: string,
+): Promise<{ summaries: DishRatingSummary[] }> {
+  return apiFetch(`/api/v1/kitchens/${kitchenId}/ratings/summaries`);
+}
+
+export type DishSuggestion = {
+  id: string;
+  kitchen_id: string;
+  dish_id: string;
+  customer_id: string;
+  order_id: string | null;
+  suggestion_text: string;
+  status: string;
+  owner_response: string | null;
+  created_at: string;
+};
+
+export async function fetchDishSuggestions(
+  kitchenId: string,
+  status?: string,
+): Promise<{ suggestions: DishSuggestion[]; total: number }> {
+  const q = status ? `?status=${encodeURIComponent(status)}` : "";
+  return apiFetch(`/api/v1/kitchens/${kitchenId}/suggestions${q}`);
+}
+
+export async function updateDishSuggestion(
+  kitchenId: string,
+  suggestionId: string,
+  data: { status: "accepted" | "rejected"; owner_response?: string },
+): Promise<DishSuggestion> {
+  return apiFetch(`/api/v1/kitchens/${kitchenId}/suggestions/${suggestionId}`, {
+    method: "PATCH",
+    body: JSON.stringify(data),
+  });
 }
 
 export async function upsertKitchenPaymentGateway(
@@ -1231,30 +1351,8 @@ export async function decideKitchenSubscription(
   });
 }
 
-export async function requestKitchenSubscription(
-  kitchenId: string,
-  planId: string,
-  data: { customer_name?: string; note?: string } = {},
-): Promise<CustomerKitchenSubscription> {
-  return apiFetch(`/api/v1/kitchens/${kitchenId}/subscription-plans/${planId}/subscribe`, {
-    method: "POST",
-    body: JSON.stringify(data),
-  });
-}
-
-export async function fetchMySubscriptions(): Promise<{
-  subscriptions: CustomerKitchenSubscription[];
-  total: number;
-}> {
-  return apiFetch("/api/v1/customers/me/subscriptions");
-}
-
-export async function cancelMySubscription(subId: string): Promise<CustomerKitchenSubscription> {
-  return apiFetch(`/api/v1/customers/me/subscriptions/${subId}/cancel`, {
-    method: "POST",
-    body: JSON.stringify({}),
-  });
-}
+/* Customer-scoped subscription calls live in `customerDashboardApi.ts` — they run on the
+   customer app and must carry the customer token, not the owner token. */
 
 export async function fetchPromotions(
   kitchenId: string,

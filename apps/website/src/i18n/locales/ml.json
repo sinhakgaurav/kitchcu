@@ -32,7 +32,12 @@
     "customerApp": "കസ്റ്റമർ ആപ്പ്",
     "kitchenOwner": "അടുക്കള ഉടമ →",
     "ownerLogin": "ഉടമ ലോഗിൻ",
-    "adminLogin": "Super admin"
+    "adminLogin": "Super admin",
+    "adminCredentialsDev": "Email {{email}} · Password {{password}} (dev / seeded)",
+    "adminCredentialsHost": "Open the console on {{host}}.",
+    "adminCredentialsProd": "Email {{email}} — password from the VM ADMIN_PASSWORD secret, not this page",
+    "adminCredentialsTitle": "Super admin credentials",
+    "adminOpenConsole": "Open Super Admin"
   },
   "status": {
     "received": "ലഭിച്ചിരിക്കുന്നു",
@@ -142,7 +147,15 @@
     "contactSending": "അയയ്ക്കുന്നു...",
     "contactSent": "നന്ദി - ഞങ്ങൾ ഉടൻ എത്തിച്ചേരും.",
     "contactError": "അയയ്ക്കാൻ കഴിഞ്ഞില്ല. ദയവായി വീണ്ടും ശ്രമിക്കുക.",
-    "navCities": "Cities"
+    "navCities": "Cities",
+    "ctaAdmin": "Super admin →",
+    "tileAdminBody": "Kitchens, employees, tickets, packages, and API keys — Super Admin only.",
+    "tileAdminCta": "Open Super Admin",
+    "tileAdminTitle": "Operate the platform",
+    "tileCustomerBody": "Nearby kitchens, live-capture menus, honest ETAs, and fair delivery fees.",
+    "tileCustomerTitle": "Order home-made food",
+    "tileKitchenBody": "WhatsApp orders, menu, tiffin plans, reports — zero food commission.",
+    "tileKitchenTitle": "Run your kitchen"
   },
   "owner": {
     "nav": {
@@ -170,7 +183,8 @@
       "paymentGateway": "പേയ്‌മെന്റ് ഗേറ്റ്‌വേ",
       "gst": "ജിഎസ്ടിയും ഫിനാൻസും",
       "setup": "അടുക്കള സജ്ജീകരണം",
-      "bulkPrep": "Prep batches"
+      "bulkPrep": "Prep batches",
+      "ratings": "Ratings"
     },
     "shell": {
       "activeKitchen": "സജീവമായ അടുക്കള",
@@ -316,7 +330,8 @@
       "setup": "അടുക്കള ക്രമീകരണം",
       "referrals": "റഫറലുകൾ",
       "newOrder": "പുതിയ ഓർഡർ",
-      "addDish": "വിഭവം ചേർക്കുക"
+      "addDish": "വിഭവം ചേർക്കുക",
+      "ratings": "Ratings"
     }
   },
   "customer": {
@@ -328,7 +343,10 @@
       "myOrders": "എന്റെ ഓർഡറുകൾ",
       "dashboard": "ഡാഷ്ബോർഡ്",
       "account": "അക്കൗണ്ട്",
-      "signIn": "ഉപഭോക്താവ് സൈൻ ഇൻ ചെയ്യുക"
+      "signIn": "ഉപഭോക്താവ് സൈൻ ഇൻ ചെയ്യുക",
+      "logout": "Log out",
+      "notifications": "Notifications",
+      "profile": "My profile"
     },
     "auth": {
       "title": "ഉപഭോക്താവ് സൈൻ ഇൻ ചെയ്യുക",

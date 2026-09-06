@@ -1,10 +1,11 @@
 import { Link, Navigate, useNavigate } from "react-router-dom";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { Order } from "../../shared/api";
 import { getCustomerToken } from "../../shared/customerApi";
 import { useCustomerAuth } from "../../shared/customerAuth";
-import { fetchMyOrders, repeatCustomerOrder } from "../../shared/customerCheckoutApi";
+import { addItemsToCart, kitchenFromOrderCode } from "../../shared/customerCart";
+import { fetchMyOrders } from "../../shared/customerCheckoutApi";
 
 function formatWhen(iso: string, locale: string): string {
   try {
@@ -50,16 +51,52 @@ export function OrdersPage() {
     return <Navigate to="/login?next=/orders" replace />;
   }
 
-  const onRepeat = async (order: Order) => {
+  const groups = useMemo(() => {
+    const result: { key: string; masterOrderId: string | null; orders: Order[] }[] = [];
+    const byMaster = new Map<string, { key: string; masterOrderId: string; orders: Order[] }>();
+    for (const order of orders) {
+      if (order.master_order_id) {
+        const existing = byMaster.get(order.master_order_id);
+        if (existing) {
+          existing.orders.push(order);
+        } else {
+          const group = {
+            key: order.master_order_id,
+            masterOrderId: order.master_order_id,
+            orders: [order],
+          };
+          byMaster.set(order.master_order_id, group);
+          result.push(group);
+        }
+      } else {
+        result.push({ key: order.id, masterOrderId: null, orders: [order] });
+      }
+    }
+    return result;
+  }, [orders]);
+
+  const onRepeat = (order: Order) => {
     setRepeatingId(order.id);
     setError("");
     try {
-      const newOrder = await repeatCustomerOrder(order.id);
-      navigate(`/orders/${newOrder.id}/confirm`, {
-        state: { order: newOrder, paymentMethod: newOrder.payment_method },
-      });
+      if (!order.items.length) {
+        setError("This order has no items to repeat");
+        return;
+      }
+      addItemsToCart(
+        kitchenFromOrderCode(order.kitchen_id, order.order_code),
+        order.items.map((item) => ({
+          dish_id: item.dish_id,
+          dish_name: item.dish_name,
+          quantity: item.quantity,
+          unit_price: item.unit_price,
+          prep_time_min: item.prep_time_min,
+          special_instructions: item.special_instructions,
+        })),
+      );
+      navigate("/checkout");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not repeat order");
+      setError(err instanceof Error ? err.message : "Could not add items to cart");
     } finally {
       setRepeatingId(null);
     }
@@ -86,50 +123,66 @@ export function OrdersPage() {
         </section>
       ) : (
         <ul className="nearby-kitchens__list">
-          {orders.map((order) => (
-            <li key={order.id}>
-              <article className="glass nearby-kitchens__card" style={{ cursor: "default" }}>
-                <div className="nearby-kitchens__card-body">
-                  <strong>{order.order_code}</strong>
-                  <span className="nearby-kitchens__meta">
-                    {formatWhen(order.created_at, i18n.language || "en")} ·{" "}
-                    {t(`status.${order.status}`, { defaultValue: order.status.replace(/_/g, " ") })}
-                  </span>
-                  <span className="nearby-kitchens__meta">
-                    {order.items.length} item{order.items.length === 1 ? "" : "s"} · ₹{order.total.toFixed(0)}
-                  </span>
-                  <ul className="owner-detail-items">
-                    {order.items.slice(0, 4).map((item) => (
-                      <li key={item.id}>
-                        <span>{item.quantity}× {item.dish_name}</span>
-                      </li>
-                    ))}
-                    {order.items.length > 4 && (
-                      <li><span>+{order.items.length - 4} more</span></li>
-                    )}
-                  </ul>
-                </div>
-                <div className="owner-actions">
-                  {order.tracking_token && (
-                    <Link to={`/t/${order.tracking_token}`} className="btn btn--ghost btn--sm">
-                      Track
-                    </Link>
-                  )}
-                  <button
-                    type="button"
-                    className="btn btn--primary btn--sm"
-                    disabled={repeatingId === order.id || order.status === "cancelled"}
-                    onClick={() => onRepeat(order)}
+          {groups.map((group) => (
+            <li key={group.key}>
+              {group.masterOrderId && (
+                <div className="customer-order-group__head">
+                  <Link
+                    to={`/master-orders/${group.masterOrderId}/confirm`}
+                    className="btn btn--ghost btn--sm"
                   >
-                    {repeatingId === order.id ? t("common.loading") : t("customer.orders.repeat")}
-                  </button>
-                  {order.status === "delivered" && (
-                    <Link to={`/orders/${order.id}/rate`} className="btn btn--ghost btn--sm">
-                      Rate meal
-                    </Link>
-                  )}
+                    Master receipt · {group.orders.length} kitchens
+                  </Link>
                 </div>
-              </article>
+              )}
+              {group.orders.map((order) => (
+                <article
+                  key={order.id}
+                  className="glass nearby-kitchens__card"
+                  style={{ cursor: "default" }}
+                >
+                  <div className="nearby-kitchens__card-body">
+                    <strong>{order.order_code}</strong>
+                    <span className="nearby-kitchens__meta">
+                      {formatWhen(order.created_at, i18n.language || "en")} ·{" "}
+                      {t(`status.${order.status}`, { defaultValue: order.status.replace(/_/g, " ") })}
+                    </span>
+                    <span className="nearby-kitchens__meta">
+                      {order.items.length} item{order.items.length === 1 ? "" : "s"} · ₹{order.total.toFixed(0)}
+                    </span>
+                    <ul className="owner-detail-items">
+                      {order.items.slice(0, 4).map((item) => (
+                        <li key={item.id}>
+                          <span>{item.quantity}× {item.dish_name}</span>
+                        </li>
+                      ))}
+                      {order.items.length > 4 && (
+                        <li><span>+{order.items.length - 4} more</span></li>
+                      )}
+                    </ul>
+                  </div>
+                  <div className="owner-actions">
+                    {order.tracking_token && (
+                      <Link to={`/t/${order.tracking_token}`} className="btn btn--ghost btn--sm">
+                        Track
+                      </Link>
+                    )}
+                    <button
+                      type="button"
+                      className="btn btn--primary btn--sm"
+                      disabled={repeatingId === order.id || order.status === "cancelled"}
+                      onClick={() => onRepeat(order)}
+                    >
+                      {repeatingId === order.id ? t("common.loading") : t("customer.orders.repeat")}
+                    </button>
+                    {order.status === "delivered" && (
+                      <Link to={`/orders/${order.id}/rate`} className="btn btn--ghost btn--sm">
+                        Rate meal
+                      </Link>
+                    )}
+                  </div>
+                </article>
+              ))}
             </li>
           ))}
         </ul>

@@ -393,6 +393,58 @@ html.theme-brand-light .brand-nav-mark__sub {
   max-width: none;
 }
 
+.nav__account {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.35rem;
+}
+
+.nav__account-menu {
+  display: flex;
+  flex-direction: column;
+  min-width: 10.5rem;
+  padding: 0.35rem 0;
+  border: 1px solid var(--border, rgba(0, 0, 0, 0.08));
+  border-radius: 10px;
+  background: var(--surface, #fff);
+  box-shadow: 0 8px 24px rgba(20, 40, 40, 0.12);
+}
+
+.nav__account-menu a,
+.nav__account-menu button {
+  display: block;
+  width: 100%;
+  padding: 0.45rem 0.85rem;
+  border: 0;
+  background: none;
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.nav__account-menu a:hover,
+.nav__account-menu button:hover {
+  background: rgba(0, 137, 123, 0.08);
+}
+
+@media (min-width: 901px) {
+  .nav__account-menu {
+    display: none;
+    position: absolute;
+    top: calc(100% + 0.35rem);
+    right: 0;
+    z-index: 20;
+  }
+
+  .nav__account:hover .nav__account-menu,
+  .nav__account:focus-within .nav__account-menu {
+    display: flex;
+  }
+}
+
 .nav__links a:not(.btn) {
   font-size: 0.9rem;
   color: var(--text-muted);
@@ -1008,6 +1060,19 @@ html.theme-brand-light .brand-nav-mark__sub {
   margin-bottom: 2.5rem;
 }
 
+.hero__ops-link {
+  align-self: center;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--brand-teal, #0f766e);
+  text-decoration: underline;
+  text-underline-offset: 0.18em;
+  padding: 0.45rem 0.2rem;
+}
+.hero__ops-link:hover {
+  color: var(--brand-ink, #0b1b32);
+}
+
 .hero__stats {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
@@ -1566,6 +1631,11 @@ html.theme-brand-light .cities-presence__chip span {
   font-size: 0.75rem;
   color: var(--text-muted);
   line-height: 1.5;
+}
+
+.auth-card__demo--admin {
+  border-color: rgba(15, 118, 110, 0.35);
+  background: rgba(15, 118, 110, 0.06);
 }
 
 .auth-card__demo-note code {
@@ -2202,10 +2272,10 @@ html.theme-brand-light .auth-card input.input-invalid {
   margin-bottom: 2rem;
 }
 
-/* Contact sits on a dark parallax veil — force readable light copy */
+/* Contact sits on a dark parallax veil — force readable light copy.
+   The form heading is excluded: it renders on the glass card, not the veil. */
 .contact--parallax .contact__info .section__eyebrow,
-.contact--parallax .contact__info h2,
-.contact--parallax .contact__form h3 {
+.contact--parallax .contact__info h2 {
   color: #faf6f0;
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.45);
 }
@@ -2214,8 +2284,7 @@ html.theme-brand-light .auth-card input.input-invalid {
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
 }
 html.theme-brand-light .contact--parallax .contact__info .section__eyebrow,
-html.theme-brand-light .contact--parallax .contact__info h2,
-html.theme-brand-light .contact--parallax .contact__form h3 {
+html.theme-brand-light .contact--parallax .contact__info h2 {
   color: #faf6f0;
 }
 html.theme-brand-light .contact--parallax .contact__info > p {
@@ -2320,6 +2389,27 @@ html.theme-brand-light .contact--parallax .contact__info > p {
 .contact__form textarea {
   resize: vertical;
   min-height: 100px;
+}
+
+/* The contact form sits on a white glass card in the light brand theme, so it cannot
+   inherit the cream heading or the dark translucent inputs used on the parallax panel —
+   those read as invisible text over greyed-out, disabled-looking fields. */
+html.theme-brand-light .contact__form h3 {
+  color: var(--brand-ink, #0b1b32);
+  text-shadow: none;
+}
+html.theme-brand-light .contact__form input,
+html.theme-brand-light .contact__form textarea {
+  background: #fff;
+  border-color: rgba(11, 27, 50, 0.16);
+  color: var(--brand-ink, #0b1b32);
+}
+html.theme-brand-light .contact__form input::placeholder,
+html.theme-brand-light .contact__form textarea::placeholder {
+  color: rgba(11, 27, 50, 0.55);
+}
+html.theme-brand-light .contact__form label {
+  color: rgba(11, 27, 50, 0.72);
 }
 
 .contact__form .btn {
@@ -2587,7 +2677,8 @@ html.theme-brand-light .contact--parallax .contact__info > p {
   }
 }
 
-@media (max-width: 768px) {
+/* Super admin + language + dual CTAs overflow a desktop bar below ~1180px */
+@media (max-width: 1180px) {
   .nav__toggle { display: flex; }
   .nav__links {
     position: fixed;
@@ -2605,12 +2696,18 @@ html.theme-brand-light .contact--parallax .contact__info > p {
     opacity: 0;
     transition: transform 0.35s, opacity 0.35s;
     pointer-events: none;
+    z-index: 90;
+    max-height: calc(100dvh - var(--nav-h));
+    overflow-y: auto;
   }
   .nav__links--open {
     transform: translateY(0);
     opacity: 1;
     pointer-events: auto;
   }
+}
+
+@media (max-width: 768px) {
   .form-row { grid-template-columns: 1fr; }
 
   /* Phone: stop flicker/crop from heavy motion + overflowing layers */
@@ -2671,6 +2768,10 @@ html.theme-brand-light .contact--parallax .contact__info > p {
 
   .hero__actions .btn {
     width: min(100%, 280px);
+  }
+
+  .hero__actions .hero__ops-link {
+    width: auto;
   }
 
   .parallax-divider {
@@ -4123,6 +4224,26 @@ html.theme-brand-light .social-btn--whatsapp:hover:not(:disabled) {
 .customer-dash__pin-actions {
   display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; margin-bottom: 0.5rem;
   font-size: 0.85rem; color: var(--text-muted);
+}
+.customer-dash__toggle {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 0.6rem;
+  margin: 0.5rem 0;
+  font-size: 0.95rem;
+  cursor: pointer;
+  /* 44px row keeps the checkbox comfortably tappable on mobile. */
+  min-height: 2.75rem;
+}
+.customer-dash__toggle input {
+  width: 1.15rem;
+  height: 1.15rem;
+  flex: none;
+  accent-color: var(--teal, #0f766e);
+}
+.customer-dash__toggle input:disabled + span {
+  color: var(--text-muted);
 }
 
 /* Legal pages (portal) */
