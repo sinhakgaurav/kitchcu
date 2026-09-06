@@ -10,8 +10,8 @@
 | **[PLATFORM-SOLUTION-BLUEPRINT.md](./PLATFORM-SOLUTION-BLUEPRINT.md)** | **Solution blueprint** — every journey: expectations, CEO/CPO problem→solution, CTO impl, achievements, gaps, arch/DB/UX; admin multilevel + package planner | CEO, CPO, CTO, Ops, Support, Finance, AI agents |
 | **[PLATFORM-STRATEGIC-ANALYSIS.md](./PLATFORM-STRATEGIC-ANALYSIS.md)** | **Strategic brief** — competitive honesty, gaps, Waves A–D | CEO, CPO, CTO, Investors, AI agents |
 | **[PLATFORM-PERSONA-DEEP-DIVE.md](./PLATFORM-PERSONA-DEEP-DIVE.md)** | **Persona lived experience** — friction, scorecards, RBAC reality | CEO, CPO, CTO, Ops, Support, Finance, AI agents |
-| **[CKAC-COMPLETE-GUIDE.md](./CKAC-COMPLETE-GUIDE.md)** | **Master guide v3.2.3 — modules through P40 (referrals, GST export, admin ops, i18n), flows §17.9–17.10, UI Catalog, OpenAPI** | CEO, CPO, CTO, DBA, QA, Investors, AI agents |
-| **[CKAC-COMPLETE-GUIDE.pdf](./CKAC-COMPLETE-GUIDE.pdf)** | Complete Executive Guide PDF v3.2.3 (portrait; UI Catalog figures) | CEO, CPO, CTO, Investors |
+| **[CKAC-COMPLETE-GUIDE.md](./CKAC-COMPLETE-GUIDE.md)** | **Master guide v3.2.5 — modules through P41 (profile edit, owner ratings, admin RBAC/stream, live-capture-safe seed), flows §17.9–17.10, UI Catalog, OpenAPI** | CEO, CPO, CTO, DBA, QA, Investors, AI agents |
+| **[CKAC-COMPLETE-GUIDE.pdf](./CKAC-COMPLETE-GUIDE.pdf)** | Complete Executive Guide PDF v3.2.5 (portrait; UI Catalog figures) | CEO, CPO, CTO, Investors |
 | **[design/PLATFORM-I18N-DESIGN.md](./design/PLATFORM-I18N-DESIGN.md)** | Platform i18n — 10 locales, gate, parity checker | Engineering, Product |
 | **[design/REFERRAL-PROGRAM-DESIGN.md](./design/REFERRAL-PROGRAM-DESIGN.md)** | Dual referral program design pack | Engineering, Product |
 | **[CKAC-USERFLOWS.md](./CKAC-USERFLOWS.md)** | **Full user journey pack** — every persona, every screen, every API call, step-by-step | Product, Design, Engineering, QA |
@@ -58,7 +58,8 @@ python scripts/generate_qa_instruction_pdf.py
 
 ## Quick Stats
 
-- **S1–S18 + P19–P40 shipped** — track progress in [ADVANCEMENT-TRACKER.md](./ADVANCEMENT-TRACKER.md); encyclopedia [Complete Guide v3.2.3](./CKAC-COMPLETE-GUIDE.md)
+- **S1–S18 + P19–P41 shipped** — track progress in [ADVANCEMENT-TRACKER.md](./ADVANCEMENT-TRACKER.md); encyclopedia [Complete Guide v3.2.5](./CKAC-COMPLETE-GUIDE.md)
+- **GCP seed:** first-boot `bulk-seed.sh` + Monday weekly cohort timer — [DEPLOYMENT-GCP.md](./DEPLOYMENT-GCP.md) §11.7–§11.7c
 - **i18n:** 12 locales (en + 11 IN) — parity `python scripts/check-i18n-locale-parity.py` · sync `python scripts/sync-i18n-missing-keys.py`
 - **Cities presence:** Pune, Mumbai, Delhi NCR, UP belt (Lucknow/Kanpur/Prayagraj/Varanasi/Jhansi), Dehradun + coming soon metros — UI `#cities` on portal / customer / kitchen
 - **Prod portals & QA:** [PRODUCTION-PORTALS-CREDENTIALS-QA.md](./PRODUCTION-PORTALS-CREDENTIALS-QA.md) (+ PDF)

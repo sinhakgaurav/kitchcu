@@ -15,7 +15,7 @@
 
 set -euo pipefail
 
-REPO_DIR="${CKAC_REPO_DIR:-/opt/ckac/CKAC}"
+REPO_DIR="${CKAC_REPO_DIR:-/opt/ckac}"
 STATE_DIR=/var/lib/ckac
 LOG_FILE=/var/log/ckac-weekly-seed.log
 

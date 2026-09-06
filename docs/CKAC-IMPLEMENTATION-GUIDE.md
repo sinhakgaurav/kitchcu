@@ -6,9 +6,9 @@
 |-------|-------|
 | Version | **2.0** |
 | Status | **S1–S18 shipped** + post-S18 **P19–P28** (packages, templates, employees RBAC, kitchen workspace); E1/E2 = design pack only |
-| Last updated | July 2026 |
+| Last updated | September 2026 |
 | Advancement | **[ADVANCEMENT-TRACKER.md](./ADVANCEMENT-TRACKER.md)** — sprint board + release gate |
-| Encyclopedia | **[CKAC-COMPLETE-GUIDE.md](./CKAC-COMPLETE-GUIDE.md) v3.2.2** — packages/employees/templates + super-admin kitchen workspace; UI Catalog; OpenAPI |
+| Encyclopedia | **[CKAC-COMPLETE-GUIDE.md](./CKAC-COMPLETE-GUIDE.md) v3.2.5** — through P41 (profile edit, owner ratings, admin RBAC/stream, live-capture-safe seed); UI Catalog; OpenAPI |
 | Companion docs | [Planning Benchmark](./CKAC-COMPLETE-PLANNING-BENCHMARK.md) · [System Benchmark](./CKAC-SYSTEM-BENCHMARK.md) · [CPO Blueprint v4.2](./CKAC-CPO-PRODUCT-BLUEPRINT.md) · [CTO Architecture](./CKAC-ARCHITECTURE-CTO.md) · [Development Phases](./DEVELOPMENT-PHASES.md) · [User Flows](./CKAC-USERFLOWS.md) · [API.md](./API.md) · [AGENTS.md](../AGENTS.md) · [UI shots](./assets/ui/) |
 
 > For deep definitions, module logic, Mermaid flows, and annotated screenshots, prefer the Complete Guide. This file remains the **code ↔ feature map** (what's wired where).
@@ -135,7 +135,7 @@ Legend: ✅ Done · 🟡 Partial · ⏳ Not started
 
 F19–F24, F46–F48 — **shipped** in S15–S18 (see [ADVANCEMENT-TRACKER.md](./ADVANCEMENT-TRACKER.md)). Per-dish go-live showcase = **P22**.
 
-### Post-S18 platform ops (P19–P40)
+### Post-S18 platform ops (P19–P41)
 
 | ID | Feature | Status | Code / notes |
 |----|---------|--------|--------------|
@@ -147,6 +147,7 @@ F19–F24, F46–F48 — **shipped** in S15–S18 (see [ADVANCEMENT-TRACKER.md](
 | P38 | GST monthly Excel/PDF | ✅ | `services/billing/app/gst_export.py` · owner GstFinance + admin kitchen GST |
 | P39 | Super-admin ops console | ✅ | Admin orders filters · ticket triage · settlements · kitchen Care/Orders |
 | P40 | Platform i18n + security harden | ✅ | `apps/website/src/i18n/` · sanitize HTML · API-key mask · login-hint flag |
+| P41 | Audit gap close + GCP seed | ✅ | Identity profile PATCH · catalog owner dish list · owner Ratings/settlements · admin RBAC/stream · `infra/gcp-vm/bulk-seed.sh` + weekly timer at `/opt/ckac` |
 
 **Maps to:** Planning Benchmark [§11 Feature Index](./CKAC-COMPLETE-PLANNING-BENCHMARK.md#11-feature-index-all-45-features) · [ADVANCEMENT-TRACKER.md](./ADVANCEMENT-TRACKER.md) · DEVELOPMENT-PHASES.md
 

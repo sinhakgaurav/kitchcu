@@ -4,10 +4,10 @@
 
 | Field | Value |
 |-------|-------|
-| Version | **1.3** |
-| Date | 2026-07-20 |
+| Version | **1.4** |
+| Date | 2026-09-07 |
 | Audience | CPO, Product, Engineering, QA, Investors |
-| Status | Traces to code shipped through **S1–S18 + P19–P40** (referrals, GST export, admin ops console, i18n) |
+| Status | Traces to code shipped through **S1–S18 + P19–P41** (kitchen profile edit, owner ratings, admin RBAC/stream, live-capture-safe seed) |
 | Companion PDF | [`docs/CKAC-USERFLOWS.pdf`](./CKAC-USERFLOWS.pdf) (generate with `scripts/generate_userflows_pdf.py`) |
 
 ---
@@ -117,11 +117,11 @@ Every transition writes an immutable `ckac_orders.order_status_events` row and p
 1. Owner opens Kitchen PWA, enters phone number.
 2. New owner: fills name/email on the register card. Existing owner: goes straight to OTP.
 3. Enters OTP (dev fixed `123456`), lands in the owner shell.
-4. First-run wizard: "Create your kitchen" — name, address, pin on map (PostGIS point).
-5. "Add your first dish" — name, price, category, and a **live-capture photo** taken with the device camera (`getUserMedia`) — gallery upload is rejected as a hero.
+4. First-run wizard: "Create your kitchen" — name, address, pin on map (PostGIS point). After create, **Setup** stays editable: `PATCH /api/v1/kitchens/{id}/profile` updates name/address/pin; **kitchen code does not change** if the owner later edits city. Admin can do the same on the kitchen Profile tab (`PATCH /api/v1/admin/kitchens/{id}/profile`, `kitchens:write`).
+5. "Add your first dish" — name, price, category, and a **live-capture photo** taken with the device camera (`getUserMedia`) — gallery upload is rejected as a hero. Owner **Menu** lists drafts via `GET /api/v1/kitchens/{id}/dishes` (includes inactive dishes missing a hero).
 6. "Record your first order" — New Order screen, pick dish(es), quantity, customer name/phone, mark manual/WhatsApp.
 7. Order appears in the Orders inbox with status `received` — owner taps **Accept**.
-8. Owner opens Reports — same-day revenue is visible.
+8. Owner opens Reports — same-day revenue, payment mix, and period compare are visible. **Ratings** (`/dashboard/ratings`) shows home-taste aggregates. Payments page lists Route settlements.
 
 ### API calls
 
@@ -132,7 +132,9 @@ Every transition writes an immutable `ckac_orders.order_status_events` row and p
 | 3b | `POST /api/v1/auth/otp/verify` | none | `OTPVerifyRequest{phone, otp}` -> `TokenResponse{access_token, expires_in}` |
 | — | `GET /api/v1/owners/me` | owner | Profile hydration on shell load |
 | 4 | `POST /api/v1/kitchens` | owner | `KitchenCreateRequest{name, address, latitude, longitude}` -> `KitchenResponse{code: "CKPNQ001", ...}` |
+| 4b | `PATCH /api/v1/kitchens/{kitchen_id}/profile` | owner | `KitchenProfileUpdate{name, address, latitude, longitude}` -> `kitchen.updated`; code immutable |
 | 5a | `POST /api/v1/kitchens/{kitchen_id}/media/upload` | owner | multipart upload; response includes `is_live_capture` echo |
+| 5c | `GET /api/v1/kitchens/{kitchen_id}/dishes` | owner | Includes inactive drafts (`?is_active=false` to hide live-only) |
 | 5b | `POST /api/v1/kitchens/{kitchen_id}/dishes` | owner | `DishCreateRequest{name, price, category_id, media:[{url, is_live_capture:true}]}` -> `DishResponse`; server **rejects** hero media with `is_live_capture:false` (`400`) |
 | 6 | `POST /api/v1/kitchens/{kitchen_id}/orders/manual` | owner | `ManualOrderCreateRequest{items, customer_name, customer_phone, payment_method}` -> `OrderResponse{status:"received", order_code}` |
 | 7 | `PATCH /api/v1/orders/{order_id}/status` | owner | Status machine; first transition to `ready` triggers stock deduct: `POST /api/v1/internal/kitchens/{kitchen_id}/stock/deduct-order` (catalog; skipped if kitchen `prep_batch_only`). Bulk thali: owner prep batches → `mark-prepared` |
@@ -874,11 +876,11 @@ Gateway-owned (not forwarded): `GET /`, `GET /health/live`, `GET /health/ready`,
 | Field | Value |
 |-------|-------|
 | Document | `CKAC-USERFLOWS.md` |
-| Version | 1.3 |
-| Date | July 2026 |
+| Version | 1.4 |
+| Date | September 2026 |
 | Author | KitchCu engineering (AI-assisted, human-reviewed) |
 | Traceability | Every route/event cited here was read directly from `services/*/app/routes.py`, `schemas.py`, and `main.py` in this repository as of July 2026 — not inferred from memory |
 | Companion | `docs/CKAC-USERFLOWS.pdf` — generate/refresh via `python scripts/generate_userflows_pdf.py` |
 | QA checklist | `docs/QA-INSTRUCTION-PACK.md` (+ PDF) — smoke, lists/UI, F19b; `python scripts/generate_qa_instruction_pdf.py` |
 | Change policy | Update this file whenever a route, event name, or status transition changes; regenerate the PDF in the same change |
-| Supersedes | v1.2; aligned with Complete Guide v3.2.3 (P37–P40 referrals, GST export, admin ops, i18n) |
+| Supersedes | v1.3; aligned with Complete Guide v3.2.5 (P41 profile edit, owner ratings, admin RBAC/stream, seed) |

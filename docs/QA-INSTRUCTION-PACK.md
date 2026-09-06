@@ -3,8 +3,8 @@
 | Field | Value |
 |-------|-------|
 | Document | `QA-INSTRUCTION-PACK.md` |
-| Version | 1.0 |
-| Date | July 2026 |
+| Version | 1.1 |
+| Date | September 2026 |
 | Audience | QA Lead, engineers, founders doing release verification |
 | Companion PDF | `docs/QA-INSTRUCTION-PACK.pdf` — generate via `python scripts/generate_qa_instruction_pdf.py` |
 | Scope | Local Docker demo + GCP production smoke; owner kitchen lists/UI polish; F19/F19b stock + bulk prep |
@@ -31,7 +31,7 @@
 |------|-------|
 | Repo | `CKAC` |
 | Start | `docker compose up -d` (postgres `15432`, redis `16379`, gateway `18000`) |
-| Seed | `.\scripts\seed-all.ps1` or `python scripts/seed-dev-data.py` + extras as needed |
+| Seed | `.\scripts\seed-all.ps1` or `python scripts/seed-bulk-data.py` (live-capture-safe: drinks without a hero stay inactive) |
 | Tests (backend) | `.\scripts\run-tests.ps1` after backend changes |
 
 | Surface | URL | Port |
@@ -65,7 +65,7 @@ Follow `docs/DEPLOYMENT-GCP.md`. Confirm `*.kitchcu.com` health and same persona
 | ID | Step | Expected | Result |
 |----|------|----------|--------|
 | S1 | Gateway `GET /health/live` and `/health/ready` | 200 | |
-| S2 | Kitchen login OTP → land on Overview | Hero shows kitchen name + code; no blank/black screen | |
+| S2 | Kitchen login OTP → land on Overview / Orders | Hero shows kitchen name + code; inbox-first after login; no blank/black screen | |
 | S3 | Customer login OTP → home | Menu/discovery loads | |
 | S4 | Admin login → overview | Dashboard KPIs/panels load | |
 | S5 | Portal home | Brand-first hero; no console crash | |
@@ -86,6 +86,9 @@ Focus: kitchen PWA `:13002`. Login as owner `9876543210`.
 | H1 | Hero layout | Greeting + kitchen name + code on left; primary CTAs (e.g. New order / Brand) on the **same row top-right** — not a tall empty column with button at bottom |
 | H2 | Pills / meta | Subscription + drafts/live pills readable; no overflow clip |
 | H3 | Recent orders list | Rows clickable; status chips coherent |
+| H4 | Kitchen setup | After create, name / address / map pin stay editable; kitchen **code does not change** |
+| H5 | Ratings | `/dashboard/ratings` loads aggregates; Reports shows payment mix + period compare |
+| H6 | Settlements | Payments page lists Route settlements with status filter |
 
 ### 3.2 Listing toolbar (search / sort / filters)
 
@@ -93,7 +96,7 @@ For each page below: toolbar visible, search filters rows, sort changes order, f
 
 | ID | Page | Route | Checks |
 |----|------|-------|--------|
-| L1 | Orders | `/dashboard/orders` | Search; sort Newest / Customer A–Z / Z–A; **drafts tab also sorts**; tabs Active/All/Drafts |
+| L1 | Orders | `/dashboard/orders` | Search; sort Newest / Customer A–Z / Z–A; **drafts tab also sorts**; tabs Active/All/Drafts; status/source/date filters; draft remap disabled until a matched item |
 | L2 | Menu | `/dashboard/menu` | Search; sort; highlight + diet chips |
 | L3 | Ingredients (pantry) | `/dashboard/ingredients` | Search; sort Name/Stock; **Low stock** chip |
 | L4 | Bulk prep (batches) | `/dashboard/prep` | Search; sort; Open / Prepared chips |
@@ -212,7 +215,7 @@ Workaround:
 | CTO / eng | | | | |
 | CPO | | | | |
 
-**Go criteria:** §2 Smoke Pass; §3 list/UI Must Pass; §4 F19b Must Pass; §6 security Must Pass; automated tests green for touched services.
+**Go criteria:** §2 Smoke Pass; §3 list/UI Must Pass; §4 F19b Must Pass; §6 security Must Pass; automated tests green for touched services. GCP: weekly timer enabled; bulk seed log exists when `run-seed=1`.
 
 ---
 
@@ -233,3 +236,4 @@ Workaround:
 | Change | Date |
 |--------|------|
 | Initial QA pack (lists/UI polish + F19b stock/bulk prep) | 2026-07-20 |
+| P41: kitchen profile edit, ratings, settlements, GCP bulk + weekly seed | 2026-09-07 |

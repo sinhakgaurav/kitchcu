@@ -11,8 +11,13 @@ Usage:
   CKAC_BULK_ORDERS=300 python scripts/seed-bulk-data.py
   $env:CKAC_BULK_OWNERS=5; .\\scripts\\seed-bulk-data.ps1
 
+GCP (VM repo is /opt/ckac):
+  sudo systemctl start kitchcu-bulk-seed.service
+  sudo bash /opt/ckac/infra/gcp-vm/bulk-seed.sh
+
 Requires: docker compose up (gateway + postgres). The primary demo owner is
 created automatically, so running seed-dev-data.py first is optional.
+Dishes without a live-capture hero stay inactive; orders use active dishes only.
 """
 
 from __future__ import annotations

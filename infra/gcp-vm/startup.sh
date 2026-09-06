@@ -122,57 +122,21 @@ bash infra/gcp-vm/build-serial.sh
 RUN_SEED="$(meta run-seed)"
 SEED_MARKER=/var/lib/ckac/.bulk-seeded
 if { [ "$RUN_SEED" = "1" ] || [ "$RUN_SEED" = "true" ]; } && [ ! -f "$SEED_MARKER" ]; then
-  echo "Waiting for identity (+ core services) before bulk seed..."
-  ready=0
-  for i in $(seq 1 90); do
-    ready_json="$(curl -sf http://127.0.0.1:18000/health/ready || true)"
-    # Require full gateway status=ok AND identity:true (never seed on live-only / degraded).
-    if echo "$ready_json" | grep -q '"status"[[:space:]]*:[[:space:]]*"ok"' \
-      && echo "$ready_json" | grep -q '"identity"[[:space:]]*:[[:space:]]*true'; then
-      # Confirm stable for 10s (alembic crash-loops can briefly pass /health/live).
-      sleep 10
-      ready_json="$(curl -sf http://127.0.0.1:18000/health/ready || true)"
-      if echo "$ready_json" | grep -q '"status"[[:space:]]*:[[:space:]]*"ok"' \
-        && echo "$ready_json" | grep -q '"identity"[[:space:]]*:[[:space:]]*true'; then
-        ready=1
-        echo "Stack ready for seed: $ready_json"
-        break
-      fi
-    fi
-    if [ $((i % 6)) -eq 0 ]; then
-      echo "  still waiting ($i/90): ${ready_json:-unreachable}"
-      docker compose -f infra/gcp-vm/docker-compose.prod.yml --env-file infra/gcp-vm/.env \
-        ps identity billing catalog 2>/dev/null || true
-    fi
-    sleep 10
-  done
-  if [ "$ready" -eq 1 ]; then
-    echo "Running scripts/seed-bulk-data.py (APP_ENV=${APP_ENV})..."
-    mkdir -p /var/lib/ckac
-    set -a
-    # shellcheck disable=SC1091
-    source infra/gcp-vm/.env
-    set +a
-    if CKAC_GATEWAY_URL=http://127.0.0.1:18000 CKAC_SEED_WAIT_SEC=120 \
-      CKAC_BULK_KITCHENS=30 CKAC_BULK_FULL=1 python3 scripts/seed-bulk-data.py; then
-      touch "$SEED_MARKER"
-      echo "Bulk seed complete."
-    else
-      echo "Bulk seed failed — marker not set; will retry on next boot." >&2
-      docker compose -f infra/gcp-vm/docker-compose.prod.yml --env-file infra/gcp-vm/.env \
-        logs --tail=60 identity 2>/dev/null || true
-    fi
+  echo "Running infra/gcp-vm/bulk-seed.sh (APP_ENV=${APP_ENV})..."
+  if bash infra/gcp-vm/bulk-seed.sh; then
+    echo "Bulk seed complete."
   else
-    echo "Identity/core not ready after ~15 min — bulk seed skipped this boot." >&2
+    echo "Bulk seed failed — marker not set; will retry on next boot." >&2
     docker compose -f infra/gcp-vm/docker-compose.prod.yml --env-file infra/gcp-vm/.env \
-      logs --tail=80 identity 2>/dev/null || true
+      logs --tail=60 identity 2>/dev/null || true
   fi
 fi
 
-# --- 7. Weekly QA cohort seed timer -------------------------------------------------
-# Fresh owner + customer test accounts every Monday; earlier cohorts stay untouched.
+# --- 7. Seed systemd units (weekly cron + on-demand bulk) ---------------------------
+# Weekly: fresh QA cohort every Monday 03:30 IST. Bulk: oneshot, start by hand.
 install -m 0644 infra/gcp-vm/kitchcu-weekly-seed.service /etc/systemd/system/
 install -m 0644 infra/gcp-vm/kitchcu-weekly-seed.timer /etc/systemd/system/
+install -m 0644 infra/gcp-vm/kitchcu-bulk-seed.service /etc/systemd/system/
 systemctl daemon-reload
 systemctl enable --now kitchcu-weekly-seed.timer
 echo "Weekly seed timer: $(systemctl list-timers kitchcu-weekly-seed --no-pager --no-legend || true)"

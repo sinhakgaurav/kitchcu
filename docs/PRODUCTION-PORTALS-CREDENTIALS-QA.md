@@ -1,7 +1,7 @@
 # KitchCu — Production Portals, Credentials & Feature QA
 
 **Audience:** CEO · CPO · CTO · QA · Ops · Support  
-**Last updated:** 2026-08-02  
+**Last updated:** 2026-09-07  
 **Related:** [DEPLOYMENT-GCP.md](./DEPLOYMENT-GCP.md) · [QA-INSTRUCTION-PACK.md](./QA-INSTRUCTION-PACK.md) · [ADVANCEMENT-TRACKER.md](./ADVANCEMENT-TRACKER.md)
 
 This pack is the single place for **production portal URLs**, **who logs in where**, **demo vs production credentials policy**, and a **feature → responsibility → test steps** matrix.
@@ -15,7 +15,7 @@ This pack is the single place for **production portal URLs**, **who logs in wher
 | **Marketing portal** | https://kitchcu.com | Prospects, owners exploring SaaS | Brand story, features, cities presence, pricing, pilot contact, support chat |
 | **WWW alias** | https://www.kitchcu.com | Same as portal | Canonical redirect / same app |
 | **Customer PWA** | https://customer.kitchcu.com | Diners | Discovery by city/GPS, kitchen code, cart, checkout, track, rate, My space |
-| **Kitchen (owner) PWA** | https://kitchen.kitchcu.com | Kitchen owners / chefs | Day ops: orders, menu, brand page, CRM, reports, WhatsApp, payments |
+| **Kitchen (owner) PWA** | https://kitchen.kitchcu.com | Kitchen owners / chefs | Day ops: orders, menu (incl. drafts), setup/profile, ratings, brand page, CRM, reports, WhatsApp, payments |
 | **Admin console** | https://admin.kitchcu.com | Platform employees | Super Admin / RBAC ops, kitchens, tickets, rate limits, API keys |
 | **API gateway** | https://api.kitchcu.com | All clients (via PWAs) | `/api/v1/*`, OpenAPI `/docs`, health |
 | **Media** | https://media.kitchcu.com | Signed/public media | Dish heroes, QR uploads (when configured) |
@@ -42,10 +42,10 @@ A systemd timer on the VM seeds a new set of test accounts each ISO week and lea
 earlier cohorts intact, so QA never has to reuse dirty accounts. Numbers are derived
 from the ISO year + week — `{prefix}{YY}{WW}{index}`, owners `7…`, customers `8…`.
 
-| Persona | Login pattern | Example (2026-W36) | Secret |
+| Persona | Login pattern | Example (2026-W37) | Secret |
 |---------|---------------|--------------------|--------|
-| **Owner** (5/week) | `7{YY}{WW}{00001…}` | `7263600001` … `7263600005` | OTP `123456` |
-| **Customer** (10/week) | `8{YY}{WW}{00001…}` | `8263600001` … `8263600010` | OTP `123456` |
+| **Owner** (5/week) | `7{YY}{WW}{00001…}` | `7263700001` … `7263700005` | OTP `123456` |
+| **Customer** (10/week) | `8{YY}{WW}{00001…}` | `8263700001` … `8263700010` | OTP `123456` |
 
 Each run also produces, per cohort kitchen:
 
@@ -66,6 +66,16 @@ The current week's cohort and per-kitchen totals are written to
 
 Preview locally without touching the API: `python scripts/weekly_test_data.py --dry-run`.
 Override volumes with `--owners`, `--customers`, `--orders-per-kitchen`, `--week 2026-W40`.
+
+### 2.1c Bulk demo seed (first boot + on demand)
+
+First boot with metadata `run-seed=1` runs `infra/gcp-vm/bulk-seed.sh` → `scripts/seed-bulk-data.py` (default 30 kitchens, full extras). Dishes without a live-capture hero stay inactive; orders use active dishes only. Re-run on the VM:
+
+```bash
+gcloud compute ssh ckac-vm --zone=asia-south1-a --command="sudo systemctl start kitchcu-bulk-seed.service"
+```
+
+Locally: `python scripts/seed-bulk-data.py` or `.\scripts\seed-bulk-data.ps1`. Cron install: [DEPLOYMENT-GCP.md](./DEPLOYMENT-GCP.md) §11.7c.
 
 ### 2.2 Production (`*.kitchcu.com`)
 
@@ -192,7 +202,8 @@ Legend: **O** = Owner · **C** = Customer · **A** = Admin · **P** = Platform/s
 | Area | Responsible for | Test steps |
 |------|-----------------|------------|
 | Identity / OTP | Auth for O/C | Request + verify OTP; invalid phone rejected |
-| Admin RBAC | Platform ops | Admin login; Control rate limits; no owner JWT on admin APIs |
+| Admin RBAC | Platform ops | Admin login; expired JWT returns to sign-in; write buttons hidden without `*:write`; kitchen Streaming tab has no publisher token |
+| Kitchen profile | Owner + admin | Setup name/address/pin stay editable after create; kitchen **code** does not change |
 | Gateway rate limits | Abuse protection | Burst OTP from a browser → 429; admin preset for test phase. On-host ops traffic (seed scripts hitting `127.0.0.1:18000` with no `X-Forwarded-For`) is exempt — anything arriving through Caddy is not |
 | i18n | Language switcher | Switch hi/en on portal + customer; labels update |
 | Support AI | FAQ / tickets | Portal chat options → answer; raise ticket |

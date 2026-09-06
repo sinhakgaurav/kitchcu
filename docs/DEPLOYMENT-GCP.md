@@ -321,29 +321,40 @@ A records for `kitchcu.com`, `www.kitchcu.com`, `customer.kitchcu.com`,
 each hostname the first time it sees traffic on port 80 for it — no manual cert step,
 but DNS must resolve first.
 
-### 11.7 Verify + seed demo data
+### 11.7 Verify + bulk seed demo data
 
 With `run-seed=1` in VM metadata (recommended for demo VMs), `startup.sh` waits for
-the gateway and runs `scripts/seed-bulk-data.py` **once** on first boot
-(marker: `/var/lib/ckac/.bulk-seeded`). Set `demo-mode=1` (or `run-seed=1` alone)
-to force `APP_ENV=development` so demo OTP `123456` works for owner/customer logins.
+the gateway and runs `infra/gcp-vm/bulk-seed.sh` **once** on first boot
+(marker: `/var/lib/ckac/.bulk-seeded`). That wrapper calls `scripts/seed-bulk-data.py`
+(30 kitchens, full extras by default). Dishes without a live-capture hero stay
+**inactive**; orders are built only from active dishes. Set `demo-mode=1` (or
+`run-seed=1` alone) to force `APP_ENV=development` so demo OTP `123456` works.
+
+Repo path on the VM is **`/opt/ckac`** (not `/opt/ckac/CKAC`).
 
 ```bash
 gcloud compute ssh ckac-vm --zone=asia-south1-a --command="cd /opt/ckac && sudo docker compose -f infra/gcp-vm/docker-compose.prod.yml ps"
 gcloud compute ssh ckac-vm --zone=asia-south1-a --command="curl -s http://127.0.0.1:18000/health/ready"
 
-# Manual re-seed (only if auto-seed failed or marker removed):
-gcloud compute ssh ckac-vm --zone=asia-south1-a --command="cd /opt/ckac && CKAC_GATEWAY_URL=http://127.0.0.1:18000 python3 scripts/seed-bulk-data.py"
+# One-shot bulk seed (idempotent; systemd unit)
+gcloud compute ssh ckac-vm --zone=asia-south1-a --command="sudo systemctl start kitchcu-bulk-seed.service"
+gcloud compute ssh ckac-vm --zone=asia-south1-a --command="sudo tail -n 80 /var/log/ckac-bulk-seed.log"
+
+# Same script without systemd
+gcloud compute ssh ckac-vm --zone=asia-south1-a --command="sudo bash /opt/ckac/infra/gcp-vm/bulk-seed.sh"
 ```
 
 **Demo logins after seed:** owner `9876543210` / OTP `123456`, customers `9123456789` etc. / OTP `123456`.
 
+Locally: `python scripts/seed-bulk-data.py` or `.\scripts\seed-bulk-data.ps1`.
+Overrides: `CKAC_BULK_KITCHENS`, `CKAC_BULK_ORDERS`, `CKAC_BULK_FULL=1`.
+
 ### 11.7b Weekly QA cohort seed (automatic)
 
-`startup.sh` installs a systemd timer that seeds a **fresh cohort every Monday 03:30
-IST**, leaving earlier cohorts untouched. It never wipes data and is safe to re-run:
-every identifier is derived from the ISO year+week, so a repeat run within the same
-week reuses the same accounts and only tops orders up to the target count.
+`startup.sh` installs a systemd **timer** that seeds a **fresh cohort every Monday
+03:30 IST** (Sunday 22:00 UTC), leaving earlier cohorts untouched. It never wipes
+data and is safe to re-run: identifiers are derived from the ISO year+week, so a
+repeat run within the same week reuses the same accounts and only tops orders up.
 
 Each run seeds **5 owners** (kitchen + full menu each), **10 customers**, and **10
 delivered, rated orders per kitchen** drawn from a mix of this week's new diners and
@@ -353,7 +364,7 @@ plan with a subscriber, a CRM refresh, growth suggestions mined from the week's 
 and one open support ticket.
 
 Accounts follow `{prefix}{YY}{WW}{index}` — owners start with `7`, customers with `8`.
-Week 2026-W36 therefore gives owners `7263600001…5` and customers `8263600001…10`,
+Week 2026-W37 therefore gives owners `7263700001…5` and customers `8263700001…10`,
 all with OTP `123456`.
 
 ```bash
@@ -370,6 +381,24 @@ gcloud compute ssh ckac-vm --zone=asia-south1-a --command="sudo cat /var/lib/cka
 Locally: `python scripts/weekly_test_data.py --dry-run` prints the cohort without
 calling the API; `--week 2026-W40`, `--owners`, `--customers`, and
 `--orders-per-kitchen` override the defaults.
+
+### 11.7c Install / repair seed cron on an existing VM
+
+Redeploy (`google_metadata_script_runner startup`) already copies the units from
+`origin/main` and `systemctl enable --now kitchcu-weekly-seed.timer`. Use this
+block only if the timer is missing after a manual install or a failed startup.
+
+```bash
+gcloud compute ssh ckac-vm --zone=asia-south1-a --command="sudo bash -lc 'cd /opt/ckac && git fetch origin main && git reset --hard origin/main && install -m 0644 infra/gcp-vm/kitchcu-weekly-seed.service /etc/systemd/system/ && install -m 0644 infra/gcp-vm/kitchcu-weekly-seed.timer /etc/systemd/system/ && install -m 0644 infra/gcp-vm/kitchcu-bulk-seed.service /etc/systemd/system/ && systemctl daemon-reload && systemctl enable --now kitchcu-weekly-seed.timer && systemctl list-timers kitchcu-weekly-seed --no-pager'"
+```
+
+Confirm:
+
+```bash
+gcloud compute ssh ckac-vm --zone=asia-south1-a --command="systemctl is-enabled kitchcu-weekly-seed.timer"
+gcloud compute ssh ckac-vm --zone=asia-south1-a --command="systemctl cat kitchcu-weekly-seed.service | grep ExecStart"
+# Must be: ExecStart=/bin/bash /opt/ckac/infra/gcp-vm/weekly-seed.sh
+```
 
 ### 11.8 Redeploy after a code change (typical update path)
 

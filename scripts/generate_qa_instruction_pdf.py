@@ -9,8 +9,8 @@ from pathlib import Path
 
 from pdf_guide import GuidePDF
 
-GUIDE_VERSION = "1.0"
-GUIDE_DATE = "July 2026"
+GUIDE_VERSION = "1.1"
+GUIDE_DATE = "September 2026"
 OUTPUT = Path(__file__).resolve().parent.parent / "docs" / "QA-INSTRUCTION-PACK.pdf"
 
 
@@ -34,6 +34,7 @@ def build() -> GuidePDF:
             "Owner list toolbars: search, sort, filter chips (Orders, Menu, Ingredients,",
             "Bulk prep, CRM, Coupons) + header/dropdown/layout polish checks",
             "F19/F19b: pantry, recipes, deduct modes, mark prepared, Ready-time stock",
+            "P41: kitchen profile edit, Ratings, settlements, GCP bulk + weekly seed",
             "Security, correlation IDs, tenant isolation, pytest focus commands",
         ],
     )

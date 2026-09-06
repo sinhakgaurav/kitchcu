@@ -8,8 +8,8 @@ from pathlib import Path
 
 from pdf_guide import GuidePDF
 
-GUIDE_VERSION = "1.0"
-GUIDE_DATE = "August 2026"
+GUIDE_VERSION = "1.1"
+GUIDE_DATE = "September 2026"
 OUTPUT = Path(__file__).resolve().parent.parent / "docs" / "PRODUCTION-PORTALS-CREDENTIALS-QA.pdf"
 
 
@@ -31,6 +31,7 @@ def build() -> GuidePDF:
         bullets=[
             "Production: kitchcu.com, customer / kitchen / admin / api.kitchcu.com",
             "Demo logins for local QA; production admin@kitchcu.com + Secret Manager",
+            "Weekly QA cohort + GCP bulk-seed.sh / systemd timer at /opt/ckac",
             "Cities presence: Delhi NCR, UP belt, Dehradun, Mumbai + coming soon",
             "F01-F48 condensed matrix with test steps",
         ],

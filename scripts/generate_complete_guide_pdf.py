@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""Generate Kitchcu Complete Executive Guide PDF v3.2.3 — deep encyclopedia (CEO + CPO + CTO).
+"""Generate Kitchcu Complete Executive Guide PDF v3.2.5 — deep encyclopedia (CEO + CPO + CTO).
 
-Source of truth: docs/CKAC-COMPLETE-GUIDE.md v3.2.3 (July 2026).
+Source of truth: docs/CKAC-COMPLETE-GUIDE.md v3.2.5 (September 2026).
 Shared layout: scripts/pdf_guide.py (GuidePDF) — header clearance, caption-above figures.
 """
 
@@ -9,8 +9,8 @@ from pathlib import Path
 
 from pdf_guide import GuidePDF
 
-GUIDE_VERSION = "3.2"
-GUIDE_DATE = "July 2026"
+GUIDE_VERSION = "3.2.5"
+GUIDE_DATE = "September 2026"
 OUTPUT = Path(__file__).resolve().parent.parent / "docs" / "CKAC-COMPLETE-GUIDE.pdf"
 UI = Path(__file__).resolve().parent.parent / "docs" / "assets" / "ui"
 
@@ -811,6 +811,7 @@ def build() -> GuidePDF:
             ["Learning + dish trials", "S16", "Done"],
             ["Community + chef rankings", "S17", "Done"],
             ["Live streaming LiveKit", "S18", "Done"],
+            ["P41 profile edit / ratings / seed", "P41", "Done"],
             ["E1/E2 purchases + chef lock", "S19 proposed", "Design only"],
         ],
         [80, 40, 50],
@@ -834,6 +835,7 @@ def build() -> GuidePDF:
         "2. OTP (dev 123456) -> POST /auth/otp/verify -> Owner JWT\n"
         "3. POST /kitchens (name, address, geo)\n"
         "   Identity: PostGIS point + code CKxxxnnn + kitchen.created (outbox)\n"
+        "3b. PATCH /kitchens/{id}/profile — name/address/pin; code stays\n"
         "4. PWA shows kitchen profile; guide to first dish (rung 1)"
     )
 
@@ -1208,7 +1210,7 @@ def build() -> GuidePDF:
     pdf.table(
         ["Document", "Role"],
         [
-            ["CKAC-COMPLETE-GUIDE.md/.pdf v3.2.3", "This CEO/CPO/CTO encyclopedia"],
+            ["CKAC-COMPLETE-GUIDE.md/.pdf v3.2.5", "This CEO/CPO/CTO encyclopedia"],
             ["CKAC-USERFLOWS.md/.pdf", "Full step-by-step user journey pack"],
             ["API.md", "Public API reference + OpenAPI URLs"],
             ["E1-E2-*-DESIGN.md", "S19 quality-loop design pack"],
@@ -1228,13 +1230,12 @@ def build() -> GuidePDF:
 
     pdf.chapter("Document control")
     pdf.body(
-        "v3.2.3 July 2026 — P37-P40 dual referrals; GST Excel/PDF + admin GST; super-admin "
-        "ops console (orders/tickets/settlements/health); platform i18n (10 locales) + "
-        "HTML/API-key/login-hint harden. Builds on v3.2 Control plane, ready-within, Maps, "
-        "UI Catalog (8 surfaces), flows 17.9-17.10."
+        "v3.2.5 September 2026 — P41 kitchen profile PATCH (code immutable), owner Ratings, "
+        "admin RBAC/stream summary, live-capture-safe GCP bulk seed, weekly cron at /opt/ckac. "
+        "Builds on P37-P40 referrals, GST export, admin ops, i18n, Control plane, Maps."
     )
     pdf.quote(
-        "KitchCu Complete Executive & Engineering Guide v3.2.3 — Confidential — July 2026. "
+        "KitchCu Complete Executive & Engineering Guide v3.2.5 — Confidential — September 2026. "
         "India's first — and the world's third — platform with this feature stack."
     )
 

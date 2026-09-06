@@ -4,11 +4,11 @@
 
 | Field | Value |
 |-------|-------|
-| Version | **3.2.4** |
-| Status | Phase 1 **S1–S18** + post-S18 **P19–P40**; prod `*.kitchcu.com`; multi-city presence; i18n parity; portals/QA pack [`PRODUCTION-PORTALS-CREDENTIALS-QA.md`](./PRODUCTION-PORTALS-CREDENTIALS-QA.md); tracker [`ADVANCEMENT-TRACKER.md`](./ADVANCEMENT-TRACKER.md); **E1/E2** design pack only |
+| Version | **3.2.5** |
+| Status | Phase 1 **S1–S18** + post-S18 **P19–P41**; prod `*.kitchcu.com`; multi-city presence; i18n parity; owner/admin audit gap close; GCP bulk seed + weekly cron; portals/QA pack [`PRODUCTION-PORTALS-CREDENTIALS-QA.md`](./PRODUCTION-PORTALS-CREDENTIALS-QA.md); tracker [`ADVANCEMENT-TRACKER.md`](./ADVANCEMENT-TRACKER.md); **E1/E2** design pack only |
 | Audience | CEO, CPO, CTO, Product, Engineering, DBA, QA, Investors, AI coding agents |
-| Last updated | 2026-08-02 |
-| Supersedes | `CKAC-COMPLETE-GUIDE.md` v3.2.3 (July 2026) |
+| Last updated | 2026-09-07 |
+| Supersedes | `CKAC-COMPLETE-GUIDE.md` v3.2.4 (August 2026) |
 | Operating charter | [`.cursor/rules/kitchcu-executive-operating-charter.mdc`](../.cursor/rules/kitchcu-executive-operating-charter.mdc) — always-on, non-negotiable |
 | Engineering constitution | [`KITCHCU-ENGINEERING-STANDARDS.md`](./KITCHCU-ENGINEERING-STANDARDS.md) |
 | Agent quick spec | [`AGENTS.md`](../AGENTS.md) |
@@ -1070,6 +1070,7 @@ curl "http://localhost:18000/openapi.json?refresh=true"   # force refresh after 
 | GST monthly Excel/PDF + admin kitchen GST | P38 | ✅ |
 | Super-admin ops console (orders/tickets/settlements/health) | P39 | ✅ |
 | Platform i18n (10 locales) + HTML/API-key/login-hint harden | P40 | ✅ |
+| Kitchen profile edit + owner ratings/inbox + admin RBAC/stream summary + live-capture-safe GCP seed | P41 | ✅ |
 | **Purchases ledger + chef-standard lock (E1/E2)** | **S19 proposed** | **📋 Design only — not started** |
 
 ---
@@ -1558,7 +1559,7 @@ Full acceptance criteria for every feature: [`CKAC-COMPLETE-PLANNING-BENCHMARK.m
 | Multi-kitchen & payments | F06, F42–F44 | Master checkout, online pay + COD, UPI, split settlement | ✅ done |
 | Analytics & growth | F07–F12, F39 | Revenue/dish/pattern reports, suggestions, daily menu push | ✅ done |
 | Catalog & trust media | F13–F15 | Live-capture dish photo, price/quality/ingredients, categories | ✅ done |
-| Ratings | F16–F18, F20 | Home-taste rating, aggregate, A/V reviews, customer tips | ✅ done (owner-facing F20 UI still thin) |
+| Ratings | F16–F18, F20 | Home-taste rating, aggregate, A/V reviews, customer tips | ✅ done (owner **Ratings** page + reports aggregates) |
 | Ingredients | F19/F19b | Ingredient mapper + bulk prep; deduct on **ready** or batch **prepared** | ✅ done — **E1 extends with a purchase ledger, design only** |
 | Social & subscription model | F25, F26 | Social share cards, zero-commission subscription | ✅ done |
 | Delivery / discovery | F27–F33 | Radius, fee accept/deny, tracking, prep/delivery time, distance, nearby, repeat orders | ✅ done |
@@ -1573,7 +1574,7 @@ Full acceptance criteria for every feature: [`CKAC-COMPLETE-PLANNING-BENCHMARK.m
 
 | Doc | Role |
 |-----|------|
-| **This guide (v3.2.3)** | CEO/CPO/CTO master encyclopedia |
+| **This guide (v3.2.5)** | CEO/CPO/CTO master encyclopedia |
 | [`PLATFORM-SOLUTION-BLUEPRINT.md`](./PLATFORM-SOLUTION-BLUEPRINT.md) | Expectations → CEO/CPO solution → CTO impl → arch/DB/UX per journey & admin controls |
 | [`PLATFORM-PERSONA-DEEP-DIVE.md`](./PLATFORM-PERSONA-DEEP-DIVE.md) | Persona lived experience + scorecards |
 | [`PLATFORM-STRATEGIC-ANALYSIS.md`](./PLATFORM-STRATEGIC-ANALYSIS.md) | Competitive honesty + Waves A–D |
@@ -1600,6 +1601,8 @@ Full acceptance criteria for every feature: [`CKAC-COMPLETE-PLANNING-BENCHMARK.m
 
 | Version | Date | Changes |
 |---------|------|---------|
+| **3.2.5** | 2026-09-07 | P41: owner/admin kitchen profile PATCH (code immutable); owner dish list includes drafts; Ratings page; order filters/draft remap; settlements + payment-mix; admin RBAC UI + stream summary; Super Admin links; live-capture-safe bulk seed; weekly cron path `/opt/ckac`; docs/PDFs refresh. |
+| **3.2.4** | 2026-08-02 | Portals/QA pack, multi-city presence, i18n parity, weekly QA cohort seed. |
 | **3.2.3** | July 2026 | Platform Solution Blueprint + Persona Deep Dive + Strategic Analysis linked from tracker/index; multilevel admin & package planner solution matrices. |
 | **3.2.3** | 2026-07-20 | P37–P40: dual referrals, GST Excel/PDF + admin GST, super-admin ops console (orders/tickets/settlements/health), platform i18n (10 locales) + HTML/API-key/login-hint harden; docs/PDFs refresh. |
 | **3.2.2** | July 2026 | Post-S18 P25–P28: package mapper, owner WA/email templates, employees CRUD+RBAC, expanded kitchen workspace + always-on super-admin Cursor gate; docs/PDFs/tracker refresh. |
@@ -1612,4 +1615,4 @@ Full acceptance criteria for every feature: [`CKAC-COMPLETE-PLANNING-BENCHMARK.m
 
 ---
 
-*KitchCu Complete Executive & Engineering Guide v3.2.3 — Confidential — July 2026*
+*KitchCu Complete Executive & Engineering Guide v3.2.5 — Confidential — September 2026*

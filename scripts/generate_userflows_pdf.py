@@ -9,8 +9,8 @@ from pathlib import Path
 
 from pdf_guide import GuidePDF
 
-GUIDE_VERSION = "1.1"
-GUIDE_DATE = "July 2026"
+GUIDE_VERSION = "1.4"
+GUIDE_DATE = "September 2026"
 OUTPUT = Path(__file__).resolve().parent.parent / "docs" / "CKAC-USERFLOWS.pdf"
 UI = Path(__file__).resolve().parent.parent / "docs" / "assets" / "ui"
 
@@ -36,7 +36,8 @@ def build() -> GuidePDF:
             "split settlement, GST close, admin ops, customer login, coupons, live stream",
             "Order status state machine + JWT auth types table",
             "Gateway proxy map + cross-links to API.md, Complete Guide, UI screenshots",
-            "Every route/event traced directly from services/*/app source, July 2026",
+            "Every route/event traced directly from services/*/app source, September 2026",
+            "P41: kitchen profile PATCH (code immutable), owner Ratings, draft-inclusive menu",
         ],
     )
 
@@ -183,8 +184,10 @@ def build() -> GuidePDF:
         "1. POST /owners/register                 (new owner)\n"
         "2. POST /auth/otp/request -> POST /auth/otp/verify   -> owner JWT\n"
         "3. POST /kitchens                         -> kitchen.created (code CKxxxnnn)\n"
+        "3b. PATCH /kitchens/{id}/profile          name/address/pin; code immutable\n"
         "4. POST /kitchens/{id}/media/upload       (live-capture hero, getUserMedia)\n"
         "5. POST /kitchens/{id}/dishes             -> dish.created\n"
+        "5b. GET /kitchens/{id}/dishes              owner list includes inactive drafts\n"
         "   (server REJECTS heroes with is_live_capture:false)\n"
         "6. POST /kitchens/{id}/orders/manual      -> order.placed (status=received)\n"
         "7. PATCH /orders/{id}/status {accepted}   -> order.status.changed\n"

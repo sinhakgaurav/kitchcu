@@ -7,7 +7,7 @@
 | Baseline | Phase 1 **S1–S18** complete (gateway + 13 domain services + 4 PWAs + GST) |
 | Production | `*.kitchcu.com` (GCP VM + Caddy) |
 | Local demo | `*.kitchcu.in` / `admin@kitchcu.dev` |
-| Last updated | 2026-08-02 |
+| Last updated | 2026-09-07 |
 | Portals / QA pack | [PRODUCTION-PORTALS-CREDENTIALS-QA.md](./PRODUCTION-PORTALS-CREDENTIALS-QA.md) (+ PDF) |
 | Architecture flows | [PLATFORM-ARCHITECTURE-FLOWS.md](./PLATFORM-ARCHITECTURE-FLOWS.md) |
 
@@ -102,6 +102,7 @@ For **manual QA / release sign-off** see [QA-INSTRUCTION-PACK.md](./QA-INSTRUCTI
 | P38 | **GST monthly Excel/PDF** | Owner GST finance downloads; admin kitchen GST tab (profile/report/export) | ✅ | `services/billing/app/gst_export.py` (xlsx + fpdf2) |
 | P39 | **Super-admin ops console fill** | Kitchen Orders + Care/health strip; ticket triage (assignee/priority/resolution); customer order/ticket history; settlements under Refunds; deep-links | ✅ | Identity admin orders filters; notify ticket filters; `test_admin_ops_controls.py` |
 | P40 | **Platform i18n + security harden** | Location language gate; 184-key catalogs × 10 locales; owner/customer/portal chrome on `t()`; dish HTML sanitize; API keys never echo full value; `ADMIN_LOGIN_REVEAL_PASSWORD` only | ✅ | `docs/design/PLATFORM-I18N-DESIGN.md`; `scripts/check-i18n-locale-parity.py` |
+| P41 | **Audit gap close + live-capture-safe seed** | Owner kitchen profile PATCH (code immutable); owner dish list includes drafts; Ratings page; order filters/draft remap; settlements; payment-mix/compare; admin RBAC UI + 401 logout + stream summary (no publisher token); Super Admin links; weekly cron path `/opt/ckac`; GCP `bulk-seed.sh` | ✅ | Identity `023`; catalog `GET …/dishes`; `infra/gcp-vm/{bulk-seed.sh,weekly-seed.sh}` |
 
 ---
 
@@ -138,6 +139,7 @@ Run `.\scripts\seed-all.ps1` (or GCP `run-seed=1`) after migrations.
 | Learning trials / community | extras (`cover_url` on community recipe) | ✅ |
 | Tiffin plans (thali / single_dish / combo) | `ensure_tiffin_plans` | ✅ |
 | Weekly QA cohort (5 owners · 10 customers · 10 orders/kitchen · marketing rotation · growth) | `scripts/weekly_test_data.py` via `kitchcu-weekly-seed.timer` | ✅ |
+| GCP bulk seeder (30 kitchens · full extras · live-capture-safe) | `infra/gcp-vm/bulk-seed.sh` → `scripts/seed-bulk-data.py` · `kitchcu-bulk-seed.service` | ✅ |
 
 ### Weekly QA cohort
 
@@ -149,7 +151,7 @@ deactivated), a tiffin plan with a subscriber, CRM refresh, growth suggestions, 
 support ticket. Identifiers are derived from the ISO year+week
 (`{prefix}{YY}{WW}{index}`; owners `7…`, customers `8…`), so re-running inside the same
 week reuses the accounts and only tops orders up. Current cohort is written to
-`/var/lib/ckac/weekly-cohort.json`. See [DEPLOYMENT-GCP.md](./DEPLOYMENT-GCP.md) §11.7b.
+`/var/lib/ckac/weekly-cohort.json`. Repo on the VM is `/opt/ckac`. See [DEPLOYMENT-GCP.md](./DEPLOYMENT-GCP.md) §11.7–§11.7c.
 
 ---
 
@@ -179,8 +181,8 @@ Both must exit 0 before calling a UI surface “done.”
 
 - [x] Admin login uses `admin@kitchcu.com` on production hosts (UI + env sync)
 - [x] Seed covers integrations, branded page, dish showcase
-- [x] Advancement tracker maintained (P19–P32.1)
-- [x] Migrations ready: identity `013`–`017`, order `007`–`008` (courier + status), billing `008`, marketing `002`
+- [x] Advancement tracker maintained (P19–P41)
+- [x] Migrations ready: identity `013`–`023`, order `007`–`010`, billing `008`–`010`, marketing `002`–`003`
 - [ ] Deploy: push `main` → GCP VM redeploy → smoke admin tabs + Packages + Templates send + Watch live + checkout Self/Porter modes
 - [ ] Confirm `ADMIN_PASSWORD` in GCE metadata matches what operators use
 - [ ] Smoke: support role sees Tickets only; finance sees Packages/Refunds; Starter kitchen hides Live stream nav

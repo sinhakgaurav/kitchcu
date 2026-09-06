@@ -5,7 +5,7 @@ Wants=network-online.target
 
 [Service]
 Type=oneshot
-ExecStart=/bin/bash /opt/ckac/CKAC/infra/gcp-vm/weekly-seed.sh
+ExecStart=/bin/bash /opt/ckac/infra/gcp-vm/weekly-seed.sh
 # ~500 API calls (5 menus, 50 orders through the lifecycle, marketing, growth) and
 # the e2-small VM is slow under load; seeding waits on readiness internally anyway.
 TimeoutStartSec=3600

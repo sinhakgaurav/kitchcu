@@ -1,9 +1,9 @@
 # Kitchcu Platform Gaps Tracker
 
-Last updated: 2026-07-20. Focus: cloud kitchen & home-based food services.
+Last updated: 2026-09-07. Focus: cloud kitchen & home-based food services.
 
 > **Superseded for open gaps:** Many Phase 2/3 rows below are stale (checkout, billing, ratings, i18n chrome, etc. later shipped).  
-> Use **[`ADVANCEMENT-TRACKER.md`](./ADVANCEMENT-TRACKER.md)** (P19–P40), **[`PLATFORM-STRATEGIC-ANALYSIS.md`](./PLATFORM-STRATEGIC-ANALYSIS.md) §5**, and **[`PLATFORM-PERSONA-DEEP-DIVE.md`](./PLATFORM-PERSONA-DEEP-DIVE.md)** as the living gap board.
+> Use **[`ADVANCEMENT-TRACKER.md`](./ADVANCEMENT-TRACKER.md)** (P19–P41), **[`PLATFORM-STRATEGIC-ANALYSIS.md`](./PLATFORM-STRATEGIC-ANALYSIS.md) §5**, and **[`PLATFORM-PERSONA-DEEP-DIVE.md`](./PLATFORM-PERSONA-DEEP-DIVE.md)** as the living gap board. Open product debt: live Razorpay Checkout, tiffin recurring billing, kitchen staff **build**.
 
 ## Closed in this sprint
 
