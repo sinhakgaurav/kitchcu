@@ -356,9 +356,11 @@ export function LoginPage() {
           )}
 
           {demoVisible ? (
-          <details className="auth-card__demo">
+          <details className="auth-card__demo" open>
             <summary>Demo owner accounts · OTP <code>{DEMO.otp}</code></summary>
-            <p className="auth-card__demo-otp">One-click sign-in for local / GCP demos</p>
+            <p className="auth-card__demo-otp">
+              Phone <code>{DEMO.phone}</code> · OTP <code>{DEMO.otp}</code>
+            </p>
             <ul className="auth-card__demo-list">
               {DEMO_OWNERS.map((account) => (
                 <li key={account.phone}>

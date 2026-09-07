@@ -314,9 +314,11 @@ export function CustomerLoginPage() {
           />
 
           {showDemoCredentials() ? (
-          <details className="auth-card__demo">
+          <details className="auth-card__demo" open>
             <summary>Demo customer accounts · OTP <code>{DEMO.otp}</code></summary>
-            <p className="auth-card__demo-otp">One-click WhatsApp login for local / GCP demos</p>
+            <p className="auth-card__demo-otp">
+              Phone <code>{DEMO.customerPhone}</code> · OTP <code>{DEMO.otp}</code>
+            </p>
             <ul className="auth-card__demo-list">
               {DEMO_CUSTOMERS.map((account) => (
                 <li key={account.phone}>

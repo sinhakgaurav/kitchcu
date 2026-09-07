@@ -30,8 +30,8 @@ Local equivalents (dev): portal `:13000` · customer `:13001` · kitchen `:13002
 
 | Persona | Login | Secret | Notes |
 |---------|-------|--------|-------|
-| **Owner** | Phone `9876543210` | OTP `123456` | Primary kitchen `CKPNQ001` (Pune). Extra owners `9876543211`–`9876543213` |
-| **Customer** | Phone `9123456789` | OTP `123456` | Also `9123456780`, `9988776655`, `9123456781`, `9123456782` |
+| **Owner** | Phone `9876543210` | OTP `123456` | Printed on kitchen Sign in (open demo list). Extra owners `9876543211`–`9876543213` |
+| **Customer** | Phone `9123456789` | OTP `123456` | Printed on customer Sign in (open demo list). Also `9123456780`, `9988776655`, `9123456781`, `9123456782` |
 | **Super Admin** | `admin@kitchcu.dev` | `admin123456` | Dev only — never use on production |
 
 Seed: `.\scripts\seed-all.ps1` (includes multi-city kitchens: Delhi, Gurugram, Noida, Dehradun, Prayagraj, Varanasi, Kanpur, Lucknow, Jhansi, Mumbai).
