@@ -73,11 +73,8 @@ if [ "$(meta demo-mode)" = "1" ] || [ "$(meta demo-mode)" = "true" ] \
   APP_ENV="development"
 fi
 
-# Reveal ADMIN_PASSWORD on admin login during demo/seed bring-up only.
-ADMIN_LOGIN_REVEAL_PASSWORD=0
-if [ "$APP_ENV" = "development" ]; then
-  ADMIN_LOGIN_REVEAL_PASSWORD=1
-fi
+# Always print ADMIN_PASSWORD on Super Admin / login-hint (operator request).
+ADMIN_LOGIN_REVEAL_PASSWORD=1
 
 cat > "$ENV_DIR/.env" <<EOF
 POSTGRES_USER=ckac

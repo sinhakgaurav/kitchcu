@@ -63,7 +63,7 @@ export type AdminLoginHint = {
   source: string;
 };
 
-/** Public bring-up hint — password only when identity allows reveal (demo / flag). */
+/** Public bring-up hint — always includes ADMIN_PASSWORD when identity is up. */
 export async function fetchAdminLoginHint(): Promise<AdminLoginHint> {
   const res = await fetch("/api/v1/admin/auth/login-hint", {
     headers: apiHeaders(),

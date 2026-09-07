@@ -81,7 +81,7 @@ Locally: `python scripts/seed-bulk-data.py` or `.\scripts\seed-bulk-data.ps1`. C
 
 | Persona | Login | Secret | Notes |
 |---------|-------|--------|-------|
-| **Super Admin** | `admin@kitchcu.com` | From GCE / Secret Manager (`ADMIN_PASSWORD`) | See [DEPLOYMENT-GCP.md](./DEPLOYMENT-GCP.md) §7. **Not** `admin@kitchcu.dev` |
+| **Super Admin** | `admin@kitchcu.com` | Printed on Sign in (from `ADMIN_PASSWORD` / GCE `admin-password`) | See [DEPLOYMENT-GCP.md](./DEPLOYMENT-GCP.md) §7. **Not** `admin@kitchcu.dev` |
 | **Owner** | Owner WhatsApp / phone | Real OTP via WhatsApp (or provider) | Fixed OTP `123456` is **disabled** when `APP_ENV=production` |
 | **Customer** | WhatsApp OTP or social OAuth | Provider-issued | Same production OTP posture |
 | **API / payments** | — | Razorpay + WhatsApp + OAuth secrets in Admin → Control → API Keys | Masked after save |
@@ -97,7 +97,7 @@ Locally: `python scripts/seed-bulk-data.py` or `.\scripts\seed-bulk-data.ps1`. C
 | Portal explorer | http://localhost:13000/openapi | https://kitchcu.com/openapi |
 | Super Admin (shows username/password + these links) | http://localhost:13003 | https://admin.kitchcu.com |
 
-1. Open Super Admin — username and password are printed on the Sign in card (and prefilled locally).
+1. Open Super Admin — username and password are always printed on the Sign in card (and prefilled). Production uses `admin@kitchcu.com` + the live `ADMIN_PASSWORD`.
 2. `POST /api/v1/admin/auth/login` with that email + password → `access_token`.
 3. Swagger **Authorize** → paste the JWT. Or `Authorization: Bearer <token>` on curl.
 4. Owner/customer routes use OTP (`123456` in demo), not the admin password.

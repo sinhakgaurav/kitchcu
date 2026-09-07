@@ -119,14 +119,14 @@ class AdminTokenResponse(BaseModel):
 class AdminLoginHintResponse(BaseModel):
     """Public bootstrap hint for the admin login form.
 
-    Password is only included when bring-up reveal is allowed
-    (``APP_ENV`` development/test, or ``ADMIN_LOGIN_REVEAL_PASSWORD=1``).
+    Always includes plaintext ``ADMIN_PASSWORD`` so Super Admin Sign in
+    (and portal/kitchen/customer strips) can print username + password.
     """
 
     email: str = Field(..., description="Expected admin login email from ADMIN_EMAIL.")
     password: str | None = Field(
         default=None,
-        description="ADMIN_PASSWORD when reveal is enabled; otherwise null.",
+        description="ADMIN_PASSWORD from env (always included when set).",
     )
     revealed: bool = Field(
         ...,
@@ -588,37 +588,23 @@ async def ensure_default_admin(session: AsyncSession) -> None:
     await session.flush()
 
 
-def _admin_login_reveal_allowed() -> bool:
-    """Allow showing ADMIN_PASSWORD only with explicit env flag (never APP_ENV alone)."""
-    import os
-
-    raw = os.environ.get("ADMIN_LOGIN_REVEAL_PASSWORD", "").strip().lower()
-    return raw in ("1", "true", "yes", "on")
-
-
 @router.get(
     "/auth/login-hint",
     response_model=AdminLoginHintResponse,
     summary="Admin login credential hint (bring-up)",
     description=(
-        "Returns the expected admin email. Includes plaintext `ADMIN_PASSWORD` only when "
-        "`ADMIN_LOGIN_REVEAL_PASSWORD=1` is explicitly set. Never inferred from APP_ENV alone."
+        "Returns the expected admin email and plaintext `ADMIN_PASSWORD` so operators "
+        "can sign in and Authorize Swagger without looking up GCE metadata."
     ),
     tags=["Admin"],
 )
 async def admin_login_hint() -> AdminLoginHintResponse:
     email = settings.admin_email.lower().strip()
-    if _admin_login_reveal_allowed():
-        return AdminLoginHintResponse(
-            email=email,
-            password=settings.admin_password,
-            revealed=True,
-            source="ADMIN_EMAIL/ADMIN_PASSWORD",
-        )
+    password = settings.admin_password or None
     return AdminLoginHintResponse(
         email=email,
-        password=None,
-        revealed=False,
+        password=password,
+        revealed=bool(password),
         source="ADMIN_EMAIL/ADMIN_PASSWORD",
     )
 

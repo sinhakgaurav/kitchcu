@@ -488,7 +488,7 @@ flowchart LR
 
 ### Preconditions
 - Admin account: local `admin@kitchcu.dev` / `admin123456`; production `admin@kitchcu.com` + VM `ADMIN_PASSWORD` (see [ADVANCEMENT-TRACKER.md](./ADVANCEMENT-TRACKER.md)).
-- Optional local only: `ADMIN_LOGIN_REVEAL_PASSWORD=1` exposes password via `GET /admin/auth/login-hint` — **never** enable on public demo VMs.
+- Sign in always prints username + password from `GET /admin/auth/login-hint`.
 - RBAC: mutations require permissions such as `employees:write`, `packages:write`, `kitchens:write` (superadmin = `*`).
 
 ### Step-by-step UI actions

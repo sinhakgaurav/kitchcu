@@ -38,7 +38,7 @@
 
 **Admin APIs** (`/api/v1/admin/*` except `GET /admin/auth/login-hint`):
 
-1. Username + password are shown on the Super Admin sign-in page (local `admin@kitchcu.dev` / `admin123456`; production `admin@kitchcu.com` + VM `ADMIN_PASSWORD`, or reveal via `ADMIN_LOGIN_REVEAL_PASSWORD=1`).
+1. Username + password are always printed on Super Admin Sign in (and on portal/kitchen/customer credential strips) via `GET /api/v1/admin/auth/login-hint`. Local: `admin@kitchcu.dev` / `admin123456`. Production: `admin@kitchcu.com` + the VM `ADMIN_PASSWORD` value.
 2. `POST /api/v1/admin/auth/login` with `{"email":"<username>","password":"<password>"}`.
 3. Copy `access_token`. In Swagger click **Authorize** and paste the JWT only (the UI adds `Bearer`). On curl: `Authorization: Bearer <token>`.
 4. Call any login-required admin route. `401` = missing/invalid token; `403` = JWT valid but RBAC denies the permission.

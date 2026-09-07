@@ -48,8 +48,8 @@ export function SuperAdminLink({ className, onClick }: LinkProps) {
 }
 
 /**
- * Login / portal credential strip. Prints the password when identity
- * `ADMIN_LOGIN_REVEAL_PASSWORD=1` (GCP demo) or on non-production hosts.
+ * Login / portal credential strip. Always prints username + password
+ * from `GET /admin/auth/login-hint` (falls back to local demo defaults).
  */
 export function SuperAdminCredentials({ className }: CredsProps) {
   const { t } = useTranslation();
@@ -69,11 +69,7 @@ export function SuperAdminCredentials({ className }: CredsProps) {
 
   const email = hint?.email || defaults.email;
   const password =
-    hint?.revealed && hint.password
-      ? hint.password
-      : demo
-        ? DEMO_ADMIN.password
-        : null;
+    hint?.password || (demo ? DEMO_ADMIN.password : defaults.password) || null;
   const showPassword = Boolean(password);
 
   return (

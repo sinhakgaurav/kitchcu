@@ -810,7 +810,7 @@ function AdminLogin({ onSuccess }: { onSuccess: (token: string) => void }) {
         const hint = await fetchAdminLoginHint();
         if (cancelled) return;
         if (hint.email) setEmail(hint.email);
-        if (hint.revealed && hint.password) {
+        if (hint.password) {
           setPassword(hint.password);
           setRevealedPassword(hint.password);
         }

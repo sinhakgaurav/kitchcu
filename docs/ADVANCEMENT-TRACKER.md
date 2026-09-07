@@ -43,7 +43,7 @@ For **manual QA / release sign-off** see [QA-INSTRUCTION-PACK.md](./QA-INSTRUCTI
 | i18n | 12 locales (en + hi/mr/ta/te/kn/ml/bn/gu/pa/bho/mai) — catalog parity green; admin stays EN |
 | Cities | Presence strip on portal / customer / kitchen; seed kitchens in Delhi NCR, UP, Dehradun, Mumbai |
 | Delivery | Cost-share + Self/Porter modes; book on accept (P32/P32.1) |
-| Trust | Admin RBAC + audit · HTML sanitize · API-key mask · login-hint flag-gated |
+| Trust | Admin RBAC + audit · HTML sanitize · API-key mask · login-hint always prints ADMIN_PASSWORD |
 | Growth | Dual referral program + GST monthly Excel/PDF |
 | Open | Kitchen staff build · tiffin recurring · Wave C/D |
 
@@ -101,11 +101,12 @@ For **manual QA / release sign-off** see [QA-INSTRUCTION-PACK.md](./QA-INSTRUCTI
 | P37 | **Dual referral program** | Customer→kitchen + kitchen→customer leads; ₹ rewards (default 10); credit ledger; owner/customer/admin UI; bulk CSV | ✅ | Identity `021`; design `docs/design/REFERRAL-PROGRAM-DESIGN.md`; stream `ckac:identity:referral` |
 | P38 | **GST monthly Excel/PDF** | Owner GST finance downloads; admin kitchen GST tab (profile/report/export) | ✅ | `services/billing/app/gst_export.py` (xlsx + fpdf2) |
 | P39 | **Super-admin ops console fill** | Kitchen Orders + Care/health strip; ticket triage (assignee/priority/resolution); customer order/ticket history; settlements under Refunds; deep-links | ✅ | Identity admin orders filters; notify ticket filters; `test_admin_ops_controls.py` |
-| P40 | **Platform i18n + security harden** | Location language gate; 184-key catalogs × 10 locales; owner/customer/portal chrome on `t()`; dish HTML sanitize; API keys never echo full value; `ADMIN_LOGIN_REVEAL_PASSWORD` only | ✅ | `docs/design/PLATFORM-I18N-DESIGN.md`; `scripts/check-i18n-locale-parity.py` |
+| P40 | **Platform i18n + security harden** | Location language gate; 184-key catalogs × 10 locales; owner/customer/portal chrome on `t()`; dish HTML sanitize; API keys never echo full value | ✅ | `docs/design/PLATFORM-I18N-DESIGN.md`; `scripts/check-i18n-locale-parity.py` |
 | P41 | **Audit gap close + live-capture-safe seed** | Owner kitchen profile PATCH (code immutable); owner dish list includes drafts; Ratings page; order filters/draft remap; settlements; payment-mix/compare; admin RBAC UI + 401 logout + stream summary (no publisher token); Super Admin links; weekly cron path `/opt/ckac`; GCP `bulk-seed.sh` | ✅ | Identity `023`; catalog `GET …/dishes`; `infra/gcp-vm/{bulk-seed.sh,weekly-seed.sh}` |
 | P42 | **Live Razorpay Checkout** | Billing live Orders API + signed capture · customer Checkout.js · kitchen/platform keys · webhook backup | 🟡 | Demo path unchanged without keys; Route transfers still pending in prod. Design `LIVE-RAZORPAY-CHECKOUT-DESIGN.md` |
 | P43 | **Order CSV + parse match-rate** | Owner `export.csv` + drafts parse-stats; admin kitchen Orders CSV/stats; first-party (no Meta/Razorpay) | ✅ | Design `ORDER-CSV-AND-PARSE-STATS-DESIGN.md`; cap 10k rows |
 | P44 | **Admin API docs + login creds** | Super Admin Sign in shows username/password + Swagger/ReDoc/portal links; how-to Authorize in `API.md` §1.1 | ✅ | Admin login / sidebar / overview |
+| P45 | **Always show admin password** | `GET /admin/auth/login-hint` always returns `ADMIN_PASSWORD`; Sign in + portal/kitchen/customer strips print it; startup writes reveal=1 | ✅ | Identity login-hint; no flag gate |
 
 ---
 
@@ -114,7 +115,7 @@ For **manual QA / release sign-off** see [QA-INSTRUCTION-PACK.md](./QA-INSTRUCTI
 | Environment | Admin email | Password |
 |-------------|-------------|----------|
 | Local / Docker demo | `admin@kitchcu.dev` | `admin123456` |
-| Production (`admin.kitchcu.com`) | `admin@kitchcu.com` | GCE metadata `admin-password` → VM `ADMIN_PASSWORD` (synced to DB on login) |
+| Production (`admin.kitchcu.com`) | `admin@kitchcu.com` | GCE metadata `admin-password` → VM `ADMIN_PASSWORD` (printed on Sign in via login-hint; synced to DB on login) |
 
 Owners (all envs with seed): `9876543210`–`9876543213`, OTP `123456`.  
 Customers: `9123456789`, `9123456780`, `9988776655`, `9123456781`, `9123456782`, OTP `123456`.

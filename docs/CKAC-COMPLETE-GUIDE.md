@@ -1273,7 +1273,7 @@ See [`DELIVERY-PAYER-MODE-DESIGN.md`](./DELIVERY-PAYER-MODE-DESIGN.md) for the c
 
 Gateway note: admin **billing** paths (packages, refunds, payment-gateway, GST) are registered **before** the identity admin catch-all so they proxy correctly.
 
-**Security (P40):** `GET /admin/auth/login-hint` reveals `ADMIN_PASSWORD` only when `ADMIN_LOGIN_REVEAL_PASSWORD=1` (never inferred from `APP_ENV` alone). Dish HTML is sanitized server- and client-side.
+**Security (P40 / P45):** Dish HTML is sanitized server- and client-side. API Keys stay masked after save. `GET /admin/auth/login-hint` always returns plaintext `ADMIN_PASSWORD` so Super Admin Sign in can print it.
 
 ---
 

@@ -12,17 +12,17 @@ SYNC_DB_URL = os.environ["DATABASE_SYNC_URL"]
 
 
 @pytest.mark.asyncio
-async def test_admin_login_hint_hides_password_without_explicit_flag(client: AsyncClient, monkeypatch):
+async def test_admin_login_hint_always_reveals_password(client: AsyncClient, monkeypatch):
     monkeypatch.setattr("app.admin_routes.settings.admin_email", "admin@kitchcu.com")
     monkeypatch.setattr("app.admin_routes.settings.admin_password", "gcp-meta-secret")
     monkeypatch.delenv("ADMIN_LOGIN_REVEAL_PASSWORD", raising=False)
-    # APP_ENV alone must NOT reveal — only explicit ADMIN_LOGIN_REVEAL_PASSWORD=1
+    monkeypatch.setenv("APP_ENV", "production")
     res = await client.get("/api/v1/admin/auth/login-hint")
     assert res.status_code == 200, res.text
     body = res.json()
     assert body["email"] == "admin@kitchcu.com"
-    assert body["revealed"] is False
-    assert body["password"] is None
+    assert body["revealed"] is True
+    assert body["password"] == "gcp-meta-secret"
 
 
 @pytest.mark.asyncio
