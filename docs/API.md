@@ -24,6 +24,31 @@
 
 **Dev OTP:** always `123456` for owner/customer WhatsApp OTP when `APP_ENV=development`.
 
+### 1.1 How to open the docs and hit login-required APIs
+
+| Surface | Local | Production |
+|---------|-------|------------|
+| Swagger UI | http://localhost:18000/docs | https://api.kitchcu.com/docs |
+| ReDoc | http://localhost:18000/redoc | https://api.kitchcu.com/redoc |
+| Spec JSON | http://localhost:18000/openapi.json | https://api.kitchcu.com/openapi.json |
+| Portal explorer | http://localhost:13000/openapi | https://kitchcu.com/openapi |
+| Super-admin (links + username/password) | http://localhost:13003 / Vite `:13103` | https://admin.kitchcu.com |
+
+**Public (no token):** `GET /health/live`, `GET /health/ready`, `GET /docs`, `GET /redoc`, `GET /openapi.json`, discovery/menu reads that the spec marks unauthenticated.
+
+**Admin APIs** (`/api/v1/admin/*` except `GET /admin/auth/login-hint`):
+
+1. Username + password are shown on the Super Admin sign-in page (local `admin@kitchcu.dev` / `admin123456`; production `admin@kitchcu.com` + VM `ADMIN_PASSWORD`, or reveal via `ADMIN_LOGIN_REVEAL_PASSWORD=1`).
+2. `POST /api/v1/admin/auth/login` with `{"email":"<username>","password":"<password>"}`.
+3. Copy `access_token`. In Swagger click **Authorize** and paste the JWT only (the UI adds `Bearer`). On curl: `Authorization: Bearer <token>`.
+4. Call any login-required admin route. `401` = missing/invalid token; `403` = JWT valid but RBAC denies the permission.
+
+**Owner APIs:** OTP `POST /api/v1/auth/otp/request` → `verify` (dev OTP `123456`) — not the admin password.  
+**Customer APIs:** customer OTP or OAuth — same Bearer pattern, `type: customer`.  
+**Internal:** `X-Internal-Key` only between services; never from Swagger in a browser.
+
+The Super Admin console also links Swagger / ReDoc / portal explorer on the login card, sidebar, and overview.
+
 ---
 
 ## 2. Conventions
@@ -216,8 +241,10 @@ Body always: `{"detail": "…"}`.
 
 ```powershell
 docker compose up -d
-# Swagger (aggregated):
+# Swagger (aggregated) — then Authorize with admin JWT (§1.1):
 start http://localhost:18000/docs
+# Super Admin shows the same links + username/password:
+start http://localhost:13003
 # Portal explorer (same schema via proxy):
 start http://localhost:13000/openapi
 # Force refresh aggregate cache after route changes:

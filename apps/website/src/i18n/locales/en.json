@@ -35,6 +35,7 @@
     "adminLogin": "Super admin",
     "adminCredentialsTitle": "Super admin credentials",
     "adminCredentialsDev": "Email {{email}} · Password {{password}} (dev / seeded)",
+    "adminCredentialsRevealed": "Email {{email}} · Password {{password}}",
     "adminCredentialsProd": "Email {{email}} — password from the VM ADMIN_PASSWORD secret, not this page",
     "adminCredentialsHost": "Open the console on {{host}}.",
     "adminOpenConsole": "Open Super Admin"

@@ -1029,9 +1029,12 @@ Every one of the 12 domain services ships its own FastAPI-generated `/openapi.js
 ```powershell
 docker compose up -d
 start http://localhost:18000/docs             # Swagger, aggregated
+start http://localhost:13003                  # Super Admin — username/password + API doc links
 start http://localhost:13000/openapi          # Portal explorer (same schema)
 curl "http://localhost:18000/openapi.json?refresh=true"   # force refresh after route changes
 ```
+
+**Hitting login-required APIs:** public health/OpenAPI need no token. For `/api/v1/admin/*`, use the username + password shown on Super Admin Sign in → `POST /api/v1/admin/auth/login` → Swagger **Authorize** with the JWT (or `Authorization: Bearer <token>`). Owner/customer routes use OTP, not the admin password. See [`API.md`](./API.md) §1.1. Production Swagger: https://api.kitchcu.com/docs.
 
 ## 16. Build Status Matrix
 

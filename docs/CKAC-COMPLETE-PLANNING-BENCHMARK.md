@@ -1113,7 +1113,7 @@ Push notification to owner PWA
 - [ ] Unmatched items flagged for owner manual mapping
 - [ ] Owner confirms/edits draft → creates official order
 - [ ] Customer receives confirmation with tracking link
-- [ ] Parse success rate tracked (target 60% MVP, 85% v2)
+- [x] Parse success rate tracked (target 60% MVP, 85% v2)
 
 **Technical:** notification-service webhook → order-service `WhatsAppParser` (rule engine + kitchen menu fuzzy match via pg_trgm)
 
@@ -1173,7 +1173,7 @@ Push notification to owner PWA
 **Acceptance criteria:**
 - [ ] Filter: today, week, month, custom range
 - [ ] Filter: source (whatsapp, pwa, manual)
-- [ ] Export CSV (Phase 2)
+- [x] Export CSV (Phase 2)
 - [ ] Sub-second load for today's orders (Redis)
 - [ ] Paginated full history from PG
 

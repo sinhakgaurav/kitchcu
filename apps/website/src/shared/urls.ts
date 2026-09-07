@@ -102,3 +102,40 @@ export function goToCustomer(path = "/"): void {
 export function goToKitchen(path = "/"): void {
   window.location.assign(kitchenUrl(path));
 }
+
+/** Public gateway origin for OpenAPI / health (not the PWA host). */
+export function gatewayPublicUrl(): string {
+  if (typeof window === "undefined") {
+    return "http://localhost:18000";
+  }
+  const { hostname } = window.location;
+  if (hostname === "localhost" || hostname === "127.0.0.1") {
+    return "http://localhost:18000";
+  }
+  const apex = stripAppPrefix(hostname.toLowerCase());
+  if (apex === "kitchcu.com" || apex.endsWith(".kitchcu.com")) {
+    return "https://api.kitchcu.com";
+  }
+  if (apex.includes(".")) {
+    return `${window.location.protocol}//api.${apex}`;
+  }
+  return "http://localhost:18000";
+}
+
+export type ApiDocsLinks = {
+  swagger: string;
+  redoc: string;
+  openapiJson: string;
+  portalExplorer: string;
+};
+
+/** Aggregated OpenAPI explorers — same contract as `docs/API.md`. */
+export function apiDocsLinks(): ApiDocsLinks {
+  const gw = gatewayPublicUrl().replace(/\/$/, "");
+  return {
+    swagger: `${gw}/docs`,
+    redoc: `${gw}/redoc`,
+    openapiJson: `${gw}/openapi.json`,
+    portalExplorer: portalUrl("/openapi"),
+  };
+}

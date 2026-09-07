@@ -19,6 +19,8 @@ import {
   fetchAdminKitchenGstProfile,
   downloadAdminKitchenGstExcel,
   downloadAdminKitchenGstPdf,
+  downloadAdminKitchenOrdersCsv,
+  fetchAdminKitchenParseStats,
   fetchAdminKitchenStreamSummary,
   fetchAdminKitchenWhatsApp,
   updateAdminKitchenDeliverySettings,
@@ -41,6 +43,7 @@ import {
   getAdminToken,
   type AdminNavDetail,
   type AdminOrder,
+  type AdminParseStats,
   type AdminEmployee,
   type AdminTicket,
   adminNavigate,
@@ -87,13 +90,14 @@ import {
 } from "./adminCharts";
 import { roleHasPermission } from "./rbac";
 import { ADMIN_DEV_EMAIL, ADMIN_HOST, CUSTOMER_HOST, KITCHEN_HOST } from "../shared/brand";
-import { DEMO_OWNERS, adminLoginDefaults } from "../shared/demo";
+import { DEMO_ADMIN, DEMO_OWNERS, adminLoginDefaults } from "../shared/demo";
+import { showDemoCredentials } from "../shared/env";
 import { AuthLoginHighlights } from "../components/AuthLoginHighlights";
 import { BrandAuthArt, BrandLogo } from "../components/BrandLogo";
 import { BrandNavMark } from "../components/BrandNavMark";
 import { PhoneField } from "../components/PhoneField";
 import { phoneInputValue, toE164, validateNationalPhone } from "../shared/validation";
-import { customerUrl, kitchenUrl } from "../shared/urls";
+import { apiDocsLinks, customerUrl, kitchenUrl } from "../shared/urls";
 import "../owner-app.css";
 
 type Tab =
@@ -332,6 +336,14 @@ export default function AdminApp() {
         </nav>
 
         <div className="admin-shell__foot">
+          <a
+            href={apiDocsLinks().swagger}
+            className="admin-app__ext-link"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            API docs
+          </a>
           <a href={customerUrl("/")} className="admin-app__ext-link" title={CUSTOMER_HOST} target="_blank" rel="noopener noreferrer">
             Customer app
           </a>
@@ -348,6 +360,14 @@ export default function AdminApp() {
               {me.name} · <strong>{me.role}</strong>
             </span>
           )}
+          <a
+            href={apiDocsLinks().swagger}
+            className="btn btn--ghost btn--sm"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            API docs
+          </a>
           <button
             type="button"
             className="btn btn--ghost btn--sm"
@@ -746,6 +766,26 @@ function AdminOverview({
                 : `${ADMIN_DEV_EMAIL} / admin123456`}
             </p>
             <p>Gateway API: <code>/api/v1/admin/*</code> · Port <code>13003</code> locally</p>
+            <p>
+              <strong>API docs:</strong>{" "}
+              <a href={apiDocsLinks().swagger} target="_blank" rel="noopener noreferrer">
+                Swagger
+              </a>
+              {" · "}
+              <a href={apiDocsLinks().redoc} target="_blank" rel="noopener noreferrer">
+                ReDoc
+              </a>
+              {" · "}
+              <a href={apiDocsLinks().portalExplorer} target="_blank" rel="noopener noreferrer">
+                Portal explorer
+              </a>
+            </p>
+            <p>
+              Login-required routes need{" "}
+              <code>Authorization: Bearer</code> after{" "}
+              <code>POST /api/v1/admin/auth/login</code> with the username/password on the
+              Sign in page (or Access above).
+            </p>
           </div>
         </section>
       </div>
@@ -758,7 +798,7 @@ function AdminLogin({ onSuccess }: { onSuccess: (token: string) => void }) {
   const [email, setEmail] = useState(defaults.email);
   const [password, setPassword] = useState(defaults.password);
   const [revealedPassword, setRevealedPassword] = useState<string | null>(
-    defaults.isProductionHost ? null : defaults.password || null,
+    showDemoCredentials() ? defaults.password || DEMO_ADMIN.password : null,
   );
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -782,6 +822,11 @@ function AdminLogin({ onSuccess }: { onSuccess: (token: string) => void }) {
       cancelled = true;
     };
   }, []);
+
+  const shownUsername = email || defaults.email;
+  const shownPassword =
+    revealedPassword || (showDemoCredentials() ? DEMO_ADMIN.password : null);
+  const docs = apiDocsLinks();
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();
@@ -819,15 +864,74 @@ function AdminLogin({ onSuccess }: { onSuccess: (token: string) => void }) {
           <p className="admin-login__eyebrow">Super admin</p>
           <h1>Sign in</h1>
           <p>Use the platform admin credentials for {ADMIN_HOST}.</p>
+          <div className="admin-login__creds" role="note">
+            <p className="admin-login__creds-title">Login</p>
+            <dl>
+              <div>
+                <dt>Username</dt>
+                <dd>
+                  <code>{shownUsername}</code>
+                </dd>
+              </div>
+              <div>
+                <dt>Password</dt>
+                <dd>
+                  {shownPassword ? (
+                    <code>{shownPassword}</code>
+                  ) : (
+                    <>
+                      From VM <code>ADMIN_PASSWORD</code>
+                    </>
+                  )}
+                </dd>
+              </div>
+            </dl>
+          </div>
+          <div className="admin-login__api-docs">
+            <p className="admin-login__creds-title">API docs</p>
+            <p>
+              <a href={docs.swagger} target="_blank" rel="noopener noreferrer">
+                Swagger {docs.swagger}
+              </a>
+            </p>
+            <p>
+              <a href={docs.redoc} target="_blank" rel="noopener noreferrer">
+                ReDoc
+              </a>
+              {" · "}
+              <a href={docs.portalExplorer} target="_blank" rel="noopener noreferrer">
+                Portal explorer
+              </a>
+              {" · "}
+              <a href={docs.openapiJson} target="_blank" rel="noopener noreferrer">
+                openapi.json
+              </a>
+            </p>
+            <p className="admin-login__api-docs-how">
+              Public routes (health, OpenAPI, discovery) need no token. Login-required
+              APIs: <code>POST /api/v1/admin/auth/login</code> with the username and
+              password above → copy <code>access_token</code> → Swagger{" "}
+              <strong>Authorize</strong> → paste the JWT (scheme adds{" "}
+              <code>Bearer</code>). Same header on curl:{" "}
+              <code>Authorization: Bearer &lt;token&gt;</code>. Owner/customer routes use
+              OTP, not this password.
+            </p>
+          </div>
           {error && <div className="auth-card__error">{error}</div>}
           <label>
-            Email
-            <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
+            Username
+            <input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+              autoComplete="username"
+            />
           </label>
           <label>
             Password
             <input
-              type={revealedPassword ? "text" : "password"}
+              type={shownPassword ? "text" : "password"}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
@@ -837,55 +941,13 @@ function AdminLogin({ onSuccess }: { onSuccess: (token: string) => void }) {
           <button type="submit" className="btn btn--primary btn--lg" disabled={busy}>
             {busy ? "Signing in..." : "Sign in"}
           </button>
-          <details className="auth-card__demo" open={!defaults.isProductionHost}>
-            <summary>Login credentials</summary>
-            <p className="auth-card__demo-otp">
-              {revealedPassword ? (
-                <>
-                  Email <code>{email || defaults.email}</code>
-                  {" · "}
-                  Password <code>{revealedPassword}</code>
-                  {defaults.isProductionHost ? (
-                    <>
-                      {" "}
-                      (from VM <code>ADMIN_PASSWORD</code> / GCE <code>admin-password</code>)
-                    </>
-                  ) : (
-                    <> (dev / seeded default)</>
-                  )}
-                </>
-              ) : defaults.isProductionHost ? (
-                <>
-                  Production: <code>admin@kitchcu.com</code> — password from VM{" "}
-                  <code>ADMIN_PASSWORD</code> (not the .dev account).
-                </>
-              ) : (
-                <>
-                  Dev: <code>{defaults.email}</code> / <code>{defaults.password}</code>
-                </>
-              )}
-            </p>
-            {!defaults.isProductionHost && revealedPassword ? (
-              <button
-                type="button"
-                className="btn btn--ghost btn--sm"
-                disabled={busy}
-                onClick={() => {
-                  setEmail(defaults.email);
-                  setPassword(revealedPassword);
-                }}
-              >
-                Fill demo credentials
-              </button>
-            ) : null}
-            <p className="auth-card__demo-note">
-              Owner demos: {DEMO_OWNERS.map((o) => o.phone).join(", ")} (OTP 123456)
-              {" · "}
-              <a href={kitchenUrl("/login")} target="_blank" rel="noopener noreferrer">
-                Owner app
-              </a>
-            </p>
-          </details>
+          <p className="auth-card__demo-note">
+            Owner demos: {DEMO_OWNERS.map((o) => o.phone).join(", ")} (OTP 123456)
+            {" · "}
+            <a href={kitchenUrl("/login")} target="_blank" rel="noopener noreferrer">
+              Owner app
+            </a>
+          </p>
         </form>
       </div>
     </div>
@@ -907,6 +969,7 @@ function AdminKitchens({
   const [loading, setLoading] = useState(true);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [kitchenOrders, setKitchenOrders] = useState<AdminOrder[]>([]);
+  const [kitchenParseStats, setKitchenParseStats] = useState<AdminParseStats | null>(null);
   const [detail, setDetail] = useState<AdminKitchenDetail | null>(null);
   const [wa, setWa] = useState<AdminKitchenWhatsApp | null>(null);
   const [pgw, setPgw] = useState<AdminKitchenPaymentGateway | null>(null);
@@ -1006,10 +1069,14 @@ function AdminKitchens({
       setGstProfile(null);
       setGstReport(null);
       setKitchenOrders([]);
+      setKitchenParseStats(null);
       setAssignPackageId(pkg?.package?.id ?? pkgs[0]?.id ?? "");
       void fetchAdminOrders(50, { kitchen_id: id })
         .then(setKitchenOrders)
         .catch(() => setKitchenOrders([]));
+      void fetchAdminKitchenParseStats(id)
+        .then(setKitchenParseStats)
+        .catch(() => setKitchenParseStats(null));
       setPgw(p);
       setModules(m);
       setPorterAutoBook(d.porter_auto_book_enabled !== false);
@@ -1411,6 +1478,9 @@ function AdminKitchens({
                       void fetchAdminOrders(50, { kitchen_id: selectedId })
                         .then(setKitchenOrders)
                         .catch(() => setKitchenOrders([]));
+                      void fetchAdminKitchenParseStats(selectedId)
+                        .then(setKitchenParseStats)
+                        .catch(() => setKitchenParseStats(null));
                     }
                     if (t === "gst" && selectedId) {
                       void (async () => {
@@ -1448,6 +1518,35 @@ function AdminKitchens({
                   Last {kitchenOrders.length} orders for this kitchen (platform read). Open Tickets /
                   Refunds tabs for care actions.
                 </p>
+                {kitchenParseStats && kitchenParseStats.lines_total > 0 && (
+                  <p className="report-hint">
+                    Parse match rate (30d): {kitchenParseStats.lines_matched} of{" "}
+                    {kitchenParseStats.lines_total} lines mapped
+                    {kitchenParseStats.match_rate != null
+                      ? ` (${Math.round(kitchenParseStats.match_rate * 100)}%)`
+                      : ""}
+                    {kitchenParseStats.drafts_with_unmatched > 0
+                      ? ` · ${kitchenParseStats.drafts_with_unmatched} drafts with unmatched lines`
+                      : ""}
+                  </p>
+                )}
+                <div className="kc-actions kc-actions--stack-sm">
+                  <button
+                    type="button"
+                    className="btn btn--ghost btn--sm"
+                    disabled={busy}
+                    onClick={() => {
+                      if (!selectedId) return;
+                      setBusy(true);
+                      setError("");
+                      void downloadAdminKitchenOrdersCsv(selectedId, detail?.code)
+                        .catch((e) => setError(e instanceof Error ? e.message : "CSV download failed"))
+                        .finally(() => setBusy(false));
+                    }}
+                  >
+                    Export CSV
+                  </button>
+                </div>
                 {kitchenOrders.length === 0 ? (
                   <p className="admin-panel__empty">No orders yet for this kitchen.</p>
                 ) : (

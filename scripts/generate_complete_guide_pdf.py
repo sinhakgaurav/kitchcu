@@ -778,10 +778,17 @@ def build() -> GuidePDF:
             ["Swagger UI", "gateway /docs", "Interactive explorer"],
             ["ReDoc", "gateway /redoc", "Read-only reference"],
             ["Portal explorer", "portal /openapi (+/api-docs)", "Same schema inside portal shell"],
-            ["Human index", "docs/API.md", "Auth cheat-sheet + quick-start examples"],
+            ["Human index", "docs/API.md", "Auth cheat-sheet + how to Authorize"],
+            ["Super Admin", "admin host Sign in", "Username/password + live doc links"],
         ],
         [35, 55, 80],
         size=7,
+    )
+    pdf.body(
+        "Login-required admin APIs: POST /api/v1/admin/auth/login with the username "
+        "and password printed on Super Admin Sign in, then Swagger Authorize with the "
+        "JWT (or Authorization: Bearer). Owner/customer routes use OTP, not that password. "
+        "See docs/API.md section 1.1. Production Swagger: https://api.kitchcu.com/docs."
     )
     pdf.body(
         "Route docs are mandatory, not auto-only: every route needs an explicit "

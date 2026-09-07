@@ -67,9 +67,9 @@ Follow `docs/DEPLOYMENT-GCP.md`. Confirm `*.kitchcu.com` health and same persona
 | S1 | Gateway `GET /health/live` and `/health/ready` | 200 | |
 | S2 | Kitchen login OTP → land on Overview / Orders | Hero shows kitchen name + code; inbox-first after login; no blank/black screen | |
 | S3 | Customer login OTP → home | Menu/discovery loads | |
-| S4 | Admin login → overview | Dashboard KPIs/panels load | |
+| S4 | Admin login → overview | Dashboard KPIs/panels load; Sign in card shows **username + password**; API docs links (Swagger / ReDoc / portal explorer) work | |
 | S5 | Portal home | Brand-first hero; no console crash | |
-| S6 | OpenAPI via gateway `/docs` or portal `/openapi` | Schema loads | |
+| S6 | OpenAPI via gateway `/docs` or portal `/openapi` | Schema loads; Swagger **Authorize** accepts admin JWT from `POST /admin/auth/login` | |
 
 **Fail any of S1–S4 → stop deep QA; fix infra first.**
 

@@ -363,6 +363,8 @@ export type Payment = {
   status: string;
   razorpay_order_id: string | null;
   razorpay_payment_id: string | null;
+  provider_mode?: "live" | "demo";
+  razorpay_key_id?: string | null;
   created_at: string;
 };
 
@@ -757,6 +759,20 @@ export async function fetchOrders(
   if (filters?.created_before) params.set("created_before", filters.created_before);
   const q = params.toString() ? `?${params.toString()}` : "";
   return apiFetch(`/api/v1/kitchens/${kitchenId}/orders${q}`);
+}
+
+export type ParseStats = {
+  kitchen_id: string;
+  days: number;
+  drafts: number;
+  lines_total: number;
+  lines_matched: number;
+  match_rate: number | null;
+  drafts_with_unmatched: number;
+};
+
+export async function fetchParseStats(kitchenId: string, days = 30): Promise<ParseStats> {
+  return apiFetch(`/api/v1/kitchens/${kitchenId}/orders/drafts/parse-stats?days=${days}`);
 }
 
 export async function fetchOrder(orderId: string): Promise<Order> {
@@ -1977,6 +1993,21 @@ async function downloadPdf(path: string, filename: string): Promise<void> {
 export function downloadOwnerOrderBillPdf(orderId: string, orderCode: string): Promise<void> {
   const safe = orderCode.replace(/[^\w.-]+/g, "_");
   return downloadPdf(`/api/v1/orders/${orderId}/bill.pdf`, `${safe}.pdf`);
+}
+
+export async function downloadOrdersCsv(
+  kitchenId: string,
+  kitchenCode: string,
+  filters?: { status?: string; source?: string; created_after?: string; created_before?: string },
+): Promise<void> {
+  const params = new URLSearchParams();
+  if (filters?.status) params.set("status", filters.status);
+  if (filters?.source) params.set("source", filters.source);
+  if (filters?.created_after) params.set("created_after", filters.created_after);
+  if (filters?.created_before) params.set("created_before", filters.created_before);
+  const q = params.toString() ? `?${params.toString()}` : "";
+  const safe = kitchenCode.replace(/[^\w.-]+/g, "_") || "kitchen";
+  return downloadPdf(`/api/v1/kitchens/${kitchenId}/orders/export.csv${q}`, `kitchcu-orders-${safe}.csv`);
 }
 
 export type CuratedRecipe = {

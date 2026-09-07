@@ -128,9 +128,9 @@ def build() -> GuidePDF:
             ["S1", "Gateway /health/live + /ready", "200"],
             ["S2", "Kitchen OTP login -> Overview", "Hero + kitchen; no blank screen"],
             ["S3", "Customer OTP login -> home", "Discovery/menu loads"],
-            ["S4", "Admin login -> overview", "Dashboard loads"],
+            ["S4", "Admin login -> overview", "Dashboard loads; username/password + API docs links visible"],
             ["S5", "Portal home", "Brand hero; no crash"],
-            ["S6", "Gateway /docs or portal /openapi", "Schema loads"],
+            ["S6", "Gateway /docs or portal /openapi", "Schema loads; Authorize with admin JWT"],
         ],
         widths=[18, 72, 80],
     )

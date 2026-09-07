@@ -856,6 +856,8 @@ Public clients only ever call the gateway. The gateway's `resolve_service_url()`
 
 Gateway-owned (not forwarded): `GET /`, `GET /health/live`, `GET /health/ready`, `GET /openapi.json` (aggregated via `services/gateway/app/openapi_aggregate.py`, cache-refreshable with `?refresh=true`), `GET /docs`, `GET /redoc`. The Portal's `/openapi` route (`apps/website/src/portal/OpenApiPage.tsx`) renders this same aggregated schema for non-technical browsing.
 
+**How to authorize login-required calls:** Super Admin Sign in prints username + password and links to Swagger (`/docs`). `POST /api/v1/admin/auth/login` → paste `access_token` in Swagger **Authorize**. Owner/customer APIs use OTP, not that password. Full steps: [`docs/API.md`](./API.md) §1.1.
+
 ---
 
 ## 14. Cross-References

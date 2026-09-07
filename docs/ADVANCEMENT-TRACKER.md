@@ -45,7 +45,7 @@ For **manual QA / release sign-off** see [QA-INSTRUCTION-PACK.md](./QA-INSTRUCTI
 | Delivery | Cost-share + Self/Porter modes; book on accept (P32/P32.1) |
 | Trust | Admin RBAC + audit · HTML sanitize · API-key mask · login-hint flag-gated |
 | Growth | Dual referral program + GST monthly Excel/PDF |
-| Open | Kitchen staff build · live Razorpay · Wave C/D |
+| Open | Kitchen staff build · tiffin recurring · Wave C/D |
 
 ---
 
@@ -103,6 +103,9 @@ For **manual QA / release sign-off** see [QA-INSTRUCTION-PACK.md](./QA-INSTRUCTI
 | P39 | **Super-admin ops console fill** | Kitchen Orders + Care/health strip; ticket triage (assignee/priority/resolution); customer order/ticket history; settlements under Refunds; deep-links | ✅ | Identity admin orders filters; notify ticket filters; `test_admin_ops_controls.py` |
 | P40 | **Platform i18n + security harden** | Location language gate; 184-key catalogs × 10 locales; owner/customer/portal chrome on `t()`; dish HTML sanitize; API keys never echo full value; `ADMIN_LOGIN_REVEAL_PASSWORD` only | ✅ | `docs/design/PLATFORM-I18N-DESIGN.md`; `scripts/check-i18n-locale-parity.py` |
 | P41 | **Audit gap close + live-capture-safe seed** | Owner kitchen profile PATCH (code immutable); owner dish list includes drafts; Ratings page; order filters/draft remap; settlements; payment-mix/compare; admin RBAC UI + 401 logout + stream summary (no publisher token); Super Admin links; weekly cron path `/opt/ckac`; GCP `bulk-seed.sh` | ✅ | Identity `023`; catalog `GET …/dishes`; `infra/gcp-vm/{bulk-seed.sh,weekly-seed.sh}` |
+| P42 | **Live Razorpay Checkout** | Billing live Orders API + signed capture · customer Checkout.js · kitchen/platform keys · webhook backup | 🟡 | Demo path unchanged without keys; Route transfers still pending in prod. Design `LIVE-RAZORPAY-CHECKOUT-DESIGN.md` |
+| P43 | **Order CSV + parse match-rate** | Owner `export.csv` + drafts parse-stats; admin kitchen Orders CSV/stats; first-party (no Meta/Razorpay) | ✅ | Design `ORDER-CSV-AND-PARSE-STATS-DESIGN.md`; cap 10k rows |
+| P44 | **Admin API docs + login creds** | Super Admin Sign in shows username/password + Swagger/ReDoc/portal links; how-to Authorize in `API.md` §1.1 | ✅ | Admin login / sidebar / overview |
 
 ---
 
@@ -139,7 +142,7 @@ Run `.\scripts\seed-all.ps1` (or GCP `run-seed=1`) after migrations.
 | Learning trials / community | extras (`cover_url` on community recipe) | ✅ |
 | Tiffin plans (thali / single_dish / combo) | `ensure_tiffin_plans` | ✅ |
 | Weekly QA cohort (5 owners · 10 customers · 10 orders/kitchen · marketing rotation · growth) | `scripts/weekly_test_data.py` via `kitchcu-weekly-seed.timer` | ✅ |
-| GCP bulk seeder (30 kitchens · full extras · live-capture-safe) | `infra/gcp-vm/bulk-seed.sh` → `scripts/seed-bulk-data.py` · `kitchcu-bulk-seed.service` | ✅ |
+| GCP bulk seeder (30 kitchens across 15 cities · 3 customers/city · live-capture-safe) | `infra/gcp-vm/bulk-seed.sh` → `scripts/seed-bulk-data.py` · `kitchcu-bulk-seed.service` | ✅ |
 
 ### Weekly QA cohort
 
@@ -159,7 +162,7 @@ week reuses the accounts and only tops orders up. Current cohort is written to
 
 | Wave | Item | Doc |
 |------|------|-----|
-| **A (trust)** | ✅ RBAC+tabs+hard entitlements · ✅ audit · ✅ prod OTP WhatsApp path · ⏳ live Razorpay Checkout | [PLATFORM-SOLUTION-BLUEPRINT.md](./PLATFORM-SOLUTION-BLUEPRINT.md) E3 |
+| **A (trust)** | ✅ RBAC+tabs+hard entitlements · ✅ audit · ✅ prod OTP WhatsApp path · 🟡 live Razorpay Checkout (signed capture; Route transfers pending) | [LIVE-RAZORPAY-CHECKOUT-DESIGN.md](./design/LIVE-RAZORPAY-CHECKOUT-DESIGN.md) |
 | **B (promises)** | ✅ Templates/Watch/Porter cost-share · ✅ Porter webhooks · ⏳ kitchen staff **build** (design pack ✅) | [KITCHEN-STAFF-RBAC-DESIGN.md](./design/KITCHEN-STAFF-RBAC-DESIGN.md) |
 | **C (design)** | E1–E2 Kitchen Quality Loop | [E1-E2-KITCHEN-QUALITY-LOOP-DESIGN.md](./E1-E2-KITCHEN-QUALITY-LOOP-DESIGN.md) |
 | **D (scale)** | Cloud Run architecture · OTel · load SLOs | [DEPLOYMENT-GCP.md](./DEPLOYMENT-GCP.md) §1–10 |
@@ -181,7 +184,7 @@ Both must exit 0 before calling a UI surface “done.”
 
 - [x] Admin login uses `admin@kitchcu.com` on production hosts (UI + env sync)
 - [x] Seed covers integrations, branded page, dish showcase
-- [x] Advancement tracker maintained (P19–P41)
+- [x] Advancement tracker maintained (P19–P44)
 - [x] Migrations ready: identity `013`–`023`, order `007`–`010`, billing `008`–`010`, marketing `002`–`003`
 - [ ] Deploy: push `main` → GCP VM redeploy → smoke admin tabs + Packages + Templates send + Watch live + checkout Self/Porter modes
 - [ ] Confirm `ADMIN_PASSWORD` in GCE metadata matches what operators use

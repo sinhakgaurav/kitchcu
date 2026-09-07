@@ -10,6 +10,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models import OwnerSubscription, Payment, Settlement
 from ckac_common.auth import stream_key
 from ckac_common.event_bus import EventPublisher
+from app.razorpay_checkout import (
+    checkout_provider_mode,
+    create_razorpay_order,
+    resolve_razorpay_checkout_creds,
+    verify_checkout_signature,
+)
 from ckac_common.platform_config import (
     is_dev_provider_id,
     is_non_production,
@@ -71,13 +77,29 @@ class PaymentResponse(BaseModel):
         description="Lifecycle status.",
         examples=["created", "pending", "authorized", "captured", "partially_refunded", "failed", "refunded"],
     )
-    razorpay_order_id: str | None = Field(default=None, description="Razorpay order reference (dev-mocked).")
+    razorpay_order_id: str | None = Field(default=None, description="Razorpay order reference (live or order_dev_*).")
     razorpay_payment_id: str | None = Field(
-        default=None, description="Razorpay payment reference, set once captured (dev-mocked)."
+        default=None, description="Razorpay payment reference, set once captured."
+    )
+    provider_mode: Literal["live", "demo"] = Field(
+        default="demo",
+        description="`live` opens Razorpay Checkout; `demo` is local/GCP mock capture.",
+    )
+    razorpay_key_id: str | None = Field(
+        default=None,
+        description="Public Razorpay key_id for Checkout.js. Never the secret.",
     )
     created_at: datetime = Field(..., description="Payment creation timestamp.")
 
     model_config = {"from_attributes": True}
+
+
+class PaymentCaptureRequest(BaseModel):
+    """Optional Razorpay Checkout handler payload. Required when `provider_mode=live`."""
+
+    razorpay_payment_id: str | None = Field(default=None, max_length=100)
+    razorpay_order_id: str | None = Field(default=None, max_length=100)
+    razorpay_signature: str | None = Field(default=None, max_length=256)
 
 
 class SettlementResponse(BaseModel):
@@ -196,7 +218,8 @@ async def _get_kitchen_code(session: AsyncSession, kitchen_id: uuid.UUID) -> str
     return code
 
 
-def payment_to_response(payment: Payment) -> PaymentResponse:
+def payment_to_response(payment: Payment, *, razorpay_key_id: str | None = None) -> PaymentResponse:
+    mode = checkout_provider_mode(payment.razorpay_order_id)
     return PaymentResponse(
         id=payment.id,
         order_id=payment.order_id,
@@ -208,8 +231,43 @@ def payment_to_response(payment: Payment) -> PaymentResponse:
         status=payment.status,
         razorpay_order_id=payment.razorpay_order_id,
         razorpay_payment_id=payment.razorpay_payment_id,
+        provider_mode=mode,  # type: ignore[arg-type]
+        razorpay_key_id=razorpay_key_id if mode == "live" else None,
         created_at=payment.created_at,
     )
+
+
+async def payment_to_checkout_response(session: AsyncSession, payment: Payment) -> PaymentResponse:
+    key_id = None
+    if checkout_provider_mode(payment.razorpay_order_id) == "live":
+        creds = await resolve_razorpay_checkout_creds(session, payment.kitchen_id)
+        key_id = creds[0] if creds else None
+    return payment_to_response(payment, razorpay_key_id=key_id)
+
+
+async def attach_razorpay_order(
+    session: AsyncSession,
+    payment: Payment,
+    *,
+    notes: dict,
+) -> str:
+    """Create a live Razorpay order when keys exist; otherwise mock in non-prod."""
+    creds = await resolve_razorpay_checkout_creds(session, payment.kitchen_id)
+    if creds:
+        key_id, secret = creds
+        payment.razorpay_order_id = await create_razorpay_order(
+            key_id=key_id,
+            key_secret=secret,
+            amount=float(payment.amount),
+            receipt=str(payment.id).replace("-", "")[:40],
+            notes=notes,
+        )
+        await session.flush()
+        return "live"
+    require_dev_payment_mocks("Payment create")
+    payment.razorpay_order_id = _mock_razorpay_order_id(payment.id)
+    await session.flush()
+    return "demo"
 
 
 def subscription_to_response(sub: OwnerSubscription) -> SubscriptionResponse:
@@ -382,9 +440,14 @@ async def create_master_payment(
     )
     session.add(payment)
     await session.flush()
-    require_dev_payment_mocks("Master payment create")
-    payment.razorpay_order_id = _mock_razorpay_order_id(payment.id)
-    await session.flush()
+    provider_mode = await attach_razorpay_order(
+        session,
+        payment,
+        notes={
+            "master_order_id": str(master_order["id"]),
+            "kind": "master",
+        },
+    )
 
     if publisher:
         event = EventPublisher.build(
@@ -397,7 +460,7 @@ async def create_master_payment(
                 "master_order_id": str(master_order["id"]),
                 "amount": float(payment.amount),
                 "method": method,
-                "provider_mode": "dev_mock",
+                "provider_mode": provider_mode,
             },
         )
         await publisher.publish(stream_key("billing", "payment"), event, session=session)
@@ -409,6 +472,11 @@ async def capture_master_payment(
     session: AsyncSession,
     payment: Payment,
     publisher: EventPublisher | None,
+    *,
+    razorpay_payment_id: str | None = None,
+    razorpay_order_id: str | None = None,
+    razorpay_signature: str | None = None,
+    from_webhook: bool = False,
 ) -> tuple[Payment, list[Settlement]]:
     if not payment.master_order_id:
         raise ValueError("Not a master order payment")
@@ -461,9 +529,15 @@ async def capture_master_payment(
             }
         )
 
-    if is_dev_provider_id(payment.razorpay_payment_id):
-        require_dev_payment_mocks("Master payment capture")
-        payment.razorpay_payment_id = payment.razorpay_payment_id or f"pay_dev_{payment.id.hex[:16]}"
+    await _apply_capture_provider(
+        session,
+        payment,
+        razorpay_payment_id=razorpay_payment_id,
+        razorpay_order_id=razorpay_order_id,
+        razorpay_signature=razorpay_signature,
+        action="Master payment capture",
+        from_webhook=from_webhook,
+    )
     payment.status = "captured"
     payment.updated_at = datetime.now(UTC)
     await session.flush()
@@ -550,9 +624,14 @@ async def create_payment(
     )
     session.add(payment)
     await session.flush()
-    require_dev_payment_mocks("Payment create")
-    payment.razorpay_order_id = _mock_razorpay_order_id(payment.id)
-    await session.flush()
+    provider_mode = await attach_razorpay_order(
+        session,
+        payment,
+        notes={
+            "order_id": str(order["id"]),
+            "kitchen_id": str(order["kitchen_id"]),
+        },
+    )
 
     if publisher:
         event = EventPublisher.build(
@@ -566,7 +645,7 @@ async def create_payment(
                 "kitchen_id": str(order["kitchen_id"]),
                 "amount": float(payment.amount),
                 "method": method,
-                "provider_mode": "dev_mock",
+                "provider_mode": provider_mode,
             },
         )
         await publisher.publish(stream_key("billing", "payment"), event, session=session)
@@ -589,19 +668,65 @@ async def create_upi_intent(
     return payment, upi_uri
 
 
+async def _apply_capture_provider(
+    session: AsyncSession,
+    payment: Payment,
+    *,
+    razorpay_payment_id: str | None,
+    razorpay_order_id: str | None,
+    razorpay_signature: str | None,
+    action: str,
+    from_webhook: bool = False,
+) -> None:
+    live = checkout_provider_mode(payment.razorpay_order_id) == "live"
+    if live:
+        if from_webhook:
+            if not payment.razorpay_payment_id and not razorpay_payment_id:
+                raise ValueError("Webhook capture missing Razorpay payment id")
+            if razorpay_payment_id:
+                payment.razorpay_payment_id = razorpay_payment_id
+            return
+        if not razorpay_payment_id or not razorpay_signature:
+            raise ValueError("Live payment requires Razorpay checkout signature")
+        if razorpay_order_id and payment.razorpay_order_id and razorpay_order_id != payment.razorpay_order_id:
+            raise ValueError("Razorpay order id does not match this payment")
+        creds = await resolve_razorpay_checkout_creds(session, payment.kitchen_id)
+        if not creds:
+            raise ValueError("Live Razorpay credentials are not configured")
+        order_ref = payment.razorpay_order_id or razorpay_order_id or ""
+        if not verify_checkout_signature(order_ref, razorpay_payment_id, razorpay_signature, creds[1]):
+            raise ValueError("Invalid Razorpay checkout signature")
+        payment.razorpay_payment_id = razorpay_payment_id
+        return
+    if is_dev_provider_id(payment.razorpay_payment_id):
+        require_dev_payment_mocks(action)
+        payment.razorpay_payment_id = payment.razorpay_payment_id or f"pay_dev_{payment.id.hex[:16]}"
+
+
 async def capture_payment(
     session: AsyncSession,
     payment: Payment,
     publisher: EventPublisher | None,
+    *,
+    razorpay_payment_id: str | None = None,
+    razorpay_order_id: str | None = None,
+    razorpay_signature: str | None = None,
+    from_webhook: bool = False,
 ) -> Payment:
     if payment.status == "captured":
         return payment
     if payment.status not in ("created", "pending", "authorized"):
         raise ValueError(f"Cannot capture payment in status {payment.status}")
 
-    if is_dev_provider_id(payment.razorpay_payment_id):
-        require_dev_payment_mocks("Payment capture")
-        payment.razorpay_payment_id = payment.razorpay_payment_id or f"pay_dev_{payment.id.hex[:16]}"
+    await _apply_capture_provider(
+        session,
+        payment,
+        razorpay_payment_id=razorpay_payment_id,
+        razorpay_order_id=razorpay_order_id,
+        razorpay_signature=razorpay_signature,
+        action="Payment capture",
+        from_webhook=from_webhook,
+    )
     payment.status = "captured"
     payment.updated_at = datetime.now(UTC)
     await session.flush()

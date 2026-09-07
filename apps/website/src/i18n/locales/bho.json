@@ -37,7 +37,8 @@
     "adminCredentialsHost": "Open the console on {{host}}.",
     "adminCredentialsProd": "Email {{email}} — password from the VM ADMIN_PASSWORD secret, not this page",
     "adminCredentialsTitle": "Super admin credentials",
-    "adminOpenConsole": "Open Super Admin"
+    "adminOpenConsole": "Open Super Admin",
+    "adminCredentialsRevealed": "Email {{email}} · Password {{password}}"
   },
   "status": {
     "received": "मिलल",

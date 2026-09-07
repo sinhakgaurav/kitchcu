@@ -406,7 +406,9 @@ def build() -> GuidePDF:
     pdf.body(
         "Gateway-owned (not forwarded): GET /, /health/live, /health/ready, "
         "/openapi.json (aggregated, ?refresh=true), /docs, /redoc. Portal /openapi "
-        "renders this same aggregated schema for non-technical browsing."
+        "renders this same aggregated schema for non-technical browsing. "
+        "Login-required admin calls: Super Admin Sign in shows username/password; "
+        "POST /admin/auth/login then Swagger Authorize (API.md 1.1). Owner/customer use OTP."
     )
 
     pdf.chapter("Cross-References")

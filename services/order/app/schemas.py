@@ -31,6 +31,14 @@ from sqlalchemy import func, or_, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import MasterOrder, Order, OrderItem, OrderStatusEvent, can_transition
+from app.exports import (
+    EXPORT_MAX_ROWS,
+    PARSE_STATS_DEFAULT_DAYS,
+    PARSE_STATS_MAX_DAYS,
+    compute_parse_stats,
+    format_order_items,
+    render_orders_csv,
+)
 from ckac_common.auth import stream_key
 from ckac_common.event_bus import EventPublisher
 from ckac_common.validators import normalize_display_name, normalize_optional_india_phone
@@ -1357,6 +1365,7 @@ async def list_kitchen_orders(
     source: str | None = None,
     created_after: datetime | None = None,
     created_before: datetime | None = None,
+    limit: int | None = None,
 ) -> list[Order]:
     query = select(Order).where(Order.kitchen_id == kitchen_id)
     if status:
@@ -1368,8 +1377,109 @@ async def list_kitchen_orders(
     if created_before:
         query = query.where(Order.created_at <= created_before)
     query = query.order_by(Order.created_at.desc())
+    if limit is not None:
+        query = query.limit(limit)
     result = await session.execute(query)
     return list(result.scalars().all())
+
+
+async def export_kitchen_orders_csv(
+    session: AsyncSession,
+    kitchen_id: uuid.UUID,
+    *,
+    status: str | None = None,
+    source: str | None = None,
+    created_after: datetime | None = None,
+    created_before: datetime | None = None,
+) -> bytes:
+    orders = await list_kitchen_orders(
+        session,
+        kitchen_id,
+        status=status,
+        source=source,
+        created_after=created_after,
+        created_before=created_before,
+        limit=EXPORT_MAX_ROWS + 1,
+    )
+    if len(orders) > EXPORT_MAX_ROWS:
+        raise ValueError(
+            f"Export is capped at {EXPORT_MAX_ROWS} orders. Narrow the date range and try again."
+        )
+    items_by_order: dict[uuid.UUID, list[OrderItem]] = {order.id: [] for order in orders}
+    if orders:
+        items_result = await session.execute(
+            select(OrderItem).where(OrderItem.order_id.in_([order.id for order in orders]))
+        )
+        for item in items_result.scalars().all():
+            items_by_order.setdefault(item.order_id, []).append(item)
+    rows = []
+    for order in orders:
+        items = items_by_order.get(order.id, [])
+        rows.append(
+            {
+                "order_code": order.order_code,
+                "created_at": order.created_at.isoformat() if order.created_at else "",
+                "status": order.status,
+                "source": order.source,
+                "customer_name": order.customer_name or "",
+                "customer_phone": order.customer_phone or "",
+                "items": format_order_items(
+                    [{"quantity": i.quantity, "dish_name": i.dish_name} for i in items]
+                ),
+                "subtotal": f"{float(order.subtotal):.2f}",
+                "delivery_fee": f"{float(order.delivery_fee):.2f}",
+                "discount_amount": f"{float(getattr(order, 'discount_amount', 0) or 0):.2f}",
+                "total": f"{float(order.total):.2f}",
+                "payment_method": order.payment_method,
+                "delivery_type": order.delivery_type,
+            }
+        )
+    return render_orders_csv(rows)
+
+
+class ParseStatsResponse(BaseModel):
+    """Kitchen WhatsApp/paste parse quality over a rolling window (F01)."""
+
+    kitchen_id: uuid.UUID
+    days: int
+    drafts: int = Field(..., description="Drafts (pending + confirmed) in the window.")
+    lines_total: int
+    lines_matched: int
+    match_rate: float | None = Field(
+        default=None,
+        description="Matched parsed lines / total parsed lines. Null when no lines.",
+    )
+    drafts_with_unmatched: int
+
+
+async def kitchen_parse_stats(
+    session: AsyncSession,
+    kitchen_id: uuid.UUID,
+    *,
+    days: int = PARSE_STATS_DEFAULT_DAYS,
+) -> ParseStatsResponse:
+    from app.models import OrderDraft
+
+    window_days = max(1, min(days, PARSE_STATS_MAX_DAYS))
+    since = datetime.now(UTC) - timedelta(days=window_days)
+    result = await session.execute(
+        select(OrderDraft).where(
+            OrderDraft.kitchen_id == kitchen_id,
+            OrderDraft.created_at >= since,
+        )
+    )
+    drafts = list(result.scalars().all())
+    stats = compute_parse_stats(
+        (
+            {
+                "parsed_items": draft.parsed_items or [],
+                "unmatched_lines": draft.unmatched_lines or [],
+            }
+            for draft in drafts
+        ),
+        days=window_days,
+    )
+    return ParseStatsResponse(kitchen_id=kitchen_id, **stats)
 
 
 class DraftItemUpdate(BaseModel):

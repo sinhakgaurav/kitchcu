@@ -88,6 +88,22 @@ Locally: `python scripts/seed-bulk-data.py` or `.\scripts\seed-bulk-data.ps1`. C
 
 **Never commit production passwords or live API secrets to git.**
 
+### 2.3 How to hit the API (docs + login-required routes)
+
+| Docs | Local | Production |
+|------|-------|------------|
+| Swagger | http://localhost:18000/docs | https://api.kitchcu.com/docs |
+| ReDoc | http://localhost:18000/redoc | https://api.kitchcu.com/redoc |
+| Portal explorer | http://localhost:13000/openapi | https://kitchcu.com/openapi |
+| Super Admin (shows username/password + these links) | http://localhost:13003 | https://admin.kitchcu.com |
+
+1. Open Super Admin — username and password are printed on the Sign in card (and prefilled locally).
+2. `POST /api/v1/admin/auth/login` with that email + password → `access_token`.
+3. Swagger **Authorize** → paste the JWT. Or `Authorization: Bearer <token>` on curl.
+4. Owner/customer routes use OTP (`123456` in demo), not the admin password.
+
+Full cheat-sheet: [`API.md`](./API.md) §1.1.
+
 ---
 
 ## 3. Cities presence

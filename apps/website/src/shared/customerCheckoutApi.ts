@@ -2,6 +2,7 @@
 
 import type { MasterOrder, MasterPaymentCapture, Order, Payment, UpiIntent } from "./api";
 import { getCustomerToken } from "./customerApi";
+import type { RazorpayCheckoutResult } from "./razorpayCheckout";
 
 async function checkoutFetch<T>(path: string, init?: RequestInit): Promise<T> {
   const token = getCustomerToken();
@@ -96,9 +97,13 @@ export async function createMasterPayment(
   });
 }
 
-export async function captureMasterPayment(paymentId: string): Promise<MasterPaymentCapture> {
+export async function captureMasterPayment(
+  paymentId: string,
+  checkout?: RazorpayCheckoutResult,
+): Promise<MasterPaymentCapture> {
   return checkoutFetch(`/api/v1/billing/payments/customer/master/${paymentId}/capture`, {
     method: "POST",
+    body: JSON.stringify(checkout ?? {}),
   });
 }
 
@@ -137,9 +142,13 @@ export async function createCustomerUpiIntent(orderId: string): Promise<UpiInten
   });
 }
 
-export async function captureCustomerPayment(paymentId: string): Promise<Payment> {
+export async function captureCustomerPayment(
+  paymentId: string,
+  checkout?: RazorpayCheckoutResult,
+): Promise<Payment> {
   return checkoutFetch(`/api/v1/billing/payments/customer/${paymentId}/capture`, {
     method: "POST",
+    body: JSON.stringify(checkout ?? {}),
   });
 }
 

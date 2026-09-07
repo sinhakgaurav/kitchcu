@@ -425,7 +425,7 @@ Status tags: ✅ Done well · 🟡 Partial · 🔴 Gap / not built · 📋 Desig
 |---|----------|--------------|------|--------|
 | 1 | Enforce admin RBAC + tab filter + audit | CEO trust / hire | A | ✅ (+ billing audit) |
 | 2 | Hard package entitlements + owner nav | CEO monetization | A | ✅ |
-| 3 | Live Razorpay + prod OTP posture | CEO / CTO | A | ⏳ |
+| 3 | Live Razorpay + prod OTP posture | CEO / CTO | A | 🟡 Checkout signed capture; Route + UPI QR follow |
 | 4 | Template send pipeline | CPO honesty | B | ✅ send + fan-out + wallet + Meta client |
 | 5 | Customer Watch + LiveKit embed | CPO honesty | B | ✅ |
 | 6 | Kitchen staff design→build | CEO TAM | B/C | ⏳ |

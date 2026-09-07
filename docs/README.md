@@ -69,7 +69,7 @@ python scripts/generate_qa_instruction_pdf.py
 - **Model:** Subscription SaaS, zero food commission
 - **Positioning:** India's first — and the world's third — platform with this feature stack
 - **Brand:** **Kitchcu** (internal repo/schemas retain `ckac_*` identifiers)
-- **API:** Aggregated OpenAPI at gateway `/openapi.json` / `/docs` / `/redoc`, portal `/openapi` (`/api-docs`) — see [`API.md`](./API.md)
+- **API:** Aggregated OpenAPI at gateway `/openapi.json` / `/docs` / `/redoc`, portal `/openapi` (`/api-docs`) — see [`API.md`](./API.md) §1.1 (how to Authorize). Super Admin Sign in shows username/password + the same doc links.
 - **Next design:** [E1–E2 Kitchen Quality Loop](./E1-E2-KITCHEN-QUALITY-LOOP-DESIGN.md)
 - **UI screenshots:** [`docs/assets/ui/`](./assets/ui/) — Complete Guide §18 (8 surfaces) + Pitch / Userflows PDF figures
 - **PDF layout (v3.2):** `scripts/pdf_guide.py` — top margin clears running header; captions above figures; part-band body starts at y=46 (no header overlap)

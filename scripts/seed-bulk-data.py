@@ -1,13 +1,12 @@
 #!/usr/bin/env python3
 """Seed a large demo dataset for full UI / report verification.
 
-Creates multiple owners, many kitchens (nearby search), dishes (all categories),
-orders (all statuses), and WhatsApp drafts. Idempotent — skips existing
-kitchens/dishes by name and adds orders/drafts until each target is reached.
+Creates owners, kitchens in every presence city (Pune → Kolkata), city
+customers with home addresses, dishes, orders, and WhatsApp drafts.
 
 Usage:
   python scripts/seed-bulk-data.py
-  CKAC_BULK_KITCHENS=30 CKAC_BULK_FULL=1 python scripts/seed-bulk-data.py
+  CKAC_BULK_KITCHENS=30 CKAC_BULK_CUSTOMERS_PER_CITY=3 python scripts/seed-bulk-data.py
   CKAC_BULK_ORDERS=300 python scripts/seed-bulk-data.py
   $env:CKAC_BULK_OWNERS=5; .\\scripts\\seed-bulk-data.ps1
 
@@ -34,9 +33,11 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from bulk_demo_data import (  # noqa: E402
     CUSTOMER_NAMES,
     EXTRA_OWNERS,
+    SEED_CITIES,
     STATUS_CHAINS,
     WHATSAPP_MESSAGES,
     captured_at,
+    city_customer_specs,
     enriched_dishes,
     order_status_plan,
     owner_kitchen_specs,
@@ -48,8 +49,8 @@ from seed_common import (  # noqa: E402
     dish_create_payload,
     ensure_dish_recipes,
     ensure_ingredients,
+    login_customer,
     login_owner,
-    log,
     request,
     resolve_postgres_container,
     wait_for_gateway,
@@ -79,6 +80,7 @@ BULK_ORDERS_PER_KITCHEN = env_int("CKAC_BULK_ORDERS_PER_KITCHEN", 40)
 BULK_DRAFTS_PER_KITCHEN = env_int("CKAC_BULK_DRAFTS_PER_KITCHEN", 5)
 BULK_DISHES_PER_KITCHEN = env_int("CKAC_BULK_DISHES_PER_KITCHEN", 6, minimum=1)
 BACKDATE_DAYS = env_int("CKAC_BULK_BACKDATE_DAYS", 30)
+BULK_CUSTOMERS_PER_CITY = env_int("CKAC_BULK_CUSTOMERS_PER_CITY", 3, minimum=0)
 BULK_FULL = os.environ.get("CKAC_BULK_FULL", "1").strip().lower() not in ("0", "false", "no")
 
 random.seed(42)
@@ -221,7 +223,14 @@ def advance_order(token: str, order_id: str, chain_key: str) -> None:
         request("PATCH", f"/api/v1/orders/{order_id}/status", body, token=token)
 
 
-def ensure_orders(token: str, kitchen_id: str, dish_ids: dict[str, str], target: int) -> int:
+def ensure_orders(
+    token: str,
+    kitchen_id: str,
+    dish_ids: dict[str, str],
+    target: int,
+    *,
+    city_customers: list[dict] | None = None,
+) -> int:
     if not dish_ids:
         log("  ! No dishes — skipping orders")
         return 0
@@ -237,23 +246,25 @@ def ensure_orders(token: str, kitchen_id: str, dish_ids: dict[str, str], target:
     rng = random.Random(42)
     created = 0
 
-    # Build a repeat-customer pool so retention analytics (repeat rate, VIPs,
-    # churn/win-back) reflect real cloud-kitchen behaviour instead of every
-    # order being an anonymous one-off. A few customers order frequently
-    # (Pareto), most order a handful of times, ~15% stay anonymous.
+    # Prefer real city diners so CRM / nearby / order history match the kitchen city.
+    located = [(c["name"], c["phone_e164"]) for c in (city_customers or []) if c.get("phone_e164")]
     pool_size = max(8, need // 6)
-    customer_pool = [
-        (rng.choice(CUSTOMER_NAMES), f"+9198{rng.randint(10000000, 99999999)}")
-        for _ in range(pool_size)
-    ]
-    pool_weights = [pool_size - idx for idx in range(pool_size)]
+    if located:
+        customer_pool = located
+        pool_weights = [max(1, len(located) - idx) for idx in range(len(located))]
+    else:
+        customer_pool = [
+            (rng.choice(CUSTOMER_NAMES), f"+9198{rng.randint(10000000, 99999999)}")
+            for _ in range(pool_size)
+        ]
+        pool_weights = [pool_size - idx for idx in range(pool_size)]
 
     log(f"  Creating {need} orders (current {current}, target {target})...")
     for i, chain_key in enumerate(plan):
         delivery = "delivery" if chain_key in ("out_for_delivery", "delivered_delivery") or rng.random() < 0.45 else "pickup"
         payment = rng.choice(["cod", "upi", "online"])
         delivery_fee = 40.0 if delivery == "delivery" else 0.0
-        if rng.random() < 0.15:
+        if rng.random() < 0.15 and not located:
             cust_name, cust_phone = rng.choice(CUSTOMER_NAMES), None
         else:
             cust_name, cust_phone = rng.choices(customer_pool, weights=pool_weights, k=1)[0]
@@ -365,16 +376,17 @@ def ensure_kitchen_complete(
     orders_target: int,
     drafts_target: int,
     with_modules: bool = True,
+    city_customers: list[dict] | None = None,
 ) -> dict[str, str]:
     """Full menu + pantry + recipes + orders + drafts + per-kitchen integrations."""
     kid = kitchen["id"]
-    log(f"  [{kitchen['code']}] {kitchen['name']}")
+    log(f"  [{kitchen['code']}] {kitchen['name']} ({kitchen.get('city', '')})")
     dish_ids = ensure_dishes(token, kid, dishes)
     log(f"    menu: {len(dish_ids)} dishes")
     ingredient_ids = ensure_ingredients(token, kid, DEMO_PANTRY)
     ensure_dish_recipes(token, kid, dish_ids, DISH_RECIPES, ingredient_ids, DISH_PREP_STEPS)
     log(f"    pantry: {len(ingredient_ids)} ingredients, recipes on {len(DISH_RECIPES)} dishes")
-    ensure_orders(token, kid, dish_ids, orders_target)
+    ensure_orders(token, kid, dish_ids, orders_target, city_customers=city_customers)
     ensure_drafts(token, kid, drafts_target)
     backdate_orders(kid)
     if with_modules:
@@ -390,6 +402,119 @@ def ensure_kitchen_complete(
     return dish_ids
 
 
+def _cities_for_customer_seed(kitchen_specs: list[dict]) -> list[dict]:
+    """All presence cities on a full run; only kitchens in this run on smoke."""
+    if BULK_FULL or BULK_KITCHENS >= len(SEED_CITIES):
+        return list(SEED_CITIES)
+    used = {s["city"] for s in kitchen_specs}
+    return [c for c in SEED_CITIES if c["name"] in used]
+
+
+def ensure_located_customers(cities: list[dict]) -> dict[str, list[dict]]:
+    """WhatsApp-login diners with a home address in each city."""
+    by_city: dict[str, list[dict]] = {c["name"]: [] for c in cities}
+    if BULK_CUSTOMERS_PER_CITY <= 0 or not cities:
+        return by_city
+    specs = city_customer_specs(BULK_CUSTOMERS_PER_CITY, cities=cities)
+    log(f"City customers: {len(specs)} across {len(cities)} location(s) (OTP {DEMO_OTP})")
+    for spec in specs:
+        try:
+            token = login_customer(spec["phone_e164"], DEMO_OTP)
+        except ApiError as exc:
+            log(f"  ! customer {spec['phone']}: {exc}")
+            continue
+        try:
+            request(
+                "PATCH",
+                "/api/v1/customers/me",
+                {"name": spec["name"], "email": f"{spec['phone']}@kitchcu.dev"},
+                token=token,
+            )
+        except ApiError as exc:
+            log(f"  ! profile {spec['phone']}: {exc}")
+        try:
+            existing = request("GET", "/api/v1/customers/me/addresses", token=token)
+            already = any(
+                str(a.get("city", "")).lower() == spec["city"].lower() for a in (existing or [])
+            )
+            if not already:
+                request(
+                    "POST",
+                    "/api/v1/customers/me/addresses",
+                    {
+                        "label": "Home",
+                        "address_line": spec["address_line"],
+                        "city": spec["city"],
+                        "state": spec["state"],
+                        "pincode": spec["pincode"],
+                        "latitude": spec["latitude"],
+                        "longitude": spec["longitude"],
+                        "is_default": True,
+                    },
+                    token=token,
+                )
+        except ApiError as exc:
+            # Feature flag off or validation — diner still logs in for nearby.
+            log(f"  ! address {spec['phone']}: {exc}")
+        by_city.setdefault(spec["city"], []).append({**spec, "token": token})
+    for city_name, diners in by_city.items():
+        phones = ", ".join(d["phone"] for d in diners) or "(none)"
+        log(f"  {city_name}: {phones}")
+    return by_city
+
+
+def ensure_city_customer_orders(
+    customers_by_city: dict[str, list[dict]],
+    kitchens: list[dict],
+    dish_ids_by_kitchen: dict[str, dict[str, str]],
+    owner_token: str,
+) -> int:
+    """One customer-PWA order per diner at a kitchen in their city."""
+    kitchens_by_city: dict[str, list[dict]] = {}
+    for k in kitchens:
+        kitchens_by_city.setdefault(str(k.get("city") or ""), []).append(k)
+    created = 0
+    for city, diners in customers_by_city.items():
+        city_kitchens = kitchens_by_city.get(city) or []
+        if not city_kitchens or not diners:
+            continue
+        kitchen = city_kitchens[0]
+        dish_ids = dish_ids_by_kitchen.get(kitchen["id"]) or {}
+        if not dish_ids:
+            continue
+        names = list(dish_ids.keys())[:6]
+        for idx, diner in enumerate(diners):
+            token = diner.get("token")
+            if not token:
+                continue
+            dish_name = names[idx % len(names)]
+            payload = {
+                "items": [{"dish_id": dish_ids[dish_name], "quantity": 1}],
+                "delivery_type": "pickup",
+                "payment_method": "cod",
+            }
+            try:
+                order = request(
+                    "POST",
+                    f"/api/v1/kitchens/{kitchen['id']}/orders/customer",
+                    payload,
+                    token=token,
+                )
+                for status in ("accepted", "preparing", "ready", "delivered"):
+                    request(
+                        "PATCH",
+                        f"/api/v1/orders/{order['id']}/status",
+                        {"status": status},
+                        token=owner_token,
+                    )
+                created += 1
+            except ApiError as exc:
+                log(f"  ! city customer order {diner['phone']}: {exc}")
+    if created:
+        log(f"  City-customer PWA orders: {created}")
+    return created
+
+
 def main() -> None:
     owner_count = min(BULK_OWNERS, len(EXTRA_OWNERS))
     if BULK_OWNERS > len(EXTRA_OWNERS):
@@ -403,7 +528,8 @@ def main() -> None:
     mode = "full data per kitchen" if BULK_FULL else "primary full + mini secondary menus"
     log(
         f"Mode: {mode} | {BULK_KITCHENS} demo-owner kitchens, {owner_count} extra owners x "
-        f"{BULK_KITCHENS_PER_OWNER} kitchens"
+        f"{BULK_KITCHENS_PER_OWNER} kitchens | {len(SEED_CITIES)} cities × "
+        f"{BULK_CUSTOMERS_PER_CITY} customers"
     )
     if BULK_FULL:
         log(
@@ -425,12 +551,23 @@ def main() -> None:
     log(f"Logged in as {DEMO_OWNER['name']}")
 
     demo_specs = owner_kitchen_specs(0, BULK_KITCHENS)
+    extra_specs: list[dict] = []
+    for idx, owner in enumerate(EXTRA_OWNERS[:owner_count]):
+        extra_specs.extend(owner_kitchen_specs(idx + 1, BULK_KITCHENS_PER_OWNER, owner["name"]))
     demo_kitchens = ensure_kitchens_for_owner(demo_token, demo_specs)
     log(f"Demo owner has {len(demo_kitchens)} kitchen(s)")
+    city_counts: dict[str, int] = {}
+    for k in demo_kitchens:
+        city_counts[str(k.get("city") or "?")] = city_counts.get(str(k.get("city") or "?"), 0) + 1
+    log("  By city: " + ", ".join(f"{name}={n}" for name, n in sorted(city_counts.items())))
+
+    customer_cities = _cities_for_customer_seed(demo_specs + extra_specs)
+    customers_by_city = ensure_located_customers(customer_cities)
 
     primary = primary_kitchen(demo_kitchens)
     all_dishes = enriched_dishes()
     primary_dish_ids: dict[str, str] = {}
+    dish_ids_by_kitchen: dict[str, dict[str, str]] = {}
 
     if BULK_FULL:
         log("")
@@ -443,14 +580,18 @@ def main() -> None:
                 all_dishes,
                 orders_target=BULK_ORDERS_PER_KITCHEN,
                 drafts_target=BULK_DRAFTS_PER_KITCHEN,
+                city_customers=customers_by_city.get(str(k.get("city") or ""), []),
             )
+            dish_ids_by_kitchen[k["id"]] = dish_ids
             if k["id"] == primary["id"]:
                 primary_dish_ids = dish_ids
         if not primary_dish_ids:
             primary_dish_ids = ensure_dishes(demo_token, primary["id"], all_dishes)
+            dish_ids_by_kitchen[primary["id"]] = primary_dish_ids
     else:
         log(f"Primary kitchen: {primary['code']} — {primary['name']}")
         primary_dish_ids = ensure_dishes(demo_token, primary["id"], all_dishes)
+        dish_ids_by_kitchen[primary["id"]] = primary_dish_ids
         log(f"Primary menu: {len(primary_dish_ids)} dishes")
 
         primary_ingredient_ids = ensure_ingredients(demo_token, primary["id"], DEMO_PANTRY)
@@ -468,11 +609,19 @@ def main() -> None:
             rotated = all_dishes[offset : offset + BULK_DISHES_PER_KITCHEN]
             if len(rotated) < BULK_DISHES_PER_KITCHEN:
                 rotated = (rotated + all_dishes)[:BULK_DISHES_PER_KITCHEN]
-            ensure_dishes(demo_token, k["id"], rotated, limit=BULK_DISHES_PER_KITCHEN)
+            dish_ids_by_kitchen[k["id"]] = ensure_dishes(
+                demo_token, k["id"], rotated, limit=BULK_DISHES_PER_KITCHEN
+            )
             secondary += 1
         log(f"Seeded mini menus on {secondary} secondary kitchens")
 
-        ensure_orders(demo_token, primary["id"], primary_dish_ids, BULK_ORDERS)
+        ensure_orders(
+            demo_token,
+            primary["id"],
+            primary_dish_ids,
+            BULK_ORDERS,
+            city_customers=customers_by_city.get(str(primary.get("city") or ""), []),
+        )
         ensure_drafts(demo_token, primary["id"], BULK_DRAFTS)
         backdate_orders(primary["id"])
 
@@ -502,7 +651,9 @@ def main() -> None:
                     all_dishes,
                     orders_target=BULK_ORDERS_PER_OWNER,
                     drafts_target=BULK_DRAFTS_PER_OWNER,
+                    city_customers=customers_by_city.get(str(k.get("city") or ""), []),
                 )
+                dish_ids_by_kitchen[k["id"]] = dish_ids
                 if j == 0:
                     owner_primary_dishes = dish_ids
         else:
@@ -512,6 +663,7 @@ def main() -> None:
                 if not chunk:
                     chunk = subset
                 dish_ids = ensure_dishes(token, k["id"], chunk, limit=BULK_DISHES_PER_KITCHEN)
+                dish_ids_by_kitchen[k["id"]] = dish_ids
                 if j == 0:
                     owner_primary_dishes = dish_ids
 
@@ -521,6 +673,7 @@ def main() -> None:
                 owner_primary["id"],
                 owner_primary_dishes,
                 BULK_ORDERS_PER_OWNER,
+                city_customers=customers_by_city.get(str(owner_primary.get("city") or ""), []),
             )
             created_drafts = ensure_drafts(
                 token,
@@ -536,10 +689,18 @@ def main() -> None:
         if BULK_FULL:
             log(f"  {owner['name']}: {len(kitchens)} kitchen(s) fully seeded")
 
+    all_kitchens = list(demo_kitchens) + [k for _, ks in seeded_owners for k in ks]
+    ensure_city_customer_orders(
+        customers_by_city,
+        all_kitchens,
+        dish_ids_by_kitchen,
+        demo_token,
+    )
+
     # Summary
     nearby = request(
         "GET",
-        f"/api/v1/kitchens/public/nearby?latitude=18.5362&longitude=73.8958&limit=30&max_km=50&sort=asc",
+        "/api/v1/kitchens/public/nearby?latitude=18.5362&longitude=73.8958&limit=30&max_km=50&sort=asc",
     )
     orders_final = request("GET", f"/api/v1/kitchens/{primary['id']}/orders", token=demo_token)
     drafts_final = request("GET", f"/api/v1/kitchens/{primary['id']}/orders/drafts", token=demo_token)
@@ -548,9 +709,21 @@ def main() -> None:
     log("")
     log("Bulk seed complete")
     log("-" * 50)
-    total_kitchens = len(demo_kitchens) + sum(len(k) for _, k in seeded_owners)
+    total_kitchens = len(all_kitchens)
     log(f"  Kitchens seeded (total): {total_kitchens}")
-    log(f"  Nearby kitchens (50km):  {nearby.get('total', 0)}")
+    log(f"  Nearby Pune (50km):      {nearby.get('total', 0)}")
+    for city in SEED_CITIES[1:6]:
+        try:
+            n = request(
+                "GET",
+                "/api/v1/kitchens/public/nearby"
+                f"?latitude={city['latitude']}&longitude={city['longitude']}&limit=20&max_km=50&sort=asc",
+            )
+            log(f"  Nearby {city['name']} (50km): {n.get('total', 0)}")
+        except ApiError as exc:
+            log(f"  ! Nearby {city['name']}: {exc}")
+    diner_total = sum(len(v) for v in customers_by_city.values())
+    log(f"  City customers:         {diner_total} across {len(customers_by_city)} cities")
     log(f"  Primary menu dishes:    {len(menu_final.get('dishes', []))}")
     log(f"  Primary orders:         {orders_final.get('total', 0)}")
     log(f"  Primary drafts:         {drafts_final.get('total', 0)}")
@@ -561,7 +734,14 @@ def main() -> None:
         kitchen = kitchens[0]
         log(f"  {owner['phone']} / {DEMO_OTP} — {owner['name']} ({kitchen['code']})")
     log("")
-    log("Customer app: http://localhost:13001  (#nearby for kitchen list)")
+    log(f"Customer app: http://localhost:13001  (OTP {DEMO_OTP})")
+    for city_name, diners in customers_by_city.items():
+        if not diners:
+            continue
+        sample = diners[0]
+        log(f"  {city_name}: {sample['phone']} ({sample['name']})" + (
+            f" +{len(diners) - 1} more" if len(diners) > 1 else ""
+        ))
 
 
 if __name__ == "__main__":

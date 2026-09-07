@@ -4,7 +4,7 @@ import uuid
 from datetime import UTC, datetime, timedelta
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile, status
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Response, UploadFile, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 import bcrypt
 from jose import JWTError, jwt
@@ -12,6 +12,7 @@ from pydantic import BaseModel, EmailStr, Field
 from sqlalchemy import bindparam, func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.admin_order_ops import admin_kitchen_parse_stats, export_admin_kitchen_orders_csv, kitchen_exists
 from app.brand_media import upload_brand_media
 from app.models import (
     Customer,
@@ -498,6 +499,18 @@ class AdminOrderRow(BaseModel):
     customer_name: str | None = Field(default=None, description="Customer name captured on the order, if any.")
     customer_phone: str | None = Field(default=None, description="Customer phone on the order, if any.")
     created_at: datetime = Field(..., description="Order creation timestamp (UTC).")
+
+
+class AdminParseStatsResponse(BaseModel):
+    """Kitchen WhatsApp/paste parse quality (F01) for ops."""
+
+    kitchen_id: uuid.UUID
+    days: int
+    drafts: int
+    lines_total: int
+    lines_matched: int
+    match_rate: float | None = None
+    drafts_with_unmatched: int
 
 
 class KitchenStatusUpdate(BaseModel):
@@ -1352,6 +1365,62 @@ async def admin_orders(
         )
         for r in result.mappings().all()
     ]
+
+
+@router.get(
+    "/kitchens/{kitchen_id}/orders/export.csv",
+    summary="Download a kitchen's order history as CSV (F05)",
+    description=(
+        "UTF-8 CSV of orders for this kitchen (capped at 10,000). "
+        "**Auth:** admin JWT with `kitchens:read`."
+    ),
+    responses={**auth_errors(include_404=True), 400: RESP_400},
+)
+async def admin_kitchen_orders_export_csv(
+    kitchen_id: uuid.UUID,
+    admin: Annotated[PlatformAdmin, Depends(get_current_admin)],
+    session: Annotated[AsyncSession, Depends(get_db)],
+) -> Response:
+    from app.rbac import assert_admin_permission
+
+    await assert_admin_permission(session, role=admin.role, permission="kitchens:read")
+    if not await kitchen_exists(session, kitchen_id):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Kitchen not found")
+    try:
+        csv_bytes = await export_admin_kitchen_orders_csv(session, kitchen_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    filename = f"kitchcu-orders-{kitchen_id.hex[:8]}.csv"
+    return Response(
+        content=csv_bytes,
+        media_type="text/csv; charset=utf-8",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+@router.get(
+    "/kitchens/{kitchen_id}/orders/parse-stats",
+    response_model=AdminParseStatsResponse,
+    summary="Kitchen WhatsApp/paste parse match-rate (F01)",
+    description=(
+        "Match rate from stored drafts (pending + confirmed) over `days` (1–90, default 30). "
+        "**Auth:** admin JWT with `kitchens:read`."
+    ),
+    responses=auth_errors(include_404=True),
+)
+async def admin_kitchen_orders_parse_stats(
+    kitchen_id: uuid.UUID,
+    admin: Annotated[PlatformAdmin, Depends(get_current_admin)],
+    session: Annotated[AsyncSession, Depends(get_db)],
+    days: Annotated[int, Query(ge=1, le=90)] = 30,
+) -> AdminParseStatsResponse:
+    from app.rbac import assert_admin_permission
+
+    await assert_admin_permission(session, role=admin.role, permission="kitchens:read")
+    if not await kitchen_exists(session, kitchen_id):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Kitchen not found")
+    stats = await admin_kitchen_parse_stats(session, kitchen_id, days=days)
+    return AdminParseStatsResponse(**stats)
 
 
 @router.get("/customers", response_model=list[AdminCustomerRow], responses=auth_errors())

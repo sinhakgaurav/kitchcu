@@ -71,6 +71,8 @@ def test_resolve_service_url_catalog():
     assert resolve_service_url("/api/v1/kitchens/me") == settings.identity_service_url
     assert resolve_service_url("/api/v1/kitchens/abc/profile") == settings.identity_service_url
     assert resolve_service_url("/api/v1/admin/kitchens/abc/profile") == settings.identity_service_url
+    assert resolve_service_url("/api/v1/admin/kitchens/abc/orders/export.csv") == settings.identity_service_url
+    assert resolve_service_url("/api/v1/admin/kitchens/abc/orders/parse-stats") == settings.identity_service_url
 
 
 def test_resolve_service_url_order():
@@ -87,6 +89,14 @@ def test_resolve_service_url_order():
     )
     assert (
         resolve_service_url("/api/v1/kitchens/abc/analytics/customers")
+        == settings.order_service_url
+    )
+    assert (
+        resolve_service_url("/api/v1/kitchens/abc/orders/export.csv")
+        == settings.order_service_url
+    )
+    assert (
+        resolve_service_url("/api/v1/kitchens/abc/orders/drafts/parse-stats")
         == settings.order_service_url
     )
 

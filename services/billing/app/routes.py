@@ -16,6 +16,7 @@ from app.packages import KitchenEntitlementsResponse, get_kitchen_entitlements
 from app.schemas import (
     MasterPaymentCaptureResponse,
     MasterPaymentCreateRequest,
+    PaymentCaptureRequest,
     PaymentCreateRequest,
     PaymentResponse,
     RazorpayWebhookPayload,
@@ -37,6 +38,7 @@ from app.schemas import (
     get_payment_for_owner,
     list_subscription_plans,
     load_master_order_for_customer,
+    payment_to_checkout_response,
     payment_to_response,
     list_kitchen_settlements,
     settlement_to_response,
@@ -386,7 +388,7 @@ async def payment_create(
         payment = await create_payment(session, owner_id, order, body.method, publisher)
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
-    return payment_to_response(payment)
+    return await payment_to_checkout_response(session, payment)
 
 
 @router.post(
@@ -439,7 +441,7 @@ async def payment_get(
         payment = await get_payment_for_owner(session, payment_id, owner_id)
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
-    return payment_to_response(payment)
+    return await payment_to_checkout_response(session, payment)
 
 
 @router.post(
@@ -459,13 +461,22 @@ async def payment_capture(
     owner_id: Annotated[uuid.UUID, Depends(get_current_owner_id)],
     session: Annotated[AsyncSession, Depends(get_db)],
     publisher: Annotated[EventPublisher, Depends(get_publisher)],
+    body: PaymentCaptureRequest | None = None,
 ) -> PaymentResponse:
+    payload = body or PaymentCaptureRequest()
     try:
         payment = await get_payment_for_owner(session, payment_id, owner_id)
-        payment = await capture_payment(session, payment, publisher)
+        payment = await capture_payment(
+            session,
+            payment,
+            publisher,
+            razorpay_payment_id=payload.razorpay_payment_id,
+            razorpay_order_id=payload.razorpay_order_id,
+            razorpay_signature=payload.razorpay_signature,
+        )
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
-    return payment_to_response(payment)
+    return await payment_to_checkout_response(session, payment)
 
 
 @router.post(
@@ -492,7 +503,7 @@ async def customer_payment_create(
         payment = await create_payment(session, None, order, body.method, publisher)
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
-    return payment_to_response(payment)
+    return await payment_to_checkout_response(session, payment)
 
 
 @router.post(
@@ -542,14 +553,23 @@ async def customer_payment_capture(
     customer_id: Annotated[uuid.UUID, Depends(get_current_customer_id)],
     session: Annotated[AsyncSession, Depends(get_db)],
     publisher: Annotated[EventPublisher, Depends(get_publisher)],
+    body: PaymentCaptureRequest | None = None,
 ) -> PaymentResponse:
+    payload = body or PaymentCaptureRequest()
     phone = await load_customer_phone(customer_id, session)
     try:
         payment = await get_payment_for_customer(session, payment_id, phone)
-        payment = await capture_payment(session, payment, publisher)
+        payment = await capture_payment(
+            session,
+            payment,
+            publisher,
+            razorpay_payment_id=payload.razorpay_payment_id,
+            razorpay_order_id=payload.razorpay_order_id,
+            razorpay_signature=payload.razorpay_signature,
+        )
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
-    return payment_to_response(payment)
+    return await payment_to_checkout_response(session, payment)
 
 
 @router.post(
@@ -578,7 +598,7 @@ async def customer_master_payment_create(
         payment = await create_master_payment(session, master, body.method, publisher)
     except ValueError as exc:
         raise _http_from_domain(exc) from exc
-    return payment_to_response(payment)
+    return await payment_to_checkout_response(session, payment)
 
 
 @router.post(
@@ -599,15 +619,24 @@ async def customer_master_payment_capture(
     customer_id: Annotated[uuid.UUID, Depends(get_current_customer_id)],
     session: Annotated[AsyncSession, Depends(get_db)],
     publisher: Annotated[EventPublisher, Depends(get_publisher)],
+    body: PaymentCaptureRequest | None = None,
 ) -> MasterPaymentCaptureResponse:
+    payload = body or PaymentCaptureRequest()
     phone = await load_customer_phone(customer_id, session)
     try:
         payment = await get_payment_for_customer_master(session, payment_id, phone)
-        payment, settlements = await capture_master_payment(session, payment, publisher)
+        payment, settlements = await capture_master_payment(
+            session,
+            payment,
+            publisher,
+            razorpay_payment_id=payload.razorpay_payment_id,
+            razorpay_order_id=payload.razorpay_order_id,
+            razorpay_signature=payload.razorpay_signature,
+        )
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
     return MasterPaymentCaptureResponse(
-        payment=payment_to_response(payment),
+        payment=await payment_to_checkout_response(session, payment),
         settlements=[settlement_to_response(s) for s in settlements],
     )
 
@@ -908,9 +937,13 @@ async def razorpay_webhook(
 
     payment.razorpay_payment_id = razorpay_payment_id
     if payment.master_order_id:
-        await capture_master_payment(session, payment, publisher)
+        await capture_master_payment(
+            session, payment, publisher, from_webhook=True, razorpay_payment_id=razorpay_payment_id
+        )
     else:
-        await capture_payment(session, payment, publisher)
+        await capture_payment(
+            session, payment, publisher, from_webhook=True, razorpay_payment_id=razorpay_payment_id
+        )
     return {"status": "ok"}
 
 

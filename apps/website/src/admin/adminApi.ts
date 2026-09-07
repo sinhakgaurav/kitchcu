@@ -602,6 +602,22 @@ export async function fetchAdminOrders(
   return adminFetch<AdminOrder[]>(`/api/v1/admin/orders?${qs}`);
 }
 
+export type AdminParseStats = {
+  kitchen_id: string;
+  days: number;
+  drafts: number;
+  lines_total: number;
+  lines_matched: number;
+  match_rate: number | null;
+  drafts_with_unmatched: number;
+};
+
+export async function fetchAdminKitchenParseStats(kitchenId: string, days = 30) {
+  return adminFetch<AdminParseStats>(
+    `/api/v1/admin/kitchens/${kitchenId}/orders/parse-stats?days=${days}`,
+  );
+}
+
 export type AdminSettlement = {
   id: string;
   kitchen_id: string;
@@ -976,6 +992,14 @@ export async function downloadAdminKitchenGstPdf(
   return adminDownloadBlob(
     `/api/v1/admin/kitchens/${kitchenId}/gst/reports/monthly/export.pdf?year=${year}&month=${month}`,
     `kitchcu-gst-${year}-${String(month).padStart(2, "0")}.pdf`,
+  );
+}
+
+export async function downloadAdminKitchenOrdersCsv(kitchenId: string, kitchenCode?: string) {
+  const safe = (kitchenCode || kitchenId.slice(0, 8)).replace(/[^\w.-]+/g, "_");
+  return adminDownloadBlob(
+    `/api/v1/admin/kitchens/${kitchenId}/orders/export.csv`,
+    `kitchcu-orders-${safe}.csv`,
   );
 }
 

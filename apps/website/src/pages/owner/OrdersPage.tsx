@@ -4,15 +4,18 @@ import { useTranslation } from "react-i18next";
 import { ListingToolbar } from "../../components/ListingToolbar";
 import {
   confirmDraft,
+  downloadOrdersCsv,
   fetchDrafts,
   fetchMenu,
   fetchOrders,
+  fetchParseStats,
   parseMessage,
   updateDraft,
   STATUS_LABELS,
   type Dish,
   type Order,
   type OrderDraft,
+  type ParseStats,
 } from "../../lib/api";
 import { useKitchen } from "../../lib/kitchen";
 
@@ -53,15 +56,18 @@ export function OrdersPage() {
   const [sort, setSort] = useState<"newest" | "name_asc" | "name_desc">("newest");
   const [statusFilter, setStatusFilter] = useState("");
   const [sourceFilter, setSourceFilter] = useState("");
-  const [dateFilter, setDateFilter] = useState<"all" | "today" | "7d">("all");
+  const [dateFilter, setDateFilter] = useState<"all" | "today" | "7d" | "30d">("all");
   const [dishes, setDishes] = useState<Dish[]>([]);
+  const [parseStats, setParseStats] = useState<ParseStats | null>(null);
+  const [exporting, setExporting] = useState(false);
 
   const dateBounds = useMemo(() => {
     if (dateFilter === "all") return {};
     const before = new Date();
     const after = new Date();
     if (dateFilter === "today") after.setHours(0, 0, 0, 0);
-    else after.setDate(after.getDate() - 7);
+    else if (dateFilter === "7d") after.setDate(after.getDate() - 7);
+    else after.setDate(after.getDate() - 30);
     return { created_after: after.toISOString(), created_before: before.toISOString() };
   }, [dateFilter]);
 
@@ -69,16 +75,18 @@ export function OrdersPage() {
     if (!kitchen) return;
     setLoading(true);
     try {
-      const [o, d, menu] = await Promise.all([
+      const [o, d, menu, stats] = await Promise.all([
         fetchOrders(kitchen.id, statusFilter || undefined, {
           source: sourceFilter || undefined,
           ...dateBounds,
         }),
         fetchDrafts(kitchen.id),
         fetchMenu(kitchen.id).catch(() => null),
+        fetchParseStats(kitchen.id, 30).catch(() => null),
       ]);
       setOrders(o.orders);
       setDrafts(d.drafts);
+      setParseStats(stats);
       if (menu) setDishes(menu.dishes.filter((dish) => dish.is_active));
     } catch {
       setError("Could not load orders");
@@ -181,6 +189,24 @@ export function OrdersPage() {
 
   if (!kitchen) return null;
 
+  const handleExportCsv = async () => {
+    setBusy(true);
+    setExporting(true);
+    setError("");
+    try {
+      await downloadOrdersCsv(kitchen.id, kitchen.code, {
+        status: statusFilter || undefined,
+        source: sourceFilter || undefined,
+        ...dateBounds,
+      });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not export CSV");
+    } finally {
+      setBusy(false);
+      setExporting(false);
+    }
+  };
+
   const handleParse = async () => {
     if (!message.trim()) return;
     setError("");
@@ -251,6 +277,9 @@ export function OrdersPage() {
           )}
         </div>
         <div className="od-board__hero-actions">
+          <button type="button" className="btn btn--ghost" disabled={exporting} onClick={() => void handleExportCsv()}>
+            {exporting ? "Exporting…" : "Export CSV"}
+          </button>
           <Link to="/dashboard/orders/new" className="btn btn--primary">New order</Link>
           <Link to="/dashboard" className="btn btn--ghost">Dashboard</Link>
         </div>
@@ -270,7 +299,11 @@ export function OrdersPage() {
           <div>
             <strong>{drafts.length}</strong>
             <span>WhatsApp drafts</span>
-            <em>Awaiting confirmation</em>
+            <em>
+              {parseStats && parseStats.lines_total > 0
+                ? `${Math.round((parseStats.match_rate ?? 0) * 100)}% lines mapped (30d)`
+                : "Awaiting confirmation"}
+            </em>
           </div>
         </div>
         <div className="od-kpi dash-card">
@@ -304,6 +337,8 @@ export function OrdersPage() {
         ))}
       </div>
 
+      {error && tab !== "drafts" && <div className="auth-card__error">{error}</div>}
+
       {tab !== "drafts" && (
         <div className="od-orders__filters">
           <label>
@@ -327,10 +362,11 @@ export function OrdersPage() {
           </label>
           <label>
             Date
-            <select value={dateFilter} onChange={(e) => setDateFilter(e.target.value as "all" | "today" | "7d")}>
+            <select value={dateFilter} onChange={(e) => setDateFilter(e.target.value as "all" | "today" | "7d" | "30d")}>
               <option value="all">Any time</option>
               <option value="today">Today</option>
               <option value="7d">Last 7 days</option>
+              <option value="30d">Last 30 days</option>
             </select>
           </label>
         </div>
@@ -354,6 +390,18 @@ export function OrdersPage() {
         <OrdersSkeleton />
       ) : tab === "drafts" ? (
         <div className="od-orders__list">
+          {parseStats && parseStats.lines_total > 0 && (
+            <p className="dash-card od-panel od-orders__parse-rate">
+              Parse match rate (30 days):{" "}
+              <strong>
+                {parseStats.lines_matched} of {parseStats.lines_total} lines mapped
+                {parseStats.match_rate != null ? ` (${Math.round(parseStats.match_rate * 100)}%)` : ""}
+              </strong>
+              {parseStats.drafts_with_unmatched > 0
+                ? ` · ${parseStats.drafts_with_unmatched} draft${parseStats.drafts_with_unmatched === 1 ? "" : "s"} still need remapping`
+                : ""}
+            </p>
+          )}
           <details className="dash-card od-panel od-orders__parse" open={shownDrafts.length === 0}>
             <summary className="od-orders__parse-summary">
               <strong>Paste WhatsApp order</strong>

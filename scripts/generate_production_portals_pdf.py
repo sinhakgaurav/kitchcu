@@ -100,6 +100,15 @@ def build() -> GuidePDF:
             "Never commit production passwords or live API secrets",
         ]
     )
+    pdf.section("How to hit login-required APIs")
+    pdf.bullets(
+        [
+            "Swagger: localhost:18000/docs (prod https://api.kitchcu.com/docs)",
+            "Super Admin Sign in prints username + password and links Swagger / ReDoc / portal /openapi",
+            "POST /api/v1/admin/auth/login then Swagger Authorize with the JWT",
+            "Owner/customer APIs use OTP, not the admin password — docs/API.md 1.1",
+        ]
+    )
 
     pdf.chapter("Cities presence")
     pdf.bullets(

@@ -4,7 +4,7 @@ import { HeroCopyParallax } from "./HeroCopyParallax";
 import { ParallaxScene } from "./ParallaxScene";
 import { APP_NAME, APP_POSITIONING } from "../shared/brand";
 import { customerUrl, kitchenUrl } from "../shared/urls";
-import { SuperAdminLink } from "./SuperAdminAccess";
+import { SuperAdminCredentials, SuperAdminLink } from "./SuperAdminAccess";
 
 /** Full-bleed home banner — brand-first, single CTA group. */
 export function PortalHero() {
@@ -44,6 +44,7 @@ export function PortalHero() {
             </a>
             <SuperAdminLink className="hero__ops-link" />
           </div>
+          <SuperAdminCredentials className="hero__admin-creds" />
 
           <ul className="hero__trust" aria-label="Highlights">
             <li>

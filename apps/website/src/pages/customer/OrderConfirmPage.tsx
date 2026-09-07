@@ -8,6 +8,7 @@ import {
 } from "../../shared/customerCheckoutApi";
 import { getCustomerToken } from "../../shared/customerApi";
 import { STATUS_LABELS, type Order, type Payment, type UpiIntent } from "../../shared/api";
+import { readCheckoutSignature } from "../../shared/razorpayCheckout";
 
 type ConfirmState = {
   order: Order;
@@ -101,7 +102,10 @@ export function OrderConfirmPage() {
     setCapturing(true);
     setError("");
     try {
-      const payment: Payment = await captureCustomerPayment(paymentId);
+      const payment: Payment = await captureCustomerPayment(
+        paymentId,
+        readCheckoutSignature(paymentId) ?? undefined,
+      );
       setPayStatus(payment.status);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not confirm payment yet");
@@ -253,7 +257,7 @@ export function OrderConfirmPage() {
       {method === "online" && navState?.paymentMethod === "online" && (
         <section className="customer-confirm__card">
           <p className="customer-confirm__hint">
-            Online payment was captured in demo mode. Production opens Razorpay Checkout with retry.
+            Prepaid captured. If Checkout closed early, reopen the kitchen menu and pay again — we never mark live payments captured without a Razorpay signature.
           </p>
         </section>
       )}

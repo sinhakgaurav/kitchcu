@@ -132,3 +132,68 @@ async def test_admin_kitchens_include_health_fields(client: AsyncClient):
     assert "open_refund_count" in kitchen
     assert "last_order_at" in kitchen
     assert kitchen["last_order_at"] is not None
+
+
+@pytest.mark.asyncio
+async def test_admin_kitchen_orders_export_csv(client: AsyncClient):
+    token, kitchen_id, _ = _seed_admin_and_order()
+    headers = {"Authorization": f"Bearer {token}"}
+    res = await client.get(
+        f"/api/v1/admin/kitchens/{kitchen_id}/orders/export.csv",
+        headers=headers,
+    )
+    assert res.status_code == 200, res.text
+    assert res.headers["content-type"].startswith("text/csv")
+    body = res.content.decode("utf-8-sig")
+    assert "order_code,created_at,status,source" in body
+    assert "Ops Customer" in body
+    assert "220.00" in body
+
+
+@pytest.mark.asyncio
+async def test_admin_kitchen_parse_stats(client: AsyncClient):
+    import json
+    from datetime import UTC, datetime
+
+    token, kitchen_id, _ = _seed_admin_and_order()
+    conn = psycopg2.connect(SYNC_DB_URL)
+    conn.autocommit = True
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            INSERT INTO ckac_orders.order_drafts
+                (id, kitchen_id, status, source, raw_message, parsed_items,
+                 unmatched_lines, special_notes, created_at, updated_at)
+            VALUES (
+                %s::uuid, %s::uuid, 'draft', 'whatsapp', '2 paneer + mystery',
+                %s::jsonb, %s::jsonb, '[]'::jsonb, %s, %s
+            )
+            """,
+            (
+                str(uuid.uuid4()),
+                str(kitchen_id),
+                json.dumps(
+                    [
+                        {"raw": "2 paneer", "matched": True, "quantity": 2},
+                        {"raw": "mystery", "matched": False, "quantity": 1},
+                    ]
+                ),
+                json.dumps(["mystery"]),
+                datetime.now(UTC),
+                datetime.now(UTC),
+            ),
+        )
+    conn.close()
+    headers = {"Authorization": f"Bearer {token}"}
+    res = await client.get(
+        f"/api/v1/admin/kitchens/{kitchen_id}/orders/parse-stats?days=30",
+        headers=headers,
+    )
+    assert res.status_code == 200, res.text
+    data = res.json()
+    assert data["kitchen_id"] == str(kitchen_id)
+    assert data["drafts"] == 1
+    assert data["lines_total"] == 2
+    assert data["lines_matched"] == 1
+    assert data["match_rate"] == 0.5
+    assert data["drafts_with_unmatched"] == 1

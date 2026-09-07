@@ -1,6 +1,7 @@
 # Seed multiple owners, kitchens, menus, orders, drafts, and platform extras.
 # Optional environment variables:
 #   CKAC_BULK_OWNERS, CKAC_BULK_KITCHENS, CKAC_BULK_KITCHENS_PER_OWNER
+#   CKAC_BULK_CUSTOMERS_PER_CITY (default 3 — one pool per presence city)
 #   CKAC_BULK_ORDERS, CKAC_BULK_ORDERS_PER_OWNER
 #   CKAC_BULK_DRAFTS, CKAC_BULK_DRAFTS_PER_OWNER
 #   CKAC_SEED_EXTRAS=1  (customers, ratings, CRM, coupons, enterprise sub, recipes)

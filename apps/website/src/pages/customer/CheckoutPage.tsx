@@ -29,8 +29,9 @@ import {
   type KitchenCartGroup,
 } from "../../shared/customerCart";
 import { APP_STORAGE_PREFIX } from "../../shared/brand";
-import { denyDeliveryFee, fetchDeliveryQuote, type DeliveryQuote } from "../../shared/api";
+import { denyDeliveryFee, fetchDeliveryQuote, type DeliveryQuote, type Payment } from "../../shared/api";
 import { fetchMyAddresses, saveAddress, type CustomerAddress } from "../../shared/customerDashboardApi";
+import { openRazorpayCheckout } from "../../shared/razorpayCheckout";
 
 type DeliveryType = "pickup" | "delivery";
 type PaymentMethod = "cod" | "online" | "upi";
@@ -45,6 +46,23 @@ function checkoutKey(cart: CustomerCart): string {
   const value = crypto.randomUUID();
   sessionStorage.setItem(storageKey, value);
   return value;
+}
+
+async function captureOnlinePayment(payment: Payment): Promise<void> {
+  if (payment.provider_mode === "live" && payment.razorpay_key_id) {
+    const result = await openRazorpayCheckout(payment);
+    await captureCustomerPayment(payment.id, result);
+    return;
+  }
+  await captureCustomerPayment(payment.id);
+}
+
+async function captureOnlineMaster(payment: Payment) {
+  if (payment.provider_mode === "live" && payment.razorpay_key_id) {
+    const result = await openRazorpayCheckout(payment);
+    return captureMasterPayment(payment.id, result);
+  }
+  return captureMasterPayment(payment.id);
 }
 
 function selectedModeFee(quote: DeliveryQuote | undefined, mode: string): number {
@@ -363,7 +381,7 @@ export function CheckoutPage() {
           paymentId = payment.id;
         } else if (paymentMethod === "online") {
           const payment = await createMasterPayment(master.id, paymentMethod);
-          const captured = await captureMasterPayment(payment.id);
+          const captured = await captureOnlineMaster(payment);
           settlements = captured.settlements;
         }
 
@@ -399,7 +417,7 @@ export function CheckoutPage() {
       let upiIntent = null;
       if (paymentMethod === "online") {
         const payment = await createCustomerPayment(order.id, "online");
-        await captureCustomerPayment(payment.id);
+        await captureOnlinePayment(payment);
       } else if (paymentMethod === "upi") {
         upiIntent = await createCustomerUpiIntent(order.id);
       }

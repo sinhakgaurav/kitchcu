@@ -22,7 +22,7 @@
 | `docs/CKAC-COMPLETE-GUIDE.md` | **Master guide v3.2.3** — CEO + CPO + CTO encyclopedia (definitions, how/why, flows, UI Catalog, aggregated OpenAPI reference + PDF) |
 | `docs/CKAC-USERFLOWS.md` | **Full user journey pack** — every persona, every screen, every API call, step-by-step (+ PDF) |
 | `docs/QA-INSTRUCTION-PACK.md` | **QA instruction pack** — smoke, list/UI polish, F19b stock/bulk prep, sign-off (+ PDF) |
-| `docs/API.md` | **Public API reference** — auth, body/response examples; live aggregated OpenAPI at gateway `/openapi.json`/`/docs`/`/redoc` + portal `/openapi` |
+| `docs/API.md` | **Public API reference** — auth, how to Authorize login-required routes (§1.1); live OpenAPI at gateway `/docs`/`/redoc`/`/openapi.json` + portal `/openapi`; Super Admin shows username/password + the same links |
 | `docs/CKAC-ARCHITECTURE-CTO.md` | **CTO layers + CPO product ↔ code map** |
 | `docs/CKAC-PRODUCT-DEPTH-GUIDE.md` | Product depth guide (superseded by Complete Guide) |
 | `docs/CKAC-IMPLEMENTATION-GUIDE.md` | **What's built — mapped to planning & system benchmarks** |

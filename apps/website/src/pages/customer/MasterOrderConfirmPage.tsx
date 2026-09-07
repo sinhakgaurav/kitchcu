@@ -7,6 +7,7 @@ import {
 } from "../../shared/customerCheckoutApi";
 import { getCustomerToken } from "../../shared/customerApi";
 import type { MasterOrder, Settlement } from "../../shared/api";
+import { readCheckoutSignature } from "../../shared/razorpayCheckout";
 
 type ConfirmState = {
   master: MasterOrder;
@@ -79,7 +80,10 @@ export function MasterOrderConfirmPage() {
     setCapturing(true);
     setError("");
     try {
-      const captured = await captureMasterPayment(paymentId);
+      const captured = await captureMasterPayment(
+        paymentId,
+        readCheckoutSignature(paymentId) ?? undefined,
+      );
       setPayStatus(captured.payment.status);
       setSettlements(captured.settlements);
     } catch (err) {

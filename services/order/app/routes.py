@@ -47,6 +47,9 @@ from app.schemas import (
     create_master_order,
     get_master_order_for_customer,
     get_order_stock_warnings,
+    ParseStatsResponse,
+    export_kitchen_orders_csv,
+    kitchen_parse_stats,
     list_kitchen_drafts,
     list_kitchen_orders,
     update_draft,
@@ -519,6 +522,69 @@ async def customer_order_repeat(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
     await dispatch_order_placed(new_order)
     return await order_to_response(session, new_order)
+
+
+@router.get(
+    "/kitchens/{kitchen_id}/orders/export.csv",
+    tags=[TAG_OWNER_ORDERS],
+    summary="Download order history as CSV (F05)",
+    description=(
+        "**Auth:** Owner JWT (Bearer) — caller must own `kitchen_id`.\n\n"
+        "**Query:** same filters as list (`status`, `source`, `created_after`, `created_before`).\n\n"
+        "**Behavior:** UTF-8 CSV (Excel BOM) capped at 10,000 rows. Narrow the date range "
+        "if the cap is exceeded (`400`)."
+    ),
+    responses={**auth_errors(include_403=True), 400: RESP_400},
+)
+async def orders_export_csv(
+    kitchen_id: uuid.UUID,
+    owner_id: Annotated[uuid.UUID, Depends(get_current_owner_id)],
+    session: Annotated[AsyncSession, Depends(get_db)],
+    status_filter: Annotated[str | None, Query(alias="status")] = None,
+    source: Annotated[str | None, Query()] = None,
+    created_after: Annotated[datetime | None, Query()] = None,
+    created_before: Annotated[datetime | None, Query()] = None,
+) -> Response:
+    await verify_kitchen_owner(kitchen_id, owner_id, session)
+    try:
+        csv_bytes = await export_kitchen_orders_csv(
+            session,
+            kitchen_id,
+            status=status_filter,
+            source=source,
+            created_after=created_after,
+            created_before=created_before,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    filename = f"kitchcu-orders-{kitchen_id.hex[:8]}.csv"
+    return Response(
+        content=csv_bytes,
+        media_type="text/csv; charset=utf-8",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+@router.get(
+    "/kitchens/{kitchen_id}/orders/drafts/parse-stats",
+    response_model=ParseStatsResponse,
+    tags=[TAG_OWNER_ORDERS],
+    summary="WhatsApp/paste parse match-rate for a kitchen (F01)",
+    description=(
+        "**Auth:** Owner JWT (Bearer) — caller must own `kitchen_id`.\n\n"
+        "**Query:** `days` (1–90, default 30). Includes pending and confirmed drafts.\n\n"
+        "**Response:** `match_rate` = matched parsed lines / total parsed lines."
+    ),
+    responses=auth_errors(include_403=True),
+)
+async def drafts_parse_stats(
+    kitchen_id: uuid.UUID,
+    owner_id: Annotated[uuid.UUID, Depends(get_current_owner_id)],
+    session: Annotated[AsyncSession, Depends(get_db)],
+    days: Annotated[int, Query(ge=1, le=90)] = 30,
+) -> ParseStatsResponse:
+    await verify_kitchen_owner(kitchen_id, owner_id, session)
+    return await kitchen_parse_stats(session, kitchen_id, days=days)
 
 
 @router.get(
