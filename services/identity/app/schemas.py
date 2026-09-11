@@ -494,6 +494,13 @@ class KitchenNearbyListResponse(BaseModel):
     """Response for `GET /kitchens/public/nearby` — a distance-sorted page of kitchens."""
 
     kitchens: list[KitchenNearbyResponse] = Field(..., description="Kitchens within `max_km`, ordered by `sort`.")
+    nearest: list[KitchenNearbyResponse] = Field(
+        default_factory=list,
+        description=(
+            "Populated only when `kitchens` is empty: the closest active kitchens regardless "
+            "of `max_km`, so an out-of-range diner still sees where kitchCU is live."
+        ),
+    )
     total: int = Field(..., description="Number of kitchens returned in this response.", examples=[8])
     customer_latitude: float = Field(..., description="Echo of the query latitude used for distance calc.", examples=[18.5204])
     customer_longitude: float = Field(..., description="Echo of the query longitude used for distance calc.", examples=[73.8567])
@@ -889,14 +896,21 @@ async def list_kitchens_nearby(
     diet: str | None = None,
     live_capture: bool | None = None,
     live_only: bool | None = None,
+    q: str | None = None,
 ) -> list[KitchenNearbyResponse]:
     """Active kitchens within max_km, ordered by distance (asc = nearest first)."""
+    from app.discovery import _search_term, kitchen_search_sql
+
     order = "ASC" if sort.lower() != "desc" else "DESC"
     max_m = max_km * 1000.0
     limit = min(max(limit, 1), 100)
 
     diet_filter = ""
     params: dict = {"lat": latitude, "lng": longitude, "max_m": max_m, "lim": limit}
+    term = _search_term(q)
+    if term:
+        diet_filter += kitchen_search_sql("ckac_identity.kitchens")
+        params["q"] = term
     if diet in ("veg", "non_veg", "vegan"):
         diet_filter = """
               AND EXISTS (
@@ -990,21 +1004,104 @@ async def list_kitchens_nearby(
         params,
     )
     rows = result.all()
-    return [
-        KitchenNearbyResponse(
-            id=row.id,
-            code=row.code,
-            name=row.name,
-            city=row.city,
-            state=row.state,
-            status=row.status,
-            latitude=float(row.lat),
-            longitude=float(row.lng),
-            distance_km=round(float(row.distance_km), 2),
-            has_veg=bool(row.has_veg),
-            has_non_veg=bool(row.has_non_veg),
-            has_live_capture=bool(row.has_live_capture),
-            is_live_now=bool(row.is_live_now),
-        )
-        for row in rows
-    ]
+    return [_nearby_row_to_response(row) for row in rows]
+
+
+def _nearby_row_to_response(row) -> KitchenNearbyResponse:
+    return KitchenNearbyResponse(
+        id=row.id,
+        code=row.code,
+        name=row.name,
+        city=row.city,
+        state=row.state,
+        status=row.status,
+        latitude=float(row.lat),
+        longitude=float(row.lng),
+        distance_km=round(float(row.distance_km), 2),
+        has_veg=bool(row.has_veg),
+        has_non_veg=bool(row.has_non_veg),
+        has_live_capture=bool(row.has_live_capture),
+        is_live_now=bool(row.is_live_now),
+    )
+
+
+async def list_nearest_kitchens(
+    session: AsyncSession,
+    *,
+    latitude: float,
+    longitude: float,
+    limit: int = 6,
+    q: str | None = None,
+) -> list[KitchenNearbyResponse]:
+    """The closest active kitchens with no radius cap — the fallback for an out-of-range diner.
+
+    Honours the same search term, so "samosa" from an unserved city answers with the
+    nearest kitchen that actually cooks samosa rather than a generic list.
+
+    Ordering uses the GiST KNN operator (`<->`) against a small LIMIT rather than
+    sorting every kitchen by `ST_Distance`, so this stays index-backed as the
+    kitchen table grows.
+    """
+    from app.discovery import _search_term, kitchen_search_sql
+    from ckac_common.platform_config import hard_mode_missing_feature_sql
+
+    limit = min(max(limit, 1), 20)
+    params: dict = {"lat": latitude, "lng": longitude, "lim": limit}
+    search_filter = ""
+    term = _search_term(q)
+    if term:
+        search_filter = kitchen_search_sql("ckac_identity.kitchens")
+        params["q"] = term
+    result = await session.execute(
+        text(
+            f"""
+            SELECT
+                id,
+                code,
+                name,
+                city,
+                state,
+                status,
+                ST_Y(location::geometry) AS lat,
+                ST_X(location::geometry) AS lng,
+                ST_Distance(
+                    location,
+                    ST_SetSRID(ST_MakePoint(:lng, :lat), 4326)::geography
+                ) / 1000.0 AS distance_km,
+                EXISTS (
+                    SELECT 1 FROM ckac_catalog.dishes d
+                    INNER JOIN ckac_catalog.categories c ON c.id = d.category_id
+                    WHERE d.kitchen_id = ckac_identity.kitchens.id
+                      AND d.is_active = true AND c.slug = 'veg'
+                ) AS has_veg,
+                EXISTS (
+                    SELECT 1 FROM ckac_catalog.dishes d
+                    INNER JOIN ckac_catalog.categories c ON c.id = d.category_id
+                    WHERE d.kitchen_id = ckac_identity.kitchens.id
+                      AND d.is_active = true AND c.slug = 'non_veg'
+                ) AS has_non_veg,
+                EXISTS (
+                    SELECT 1 FROM ckac_catalog.dishes d
+                    INNER JOIN ckac_catalog.dish_media m ON m.dish_id = d.id
+                    WHERE d.kitchen_id = ckac_identity.kitchens.id
+                      AND d.is_active = true
+                      AND m.is_hero = true AND m.is_live_capture = true
+                ) AS has_live_capture,
+                EXISTS (
+                    SELECT 1 FROM ckac_streaming.live_sessions s
+                    INNER JOIN ckac_streaming.kitchen_stream_settings st ON st.kitchen_id = s.kitchen_id
+                    WHERE s.kitchen_id = ckac_identity.kitchens.id
+                      AND s.status = 'live'
+                      AND st.live_sharing_enabled = true
+                ) AS is_live_now
+            FROM ckac_identity.kitchens
+            WHERE status = 'active'
+              {hard_mode_missing_feature_sql("ckac_identity.kitchens.id", "discovery")}
+              {search_filter}
+            ORDER BY location::geometry <-> ST_SetSRID(ST_MakePoint(:lng, :lat), 4326)
+            LIMIT :lim
+            """
+        ),
+        params,
+    )
+    return [_nearby_row_to_response(row) for row in result.all()]

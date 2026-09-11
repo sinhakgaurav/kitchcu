@@ -37,6 +37,58 @@ function skipScrollWork(): boolean {
   );
 }
 
+const scrollSubscribers = new Set<() => void>();
+let scrollRaf = 0;
+let scrollBound = false;
+
+function flushScrollSubscribers() {
+  scrollRaf = 0;
+  for (const run of scrollSubscribers) run();
+}
+
+function onSharedScroll() {
+  if (scrollRaf) return;
+  scrollRaf = requestAnimationFrame(flushScrollSubscribers);
+}
+
+/**
+ * One scroll/resize listener and one animation frame for every parallax hook on the page.
+ *
+ * The portal home mounts around twenty of these hooks. Giving each its own listener,
+ * its own frame, and its own `getBoundingClientRect()` interleaved reads with React
+ * writes on every frame, which is what made scrolling stutter. Batching the reads into
+ * a single frame also lets React collapse the resulting state updates into one render.
+ */
+function subscribeToScroll(run: () => void): () => void {
+  scrollSubscribers.add(run);
+  if (!scrollBound) {
+    window.addEventListener("scroll", onSharedScroll, { passive: true });
+    window.addEventListener("resize", onSharedScroll, { passive: true });
+    scrollBound = true;
+  }
+  run();
+  return () => {
+    scrollSubscribers.delete(run);
+    if (scrollSubscribers.size > 0 || !scrollBound) return;
+    window.removeEventListener("scroll", onSharedScroll);
+    window.removeEventListener("resize", onSharedScroll);
+    scrollBound = false;
+    if (scrollRaf) {
+      cancelAnimationFrame(scrollRaf);
+      scrollRaf = 0;
+    }
+  };
+}
+
+/** Subscribe to the shared scroll frame; exported for non-parallax scroll state. */
+export function useScrollEffect(run: () => void, deps: unknown[] = []) {
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    return subscribeToScroll(run);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, deps);
+}
+
 export function useScrollProgress() {
   const [progress, setProgress] = useState(0);
   const [scrollY, setScrollY] = useState(0);
@@ -49,23 +101,12 @@ export function useScrollProgress() {
     ) {
       return;
     }
-    let raf = 0;
-    const onScroll = () => {
-      if (raf) return;
-      raf = requestAnimationFrame(() => {
-        raf = 0;
-        const doc = document.documentElement;
-        const max = doc.scrollHeight - window.innerHeight;
-        setScrollY(window.scrollY);
-        setProgress(max > 0 ? window.scrollY / max : 0);
-      });
-    };
-    onScroll();
-    window.addEventListener("scroll", onScroll, { passive: true });
-    return () => {
-      cancelAnimationFrame(raf);
-      window.removeEventListener("scroll", onScroll);
-    };
+    return subscribeToScroll(() => {
+      const doc = document.documentElement;
+      const max = doc.scrollHeight - window.innerHeight;
+      setScrollY(Math.round(window.scrollY));
+      setProgress(max > 0 ? Math.round((window.scrollY / max) * 1000) / 1000 : 0);
+    });
   }, []);
 
   return { progress, scrollY };
@@ -79,24 +120,12 @@ export function useSectionParallax(ref: RefObject<HTMLElement | null>) {
     const el = ref.current;
     if (!el || skipScrollWork()) return;
 
-    let raf = 0;
-    const update = () => {
-      cancelAnimationFrame(raf);
-      raf = requestAnimationFrame(() => {
-        const rect = el.getBoundingClientRect();
-        const centerY = rect.top + rect.height * 0.5;
-        setOffset(centerY - window.innerHeight * 0.5);
-      });
-    };
-
-    update();
-    window.addEventListener("scroll", update, { passive: true });
-    window.addEventListener("resize", update);
-    return () => {
-      cancelAnimationFrame(raf);
-      window.removeEventListener("scroll", update);
-      window.removeEventListener("resize", update);
-    };
+    return subscribeToScroll(() => {
+      const rect = el.getBoundingClientRect();
+      const centerY = rect.top + rect.height * 0.5;
+      // Whole pixels only — sub-pixel churn re-renders without changing what is drawn.
+      setOffset(Math.round(centerY - window.innerHeight * 0.5));
+    });
   }, [ref]);
 
   return offset;
@@ -180,29 +209,16 @@ export function useSectionScrollProgress(ref: RefObject<HTMLElement | null>) {
     const el = ref.current;
     if (!el || skipScrollWork()) return;
 
-    let raf = 0;
-    const update = () => {
-      cancelAnimationFrame(raf);
-      raf = requestAnimationFrame(() => {
-        const rect = el.getBoundingClientRect();
-        const scrollable = el.offsetHeight - window.innerHeight;
-        if (scrollable <= 0) {
-          setProgress(0);
-          return;
-        }
-        const scrolled = Math.min(scrollable, Math.max(0, -rect.top));
-        setProgress(scrolled / scrollable);
-      });
-    };
-
-    update();
-    window.addEventListener("scroll", update, { passive: true });
-    window.addEventListener("resize", update);
-    return () => {
-      cancelAnimationFrame(raf);
-      window.removeEventListener("scroll", update);
-      window.removeEventListener("resize", update);
-    };
+    return subscribeToScroll(() => {
+      const rect = el.getBoundingClientRect();
+      const scrollable = el.offsetHeight - window.innerHeight;
+      if (scrollable <= 0) {
+        setProgress(0);
+        return;
+      }
+      const scrolled = Math.min(scrollable, Math.max(0, -rect.top));
+      setProgress(Math.round((scrolled / scrollable) * 1000) / 1000);
+    });
   }, [ref]);
 
   return progress;
@@ -216,25 +232,12 @@ export function useItemParallax(ref: RefObject<HTMLElement | null>, speed = 0.12
     const el = ref.current;
     if (!el || skipScrollWork()) return;
 
-    let raf = 0;
-    const update = () => {
-      cancelAnimationFrame(raf);
-      raf = requestAnimationFrame(() => {
-        const rect = el.getBoundingClientRect();
-        const center = rect.top + rect.height * 0.5;
-        const viewCenter = window.innerHeight * 0.5;
-        setOffset((center - viewCenter) * speed);
-      });
-    };
-
-    update();
-    window.addEventListener("scroll", update, { passive: true });
-    window.addEventListener("resize", update);
-    return () => {
-      cancelAnimationFrame(raf);
-      window.removeEventListener("scroll", update);
-      window.removeEventListener("resize", update);
-    };
+    return subscribeToScroll(() => {
+      const rect = el.getBoundingClientRect();
+      const center = rect.top + rect.height * 0.5;
+      const viewCenter = window.innerHeight * 0.5;
+      setOffset(Math.round((center - viewCenter) * speed));
+    });
   }, [ref, speed]);
 
   return offset;

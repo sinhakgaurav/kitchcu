@@ -8,7 +8,7 @@ import { PhoneField } from "../components/PhoneField";
 import { PolicyAgreement } from "../components/PolicyAgreement";
 import { DEMO, DEMO_OWNERS, type DemoOwnerAccount } from "../shared/demo";
 import { showDemoCredentials } from "../shared/env";
-import { registerOwner, requestOtp, verifyOtp } from "../shared/api";
+import { otpDeliveryNotice, registerOwner, requestOtp, verifyOtp } from "../shared/api";
 import {
   firstError,
   otpInputValue,
@@ -39,6 +39,7 @@ export function LoginPage() {
   const [email, setEmail] = useState("");
   const [otp, setOtp] = useState("");
   const [otpSent, setOtpSent] = useState(false);
+  const [otpNotice, setOtpNotice] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [busyPhone, setBusyPhone] = useState<string | null>(null);
@@ -96,7 +97,8 @@ export function LoginPage() {
     }
     setBusy(true);
     try {
-      await requestOtp(toE164(phone));
+      const result = await requestOtp(toE164(phone));
+      setOtpNotice(otpDeliveryNotice(result));
       setOtpSent(true);
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Could not send OTP";
@@ -324,6 +326,7 @@ export function LoginPage() {
                 required
                 placeholder={DEMO.phone}
               />
+              {otpSent && otpNotice && <p className="auth-card__notice">{otpNotice}</p>}
               {otpSent && (
                 <label>
                   {t("owner.auth.otp")}

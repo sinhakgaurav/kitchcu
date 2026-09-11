@@ -156,11 +156,25 @@ def ensure_dishes(
     # wrong image would survive every re-seed.
     intended_media = {d["name"]: d.get("media_url") for d in target}
     resynced = 0
+    retired = 0
     for d in menu.get("dishes", []):
-        want = intended_media.get(d["name"])
-        if not want:
+        if d["name"] not in intended_media:
             continue
+        want = intended_media[d["name"]]
         hero = next((m for m in d.get("media", []) if m.get("is_hero")), None)
+        if not want:
+            # The dish lost its hero because no asset honestly showed it. Pull it off
+            # the public menu instead of leaving the borrowed photo in place.
+            if hero:
+                request(
+                    "PATCH",
+                    f"/api/v1/kitchens/{kitchen_id}/dishes/{d['id']}",
+                    {"is_active": False},
+                    token=token,
+                )
+                retired += 1
+            dish_ids.pop(d["name"], None)
+            continue
         if hero and hero.get("url") == want:
             continue
         request(
@@ -179,6 +193,8 @@ def ensure_dishes(
         resynced += 1
     if resynced:
         log(f"  Resynced {resynced} dish heroes to the correct image.")
+    if retired:
+        log(f"  Unpublished {retired} dishes whose hero did not show the dish.")
     for i, dish in enumerate(target):
         if dish["name"] in existing_names:
             continue

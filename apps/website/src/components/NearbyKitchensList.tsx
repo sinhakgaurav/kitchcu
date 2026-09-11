@@ -12,7 +12,6 @@ import { useGeolocation } from "../hooks/useGeolocation";
 import { useInView } from "../hooks/useParallax";
 import {
   discoveryMapEmbedUrl,
-  distanceKm,
   googleMapsNearbyStaticUrl,
   googleMapsUrl,
   hasGoogleMapsApiKey,
@@ -28,19 +27,20 @@ export function NearbyKitchensList() {
   const { ref, visible } = useInView(0.06);
   const { coords, status, error: geoError, refresh, setCoords } = useGeolocation(DEMO.defaultLocation);
   const [kitchens, setKitchens] = useState<KitchenNearby[]>([]);
+  const [nearest, setNearest] = useState<KitchenNearby[]>([]);
   const [liveByKitchen, setLiveByKitchen] = useState<Record<string, LiveKitchenSummary>>({});
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState("");
   const [sort, setSort] = useState<SortOrder>("asc");
   const [listSort, setListSort] = useState<ListSort>("distance_asc");
   const [search, setSearch] = useState("");
+  const [activeSearch, setActiveSearch] = useState("");
   const [maxKm, setMaxKm] = useState(25);
   const [diet, setDiet] = useState<DietFilter>("");
   const [liveCaptureOnly, setLiveCaptureOnly] = useState(false);
   const [liveOnly, setLiveOnly] = useState(false);
 
   const mapsEnabled = hasGoogleMapsApiKey();
-  const kmFromDemo = distanceKm(coords, DEMO.defaultLocation);
 
   const staticMapSrc = useMemo(() => {
     if (!mapsEnabled) return null;
@@ -75,10 +75,12 @@ export function NearbyKitchensList() {
           diet: diet || undefined,
           live_capture: liveCaptureOnly || undefined,
           live_only: liveOnly || undefined,
+          q: activeSearch || undefined,
         }),
         fetchLiveKitchens().catch(() => ({ kitchens: [] as LiveKitchenSummary[], total: 0 })),
       ]);
       setKitchens(data.kitchens);
+      setNearest(data.nearest ?? []);
       const map: Record<string, LiveKitchenSummary> = {};
       for (const live of liveRes.kitchens) {
         map[live.kitchen_id] = live;
@@ -87,14 +89,23 @@ export function NearbyKitchensList() {
     } catch (err) {
       setFetchError(err instanceof Error ? err.message : "Could not load nearby kitchens");
       setKitchens([]);
+      setNearest([]);
     } finally {
       setLoading(false);
     }
-  }, [coords.latitude, coords.longitude, maxKm, sort, diet, liveCaptureOnly, liveOnly]);
+  }, [coords.latitude, coords.longitude, maxKm, sort, diet, liveCaptureOnly, liveOnly, activeSearch]);
 
   useEffect(() => {
     load();
   }, [load]);
+
+  // Search hits the API so dish and cuisine names match, not just kitchen names.
+  useEffect(() => {
+    const trimmed = search.trim();
+    if (trimmed === activeSearch) return;
+    const timer = window.setTimeout(() => setActiveSearch(trimmed), 350);
+    return () => window.clearTimeout(timer);
+  }, [search, activeSearch]);
 
   const openKitchen = (kitchen: KitchenNearby) => {
     const next = saveKitchenToSession(kitchen);
@@ -108,22 +119,13 @@ export function NearbyKitchensList() {
   };
 
   const displayed = useMemo(() => {
-    let list = [...kitchens];
-    if (search.trim()) {
-      const n = search.trim().toLowerCase();
-      list = list.filter(
-        (k) =>
-          k.name.toLowerCase().includes(n) ||
-          (k.city || "").toLowerCase().includes(n) ||
-          (k.code || "").toLowerCase().includes(n),
-      );
-    }
+    const list = [...kitchens];
     if (listSort === "name_asc") list.sort((a, b) => a.name.localeCompare(b.name));
     else if (listSort === "name_desc") list.sort((a, b) => b.name.localeCompare(a.name));
     else if (listSort === "distance_desc") list.sort((a, b) => b.distance_km - a.distance_km);
     else list.sort((a, b) => a.distance_km - b.distance_km);
     return list;
-  }, [kitchens, search, listSort]);
+  }, [kitchens, listSort]);
 
   const onListSortChange = (v: string) => {
     const next = v as ListSort;
@@ -132,7 +134,8 @@ export function NearbyKitchensList() {
     if (next === "distance_desc") setSort("desc");
   };
 
-  const showFarHint = !loading && kitchens.length === 0 && kmFromDemo > 80;
+  const fallbackNearest = !loading && kitchens.length === 0 && nearest.length > 0;
+  const nothingAnywhere = !loading && kitchens.length === 0 && nearest.length === 0;
 
   return (
     <section
@@ -231,30 +234,10 @@ export function NearbyKitchensList() {
 
         {fetchError && <div className="auth-card__error">{fetchError}</div>}
 
-        {showFarHint && (
-          <div className="glass nearby-kitchens__empty nearby-kitchens__empty--hint">
-            <p>
-              No active kitchens within {maxKm} km of your current GPS
-              ({kmFromDemo.toFixed(0)} km from the Pune demo cluster).
-            </p>
-            <p className="nearby-kitchens__empty-hint">
-              Seeded demo kitchens sit around Pune. Widen the radius or jump to the demo pin.
-            </p>
-            <div className="nearby-kitchens__empty-actions">
-              <button type="button" className="btn btn--primary btn--sm" onClick={useDemoLocation}>
-                Show Pune demo kitchens
-              </button>
-              <button type="button" className="btn btn--ghost btn--sm" onClick={() => setMaxKm(100)}>
-                Search 100 km
-              </button>
-            </div>
-          </div>
-        )}
-
         <ListingToolbar
           search={search}
           onSearchChange={setSearch}
-          searchPlaceholder="Search kitchens by name or city…"
+          searchPlaceholder="Search a dish, cuisine, kitchen, or city…"
           sort={listSort}
           onSortChange={onListSortChange}
           sortOptions={[
@@ -268,23 +251,52 @@ export function NearbyKitchensList() {
 
         {loading ? (
           <p className="app-loading nearby-kitchens__loading">Finding kitchens near you…</p>
-        ) : kitchens.length === 0 && !showFarHint ? (
+        ) : nothingAnywhere ? (
           <div className="glass nearby-kitchens__empty">
-            <p>No active kitchens within {maxKm} km with these filters.</p>
-            <p className="nearby-kitchens__empty-hint">
-              Run <code>python scripts/seed-dev-data.py</code>, clear filters, or try{" "}
-              <button type="button" className="btn btn--ghost btn--sm" onClick={useDemoLocation}>
-                Demo: Pune
-              </button>
+            <p>
+              {activeSearch
+                ? `No kitchen on kitchCU matches “${activeSearch}” yet.`
+                : "No active kitchens with these filters."}
             </p>
-          </div>
-        ) : displayed.length === 0 && kitchens.length > 0 ? (
-          <div className="glass nearby-kitchens__empty">
-            <p>No kitchens match “{search}”.</p>
+            <div className="nearby-kitchens__empty-actions">
+              {activeSearch && (
+                <button type="button" className="btn btn--ghost btn--sm" onClick={() => setSearch("")}>
+                  Clear search
+                </button>
+              )}
+              <button type="button" className="btn btn--primary btn--sm" onClick={useDemoLocation}>
+                Demo: Pune kitchens
+              </button>
+            </div>
           </div>
         ) : (
-          <ul className={`nearby-kitchens__list reveal-stagger ${visible ? "reveal--visible" : ""}`}>
-            {displayed.map((k, i) => {
+          <>
+            {fallbackNearest && (
+              <div className="glass nearby-kitchens__empty nearby-kitchens__empty--hint">
+                <p>
+                  {activeSearch
+                    ? `No kitchen within ${maxKm} km serves “${activeSearch}”.`
+                    : `No kitchens within ${maxKm} km of you yet.`}
+                </p>
+                <p className="nearby-kitchens__empty-hint">
+                  Closest is {formatDistance(nearest[0].distance_km)} away
+                  {nearest[0].city ? ` in ${nearest[0].city}` : ""} — here is where kitchCU is live
+                  right now.
+                </p>
+                <div className="nearby-kitchens__empty-actions">
+                  {activeSearch && (
+                    <button type="button" className="btn btn--ghost btn--sm" onClick={() => setSearch("")}>
+                      Clear search
+                    </button>
+                  )}
+                  <button type="button" className="btn btn--primary btn--sm" onClick={useDemoLocation}>
+                    Demo: Pune kitchens
+                  </button>
+                </div>
+              </div>
+            )}
+            <ul className={`nearby-kitchens__list reveal-stagger ${visible ? "reveal--visible" : ""}`}>
+            {(fallbackNearest ? nearest : displayed).map((k, i) => {
               const live = liveByKitchen[k.id];
               return (
               <li key={k.id} style={{ "--i": i } as CSSProperties}>
@@ -342,7 +354,8 @@ export function NearbyKitchensList() {
               </li>
             );
             })}
-          </ul>
+            </ul>
+          </>
         )}
       </div>
     </section>

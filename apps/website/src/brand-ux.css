@@ -140,6 +140,27 @@ html.theme-brand-light .nav__tagline {
   color: var(--brand-teal-deep);
 }
 
+/* The portal runs on the light brand, but the hamburger panel stayed near-black, so
+   ink-coloured links, Super admin, and the language select disappeared into it. */
+@media (max-width: 1180px) {
+  html.theme-brand-light .nav__links {
+    background: var(--brand-cream);
+    backdrop-filter: none;
+    border-bottom: 1px solid rgba(28, 25, 23, 0.12);
+    box-shadow: 0 18px 44px rgba(11, 27, 50, 0.16);
+  }
+
+  html.theme-brand-light .nav__links .nav__owner-link {
+    color: var(--brand-teal-deep);
+  }
+
+  html.theme-brand-light .nav__links .lang-switcher select {
+    background: #fff;
+    border-color: rgba(28, 25, 23, 0.2);
+    color: var(--brand-ink);
+  }
+}
+
 html.theme-brand-light .hero,
 html.theme-brand-light .hero--fullbleed {
   background: transparent;

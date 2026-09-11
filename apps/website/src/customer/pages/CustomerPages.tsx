@@ -33,6 +33,7 @@ import {
   requestCustomerWhatsAppOtp,
   verifyCustomerWhatsAppOtp,
 } from "../../shared/customerApi";
+import { otpDeliveryNotice } from "../../shared/api";
 
 export function CustomerLoginPage() {
   const { t } = useTranslation();
@@ -44,6 +45,7 @@ export function CustomerLoginPage() {
   const [phone, setPhone] = useState(phoneInputValue(session?.phone ?? ""));
   const [otp, setOtp] = useState("");
   const [otpSent, setOtpSent] = useState(false);
+  const [otpNotice, setOtpNotice] = useState("");
   const [code, setCode] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -97,7 +99,8 @@ export function CustomerLoginPage() {
     }
     setBusy(true);
     try {
-      await requestCustomerWhatsAppOtp(toE164(phone));
+      const result = await requestCustomerWhatsAppOtp(toE164(phone));
+      setOtpNotice(otpDeliveryNotice(result));
       setOtpSent(true);
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Could not send OTP";
@@ -256,6 +259,7 @@ export function CustomerLoginPage() {
               />
               <span className="field-hint">{t("customer.auth.kitchenCodeHint")}</span>
             </label>
+            {otpSent && otpNotice && <p className="auth-card__notice">{otpNotice}</p>}
             {otpSent && (
               <label>
                 {t("owner.auth.otp")}
@@ -449,7 +453,7 @@ export function CustomerHomePage() {
           <p>Cloud kitchens focused on authentic home cooking, not aggregator races.</p>
         </article>
         <article className="glass customer-benefit-card" style={{ "--i": 2 } as CSSProperties}>
-          <img src={sampleDishImages.thali} alt="" loading="lazy" />
+          <img src={sampleDishImages.friedRice} alt="" loading="lazy" />
           <h3>Order tracking</h3>
           <p>Follow your order from kitchen to door with live tracking links.</p>
         </article>

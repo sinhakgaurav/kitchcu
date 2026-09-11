@@ -6,8 +6,8 @@ const FLOATERS = [
   { src: images.sushi.src, top: "8%", left: "4%", width: "200px", speed: 0.14, rotate: "-8deg" },
   { src: images.tacos.src, top: "62%", left: "2%", width: "170px", speed: 0.2, rotate: "6deg" },
   { src: sampleDishImages.biryani, top: "18%", right: "3%", width: "190px", speed: 0.16, rotate: "10deg" },
-  { src: sampleDishImages.thali, top: "70%", right: "6%", width: "160px", speed: 0.22, rotate: "-5deg" },
-  { src: sampleDishImages.lassi, top: "42%", left: "38%", width: "130px", speed: 0.11, rotate: "4deg" },
+  { src: sampleDishImages.friedRice, top: "70%", right: "6%", width: "160px", speed: 0.22, rotate: "-5deg" },
+  { src: sampleDishImages.buddhaBowl, top: "42%", left: "38%", width: "130px", speed: 0.11, rotate: "4deg" },
 ];
 
 function PricingFloater({

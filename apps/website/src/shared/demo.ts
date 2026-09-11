@@ -92,13 +92,18 @@ export function adminLoginDefaults(): {
   return { email: DEMO_ADMIN.email, password: DEMO_ADMIN.password, isProductionHost: false };
 }
 
+/** Dishes the demo seed publishes — house classics without a live-capture hero seed
+ *  as drafts, so they are absent from the public menu and from this list. */
 export const DEMO_DISH_NAMES = [
-  "Paneer Tikka",
   "Chicken Biryani",
   "Masala Dosa",
-  "Butter Chicken",
-  "Mango Lassi",
-  "Gulab Jamun",
-  "Veg Thali Combo",
-  "Pav Bhaji",
+  "Samosa (2 pc)",
+  "Chicken Fried Rice",
+  "Mixed Grill Platter",
+  "BBQ Chicken Pizza",
+  "Tomato Basil Spaghetti",
+  "Vegan Buddha Bowl",
+  "Egg & Tofu Protein Bowl",
+  "Smoky BBQ Ribs",
+  "Apple Cinnamon Turnovers",
 ] as const;

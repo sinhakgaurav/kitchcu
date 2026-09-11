@@ -89,18 +89,24 @@ def _search_term(q: str | None) -> str | None:
     return f"%{escaped}%"
 
 
-# Kitchen matches on its own fields, or on any active dish / cuisine / diet it serves.
-_KITCHEN_SEARCH_SQL = """
+def kitchen_search_sql(alias: str = "k") -> str:
+    """Kitchen matches on its own fields, or on any active dish / cuisine / diet it serves.
+
+    `alias` lets the nearby endpoint reuse the same rules on an unaliased
+    `ckac_identity.kitchens`, so a diner searching "samosa" gets the same answer
+    from both the discovery feed and the kitchen list.
+    """
+    return f"""
               AND (
-                k.name ILIKE :q
-                OR k.code ILIKE :q
-                OR COALESCE(k.city, '') ILIKE :q
-                OR COALESCE(k.settings->'branded_page'->>'tagline', '') ILIKE :q
+                {alias}.name ILIKE :q
+                OR {alias}.code ILIKE :q
+                OR COALESCE({alias}.city, '') ILIKE :q
+                OR COALESCE({alias}.settings->'branded_page'->>'tagline', '') ILIKE :q
                 OR EXISTS (
                     SELECT 1 FROM ckac_catalog.dishes sd
                     LEFT JOIN ckac_catalog.cuisines sc ON sc.id = sd.cuisine_id
                     LEFT JOIN ckac_catalog.categories scat ON scat.id = sd.category_id
-                    WHERE sd.kitchen_id = k.id AND sd.is_active = true
+                    WHERE sd.kitchen_id = {alias}.id AND sd.is_active = true
                       AND (
                         sd.name ILIKE :q
                         OR COALESCE(sc.name, '') ILIKE :q
@@ -109,6 +115,9 @@ _KITCHEN_SEARCH_SQL = """
                 )
               )
 """
+
+
+_KITCHEN_SEARCH_SQL = kitchen_search_sql("k")
 
 _DISH_SEARCH_SQL = """
           AND (

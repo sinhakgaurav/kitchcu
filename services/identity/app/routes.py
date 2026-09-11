@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.brand_media import upload_brand_media
 from app.models import Kitchen, Owner
 from app.discovery import DiscoveryHomeResponse, build_discovery_home
+from app.otp_delivery import demo_otp_response
 from app.schemas import (
     KitchenCreateRequest,
     KitchenDeliverySettingsUpdate,
@@ -31,6 +32,7 @@ from app.schemas import (
     kitchen_to_public_response,
     kitchen_to_response,
     list_kitchens_nearby,
+    list_nearest_kitchens,
     register_owner,
     update_kitchen_branded_page,
     update_kitchen_delivery_settings,
@@ -87,24 +89,25 @@ async def get_current_owner(
     description=(
         "Sends a one-time password to the owner's phone via WhatsApp/SMS to start login.\n\n"
         "**Body:** phone (10-digit India mobile or E.164).\n\n"
-        "**Response 202:** confirmation message. In `development`/`test` the OTP is "
-        "`DEMO_OTP` (default `123456`) via `dev_hint`. Outside that, returns 503 until "
-        "WhatsApp outbound delivery is configured.\n\n"
+        "**Response 202:** In `development`/`test` nothing is delivered — the body carries "
+        "`delivered: false` and `demo_otp` (default `123456`) so the caller knows what to type. "
+        "Outside that, returns 503 until WhatsApp outbound delivery is configured.\n\n"
         "Follow up with `POST /auth/otp/verify` to exchange the OTP for a JWT."
     ),
     responses={422: RESP_422},
     tags=["Auth"],
 )
-async def request_otp(body: OTPRequest) -> dict[str, str]:
+async def request_otp(body: OTPRequest) -> dict[str, object]:
     phone = body.phone.strip()
     if allows_fixed_dev_otp():
         otp = get_demo_otp()
         _DEV_OTP[phone] = otp
-        return {"message": "OTP sent", "dev_hint": f"Use {otp} in development"}
+        return demo_otp_response(otp)
 
     from app.main import redis_client
     from app.otp_delivery import (
         OWNER_OTP_PREFIX,
+        delivered_otp_response,
         generate_otp_code,
         send_otp_whatsapp,
         store_otp_redis,
@@ -122,7 +125,7 @@ async def request_otp(body: OTPRequest) -> dict[str, str]:
                 "WHATSAPP_OTP_PHONE_NUMBER_ID (or Admin → API Keys) and ensure Redis is up."
             ),
         ) from exc
-    return {"message": "OTP sent via WhatsApp"}
+    return delivered_otp_response()
 
 
 @router.post(
@@ -538,10 +541,12 @@ async def discovery_home(
     description=(
         "Public, unauthenticated discovery endpoint used by the customer app. Lists active "
         "cloud kitchens within `max_km` of the given point, sorted by distance, with optional "
-        "diet/live-capture/live-streaming filters.\n\n"
+        "free-text search and diet/live-capture/live-streaming filters.\n\n"
         "**Auth:** none — public endpoint.\n\n"
         "**Response 200:** distance-sorted kitchen list with per-kitchen discovery signals "
-        "(`has_veg`, `has_non_veg`, `has_live_capture`, `is_live_now`)."
+        "(`has_veg`, `has_non_veg`, `has_live_capture`, `is_live_now`). When nothing is in "
+        "range, `nearest` carries the closest active kitchens so the caller can still show "
+        "where kitchCU is live."
     ),
     responses={422: RESP_422},
     tags=["Discovery"],
@@ -556,6 +561,12 @@ async def kitchens_public_nearby(
     diet: str | None = Query(None, pattern="^(veg|non_veg|vegan)$", description="Filter to kitchens with an active dish in this diet category."),
     live_capture: bool | None = Query(None, description="Only kitchens with live-capture hero dishes"),
     live_only: bool | None = Query(None, description="Only kitchens currently streaming live prep"),
+    q: str | None = Query(
+        None,
+        max_length=120,
+        description="Free-text search across kitchen name/code/city/tagline, dish name, and cuisine.",
+        examples=["samosa"],
+    ),
 ) -> KitchenNearbyListResponse:
     kitchens = await list_kitchens_nearby(
         session,
@@ -567,9 +578,18 @@ async def kitchens_public_nearby(
         diet=diet,
         live_capture=live_capture,
         live_only=live_only,
+        q=q,
+    )
+    # Nothing in range is a dead end for the diner, so surface the closest kitchens
+    # instead. Only costs a query when the radius search came back empty.
+    nearest = (
+        []
+        if kitchens
+        else await list_nearest_kitchens(session, latitude=latitude, longitude=longitude, q=q)
     )
     return KitchenNearbyListResponse(
         kitchens=kitchens,
+        nearest=nearest,
         total=len(kitchens),
         customer_latitude=latitude,
         customer_longitude=longitude,

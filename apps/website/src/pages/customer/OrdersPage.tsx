@@ -114,11 +114,12 @@ export function OrdersPage() {
 
       {error && <div className="auth-card__error">{error}</div>}
 
-      {fetching ? (
+      {loading || fetching ? (
         <p className="app-loading">{t("common.loading")}</p>
       ) : orders.length === 0 ? (
-        <section className="glass">
-          <p>{t("customer.orders.empty")}</p>
+        <section className="glass empty-state">
+          <p className="empty-state__title">{t("customer.orders.empty")}</p>
+          <p className="empty-state__hint">{t("customer.orders.emptyHint")}</p>
           <Link to="/#near-you" className="btn btn--primary">{t("customer.discovery.title")}</Link>
         </section>
       ) : (

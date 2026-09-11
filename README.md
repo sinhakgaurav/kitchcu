@@ -13,7 +13,7 @@ copy .env.example .env
 # Start infrastructure + services
 docker compose up --build
 
-# Seed demo owner, kitchen, menu (8 dishes with images), and sample orders
+# Seed demo owner, kitchen, menu (11 dishes live + house classics as drafts), and sample orders
 python scripts/seed-dev-data.py
 
 # Customer app:  http://localhost:13001  (customer.kitchcu.in)

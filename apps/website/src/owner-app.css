@@ -936,6 +936,25 @@
 .owner-pay-panel > .btn--primary {
   align-self: flex-start;
 }
+/* The submit sits in its own rule rather than inheriting the field-to-field gap, so the
+   spacing below Reason stays put as conditional Channel/Amount fields come and go. */
+.owner-pay-panel__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-top: 0.25rem;
+  padding-top: 1.1rem;
+  border-top: 1px solid var(--surface-border);
+}
+.owner-pay-panel__actions .btn {
+  min-width: 14rem;
+}
+@media (max-width: 640px) {
+  .owner-pay-panel__actions .btn {
+    width: 100%;
+    min-width: 0;
+  }
+}
 .owner-pay-status { margin-top: 0.75rem; font-size: 0.85rem; }
 .owner-pay-status--ok { color: #81c784; }
 .owner-upi-box { margin-top: 1rem; display: flex; flex-direction: column; gap: 0.75rem; }
@@ -1185,16 +1204,28 @@
   padding: 0;
 }
 
-.nearby-kitchens__list li {
+/* The stagger classes sit on the list element itself, so the reveal must match the
+   list — not a wrapper. Keyed off .reveal-stagger so a list rendered without the
+   reveal classes is visible immediately instead of stranded at opacity 0. */
+.nearby-kitchens__list.reveal-stagger li {
   opacity: 0;
   transform: translateX(-16px);
   transition: opacity 0.55s ease, transform 0.55s ease;
   transition-delay: calc(var(--i, 0) * 0.06s);
 }
 
+.nearby-kitchens__list.reveal--visible li,
 .reveal-stagger.reveal--visible .nearby-kitchens__list li {
   opacity: 1;
   transform: translateX(0);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .nearby-kitchens__list.reveal-stagger li {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
 }
 
 .nearby-kitchens__card {

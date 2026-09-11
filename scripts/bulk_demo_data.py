@@ -12,6 +12,7 @@ from demo_data import (
     DEMO_KITCHENS_CITIES,
     DEMO_OWNERS_EXTRA,
     food_media,
+    media_for_dish,
 )
 
 random.seed(42)
@@ -204,63 +205,40 @@ CUSTOMER_NAMES = [
     "Guest Order",
 ]
 
-# 55 dishes across all catalog categories
+# Demo menu. Order matters: the photo-backed dishes come first so the non-full seed
+# (`all_dishes[:BULK_DISHES_PER_KITCHEN]`) fills a secondary kitchen with live dishes
+# rather than drafts.
+#
+# The tail has no honest photo yet, so those seed as inactive drafts and show the
+# live-capture gate an owner clears before a dish can go live. Adding a name here
+# without a DISH_MEDIA_BY_NAME entry is fine — it just stays a draft.
 BULK_DISHES: list[dict] = [
+    # ── Live: each one has a photo that genuinely shows it ────────────────────
+    {"name": "Chicken Biryani", "category_slug": "non_veg", "price": 279, "prep_time_min": 40},
+    {"name": "Masala Dosa", "category_slug": "veg", "price": 149, "prep_time_min": 20},
+    {"name": "Samosa (2 pc)", "category_slug": "snacks", "price": 59, "prep_time_min": 10},
+    {"name": "Chicken Fried Rice", "category_slug": "non_veg", "price": 219, "prep_time_min": 22},
+    {"name": "Mixed Grill Platter", "category_slug": "non_veg", "price": 449, "prep_time_min": 35},
+    {"name": "BBQ Chicken Pizza", "category_slug": "non_veg", "price": 329, "prep_time_min": 26},
+    {"name": "Tomato Basil Spaghetti", "category_slug": "veg", "price": 229, "prep_time_min": 20},
+    {"name": "Vegan Buddha Bowl", "category_slug": "vegan", "price": 249, "prep_time_min": 18},
+    {"name": "Egg & Tofu Protein Bowl", "category_slug": "eggetarian", "price": 249, "prep_time_min": 18},
+    {"name": "Smoky BBQ Ribs", "category_slug": "non_veg", "price": 479, "prep_time_min": 45},
+    {"name": "Apple Cinnamon Turnovers", "category_slug": "desserts", "price": 159, "prep_time_min": 25},
+    # ── Drafts: house classics awaiting a live-capture hero ──────────────────
     {"name": "Paneer Tikka", "category_slug": "veg", "price": 199, "prep_time_min": 25},
+    {"name": "Butter Chicken", "category_slug": "non_veg", "price": 299, "prep_time_min": 35},
     {"name": "Palak Paneer", "category_slug": "veg", "price": 189, "prep_time_min": 22},
     {"name": "Dal Tadka", "category_slug": "veg", "price": 149, "prep_time_min": 20},
     {"name": "Aloo Gobi", "category_slug": "veg", "price": 159, "prep_time_min": 18},
-    {"name": "Bhindi Masala", "category_slug": "veg", "price": 169, "prep_time_min": 20},
     {"name": "Chole Bhature", "category_slug": "veg", "price": 179, "prep_time_min": 25},
-    {"name": "Masala Dosa", "category_slug": "veg", "price": 149, "prep_time_min": 20},
-    {"name": "Idli Sambar (4 pc)", "category_slug": "veg", "price": 99, "prep_time_min": 15},
-    {"name": "Veg Biryani", "category_slug": "veg", "price": 219, "prep_time_min": 35},
-    {"name": "Methi Thepla (3 pc)", "category_slug": "veg", "price": 89, "prep_time_min": 12},
-    {"name": "Chicken Biryani", "category_slug": "non_veg", "price": 279, "prep_time_min": 40},
-    {"name": "Butter Chicken", "category_slug": "non_veg", "price": 299, "prep_time_min": 35},
-    {"name": "Chicken Tikka", "category_slug": "non_veg", "price": 249, "prep_time_min": 30},
     {"name": "Mutton Curry", "category_slug": "non_veg", "price": 349, "prep_time_min": 45},
-    {"name": "Fish Fry", "category_slug": "non_veg", "price": 289, "prep_time_min": 28},
-    {"name": "Egg Curry", "category_slug": "non_veg", "price": 159, "prep_time_min": 22},
-    {"name": "Chicken Keema Pav", "category_slug": "non_veg", "price": 199, "prep_time_min": 25},
-    {"name": "Tandoori Roti (2 pc)", "category_slug": "non_veg", "price": 49, "prep_time_min": 10},
-    {"name": "Tofu Stir Fry", "category_slug": "vegan", "price": 219, "prep_time_min": 20},
-    {"name": "Vegan Buddha Bowl", "category_slug": "vegan", "price": 249, "prep_time_min": 18},
-    {"name": "Coconut Curry (Vegan)", "category_slug": "vegan", "price": 199, "prep_time_min": 22},
-    {"name": "Mango Lassi", "category_slug": "beverages", "price": 89, "prep_time_min": 5},
-    {"name": "Sweet Lassi", "category_slug": "beverages", "price": 79, "prep_time_min": 5},
-    {"name": "Fresh Lime Soda", "category_slug": "beverages", "price": 59, "prep_time_min": 5},
-    {"name": "Buttermilk (Chaas)", "category_slug": "beverages", "price": 49, "prep_time_min": 3},
-    {"name": "Masala Chai", "category_slug": "hot_drinks", "price": 39, "prep_time_min": 8},
-    {"name": "Filter Coffee", "category_slug": "hot_drinks", "price": 49, "prep_time_min": 8},
-    {"name": "Hot Chocolate", "category_slug": "hot_drinks", "price": 99, "prep_time_min": 10},
-    {"name": "Cold Coffee", "category_slug": "cold_drinks", "price": 89, "prep_time_min": 5},
-    {"name": "Iced Tea", "category_slug": "cold_drinks", "price": 69, "prep_time_min": 5},
-    {"name": "Watermelon Juice", "category_slug": "cold_drinks", "price": 79, "prep_time_min": 5},
     {"name": "Pav Bhaji", "category_slug": "snacks", "price": 129, "prep_time_min": 18},
-    {"name": "Vada Pav (2 pc)", "category_slug": "snacks", "price": 79, "prep_time_min": 12},
-    {"name": "Samosa (2 pc)", "category_slug": "snacks", "price": 59, "prep_time_min": 10},
-    {"name": "Bhel Puri", "category_slug": "snacks", "price": 69, "prep_time_min": 8},
-    {"name": "French Fries", "category_slug": "snacks", "price": 99, "prep_time_min": 12},
-    {"name": "Gulab Jamun", "category_slug": "desserts", "price": 99, "prep_time_min": 10},
-    {"name": "Kheer", "category_slug": "desserts", "price": 89, "prep_time_min": 12},
-    {"name": "Rasmalai", "category_slug": "desserts", "price": 119, "prep_time_min": 10},
-    {"name": "Chocolate Brownie", "category_slug": "desserts", "price": 129, "prep_time_min": 8},
     {"name": "Veg Thali Combo", "category_slug": "combos", "price": 249, "prep_time_min": 30},
-    {"name": "Non-Veg Thali", "category_slug": "combos", "price": 329, "prep_time_min": 35},
-    {"name": "Office Lunch Box", "category_slug": "combos", "price": 199, "prep_time_min": 25},
-    {"name": "Family Feast (4 pax)", "category_slug": "combos", "price": 899, "prep_time_min": 45},
-    {"name": "Monsoon Pakora Platter", "category_slug": "seasonal_special", "price": 149, "prep_time_min": 15},
-    {"name": "Winter Gajar Halwa", "category_slug": "seasonal_special", "price": 109, "prep_time_min": 12},
-    {"name": "Summer Mango Special", "category_slug": "seasonal_special", "price": 179, "prep_time_min": 15},
-    {"name": "Festive Sweets Box", "category_slug": "seasonal_special", "price": 299, "prep_time_min": 20},
-    {"name": "Sunday Brunch Combo", "category_slug": "seasonal_special", "price": 399, "prep_time_min": 30},
-    {"name": "Jeera Rice", "category_slug": "veg", "price": 119, "prep_time_min": 15},
-    {"name": "Garlic Naan (2 pc)", "category_slug": "veg", "price": 79, "prep_time_min": 12},
-    {"name": "Chicken Wings (6 pc)", "category_slug": "non_veg", "price": 269, "prep_time_min": 25},
-    {"name": "Paneer Butter Masala", "category_slug": "veg", "price": 229, "prep_time_min": 28},
-    {"name": "Misal Pav", "category_slug": "snacks", "price": 119, "prep_time_min": 15},
-    {"name": "Sabudana Khichdi", "category_slug": "veg", "price": 109, "prep_time_min": 18},
+    {"name": "Gulab Jamun", "category_slug": "desserts", "price": 99, "prep_time_min": 10},
+    {"name": "Mango Lassi", "category_slug": "beverages", "price": 89, "prep_time_min": 5},
+    {"name": "Masala Chai", "category_slug": "hot_drinks", "price": 39, "prep_time_min": 8},
+    {"name": "Cold Coffee", "category_slug": "cold_drinks", "price": 89, "prep_time_min": 5},
 ]
 
 WHATSAPP_MESSAGES = [
@@ -317,89 +295,8 @@ ORDER_STATUS_WEIGHTS: list[tuple[str, int]] = [
 ]
 
 
-# Explicit dish → local food asset. This is the source of truth: keyword matching and
-# index round-robin both produced contradictory heroes (Bhel Puri showing grilled meat,
-# Aloo Gobi showing an unrelated plate).
-#
-# Two rules the seed data must respect:
-#   1. Never put a venue photo (kitchen/service/restaurant/dining) on a dish.
-#   2. When no asset honestly represents the dish — every drink, we have no beverage
-#      shot — seed no hero at all. A missing photo beats a misleading one.
-DISH_MEDIA_BY_NAME: dict[str, str | None] = {
-    # Veg mains
-    "Paneer Tikka": "skewers.jpg",
-    "Palak Paneer": "bowls.jpg",
-    "Dal Tadka": "bowls.jpg",
-    "Aloo Gobi": "bowls.jpg",
-    "Bhindi Masala": "bowls.jpg",
-    "Chole Bhature": "bowls.jpg",
-    "Masala Dosa": "dosa.jpg",
-    "Idli Sambar (4 pc)": "dosa.jpg",
-    "Veg Biryani": "biryani.jpg",
-    "Methi Thepla (3 pc)": "dosa.jpg",
-    "Jeera Rice": "rice.jpg",
-    "Garlic Naan (2 pc)": "dosa.jpg",
-    "Paneer Butter Masala": "bowls.jpg",
-    "Sabudana Khichdi": "bowls.jpg",
-    # Non-veg
-    "Chicken Biryani": "biryani.jpg",
-    "Butter Chicken": "bowls.jpg",
-    "Chicken Tikka": "skewers.jpg",
-    "Mutton Curry": "bowls.jpg",
-    "Fish Fry": "bbq.jpg",
-    "Egg Curry": "bowls.jpg",
-    "Chicken Keema Pav": "burger.jpg",
-    "Tandoori Roti (2 pc)": "dosa.jpg",
-    "Chicken Wings (6 pc)": "bbq.jpg",
-    # Vegan
-    "Tofu Stir Fry": "salad.jpg",
-    "Vegan Buddha Bowl": "salad.jpg",
-    "Coconut Curry (Vegan)": "bowls.jpg",
-    # Drinks — no beverage asset exists, so no hero.
-    "Mango Lassi": None,
-    "Sweet Lassi": None,
-    "Fresh Lime Soda": None,
-    "Buttermilk (Chaas)": None,
-    "Masala Chai": None,
-    "Filter Coffee": None,
-    "Hot Chocolate": None,
-    "Cold Coffee": None,
-    "Iced Tea": None,
-    "Watermelon Juice": None,
-    # Snacks
-    "Pav Bhaji": "bowls.jpg",
-    "Vada Pav (2 pc)": "burger.jpg",
-    "Samosa (2 pc)": "samosa.jpg",
-    "Bhel Puri": "samosa.jpg",
-    "French Fries": "burger.jpg",
-    "Misal Pav": "bowls.jpg",
-    # Desserts
-    "Gulab Jamun": "dessert.jpg",
-    "Kheer": "dessert.jpg",
-    "Rasmalai": "dessert.jpg",
-    "Chocolate Brownie": "dessert.jpg",
-    # Combos
-    "Veg Thali Combo": "rice.jpg",
-    "Non-Veg Thali": "rice.jpg",
-    "Office Lunch Box": "rice.jpg",
-    "Family Feast (4 pax)": "biryani.jpg",
-    # Seasonal
-    "Monsoon Pakora Platter": "samosa.jpg",
-    "Winter Gajar Halwa": "dessert.jpg",
-    "Summer Mango Special": "dessert.jpg",
-    "Festive Sweets Box": "dessert.jpg",
-    "Sunday Brunch Combo": "rice.jpg",
-}
-
-
-def _media_for_dish(name: str) -> str | None:
-    """Return the hero URL for a seeded dish, or None when no honest asset exists."""
-    asset = DISH_MEDIA_BY_NAME.get(name.strip())
-    return food_media(asset) if asset else None
-
-
 def dish_with_media(dish: dict) -> dict:
-    media_url = dish.get("media_url") or _media_for_dish(str(dish.get("name", "")))
+    media_url = dish.get("media_url") or media_for_dish(str(dish.get("name", "")))
     return {
         **dish,
         "description": f"Home-style {dish['name']} — live-capture, made fresh to order.",

@@ -385,6 +385,7 @@
     "orders": {
       "title": "My orders",
       "empty": "No orders yet",
+      "emptyHint": "Orders you place will show up here with live status and a one-tap reorder.",
       "track": "Track",
       "repeat": "Reorder",
       "history": "Order history"

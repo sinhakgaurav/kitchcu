@@ -110,7 +110,7 @@ export function CustomerBrowsePage() {
             <p>Cloud kitchens focused on authentic home cooking, not aggregator races.</p>
           </article>
           <article className="glass customer-benefit-card">
-            <img src={sampleDishImages.thali} alt="" loading="lazy" />
+            <img src={sampleDishImages.friedRice} alt="" loading="lazy" />
             <h3>Order tracking</h3>
             <p>Follow every order from kitchen to door — live status and a shareable tracking link.</p>
           </article>

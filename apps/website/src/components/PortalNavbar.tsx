@@ -1,22 +1,18 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { BrandNavMark } from "./BrandNavMark";
 import { LanguageSwitcher } from "../i18n/LanguageSwitcher";
 import { APP_TAGLINE } from "../shared/brand";
 import { customerUrl, kitchenUrl } from "../shared/urls";
 import { SuperAdminLink } from "./SuperAdminAccess";
+import { useScrollEffect } from "../hooks/useParallax";
 
 export function PortalNavbar() {
   const { t } = useTranslation();
   const [scrolled, setScrolled] = useState(false);
   const [open, setOpen] = useState(false);
 
-  useEffect(() => {
-    const onScroll = () => setScrolled(window.scrollY > 40);
-    onScroll();
-    window.addEventListener("scroll", onScroll, { passive: true });
-    return () => window.removeEventListener("scroll", onScroll);
-  }, []);
+  useScrollEffect(() => setScrolled(window.scrollY > 40));
 
   const links = [
     { href: "#apps", label: t("portal.navApps") },

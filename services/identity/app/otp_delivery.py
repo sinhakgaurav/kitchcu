@@ -21,6 +21,24 @@ def generate_otp_code() -> str:
     return f"{secrets.randbelow(1_000_000):06d}"
 
 
+def demo_otp_response(code: str) -> dict[str, object]:
+    """Body for demo/dev logins, where no SMS or WhatsApp message is actually sent.
+
+    Callers used to get `"OTP sent via WhatsApp"` here and then wait for a message
+    that never arrives. Say what happened and hand back the code to type.
+    """
+    return {
+        "message": "Demo mode — no message sent",
+        "demo_otp": code,
+        "delivered": False,
+        "dev_hint": f"Use {code} in development",
+    }
+
+
+def delivered_otp_response(channel: str = "WhatsApp") -> dict[str, object]:
+    return {"message": f"OTP sent via {channel}", "delivered": True}
+
+
 async def store_otp_redis(redis_client, *, prefix: str, phone: str, code: str) -> None:
     if redis_client is None:
         raise RuntimeError("Redis unavailable for OTP storage")

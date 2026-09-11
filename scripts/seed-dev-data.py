@@ -135,6 +135,7 @@ def ensure_dishes(token: str, kitchen_id: str) -> dict[str, str]:
     cats = category_map(token, kitchen_id)
     cuisines = cuisine_map(token, kitchen_id)
     created = 0
+    published = 0
 
     for dish in DEMO_DISHES:
         if dish["name"] in existing:
@@ -148,12 +149,15 @@ def ensure_dishes(token: str, kitchen_id: str) -> dict[str, str]:
         resp = request("POST", f"/api/v1/kitchens/{kitchen_id}/dishes", payload, token=token)
         existing[dish["name"]] = resp["id"]
         created += 1
-        print(f"  + dish: {dish['name']}")
+        live = "live" if payload.get("media") else "draft — awaiting live capture"
+        if payload.get("media"):
+            published += 1
+        print(f"  + dish: {dish['name']} ({live})")
 
     if created == 0:
         print(f"Menu already has {len(existing)} dishes - skipped dish creation.")
     else:
-        print(f"Added {created} dishes with live-capture images.")
+        print(f"Added {created} dishes: {published} live with a matching hero, {created - published} drafts.")
 
     return existing
 

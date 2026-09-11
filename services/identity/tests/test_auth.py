@@ -10,8 +10,11 @@ async def test_request_otp_returns_accepted(client: AsyncClient, registered_owne
     )
     assert response.status_code == 202
     data = response.json()
-    assert data["message"] == "OTP sent"
     assert "dev_hint" in data
+    # Demo mode delivers nothing — saying "sent" would strand the caller waiting for an SMS.
+    assert data["message"] == "Demo mode — no message sent"
+    assert data["demo_otp"] == "123456"
+    assert data["delivered"] is False
 
 
 @pytest.mark.asyncio
@@ -48,6 +51,14 @@ async def test_request_otp_rejects_invalid_phone(client: AsyncClient):
         json={"phone": "not-a-phone"},
     )
     assert response.status_code == 422
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("phone", ["987654321011", "98765", "98765 4321!", "+14155550123"])
+async def test_request_otp_rejects_undeliverable_phone(client: AsyncClient, phone: str):
+    """QA tracker BUG_01 — an over-long or foreign number must never mint an OTP."""
+    response = await client.post("/api/v1/auth/otp/request", json={"phone": phone})
+    assert response.status_code == 422, phone
 
 
 @pytest.mark.asyncio

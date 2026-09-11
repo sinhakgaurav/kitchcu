@@ -95,6 +95,8 @@ export type KitchenNearby = KitchenPublic & {
 
 export type KitchenNearbyList = {
   kitchens: KitchenNearby[];
+  /** Closest kitchens ignoring the radius. Only sent when `kitchens` is empty. */
+  nearest?: KitchenNearby[];
   total: number;
   customer_latitude: number;
   customer_longitude: number;
@@ -445,8 +447,28 @@ export async function registerOwner(data: {
   });
 }
 
-export async function requestOtp(phone: string): Promise<void> {
-  await apiFetch("/api/v1/auth/otp/request", {
+export type OtpRequestResult = {
+  message?: string;
+  /** Present only in demo/dev mode, where no SMS or WhatsApp message is sent. */
+  demo_otp?: string;
+  delivered?: boolean;
+};
+
+/**
+ * What to tell the user after requesting an OTP. Demo builds deliver nothing, so
+ * saying "check your phone" would leave them waiting on a message that never comes.
+ */
+export function otpDeliveryNotice(result: OtpRequestResult | void): string {
+  if (result && result.delivered === false) {
+    return result.demo_otp
+      ? `Demo mode — no SMS or WhatsApp message is sent. Enter ${result.demo_otp}.`
+      : "Demo mode — no SMS or WhatsApp message is sent.";
+  }
+  return "";
+}
+
+export async function requestOtp(phone: string): Promise<OtpRequestResult> {
+  return apiFetch("/api/v1/auth/otp/request", {
     method: "POST",
     body: JSON.stringify({ phone: normalizePhone(phone) }),
   });

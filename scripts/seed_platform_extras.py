@@ -8,7 +8,7 @@ import os
 import subprocess
 from datetime import datetime, timedelta, timezone
 
-from demo_data import DEMO_ADMIN, DEMO_CUSTOMERS, DEMO_OTP, DEMO_REFERRAL
+from demo_data import DEMO_ADMIN, DEMO_CUSTOMERS, DEMO_OTP, DEMO_REFERRAL, media_for_dish
 from seed_common import (
     ApiError,
     login_admin,
@@ -315,6 +315,15 @@ def _brand_asset_for_kitchen(kitchen_id: str, options: tuple[str, ...]) -> str:
     return options[digest % len(options)]
 
 
+def _first_dish(dish_ids: dict[str, str], preferred: tuple[str, ...]) -> tuple[str, str] | None:
+    """First preferred dish that is live on this menu, as (name, id)."""
+    for name in preferred:
+        dish_id = dish_ids.get(name)
+        if dish_id and media_for_dish(name):
+            return name, str(dish_id)
+    return None
+
+
 def ensure_tiffin_plans(owner_token: str, kitchen_id: str, dish_ids: dict[str, str]) -> None:
     """F34/F35 — seed thali, combo (≥2 dishes), and single_dish plans (idempotent by name)."""
     ids = [str(v) for v in dish_ids.values() if v]
@@ -334,44 +343,54 @@ def ensure_tiffin_plans(owner_token: str, kitchen_id: str, dish_ids: dict[str, s
         log(f"  ! tiffin plans list: {exc}")
         return
 
+    # A plan advertises the dishes inside it, so its cover is the lead dish's own hero
+    # and its name follows that dish. Hardcoding either is how "Demo Veg Thali Monthly"
+    # ended up serving chicken biryani under a photo of the dining room.
+    veg_lead = _first_dish(dish_ids, ("Masala Dosa", "Tomato Basil Spaghetti", "Vegan Buddha Bowl"))
+    solo_lead = _first_dish(dish_ids, ("Chicken Biryani", "Masala Dosa"))
+    if not veg_lead or not solo_lead:
+        log("  ! tiffin plans skipped: no live dish to build a plan around")
+        return
+
     specs: list[dict] = [
         {
             "name": "Demo Veg Thali Monthly",
-            "description": "Weekday thali — seed plan for owner + admin tiffin flows.",
+            "description": f"Weekday veg thali built on {veg_lead[0]} — seed plan for owner + admin tiffin flows.",
             "plan_type": "thali",
             "price_monthly": 2499.0,
             "dishes_config": {
-                "dish_ids": [ids[0]],
+                "dish_ids": [veg_lead[1]],
                 "weekdays": [0, 1, 2, 3, 4],
                 "meals_per_day": 1,
-                "image_url": "/media/food/rice.jpg",
+                "image_url": media_for_dish(veg_lead[0]),
             },
         },
         {
             "name": "Demo Single Dish Monthly",
-            "description": "One-dish monthly pack (F35 single_dish rule).",
+            "description": f"One-dish monthly pack of {solo_lead[0]} (F35 single_dish rule).",
             "plan_type": "single_dish",
             "price_monthly": 1499.0,
             "dishes_config": {
-                "dish_ids": [ids[0]],
+                "dish_ids": [solo_lead[1]],
                 "weekdays": [0, 1, 2, 3, 4, 5],
                 "meals_per_day": 1,
-                "image_url": "/media/food/bowls.jpg",
+                "image_url": media_for_dish(solo_lead[0]),
             },
         },
     ]
-    if len(ids) >= 2:
+    combo_names = [n for n in dish_ids if media_for_dish(n)][:2]
+    if len(combo_names) >= 2:
         specs.append(
             {
                 "name": "Demo Combo Lunch Pack",
-                "description": "Multi-dish combo pack (F35 combo ≥2 dishes).",
+                "description": f"Multi-dish combo pack — {' + '.join(combo_names)} (F35 combo ≥2 dishes).",
                 "plan_type": "combo",
                 "price_monthly": 2999.0,
                 "dishes_config": {
-                    "dish_ids": ids[:2],
+                    "dish_ids": [dish_ids[n] for n in combo_names],
                     "weekdays": [0, 1, 2, 3, 4],
                     "meals_per_day": 1,
-                    "image_url": "/media/food/dining.jpg",
+                    "image_url": media_for_dish(combo_names[0]),
                 },
             }
         )
@@ -382,13 +401,16 @@ def ensure_tiffin_plans(owner_token: str, kitchen_id: str, dish_ids: dict[str, s
         existing = existing_by_name.get(body["name"])
         if existing:
             cfg = existing.get("dishes_config") or {}
-            want_img = (body.get("dishes_config") or {}).get("image_url")
-            if want_img and not cfg.get("image_url"):
+            want_cfg = body.get("dishes_config") or {}
+            want_img = want_cfg.get("image_url")
+            # Correct a cover that shows the wrong food, not just a missing one — an
+            # earlier seed put a dining-room photo on the combo pack.
+            if want_img and cfg.get("image_url") != want_img:
                 try:
                     request(
                         "PATCH",
                         f"/api/v1/kitchens/{kitchen_id}/subscription-plans/{existing['id']}",
-                        {"dishes_config": {**cfg, "image_url": want_img}},
+                        {"dishes_config": {**cfg, **want_cfg}},
                         token=owner_token,
                     )
                     updated += 1

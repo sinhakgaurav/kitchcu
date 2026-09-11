@@ -62,10 +62,13 @@ def run() -> None:
     assert_ok(recipes_set > 0, "No dish recipes set")
     print(f"Ingredients: {len(ingredient_ids)} · Recipes: {recipes_set}")
 
-    paneer_tikka_id = dish_ids.get("Paneer Tikka") or dishes[0]["id"]
+    # Probe a dish that actually carries prep steps — draft dishes are absent from the
+    # public menu, so picking by name alone can land on a dish with no recipe.
+    probe_name = next((n for n in DISH_PREP_STEPS if n in dish_ids), None)
+    assert_ok(probe_name is not None, "No live dish has prep steps — check DISH_PREP_STEPS")
     recipe_check = request(
         "GET",
-        f"/api/v1/kitchens/{kitchen_id}/dishes/{paneer_tikka_id}/recipe",
+        f"/api/v1/kitchens/{kitchen_id}/dishes/{dish_ids[probe_name]}/recipe",
         token=token,
     )
     assert_ok(len(recipe_check.get("prep_steps", [])) >= 1, "Recipe missing prep steps")

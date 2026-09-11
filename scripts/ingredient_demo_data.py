@@ -28,7 +28,42 @@ DEMO_PANTRY: list[dict] = [
 ]
 
 # Per-dish recipe: dish name -> list of (ingredient name, qty, unit, optional line photo)
+#
+# Recipes only bind to live dishes (ensure_dish_recipes walks the active menu), so the
+# photo-backed dishes come first. The house classics below keep their recipes for when
+# an owner captures a hero and publishes them.
 DISH_RECIPES: dict[str, list[tuple[str, float, str] | tuple[str, float, str, str]]] = {
+    "Chicken Fried Rice": [
+        ("Chicken", 150, "g"),
+        ("Basmati Rice", 180, "g", _RICE),
+        ("Mixed Vegetables", 80, "g"),
+        ("Haldi", 2, "g"),
+    ],
+    "Samosa (2 pc)": [
+        ("Potato", 120, "g"),
+        ("Wheat Flour", 80, "g"),
+        ("Garam Masala", 5, "g"),
+    ],
+    "Mixed Grill Platter": [
+        ("Chicken", 250, "g"),
+        ("Yogurt", 50, "g"),
+        ("Garam Masala", 10, "g"),
+        ("Lal Mirch", 5, "g"),
+    ],
+    "BBQ Chicken Pizza": [
+        ("Chicken", 120, "g"),
+        ("Wheat Flour", 150, "g"),
+        ("Tomato", 90, "g"),
+    ],
+    "Tomato Basil Spaghetti": [
+        ("Tomato", 200, "g"),
+        ("Butter", 20, "g"),
+        ("Lal Mirch", 2, "g"),
+    ],
+    "Vegan Buddha Bowl": [
+        ("Mixed Vegetables", 200, "g"),
+        ("Potato", 100, "g"),
+    ],
     "Paneer Tikka": [
         ("Paneer", 150, "g", _PANEER),
         ("Garam Masala", 8, "g"),

@@ -96,8 +96,10 @@ export async function completeCustomerOAuth(
   });
 }
 
-export async function requestCustomerWhatsAppOtp(phone: string): Promise<void> {
-  await customerFetch("/api/v1/auth/customer/whatsapp/request", {
+export async function requestCustomerWhatsAppOtp(
+  phone: string,
+): Promise<import("./api").OtpRequestResult> {
+  return customerFetch("/api/v1/auth/customer/whatsapp/request", {
     method: "POST",
     body: JSON.stringify({ phone }),
   });

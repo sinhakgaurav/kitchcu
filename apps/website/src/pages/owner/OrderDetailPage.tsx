@@ -585,13 +585,15 @@ export function OrderDetailPage() {
                 />
               </label>
 
-              <button type="button" className="btn btn--primary" disabled={refundBusy} onClick={submitRefund}>
-                {refundBusy
-                  ? "Working…"
-                  : refundKind === "full" && refundChannel === "gateway"
-                    ? "Refund via gateway"
-                    : "Create direct refund"}
-              </button>
+              <div className="owner-pay-panel__actions">
+                <button type="button" className="btn btn--primary" disabled={refundBusy} onClick={submitRefund}>
+                  {refundBusy
+                    ? "Working…"
+                    : refundKind === "full" && refundChannel === "gateway"
+                      ? "Refund via gateway"
+                      : "Create direct refund"}
+                </button>
+              </div>
 
               {refunds.length > 0 && (
                 <ul className="owner-detail-items" style={{ marginTop: "1rem" }}>

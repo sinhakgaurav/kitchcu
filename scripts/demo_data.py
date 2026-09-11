@@ -311,6 +311,63 @@ def unsplash(photo_id: str, width: int = 800) -> str:
     return f"https://images.unsplash.com/{photo_id}?w={width}&q=85&auto=format&fit=crop"
 
 
+# ── Dish photo truth table ────────────────────────────────────────────────────
+# A hero photo is a promise about what arrives in the bag, so every asset is
+# described here by what it actually shows. An asset may be assigned to a dish
+# only when the photo *is* that dish.
+FOOD_ASSET_SUBJECTS: dict[str, str] = {
+    "biryani.jpg": "Chicken biryani — bone-in chicken pieces in saffron basmati",
+    "dosa.jpg": "Folded masala dosa on a plate with a chutney cup",
+    "samosa.jpg": "Two deep-fried samosas on white",
+    "salad.jpg": "Vegan bowl — avocado, chickpea, sweet potato, radish, greens",
+    "bowls.jpg": "Seared tofu and boiled egg bowl with edamame, corn, greens",
+    "rice.jpg": "Chicken fried rice with scrambled egg, peas, carrot",
+    "pizza.jpg": "BBQ chicken pizza with pineapple, red onion, coriander",
+    "pasta.jpg": "Spaghetti tossed in tomato sauce",
+    "skewers.jpg": "Mixed grill platter — chicken skewers and wings, lamb chops, grilled veg",
+    "bbq.jpg": "Glazed rib rack with fries, tomato, pickles",
+    "dessert.jpg": "Apple turnovers dusted with icing sugar",
+    # Venue photography. Fine as marketing backdrop, never a dish hero.
+    "kitchen.jpg": "Kitchen interior (venue)",
+    "dining.jpg": "Laid dining table (venue)",
+    "service.jpg": "Counter service (venue)",
+    "restaurant.jpg": "Restaurant room (venue)",
+    # Fast-food chain product shot of a beef patty on branded paper: wrong meat for
+    # an Indian demo menu and not ours to pass off as a kitchen's own cooking.
+    "burger.jpg": "Beef cheeseburger, brand product shot",
+}
+
+VENUE_ASSETS = frozenset({"kitchen.jpg", "dining.jpg", "service.jpg", "restaurant.jpg"})
+UNUSABLE_DISH_ASSETS = VENUE_ASSETS | {"burger.jpg"}
+# Shows meat or egg, so it can never sit on a veg or vegan dish.
+NON_VEG_ASSETS = frozenset({"biryani.jpg", "rice.jpg", "pizza.jpg", "skewers.jpg", "bbq.jpg", "bowls.jpg"})
+
+# One asset, one dish — shared by the primary and bulk seeders so they cannot drift.
+# A dish missing from this map seeds with no hero, which keeps it an inactive draft
+# and off the public menu until an owner captures a real photo. That is deliberate:
+# a dish with no photo costs the demo a tile, a dish with someone else's photo costs
+# the diner their trust.
+DISH_MEDIA_BY_NAME: dict[str, str] = {
+    "Chicken Biryani": "biryani.jpg",
+    "Masala Dosa": "dosa.jpg",
+    "Samosa (2 pc)": "samosa.jpg",
+    "Vegan Buddha Bowl": "salad.jpg",
+    "Egg & Tofu Protein Bowl": "bowls.jpg",
+    "Chicken Fried Rice": "rice.jpg",
+    "BBQ Chicken Pizza": "pizza.jpg",
+    "Tomato Basil Spaghetti": "pasta.jpg",
+    "Mixed Grill Platter": "skewers.jpg",
+    "Smoky BBQ Ribs": "bbq.jpg",
+    "Apple Cinnamon Turnovers": "dessert.jpg",
+}
+
+
+def media_for_dish(name: str) -> str | None:
+    """Hero URL for a seeded dish, or None when no asset honestly shows it."""
+    asset = DISH_MEDIA_BY_NAME.get(name.strip())
+    return food_media(asset) if asset else None
+
+
 CAPTURED_AT = datetime.now(timezone.utc).isoformat()
 
 # Legacy category slugs mapped to diet types (veg / non_veg / vegan / eggetarian)
@@ -378,18 +435,13 @@ def infer_cuisine_slug(dish: dict) -> str:
     return "home_style"
 
 
-# Sample dishes for seeded menu (cuisine -> diet category -> dish)
+# Sample dishes for seeded menu (cuisine -> diet category -> dish).
+#
+# Heroes come from DISH_MEDIA_BY_NAME, so the menu splits in two:
+#   * dishes whose photo genuinely shows them go live;
+#   * the house classics below have no honest asset yet, so they seed as drafts
+#     and demo the live-capture gate an owner walks through on day one.
 DEMO_DISHES: list[dict] = [
-    {
-        "name": "Paneer Tikka",
-        "cuisine_slug": "north_indian",
-        "category_slug": "veg",
-        "price": 199.0,
-        "prep_time_min": 25,
-        "description": "Char-grilled cottage cheese with bell peppers and mint chutney.",
-        "ingredients_description": "Paneer, capsicum, onion, yogurt marinade, spices",
-        "media_url": food_media("skewers.jpg"),
-    },
     {
         "name": "Chicken Biryani",
         "cuisine_slug": "north_indian",
@@ -398,7 +450,6 @@ DEMO_DISHES: list[dict] = [
         "prep_time_min": 40,
         "description": "Fragrant basmati rice with tender chicken and whole spices.",
         "ingredients_description": "Chicken, basmati rice, saffron, fried onions, biryani masala",
-        "media_url": food_media("biryani.jpg"),
     },
     {
         "name": "Masala Dosa",
@@ -408,7 +459,97 @@ DEMO_DISHES: list[dict] = [
         "prep_time_min": 20,
         "description": "Crispy rice crepe filled with spiced potato masala, served with sambar.",
         "ingredients_description": "Rice, urad dal, potato, mustard seeds, curry leaves",
-        "media_url": food_media("dosa.jpg"),
+    },
+    {
+        "name": "Samosa (2 pc)",
+        "cuisine_slug": "street_food",
+        "category_slug": "veg",
+        "price": 59.0,
+        "prep_time_min": 10,
+        "description": "Flaky pastry triangles stuffed with spiced potato and peas.",
+        "ingredients_description": "Wheat flour, potato, green peas, cumin, garam masala",
+    },
+    {
+        "name": "Chicken Fried Rice",
+        "cuisine_slug": "chinese",
+        "category_slug": "non_veg",
+        "price": 219.0,
+        "prep_time_min": 22,
+        "description": "Wok-tossed rice with chicken, egg, peas, and carrot.",
+        "ingredients_description": "Rice, chicken, egg, peas, carrot, soy, spring onion",
+    },
+    {
+        "name": "Egg & Tofu Protein Bowl",
+        "cuisine_slug": "continental",
+        "category_slug": "eggetarian",
+        "price": 249.0,
+        "prep_time_min": 18,
+        "description": "Seared tofu and boiled egg over greens with edamame and sweetcorn.",
+        "ingredients_description": "Tofu, egg, edamame, sweetcorn, cucumber, lettuce, chilli flakes",
+    },
+    {
+        "name": "Vegan Buddha Bowl",
+        "cuisine_slug": "continental",
+        "category_slug": "vegan",
+        "price": 249.0,
+        "prep_time_min": 18,
+        "description": "Avocado, chickpea, roast sweet potato, and radish over crisp greens.",
+        "ingredients_description": "Avocado, chickpea, sweet potato, radish, cabbage, tahini",
+    },
+    {
+        "name": "BBQ Chicken Pizza",
+        "cuisine_slug": "continental",
+        "category_slug": "non_veg",
+        "price": 329.0,
+        "prep_time_min": 26,
+        "description": "Thin crust with pulled BBQ chicken, pineapple, and red onion.",
+        "ingredients_description": "Wheat flour, mozzarella, chicken, BBQ sauce, pineapple, red onion",
+    },
+    {
+        "name": "Tomato Basil Spaghetti",
+        "cuisine_slug": "continental",
+        "category_slug": "veg",
+        "price": 229.0,
+        "prep_time_min": 20,
+        "description": "Spaghetti tossed in slow-cooked tomato sauce with basil.",
+        "ingredients_description": "Spaghetti, tomato, garlic, basil, olive oil",
+    },
+    {
+        "name": "Mixed Grill Platter",
+        "cuisine_slug": "north_indian",
+        "category_slug": "non_veg",
+        "price": 449.0,
+        "prep_time_min": 35,
+        "description": "Chicken skewers, wings, and lamb chops with grilled veg and dips.",
+        "ingredients_description": "Chicken, lamb, yogurt marinade, capsicum, aubergine, potato",
+    },
+    {
+        "name": "Smoky BBQ Ribs",
+        "cuisine_slug": "continental",
+        "category_slug": "non_veg",
+        "price": 479.0,
+        "prep_time_min": 45,
+        "description": "Slow-cooked glazed rib rack with fries and house pickles.",
+        "ingredients_description": "Ribs, BBQ glaze, paprika, potato, gherkins",
+    },
+    {
+        "name": "Apple Cinnamon Turnovers",
+        "cuisine_slug": "continental",
+        "category_slug": "veg",
+        "price": 159.0,
+        "prep_time_min": 25,
+        "description": "Baked puff pastry parcels of cinnamon apple, dusted with icing sugar.",
+        "ingredients_description": "Puff pastry, apple, cinnamon, butter, icing sugar",
+    },
+    # ── House classics awaiting a live-capture hero (seed as drafts) ──────────
+    {
+        "name": "Paneer Tikka",
+        "cuisine_slug": "north_indian",
+        "category_slug": "veg",
+        "price": 199.0,
+        "prep_time_min": 25,
+        "description": "Char-grilled cottage cheese with bell peppers and mint chutney.",
+        "ingredients_description": "Paneer, capsicum, onion, yogurt marinade, spices",
     },
     {
         "name": "Butter Chicken",
@@ -418,27 +559,6 @@ DEMO_DISHES: list[dict] = [
         "prep_time_min": 35,
         "description": "Creamy tomato gravy with tandoori chicken — home-style, not restaurant heavy.",
         "ingredients_description": "Chicken, tomato, butter, cream, kasuri methi",
-        "media_url": food_media("restaurant.jpg"),
-    },
-    {
-        "name": "Mango Lassi",
-        "cuisine_slug": "home_style",
-        "category_slug": "veg",
-        "price": 89.0,
-        "prep_time_min": 5,
-        "description": "Thick yogurt drink blended with Alphonso mango pulp.",
-        "ingredients_description": "Yogurt, mango pulp, cardamom, ice",
-        "media_url": food_media("dessert.jpg"),
-    },
-    {
-        "name": "Gulab Jamun",
-        "cuisine_slug": "north_indian",
-        "category_slug": "veg",
-        "price": 99.0,
-        "prep_time_min": 10,
-        "description": "Warm milk-solid dumplings in rose-cardamom syrup (2 pcs).",
-        "ingredients_description": "Khoya, flour, sugar, rose water, cardamom",
-        "media_url": food_media("dessert.jpg"),
     },
     {
         "name": "Veg Thali Combo",
@@ -448,7 +568,6 @@ DEMO_DISHES: list[dict] = [
         "prep_time_min": 30,
         "description": "Dal, seasonal sabzi, rice, roti, pickle, and papad — complete meal.",
         "ingredients_description": "Dal, seasonal vegetables, wheat roti, rice, accompaniments",
-        "media_url": food_media("rice.jpg"),
     },
     {
         "name": "Pav Bhaji",
@@ -458,11 +577,32 @@ DEMO_DISHES: list[dict] = [
         "prep_time_min": 18,
         "description": "Mumbai-style mashed veggie curry with butter-toasted pav (2 pcs).",
         "ingredients_description": "Mixed vegetables, pav, butter, bhaji masala",
-        "media_url": food_media("dining.jpg"),
+    },
+    {
+        "name": "Gulab Jamun",
+        "cuisine_slug": "north_indian",
+        "category_slug": "veg",
+        "price": 99.0,
+        "prep_time_min": 10,
+        "description": "Warm milk-solid dumplings in rose-cardamom syrup (2 pcs).",
+        "ingredients_description": "Khoya, flour, sugar, rose water, cardamom",
+    },
+    {
+        "name": "Mango Lassi",
+        "cuisine_slug": "home_style",
+        "category_slug": "veg",
+        "price": 89.0,
+        "prep_time_min": 5,
+        "description": "Thick yogurt drink blended with Alphonso mango pulp.",
+        "ingredients_description": "Yogurt, mango pulp, cardamom, ice",
     },
 ]
 
-# Sample orders (created after dishes exist; dish names matched at runtime)
+DEMO_DISHES = [{**dish, "media_url": media_for_dish(dish["name"])} for dish in DEMO_DISHES]
+
+# Sample orders (created after dishes exist; dish names matched at runtime).
+# Only live dishes are orderable, so every item here must be a photo-backed dish
+# from DISH_MEDIA_BY_NAME — otherwise the item is silently dropped at seed time.
 DEMO_ORDERS: list[dict] = [
     {
         "customer_name": "Priya Mehta",
@@ -470,7 +610,7 @@ DEMO_ORDERS: list[dict] = [
         "delivery_type": "delivery",
         "payment_method": "upi",
         "delivery_fee": 40.0,
-        "items": [{"dish_name": "Chicken Biryani", "quantity": 1}, {"dish_name": "Mango Lassi", "quantity": 2}],
+        "items": [{"dish_name": "Chicken Biryani", "quantity": 1}, {"dish_name": "Samosa (2 pc)", "quantity": 2}],
         "target_status": "preparing",
     },
     {
@@ -479,7 +619,7 @@ DEMO_ORDERS: list[dict] = [
         "delivery_type": "pickup",
         "payment_method": "cod",
         "delivery_fee": 0.0,
-        "items": [{"dish_name": "Paneer Tikka", "quantity": 2}],
+        "items": [{"dish_name": "Masala Dosa", "quantity": 2}],
         "target_status": "received",
     },
     {
@@ -488,7 +628,10 @@ DEMO_ORDERS: list[dict] = [
         "delivery_type": "pickup",
         "payment_method": "cod",
         "delivery_fee": 0.0,
-        "items": [{"dish_name": "Veg Thali Combo", "quantity": 1}, {"dish_name": "Gulab Jamun", "quantity": 1}],
+        "items": [
+            {"dish_name": "Vegan Buddha Bowl", "quantity": 1},
+            {"dish_name": "Apple Cinnamon Turnovers", "quantity": 1},
+        ],
         "target_status": "delivered",
     },
 ]

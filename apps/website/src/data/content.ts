@@ -81,10 +81,10 @@ export const parallaxPhotos = [
 /** Masonry-style gallery for customer landing */
 export const customerGallery = [
   { src: m("biryani.jpg"), alt: "Biryani", label: "Biryani", rotate: "-3deg" },
-  { src: m("pasta.jpg"), alt: "Wok toss", label: "Wok toss", rotate: "2deg" },
+  { src: m("pasta.jpg"), alt: "Spaghetti in tomato sauce", label: "Tomato spaghetti", rotate: "2deg" },
   { src: m("bowls.jpg"), alt: "Bowls", label: "Meal bowls", rotate: "-2deg" },
   { src: m("burger.jpg"), alt: "Burger", label: "Gourmet burger", rotate: "4deg" },
-  { src: m("rice.jpg"), alt: "Thali", label: "Home thali", rotate: "-5deg" },
+  { src: m("rice.jpg"), alt: "Fried rice", label: "Fried rice", rotate: "-5deg" },
   { src: m("pizza.jpg"), alt: "Pizza", label: "Artisan pizza", rotate: "3deg" },
   { src: m("samosa.jpg"), alt: "Snacks", label: "Evening snacks", rotate: "-2deg" },
   { src: m("dessert.jpg"), alt: "Dessert", label: "Sweet treat", rotate: "5deg" },
@@ -369,16 +369,23 @@ export const supportChannels = [
   { label: "Response time", value: "Within 24 hours on weekdays" },
 ];
 
-/** Sample dish hero URLs for menu cards and add-dish hints */
+/** Sample dish hero URLs for menu cards and add-dish hints.
+ *
+ * Keys are rendered as captions (ParallaxMosaic), so each one names what the photo
+ * actually shows. Naming a key after a dish the photo does not contain is how
+ * "pav bhaji" ended up captioning a pizza and "lassi" a salad bowl. */
 export const sampleDishImages = {
-  paneerTikka: m("skewers.jpg"),
   biryani: m("biryani.jpg"),
   dosa: m("dosa.jpg"),
-  butterChicken: m("bbq.jpg"),
-  lassi: m("salad.jpg"),
-  gulabJamun: m("dessert.jpg"),
-  thali: m("rice.jpg"),
-  pavBhaji: m("pizza.jpg"),
+  samosa: m("samosa.jpg"),
+  friedRice: m("rice.jpg"),
+  mixedGrill: m("skewers.jpg"),
+  bbqRibs: m("bbq.jpg"),
+  buddhaBowl: m("salad.jpg"),
+  proteinBowl: m("bowls.jpg"),
+  pizza: m("pizza.jpg"),
+  spaghetti: m("pasta.jpg"),
+  appleTurnovers: m("dessert.jpg"),
 } as const;
 
 /** Stable placeholder cover for discovery cards (hash by kitchen id). */

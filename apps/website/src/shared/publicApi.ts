@@ -101,6 +101,7 @@ export async function fetchPublicNearbyKitchens(params: {
   diet?: string;
   live_capture?: boolean;
   live_only?: boolean;
+  q?: string;
 }): Promise<KitchenNearbyList> {
   const q = new URLSearchParams({
     latitude: String(params.latitude),
@@ -112,6 +113,7 @@ export async function fetchPublicNearbyKitchens(params: {
   if (params.diet) q.set("diet", params.diet);
   if (params.live_capture) q.set("live_capture", "true");
   if (params.live_only) q.set("live_only", "true");
+  if (params.q?.trim()) q.set("q", params.q.trim());
   return publicFetch(`/api/v1/kitchens/public/nearby?${q.toString()}`);
 }
 

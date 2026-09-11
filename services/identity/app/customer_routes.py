@@ -50,6 +50,7 @@ from app.customer_dashboard import (
 )
 from app.models import Customer
 from app.oauth import exchange_oauth_code, start_oauth
+from app.otp_delivery import demo_otp_response
 from ckac_common.auth import stream_key
 from ckac_common.config import get_settings
 from ckac_common.database import get_db
@@ -243,27 +244,26 @@ async def oauth_complete(
     description=(
         "Sends a one-time password to the customer's WhatsApp number to start login.\n\n"
         "**Body:** phone (10-digit India mobile or E.164).\n\n"
-        "**Response 202:** In `development`/`test` OTP is `DEMO_OTP` (default `123456`). "
+        "**Response 202:** In `development`/`test` nothing is delivered — the body carries "
+        "`delivered: false` and `demo_otp` (default `123456`) so the caller knows what to type. "
         "Outside that, returns 503 until WhatsApp outbound is configured.\n\n"
         "Follow up with `POST /auth/customer/whatsapp/verify`."
     ),
     responses={422: RESP_422},
     tags=["Customer Auth"],
 )
-async def customer_whatsapp_request(body: CustomerPhoneRequest) -> dict[str, str]:
+async def customer_whatsapp_request(body: CustomerPhoneRequest) -> dict[str, object]:
     from ckac_common.platform_config import allows_fixed_dev_otp
 
     phone = body.phone.strip()
     if allows_fixed_dev_otp():
         code = store_customer_otp(phone)
-        return {
-            "message": "OTP sent via WhatsApp",
-            "dev_hint": f"Use {code} in development",
-        }
+        return demo_otp_response(code)
 
     from app.main import redis_client
     from app.otp_delivery import (
         CUSTOMER_OTP_PREFIX,
+        delivered_otp_response,
         generate_otp_code,
         send_otp_whatsapp,
         store_otp_redis,
@@ -281,7 +281,7 @@ async def customer_whatsapp_request(body: CustomerPhoneRequest) -> dict[str, str
                 "WHATSAPP_OTP_PHONE_NUMBER_ID (or Admin → API Keys) and ensure Redis is up."
             ),
         ) from exc
-    return {"message": "OTP sent via WhatsApp"}
+    return delivered_otp_response()
 
 
 @router.post(

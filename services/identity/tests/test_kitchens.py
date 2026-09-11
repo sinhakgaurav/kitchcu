@@ -241,6 +241,7 @@ def _seed_catalog_for_kitchen(
     *,
     category_slug: str = "veg",
     live_capture: bool = False,
+    dish_name: str = "Test Dish",
 ) -> None:
     category_id = uuid.uuid4()
     dish_id = uuid.uuid4()
@@ -258,9 +259,9 @@ def _seed_catalog_for_kitchen(
             """
                 INSERT INTO ckac_catalog.dishes
                 (id, kitchen_id, category_id, name, price, prep_time_min, delivery_time_min, max_time_min, is_active)
-                VALUES (%s::uuid, %s::uuid, %s::uuid, 'Test Dish', 149.00, 20, 15, 35, true)
+                VALUES (%s::uuid, %s::uuid, %s::uuid, %s, 149.00, 20, 15, 35, true)
                 """,
-                (str(dish_id), str(kitchen_id), str(category_id)),
+                (str(dish_id), str(kitchen_id), str(category_id), dish_name),
             )
         if live_capture:
             cur.execute(
@@ -325,3 +326,126 @@ async def test_nearby_kitchens_live_capture_filter(client: AsyncClient, auth_hea
     assert filtered.json()["total"] == 1
     assert filtered.json()["kitchens"][0]["name"] == "Live Photo Kitchen"
     assert filtered.json()["kitchens"][0]["has_live_capture"] is True
+
+
+@pytest.mark.asyncio
+async def test_nearby_kitchens_search_matches_dish_name(client: AsyncClient, auth_headers: dict):
+    """A diner searching a dish finds the kitchen that cooks it, not every kitchen in range."""
+    samosa = {**KITCHEN_PAYLOAD, "name": "Chaat Corner", "latitude": 18.5370, "longitude": 73.8960}
+    biryani = {**KITCHEN_PAYLOAD, "name": "Dum Handi", "latitude": 18.5372, "longitude": 73.8962}
+
+    samosa_resp = await client.post("/api/v1/kitchens", json=samosa, headers=auth_headers)
+    biryani_resp = await client.post("/api/v1/kitchens", json=biryani, headers=auth_headers)
+    assert samosa_resp.status_code == 201
+    assert biryani_resp.status_code == 201
+
+    _seed_catalog_for_kitchen(uuid.UUID(samosa_resp.json()["id"]), dish_name="Samosa (2 pc)")
+    _seed_catalog_for_kitchen(uuid.UUID(biryani_resp.json()["id"]), dish_name="Veg Biryani")
+
+    resp = await client.get(
+        "/api/v1/kitchens/public/nearby",
+        params={"latitude": 18.5362, "longitude": 73.8958, "q": "samosa"},
+    )
+    assert resp.status_code == 200
+    assert [k["name"] for k in resp.json()["kitchens"]] == ["Chaat Corner"]
+
+
+@pytest.mark.asyncio
+async def test_nearby_kitchens_search_matches_kitchen_fields(client: AsyncClient, auth_headers: dict):
+    """Name, code, and city stay searchable alongside dish names."""
+    created = await client.post(
+        "/api/v1/kitchens",
+        json={**KITCHEN_PAYLOAD, "name": "Sharma Home Kitchen"},
+        headers=auth_headers,
+    )
+    assert created.status_code == 201
+    code = created.json()["code"]
+
+    for term in ("sharma", "pune", code.lower()):
+        resp = await client.get(
+            "/api/v1/kitchens/public/nearby",
+            params={"latitude": 18.5362, "longitude": 73.8958, "q": term},
+        )
+        assert resp.status_code == 200, term
+        assert resp.json()["total"] == 1, term
+
+
+@pytest.mark.asyncio
+async def test_nearby_kitchens_search_without_match_is_empty(client: AsyncClient, auth_headers: dict):
+    await client.post("/api/v1/kitchens", json=KITCHEN_PAYLOAD, headers=auth_headers)
+    resp = await client.get(
+        "/api/v1/kitchens/public/nearby",
+        params={"latitude": 18.5362, "longitude": 73.8958, "q": "definitely-not-on-any-menu"},
+    )
+    assert resp.status_code == 200
+    assert resp.json()["kitchens"] == []
+
+
+@pytest.mark.asyncio
+async def test_nearby_falls_back_to_nearest_when_radius_is_empty(client: AsyncClient, auth_headers: dict):
+    """Out of range must not dead-end: return the nearest kitchens with real distances."""
+    mumbai = {
+        **KITCHEN_PAYLOAD,
+        "name": "Bandra Tiffin Room",
+        "city": "Mumbai",
+        "latitude": 19.0760,
+        "longitude": 72.8777,
+    }
+    assert (await client.post("/api/v1/kitchens", json=mumbai, headers=auth_headers)).status_code == 201
+
+    resp = await client.get(
+        "/api/v1/kitchens/public/nearby",
+        params={"latitude": 18.5362, "longitude": 73.8958, "max_km": 10},
+    )
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["kitchens"] == []
+    assert data["total"] == 0
+    assert len(data["nearest"]) == 1
+    assert data["nearest"][0]["name"] == "Bandra Tiffin Room"
+    assert data["nearest"][0]["distance_km"] > 10
+
+
+@pytest.mark.asyncio
+async def test_nearest_fallback_respects_the_search_term(client: AsyncClient, auth_headers: dict):
+    """Searching a dish from an unserved city answers with kitchens that actually cook it."""
+    samosa = {
+        **KITCHEN_PAYLOAD,
+        "name": "Bandra Chaat Cart",
+        "city": "Mumbai",
+        "latitude": 19.0760,
+        "longitude": 72.8777,
+    }
+    biryani = {
+        **KITCHEN_PAYLOAD,
+        "name": "Bandra Dum Handi",
+        "city": "Mumbai",
+        "latitude": 19.0770,
+        "longitude": 72.8787,
+    }
+    samosa_resp = await client.post("/api/v1/kitchens", json=samosa, headers=auth_headers)
+    biryani_resp = await client.post("/api/v1/kitchens", json=biryani, headers=auth_headers)
+    _seed_catalog_for_kitchen(uuid.UUID(samosa_resp.json()["id"]), dish_name="Samosa (2 pc)")
+    _seed_catalog_for_kitchen(uuid.UUID(biryani_resp.json()["id"]), dish_name="Veg Biryani")
+
+    resp = await client.get(
+        "/api/v1/kitchens/public/nearby",
+        params={"latitude": 18.5362, "longitude": 73.8958, "max_km": 10, "q": "samosa"},
+    )
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["kitchens"] == []
+    assert [k["name"] for k in data["nearest"]] == ["Bandra Chaat Cart"]
+
+
+@pytest.mark.asyncio
+async def test_nearby_omits_nearest_when_radius_has_results(client: AsyncClient, auth_headers: dict):
+    assert (await client.post("/api/v1/kitchens", json=KITCHEN_PAYLOAD, headers=auth_headers)).status_code == 201
+    resp = await client.get(
+        "/api/v1/kitchens/public/nearby",
+        params={"latitude": 18.5362, "longitude": 73.8958, "max_km": 10},
+    )
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["total"] == 1
+    assert data["nearest"] == []

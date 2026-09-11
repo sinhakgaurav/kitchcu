@@ -61,6 +61,11 @@ async def test_customer_whatsapp_otp_login(client: AsyncClient):
     phone = "+919876543210"
     req = await client.post("/api/v1/auth/customer/whatsapp/request", json={"phone": phone})
     assert req.status_code == 202
+    # Demo mode sends no WhatsApp message; say so and hand back the code to type.
+    body = req.json()
+    assert body["message"] == "Demo mode — no message sent"
+    assert body["demo_otp"] == "123456"
+    assert body["delivered"] is False
 
     bad = await client.post(
         "/api/v1/auth/customer/whatsapp/verify",

@@ -107,6 +107,28 @@ For **manual QA / release sign-off** see [QA-INSTRUCTION-PACK.md](./QA-INSTRUCTI
 | P43 | **Order CSV + parse match-rate** | Owner `export.csv` + drafts parse-stats; admin kitchen Orders CSV/stats; first-party (no Meta/Razorpay) | ✅ | Design `ORDER-CSV-AND-PARSE-STATS-DESIGN.md`; cap 10k rows |
 | P44 | **Admin API docs + login creds** | Super Admin Sign in shows username/password + Swagger/ReDoc/portal links; how-to Authorize in `API.md` §1.1 | ✅ | Admin login / sidebar / overview |
 | P45 | **Always show admin password** | `GET /admin/auth/login-hint` always returns `ADMIN_PASSWORD`; Sign in + portal/kitchen/customer strips print it; startup writes reveal=1 | ✅ | Identity login-hint; no flag gate |
+| P46 | **QA tracker close-out (13 issues, 3 sheets)** | Discovery `q` + KNN `nearest` fallback; honest demo-OTP response; dish photo truth table; nearby reveal CSS; social buttons; nav overlay; scroll listener; refund actions; orders empty state | ✅ | See table below. Guardrail `scripts/tests/test_dish_media_truth.py` |
+
+---
+
+## P46 — QA issue tracker close-out
+
+Source: QA workbook, sheets **Bug Issue** · **Bug Resolved** · **API Bug Report**. 13 open rows.
+
+| ID | Pri | Reported | Root cause found | Fix |
+|----|-----|----------|------------------|-----|
+| ID-04 | High | "No kitchens" after *Use my location* | Two causes. `.reveal-stagger.reveal--visible .nearby-kitchens__list li` needed the stagger classes on an **ancestor**, but they sit on the `<ul>` itself — every card stayed at `opacity: 0` while the API returned kitchens. Out-of-range diners also had no path forward. | Reveal selector matches the list element (+ reduced-motion escape); `GET /kitchens/public/nearby` returns a bounded `nearest[]` KNN fallback when nothing is in radius; UI shows "closest is N km away in *city*" with the real cards |
+| ID-05 | High | Search bar returns nothing | `/kitchens/public/nearby` ignored `q` entirely; the toolbar filtered client-side on kitchen name/city/code only, so no dish or cuisine term could ever match | `q` now filters server-side across kitchen name/code/city/tagline **and** active dish, cuisine, and category names (shared SQL with the discovery feed); UI debounces to the API |
+| ID-08 | High | OTP not sent | Dev/demo mode returned `202 {"message": "OTP sent via WhatsApp"}` while sending nothing, so testers waited for a message that never existed | Both OTP routes return `delivered: false` + `demo_otp` in demo mode; owner, customer, and social sign-in surface "Demo mode — no SMS or WhatsApp message is sent. Enter 123456." |
+| ID-16 | High | Dish images do not match names | One salad-bowl photo stood in for 13 curries; `biryani.jpg` (chicken) sat on "Veg Biryani", `skewers.jpg` (lamb chops) on "Paneer Tikka", `rice.jpg` (chicken) on "Veg Thali Combo"; `restaurant.jpg` / `dining.jpg` (venue) sat on dishes; tiffin plan covers were hardcoded and a re-seed only filled a *missing* image, never corrected a wrong one | `FOOD_ASSET_SUBJECTS` describes what every photo actually shows; `DISH_MEDIA_BY_NAME` binds one asset to one dish and is shared by both seeders; menu reshaped to 11 live dishes each with a truthful unique hero; house classics seed as drafts (absent from the public menu) until an owner captures a hero; plan covers derive from the lead dish; re-seed now corrects wrong heroes and unpublishes dishes that lost one |
+| ID-01 | Med | Home page scroll lag | ~23 independent `scroll` listeners, each doing its own layout read | One shared rAF-batched scroll frame (`useParallax`), values rounded to whole pixels |
+| ID-09 | Med | Social buttons not highlighted | Providers had no visual identity and read as disabled | Per-provider accent drives dot, border tint, hover lift, and busy state from one `--social-accent` custom property |
+| ID-20 | Med | Nav menu dark overlay hides items | Mobile panel inherited the dark-theme glass on the light brand theme | Light-theme panel override: cream background, dark text, brand-teal links |
+| ID-21 | Med | My Orders blank | Rendered the empty branch while auth was still resolving, and the empty state had no content | Loader covers `loading \|\| fetching`; empty state gets title, hint (12 locales), and a discovery CTA |
+| ID-15 | Low | Refund gateway button alignment | Submit inherited the field-to-field gap, so spacing shifted as conditional fields appeared | `.owner-pay-panel__actions` owns the submit row; full-width under 640 px |
+| BUG_01–04 | High | OTP/register accept >10-digit phone, echo uppercase email, accept invalid names | **Already fixed in `93cb604`** — re-verified live on `api.kitchcu.com` (422 on `987654321011`, `12345`, `123456`, `125@`, `Pooja123`; `QA.xxx@GMAIL.COM` → `qa.xxx@gmail.com`; `D'Souza Rao-Patil` → 201). Sheet is stale | Closed the one gap: HTTP-level parametrized OTP phone test |
+
+**Regression guards:** `scripts/tests/test_dish_media_truth.py` (asset described, no reuse across dishes, no venue/branded photo as a hero, no meat or egg photo on a veg dish, unmapped dish ⇒ draft, both seeders agree, menu still browsable) · `services/identity/tests/test_kitchens.py` (`q` across dish/cuisine, `nearest` fallback) · `services/identity/tests/test_auth.py` (demo-OTP response shape, phone validation).
 
 ---
 

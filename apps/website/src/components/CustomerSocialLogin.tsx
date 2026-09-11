@@ -8,6 +8,7 @@ import {
   type OAuthProvider,
 } from "../shared/customerApi";
 import { PhoneField } from "./PhoneField";
+import { otpDeliveryNotice } from "../shared/api";
 import {
   otpInputValue,
   toE164,
@@ -52,6 +53,7 @@ export function CustomerSocialLogin({
   const [whatsappPhone, setWhatsappPhone] = useState("");
   const [whatsappOtp, setWhatsappOtp] = useState("");
   const [whatsappStep, setWhatsappStep] = useState<"idle" | "otp">("idle");
+  const [otpNotice, setOtpNotice] = useState("");
   const [fieldErrors, setFieldErrors] = useState<{ phone?: string; otp?: string }>({});
   const [providers, setProviders] = useState<OAuthProvider[] | null>(null);
 
@@ -98,7 +100,8 @@ export function CustomerSocialLogin({
     }
     setBusy("whatsapp");
     try {
-      await requestCustomerWhatsAppOtp(toE164(whatsappPhone));
+      const result = await requestCustomerWhatsAppOtp(toE164(whatsappPhone));
+      setOtpNotice(otpDeliveryNotice(result));
       setWhatsappStep("otp");
     } catch (err) {
       onError(err instanceof Error ? err.message : "Could not send OTP");
@@ -137,12 +140,17 @@ export function CustomerSocialLogin({
         <>
           <p className="customer-social-login__label">Or continue with</p>
           <div className="customer-social-login__grid">
+            {/* Not disabled on missing policy consent — a dead grey button with no hover
+                reads as broken. handleOAuth explains what is missing instead. */}
             {oauthProviders.map((p) => (
               <button
                 key={p.id}
                 type="button"
-                className={`social-btn ${PROVIDER_CLASS[p.id] ?? ""}`}
-                disabled={!!busy || !policiesAgreed}
+                className={`social-btn ${PROVIDER_CLASS[p.id] ?? ""}${
+                  busy === p.id ? " social-btn--busy" : ""
+                }`}
+                disabled={!!busy}
+                aria-busy={busy === p.id}
                 onClick={() => handleOAuth(p.id)}
               >
                 {busy === p.id ? "Connecting…" : PROVIDER_LABELS[p.id] ?? p.label}
@@ -165,6 +173,7 @@ export function CustomerSocialLogin({
           error={fieldErrors.phone}
           disabled={whatsappStep === "otp"}
         />
+        {whatsappStep === "otp" && otpNotice && <p className="auth-card__notice">{otpNotice}</p>}
         {whatsappStep === "otp" && (
           <label>
             OTP
@@ -187,7 +196,7 @@ export function CustomerSocialLogin({
         <button
           type="button"
           className="btn btn--ghost btn--sm social-btn--whatsapp"
-          disabled={!!busy || !whatsappPhone.trim() || !policiesAgreed}
+          disabled={!!busy || !whatsappPhone.trim()}
           onClick={whatsappStep === "otp" ? handleWhatsAppVerify : handleWhatsAppRequest}
         >
           {busy === "whatsapp"
