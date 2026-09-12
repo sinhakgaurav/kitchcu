@@ -176,7 +176,13 @@ export function OrdersPage() {
                     >
                       {repeatingId === order.id ? t("common.loading") : t("customer.orders.repeat")}
                     </button>
-                    {order.status === "delivered" && (
+                    {order.status === "delivered" && order.is_rated && (
+                      <Link to={`/orders/${order.id}/rate`} className="btn btn--ghost btn--sm">
+                        ★ {order.rating_home_taste?.toFixed(1) ?? "—"} taste
+                        {order.rating_quality != null ? ` · ${order.rating_quality.toFixed(1)} quality` : ""}
+                      </Link>
+                    )}
+                    {order.status === "delivered" && !order.is_rated && (
                       <Link to={`/orders/${order.id}/rate`} className="btn btn--ghost btn--sm">
                         Rate meal
                       </Link>

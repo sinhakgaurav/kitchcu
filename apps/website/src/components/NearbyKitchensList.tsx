@@ -1,14 +1,14 @@
 import { useCallback, useEffect, useMemo, useState, type CSSProperties, type RefObject } from "react";
 import { useNavigate } from "react-router-dom";
 import { ListingToolbar } from "./ListingToolbar";
+import { DeliveryAddressPicker } from "./DeliveryAddressPicker";
 import { kitchenCardImage } from "../data/content";
-import { DEMO } from "../shared/demo";
 import type { KitchenNearby, LiveKitchenSummary } from "../shared/api";
 import { fetchLiveKitchens } from "../shared/api";
 import { fetchPublicNearbyKitchens } from "../shared/publicApi";
 import { useCustomerAuth } from "../shared/customerAuth";
+import { useCustomerDelivery } from "../shared/customerDelivery";
 import { saveKitchenToSession } from "../shared/customerSession";
-import { useGeolocation } from "../hooks/useGeolocation";
 import { useInView } from "../hooks/useParallax";
 import {
   discoveryMapEmbedUrl,
@@ -25,7 +25,7 @@ export function NearbyKitchensList() {
   const navigate = useNavigate();
   const { updateSession } = useCustomerAuth();
   const { ref, visible } = useInView(0.06);
-  const { coords, status, error: geoError, refresh, setCoords } = useGeolocation(DEMO.defaultLocation);
+  const { coords, selectedAddress, geoStatus, geoError, loading: deliveryLoading, useGps, useDemo } = useCustomerDelivery();
   const [kitchens, setKitchens] = useState<KitchenNearby[]>([]);
   const [nearest, setNearest] = useState<KitchenNearby[]>([]);
   const [liveByKitchen, setLiveByKitchen] = useState<Record<string, LiveKitchenSummary>>({});
@@ -96,8 +96,9 @@ export function NearbyKitchensList() {
   }, [coords.latitude, coords.longitude, maxKm, sort, diet, liveCaptureOnly, liveOnly, activeSearch]);
 
   useEffect(() => {
-    load();
-  }, [load]);
+    if (deliveryLoading) return;
+    void load();
+  }, [load, deliveryLoading]);
 
   // Search hits the API so dish and cuisine names match, not just kitchen names.
   useEffect(() => {
@@ -114,9 +115,13 @@ export function NearbyKitchensList() {
   };
 
   const useDemoLocation = () => {
-    setCoords(DEMO.defaultLocation);
+    useDemo();
     setMaxKm((km) => (km < 50 ? 50 : km));
   };
+
+  const placeLabel = selectedAddress
+    ? `${selectedAddress.label}, ${selectedAddress.city}`
+    : null;
 
   const displayed = useMemo(() => {
     const list = [...kitchens];
@@ -147,7 +152,7 @@ export function NearbyKitchensList() {
         <div className={`nearby-kitchens__head reveal ${visible ? "reveal--visible" : ""}`}>
           <div>
             <span className="section__eyebrow">Near you</span>
-            <h2>Cloud kitchens nearby</h2>
+            <h2>{placeLabel ? `Cloud kitchens near ${placeLabel}` : "Cloud kitchens nearby"}</h2>
             <p>
               {mapsEnabled ? "Google Map" : "Map"} + list sorted by distance. Filter by diet,
               live-capture menu photos, or kitchens streaming now.
@@ -155,6 +160,7 @@ export function NearbyKitchensList() {
             </p>
           </div>
           <div className="nearby-kitchens__controls">
+            <DeliveryAddressPicker variant="bar" />
             <label>
               Radius (km)
               <select value={maxKm} onChange={(e) => setMaxKm(Number(e.target.value))}>
@@ -195,8 +201,8 @@ export function NearbyKitchensList() {
               />
               Live-capture photos only
             </label>
-            <button type="button" className="btn btn--ghost btn--sm" onClick={refresh} disabled={status === "loading"}>
-              {status === "loading" ? "Locating…" : "Use my location"}
+            <button type="button" className="btn btn--ghost btn--sm" onClick={() => void useGps()} disabled={geoStatus === "loading"}>
+              {geoStatus === "loading" ? "Locating…" : "Use my location"}
             </button>
             <button type="button" className="btn btn--primary btn--sm" onClick={useDemoLocation}>
               Demo: Pune kitchens
@@ -311,6 +317,9 @@ export function NearbyKitchensList() {
                       {k.code}
                       {k.city ? ` · ${k.city}` : ""}
                       {k.state ? `, ${k.state}` : ""}
+                      {k.avg_rating != null && (k.rating_count ?? 0) > 0
+                        ? ` · ★ ${k.avg_rating.toFixed(1)}${k.rating_count ? ` (${k.rating_count})` : ""}`
+                        : ""}
                       {live?.dish_name
                         ? ` · cooking ${live.dish_name}${
                             live.showcase_phase && live.showcase_phase !== "idle"

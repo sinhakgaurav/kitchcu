@@ -379,6 +379,15 @@ async def promotions_update(
         "window and eligible for the caller's segment, with minimal customer-facing fields "
         "(no internal targeting details)."
     ),
+    # The empty requirement is how OpenAPI says "a token is understood but not
+    # needed". Without it FastAPI publishes HTTPBearer as mandatory, which puts a
+    # padlock on an endpoint the customer menu calls anonymously.
+    #
+    # HTTPBearer is repeated on purpose: FastAPI merges openapi_extra by
+    # concatenating lists, so the published value is
+    # [{HTTPBearer}, {}, {HTTPBearer}] today. Naming both alternatives keeps the
+    # contract correct whether that merge concatenates or replaces.
+    openapi_extra={"security": [{}, {"HTTPBearer": []}]},
 )
 async def promotions_active(
     kitchen_id: uuid.UUID,

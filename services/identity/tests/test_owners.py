@@ -1,5 +1,10 @@
+from datetime import UTC, datetime, timedelta
+
 import pytest
 from httpx import AsyncClient
+from jose import jwt
+
+from ckac_common.config import get_settings
 
 
 @pytest.mark.asyncio
@@ -40,6 +45,28 @@ async def test_register_owner_invalid_phone(client: AsyncClient):
 async def test_owner_me_requires_auth(client: AsyncClient):
     response = await client.get("/api/v1/owners/me")
     assert response.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_owner_me_rejects_customer_typed_token(
+    client: AsyncClient, registered_owner: dict
+):
+    settings = get_settings()
+    token = jwt.encode(
+        {
+            "sub": registered_owner["id"],
+            "type": "customer",
+            "exp": datetime.now(UTC) + timedelta(minutes=15),
+        },
+        settings.jwt_secret,
+        algorithm=settings.jwt_algorithm,
+    )
+    response = await client.get(
+        "/api/v1/owners/me",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert response.status_code == 401
+    assert "type" in response.json()["detail"].lower()
 
 
 @pytest.mark.asyncio

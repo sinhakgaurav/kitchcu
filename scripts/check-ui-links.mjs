@@ -241,17 +241,22 @@ const customerNav = read(path.join(srcRoot, "components/CustomerNavbar.tsx"));
 const customerFooter = read(path.join(srcRoot, "components/CustomerFooter.tsx"));
 const branded = read(path.join(srcRoot, "customer/BrandedStorefront.tsx"));
 const openApi = read(path.join(srcRoot, "portal/OpenApiPage.tsx"));
-const browse = read(path.join(srcRoot, "pages/customer/CustomerBrowsePage.tsx"));
+const discovery = read(path.join(srcRoot, "customer/pages/CustomerDiscoveryHome.tsx"));
 const menuPage = read(path.join(srcRoot, "pages/customer/KitchenMenuPage.tsx"));
 const audience = read(path.join(srcRoot, "components/AudienceSections.tsx"));
 const legacyNav = read(path.join(srcRoot, "components/Navbar.tsx"));
 const legacyFooter = read(path.join(srcRoot, "components/Footer.tsx"));
 
-ok(customerNav.includes('to="/browse"') || customerNav.includes("to={'/browse'}"), "Customer nav links to /browse");
-ok(customerFooter.includes('to="/browse"') || customerFooter.includes("/#nearby"), "Customer footer discovers kitchens");
+// Discovery sections are anchors on the customer home, so nav and footer must
+// point at ids the page actually renders — a stale anchor scrolls nowhere.
+for (const anchor of ["#near-you", "#by-code"]) {
+  ok(customerNav.includes(anchor), `Customer nav links to ${anchor}`);
+  ok(discovery.includes(`id="${anchor.slice(1)}"`), `Discovery home renders ${anchor}`);
+}
+ok(customerFooter.includes("/#near-you"), "Customer footer discovers kitchens");
 ok(branded.includes("portalUrl"), "BrandedStorefront uses portalUrl (not hardcoded kitchcu.in)");
 ok(!openApi.includes("localhost:18000"), "OpenApiPage avoids hardcoded localhost:18000");
-ok(browse.includes("kitchenUrl"), "Browse page Owner CTA → kitchenUrl");
+ok(discovery.includes("kitchenUrl") || customerNav.includes("kitchenUrl"), "Owner CTA → kitchenUrl");
 ok(menuPage.includes("login?next=") || menuPage.includes("next="), "KitchenMenuPage login preserves next=");
 ok(!audience.includes('to="/customers"'), "AudienceSections has no /customers");
 ok(!legacyNav.includes('to="/customers"'), "Legacy Navbar has no /customers");

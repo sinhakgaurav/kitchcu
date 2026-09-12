@@ -49,7 +49,25 @@ async def resolve_razorpay_checkout_creds(
     session: AsyncSession,
     kitchen_id: uuid.UUID | None,
 ) -> tuple[str, str] | None:
-    """Return (key_id, key_secret) or None when live Checkout cannot run."""
+    """Return (key_id, key_secret) or None when live Checkout cannot run.
+
+    Honours the ``third_party_integrations`` master kill-switch, like every other
+    outbound integration. Without it, a kitchen with saved keys drags the payment
+    path out to api.razorpay.com on a stack where integrations are switched off,
+    and every checkout fails with the provider's 401.
+    """
+    from ckac_common.platform_config import third_party_integrations_enabled
+
+    if not await third_party_integrations_enabled(session, default=False):
+        return None
+    return await _kitchen_or_platform_creds(session, kitchen_id)
+
+
+async def _kitchen_or_platform_creds(
+    session: AsyncSession,
+    kitchen_id: uuid.UUID | None,
+) -> tuple[str, str] | None:
+    """Kitchen gateway row wins; platform API Keys / env are the fallback."""
     if kitchen_id is not None:
         row = (
             await session.execute(

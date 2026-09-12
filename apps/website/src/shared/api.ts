@@ -91,6 +91,8 @@ export type KitchenNearby = KitchenPublic & {
   has_non_veg: boolean;
   has_live_capture: boolean;
   is_live_now: boolean;
+  avg_rating?: number | null;
+  rating_count?: number;
 };
 
 export type KitchenNearbyList = {
@@ -217,6 +219,9 @@ export type Order = {
   customer_latitude?: number | null;
   customer_longitude?: number | null;
   tracking_token?: string | null;
+  is_rated?: boolean;
+  rating_home_taste?: number | null;
+  rating_quality?: number | null;
   total: number;
   estimated_prep_min: number | null;
   estimated_ready_at: string | null;

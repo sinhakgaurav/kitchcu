@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""Generate Kitchcu Complete Executive Guide PDF v3.2.5 — deep encyclopedia (CEO + CPO + CTO).
+"""Generate Kitchcu Complete Executive Guide PDF v3.2.6 — deep encyclopedia (CEO + CPO + CTO).
 
-Source of truth: docs/CKAC-COMPLETE-GUIDE.md v3.2.5 (September 2026).
+Source of truth: docs/CKAC-COMPLETE-GUIDE.md v3.2.6 (September 2026).
 Shared layout: scripts/pdf_guide.py (GuidePDF) — header clearance, caption-above figures.
 """
 
@@ -9,7 +9,7 @@ from pathlib import Path
 
 from pdf_guide import GuidePDF
 
-GUIDE_VERSION = "3.2.5"
+GUIDE_VERSION = "3.2.6"
 GUIDE_DATE = "September 2026"
 OUTPUT = Path(__file__).resolve().parent.parent / "docs" / "CKAC-COMPLETE-GUIDE.pdf"
 UI = Path(__file__).resolve().parent.parent / "docs" / "assets" / "ui"
@@ -761,6 +761,8 @@ def build() -> GuidePDF:
         "Internal calls: X-Internal-Key (distinct from public JWT)",
         "/health/live + /health/ready every service; correlation ID from gateway",
         "Rate limiting at gateway: named Phase-2 target",
+        "Login-hint prints ADMIN_PASSWORD only in development/test or ADMIN_LOGIN_REVEAL_PASSWORD=1",
+        "Owner JWT must be type=owner; Swagger public ops publish security: []",
     ])
 
     pdf.section("Aggregated OpenAPI & API Reference (new in 3.1)")
@@ -785,10 +787,14 @@ def build() -> GuidePDF:
         size=7,
     )
     pdf.body(
-        "Login-required admin APIs: POST /api/v1/admin/auth/login with the username "
-        "and password printed on Super Admin Sign in, then Swagger Authorize with the "
-        "JWT (or Authorization: Bearer). Owner/customer routes use OTP, not that password. "
-        "See docs/API.md section 1.1. Production Swagger: https://api.kitchcu.com/docs."
+        "Swagger Authorize: prefer OAuth2Password (POST /api/v1/auth/token) — admin "
+        "email+password or owner/customer phone+OTP (local 9876543210 / 123456, "
+        "9123456789 / 123456, admin@kitchcu.dev / admin123456). Or HTTPBearer paste "
+        "the JWT. Public operations have no padlock (security: []); leftover tokens "
+        "are not sent on those Try it out calls. Login-hint prints username/password "
+        "only when APP_ENV is development/test or ADMIN_LOGIN_REVEAL_PASSWORD=1. "
+        "Owner JWT must be type=owner. See docs/API.md 1.1-1.2. "
+        "Production Swagger: https://api.kitchcu.com/docs."
     )
     pdf.body(
         "Route docs are mandatory, not auto-only: every route needs an explicit "
@@ -819,6 +825,8 @@ def build() -> GuidePDF:
             ["Community + chef rankings", "S17", "Done"],
             ["Live streaming LiveKit", "S18", "Done"],
             ["P41 profile edit / ratings / seed", "P41", "Done"],
+            ["P45 gated admin login-hint", "P45", "Done"],
+            ["P47 Swagger token + owner JWT type", "P47", "Done"],
             ["E1/E2 purchases + chef lock", "S19 proposed", "Design only"],
         ],
         [80, 40, 50],
@@ -1217,7 +1225,7 @@ def build() -> GuidePDF:
     pdf.table(
         ["Document", "Role"],
         [
-            ["CKAC-COMPLETE-GUIDE.md/.pdf v3.2.5", "This CEO/CPO/CTO encyclopedia"],
+            ["CKAC-COMPLETE-GUIDE.md/.pdf v3.2.6", "This CEO/CPO/CTO encyclopedia"],
             ["CKAC-USERFLOWS.md/.pdf", "Full step-by-step user journey pack"],
             ["API.md", "Public API reference + OpenAPI URLs"],
             ["E1-E2-*-DESIGN.md", "S19 quality-loop design pack"],
@@ -1237,12 +1245,13 @@ def build() -> GuidePDF:
 
     pdf.chapter("Document control")
     pdf.body(
-        "v3.2.5 September 2026 — P41 kitchen profile PATCH (code immutable), owner Ratings, "
-        "admin RBAC/stream summary, live-capture-safe GCP bulk seed, weekly cron at /opt/ckac. "
-        "Builds on P37-P40 referrals, GST export, admin ops, i18n, Control plane, Maps."
+        "v3.2.6 September 2026 — P47 Swagger/OpenAPI tester (POST /api/v1/auth/token, "
+        "public security: []), owner JWT type=owner, gated login-hint, 6-month demo "
+        "history seed. Builds on P41 profile PATCH, live-capture-safe GCP bulk seed, "
+        "P37-P40 referrals, GST export, admin ops, i18n."
     )
     pdf.quote(
-        "KitchCu Complete Executive & Engineering Guide v3.2.5 — Confidential — September 2026. "
+        "KitchCu Complete Executive & Engineering Guide v3.2.6 — Confidential — September 2026. "
         "India's first — and the world's third — platform with this feature stack."
     )
 

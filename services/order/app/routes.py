@@ -53,7 +53,9 @@ from app.schemas import (
     list_kitchen_drafts,
     list_kitchen_orders,
     update_draft,
+    attach_rating_stats,
     list_customer_orders,
+    load_order_rating_stats,
     master_order_to_response,
     order_to_response,
     repeat_customer_order,
@@ -427,6 +429,8 @@ async def customer_orders_list(
         return OrderListResponse(kitchen_id=uuid.UUID(int=0), orders=[], total=0)
     orders = await list_customer_orders(session, phone)
     enriched = [await order_to_response(session, o) for o in orders]
+    stats = await load_order_rating_stats(session, [o.id for o in orders])
+    enriched = [attach_rating_stats(row, stats) for row in enriched]
     kitchen_id = orders[0].kitchen_id if orders else uuid.UUID(int=0)
     return OrderListResponse(kitchen_id=kitchen_id, orders=enriched, total=len(enriched))
 
@@ -453,7 +457,9 @@ async def customer_order_get(
     if not phone:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Order not found")
     order = await get_order_for_customer(order_id, phone, session)
-    return await order_to_response(session, order)
+    resp = await order_to_response(session, order)
+    stats = await load_order_rating_stats(session, [order.id])
+    return attach_rating_stats(resp, stats)
 
 
 @router.get(

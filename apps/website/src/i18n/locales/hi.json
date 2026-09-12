@@ -428,6 +428,19 @@
       "upiQrHint": "वैकल्पिक — सीधा UPI रिफ़ंड भेजते समय ओनर इसका उपयोग कर सकते हैं।",
       "upiQrTitle": "UPI QR / स्कैनर छवि",
       "uploadImage": "छवि अपलोड करें"
+    },
+    "delivery": {
+      "addAddress": "Add an address",
+      "deliverTo": "Deliver to",
+      "demoPune": "Demo: Pune kitchens",
+      "manage": "Manage addresses",
+      "signInToSave": "Sign in to save addresses",
+      "useGps": "Current location (GPS)",
+      "contactPhone": "Contact number",
+      "cancelEdit": "Cancel edit",
+      "editAddress": "Edit address",
+      "editThisAddress": "Edit this address",
+      "updateAddress": "Update address"
     }
   },
   "cities": {

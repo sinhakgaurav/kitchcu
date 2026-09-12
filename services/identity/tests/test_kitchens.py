@@ -223,6 +223,8 @@ async def test_nearby_kitchens_sorted_by_distance(client: AsyncClient, auth_head
     assert kitchens[0]["name"] == "Near Kitchen"
     assert kitchens[0]["distance_km"] < kitchens[1]["distance_km"]
     assert "latitude" in kitchens[0]
+    assert "avg_rating" in kitchens[0]
+    assert kitchens[0]["rating_count"] == 0
 
 
 @pytest.mark.asyncio

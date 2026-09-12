@@ -56,7 +56,7 @@ export function OrdersPage() {
   const [sort, setSort] = useState<"newest" | "name_asc" | "name_desc">("newest");
   const [statusFilter, setStatusFilter] = useState("");
   const [sourceFilter, setSourceFilter] = useState("");
-  const [dateFilter, setDateFilter] = useState<"all" | "today" | "7d" | "30d">("all");
+  const [dateFilter, setDateFilter] = useState<"all" | "today" | "7d" | "30d" | "90d" | "180d">("all");
   const [dishes, setDishes] = useState<Dish[]>([]);
   const [parseStats, setParseStats] = useState<ParseStats | null>(null);
   const [exporting, setExporting] = useState(false);
@@ -67,9 +67,20 @@ export function OrdersPage() {
     const after = new Date();
     if (dateFilter === "today") after.setHours(0, 0, 0, 0);
     else if (dateFilter === "7d") after.setDate(after.getDate() - 7);
-    else after.setDate(after.getDate() - 30);
+    else if (dateFilter === "30d") after.setDate(after.getDate() - 30);
+    else if (dateFilter === "90d") after.setDate(after.getDate() - 90);
+    else after.setDate(after.getDate() - 180);
     return { created_after: after.toISOString(), created_before: before.toISOString() };
   }, [dateFilter]);
+
+  // In-flight tickets are at most two days old. The active inbox must not pull
+  // six months of delivered history every 20s just to find the live queue.
+  const listBounds = useMemo(() => {
+    if (tab === "all" || dateFilter !== "all") return dateBounds;
+    const after = new Date();
+    after.setDate(after.getDate() - 3);
+    return { created_after: after.toISOString() };
+  }, [tab, dateFilter, dateBounds]);
 
   const load = useCallback(async () => {
     if (!kitchen) return;
@@ -78,7 +89,7 @@ export function OrdersPage() {
       const [o, d, menu, stats] = await Promise.all([
         fetchOrders(kitchen.id, statusFilter || undefined, {
           source: sourceFilter || undefined,
-          ...dateBounds,
+          ...listBounds,
         }),
         fetchDrafts(kitchen.id),
         fetchMenu(kitchen.id).catch(() => null),
@@ -93,7 +104,7 @@ export function OrdersPage() {
     } finally {
       setLoading(false);
     }
-  }, [kitchen, statusFilter, sourceFilter, dateBounds]);
+  }, [kitchen, statusFilter, sourceFilter, listBounds]);
 
   useEffect(() => {
     load().catch(() => {});
@@ -102,11 +113,12 @@ export function OrdersPage() {
   // Service-mode inbox: poll for new received orders / drafts without full-page refresh noise.
   useEffect(() => {
     if (!kitchen) return;
+    if (tab === "all" && dateFilter === "all") return;
     const tick = () => {
       Promise.all([
         fetchOrders(kitchen.id, statusFilter || undefined, {
           source: sourceFilter || undefined,
-          ...dateBounds,
+          ...listBounds,
         }),
         fetchDrafts(kitchen.id),
       ])
@@ -125,7 +137,7 @@ export function OrdersPage() {
       window.clearInterval(id);
       document.removeEventListener("visibilitychange", onVis);
     };
-  }, [kitchen, statusFilter, sourceFilter, dateBounds]);
+  }, [kitchen, statusFilter, sourceFilter, listBounds]);
 
   const activeOrders = useMemo(
     () => orders.filter((o) => !["delivered", "cancelled"].includes(o.status)),
@@ -362,11 +374,18 @@ export function OrdersPage() {
           </label>
           <label>
             Date
-            <select value={dateFilter} onChange={(e) => setDateFilter(e.target.value as "all" | "today" | "7d" | "30d")}>
+            <select
+              value={dateFilter}
+              onChange={(e) =>
+                setDateFilter(e.target.value as "all" | "today" | "7d" | "30d" | "90d" | "180d")
+              }
+            >
               <option value="all">Any time</option>
               <option value="today">Today</option>
               <option value="7d">Last 7 days</option>
               <option value="30d">Last 30 days</option>
+              <option value="90d">Last 90 days</option>
+              <option value="180d">Last 6 months</option>
             </select>
           </label>
         </div>

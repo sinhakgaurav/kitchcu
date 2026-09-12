@@ -2,9 +2,11 @@ import { Link, Navigate, useNavigate } from "react-router-dom";
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useBrandedStorefront } from "../../customer/BrandedStorefront";
-import { useGeolocation } from "../../hooks/useGeolocation";
+import { PhoneField } from "../../components/PhoneField";
 import { getCustomerToken } from "../../shared/customerApi";
 import { useCustomerAuth } from "../../shared/customerAuth";
+import { useCustomerDelivery } from "../../shared/customerDelivery";
+import { parsePhoneInput, toE164, validateNationalPhone } from "../../shared/validation";
 import {
   captureCustomerPayment,
   createCustomerOrder,
@@ -30,14 +32,13 @@ import {
 } from "../../shared/customerCart";
 import { APP_STORAGE_PREFIX } from "../../shared/brand";
 import { denyDeliveryFee, fetchDeliveryQuote, type DeliveryQuote, type Payment } from "../../shared/api";
-import { fetchMyAddresses, saveAddress, type CustomerAddress } from "../../shared/customerDashboardApi";
+import { saveAddress } from "../../shared/customerDashboardApi";
+import { DeliveryAddressPicker } from "../../components/DeliveryAddressPicker";
 import { openRazorpayCheckout } from "../../shared/razorpayCheckout";
 
 type DeliveryType = "pickup" | "delivery";
 type PaymentMethod = "cod" | "online" | "upi";
 type DeliveryFeePayment = "prepaid" | "pay_on_delivery";
-
-const PUNE_FALLBACK = { latitude: 18.5362, longitude: 73.8958 };
 
 function checkoutKey(cart: CustomerCart): string {
   const storageKey = `${APP_STORAGE_PREFIX}_checkout_key:${cart.updatedAt}`;
@@ -110,10 +111,20 @@ function buildGroupPayload(
 
 export function CheckoutPage() {
   const { t } = useTranslation();
-  const { loading } = useCustomerAuth();
+  const { loading, session } = useCustomerAuth();
   const navigate = useNavigate();
   const token = getCustomerToken();
-  const { coords, status: geoStatus, error: geoError, refresh: refreshGeo } = useGeolocation(PUNE_FALLBACK);
+  const {
+    addresses,
+    selectedAddress,
+    coords: dropCoords,
+    source,
+    geoStatus,
+    geoError,
+    selectAddress,
+    useGps,
+    refreshAddresses,
+  } = useCustomerDelivery();
   const [cart, setCart] = useState<CustomerCart | null>(null);
   const [deliveryByKitchen, setDeliveryByKitchen] = useState<Record<string, DeliveryType>>({});
   const [quotes, setQuotes] = useState<Record<string, DeliveryQuote>>({});
@@ -125,15 +136,19 @@ export function CheckoutPage() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [deniedFeeKitchens, setDeniedFeeKitchens] = useState<Record<string, boolean>>({});
-  const [addresses, setAddresses] = useState<CustomerAddress[]>([]);
-  const [selectedAddressId, setSelectedAddressId] = useState<string>("");
   const [couponCode, setCouponCode] = useState("");
   const [couponDiscount, setCouponDiscount] = useState(0);
   const [couponMsg, setCouponMsg] = useState("");
   const [couponBusy, setCouponBusy] = useState(false);
   const [addrLine, setAddrLine] = useState("");
   const [addrCity, setAddrCity] = useState("");
+  const [addrPhone, setAddrPhone] = useState(() => parsePhoneInput(session?.phone || "").national);
   const [addrBusy, setAddrBusy] = useState(false);
+
+  useEffect(() => {
+    if (addrPhone || !session?.phone) return;
+    setAddrPhone(parsePhoneInput(session.phone).national);
+  }, [session?.phone, addrPhone]);
 
   const requiresPrepaid = useMemo(() => {
     if (!cart) return false;
@@ -173,37 +188,6 @@ export function CheckoutPage() {
   useEffect(() => {
     setCart(getCart());
   }, []);
-
-  useEffect(() => {
-    if (!token) return;
-    fetchMyAddresses()
-      .then((list) => {
-        setAddresses(list);
-        const def = list.find((a) => a.is_default) ?? list[0];
-        if (def) setSelectedAddressId(def.id);
-      })
-      .catch(() => setAddresses([]));
-  }, [token]);
-
-  const selectedAddress = useMemo(
-    () => addresses.find((a) => a.id === selectedAddressId) ?? null,
-    [addresses, selectedAddressId],
-  );
-
-  const dropCoords = useMemo(() => {
-    if (
-      selectedAddress?.latitude != null &&
-      selectedAddress.longitude != null &&
-      Number.isFinite(selectedAddress.latitude) &&
-      Number.isFinite(selectedAddress.longitude)
-    ) {
-      return {
-        latitude: selectedAddress.latitude,
-        longitude: selectedAddress.longitude,
-      };
-    }
-    return coords;
-  }, [selectedAddress, coords]);
 
   useEffect(() => {
     if (!cart) return;
@@ -460,105 +444,95 @@ export function CheckoutPage() {
         </div>
       </header>
 
-      {addresses.length > 0 ? (
-        <section className="customer-checkout__card">
-          <label>
-            Delivery address
-            <select
-              value={selectedAddressId}
-              onChange={(e) => setSelectedAddressId(e.target.value)}
-            >
-              {addresses.map((a) => (
-                <option key={a.id} value={a.id}>
-                  {a.label}
-                  {a.is_default ? " (default)" : ""} — {a.address_line}, {a.city}
-                </option>
-              ))}
-            </select>
-          </label>
-          {selectedAddress && (
+      <section className="customer-checkout__card">
+        <h2>{t("customer.checkout.deliveryAddress")}</h2>
+        <DeliveryAddressPicker variant="checkout" />
+        {addresses.length === 0 ? (
+          <>
             <p className="customer-checkout__hint">
-              {selectedAddress.address_line}
-              {selectedAddress.landmark ? ` · ${selectedAddress.landmark}` : ""}
-              {selectedAddress.latitude == null &&
-                " · No pin saved — using GPS for fee distance"}
+              Save a pin for accurate delivery fees — or continue with GPS.
             </p>
-          )}
-          <Link to="/dashboard" className="btn btn--ghost btn--sm">
-            Manage addresses
-          </Link>
-        </section>
-      ) : (
-        <section className="customer-checkout__card">
-          <h2>Add a delivery address</h2>
-          <p className="customer-checkout__hint">
-            Save a pin for accurate delivery fees — or continue with GPS.
-          </p>
-          <label>
-            Address
-            <input
-              value={addrLine}
-              onChange={(e) => setAddrLine(e.target.value)}
-              placeholder="Flat / street"
-              maxLength={240}
+            <label>
+              Address
+              <input
+                value={addrLine}
+                onChange={(e) => setAddrLine(e.target.value)}
+                placeholder="Flat / street"
+                maxLength={240}
+              />
+            </label>
+            <label>
+              City
+              <input
+                value={addrCity}
+                onChange={(e) => setAddrCity(e.target.value)}
+                placeholder="Pune"
+                maxLength={80}
+              />
+            </label>
+            <PhoneField
+              label="Contact number"
+              value={addrPhone}
+              onChange={setAddrPhone}
+              required
+              hint="Kitchen and rider call this number at this address."
             />
-          </label>
-          <label>
-            City
-            <input
-              value={addrCity}
-              onChange={(e) => setAddrCity(e.target.value)}
-              placeholder="Pune"
-              maxLength={80}
-            />
-          </label>
-          <button
-            type="button"
-            className="btn btn--ghost btn--sm"
-            disabled={addrBusy || addrLine.trim().length < 5 || !addrCity.trim()}
-            onClick={async () => {
-              setAddrBusy(true);
-              setError("");
-              try {
-                const saved = await saveAddress({
-                  label: "Home",
-                  address_line: addrLine.trim(),
-                  city: addrCity.trim(),
-                  state: null,
-                  pincode: null,
-                  landmark: null,
-                  latitude: coords.latitude,
-                  longitude: coords.longitude,
-                  is_default: true,
-                });
-                setAddresses([saved]);
-                setSelectedAddressId(saved.id);
-                setAddrLine("");
-                setAddrCity("");
-              } catch (err) {
-                setError(err instanceof Error ? err.message : "Could not save address");
-              } finally {
-                setAddrBusy(false);
+            <button
+              type="button"
+              className="btn btn--ghost btn--sm"
+              disabled={
+                addrBusy ||
+                addrLine.trim().length < 5 ||
+                !addrCity.trim() ||
+                Boolean(validateNationalPhone(addrPhone))
               }
-            }}
-          >
-            {addrBusy ? "Saving…" : "Save address"}
-          </button>
-        </section>
-      )}
+              onClick={async () => {
+                setAddrBusy(true);
+                setError("");
+                try {
+                  const saved = await saveAddress({
+                    label: "Home",
+                    address_line: addrLine.trim(),
+                    city: addrCity.trim(),
+                    state: null,
+                    pincode: null,
+                    landmark: null,
+                    phone: toE164(addrPhone),
+                    latitude: dropCoords.latitude,
+                    longitude: dropCoords.longitude,
+                    is_default: true,
+                  });
+                  await refreshAddresses();
+                  selectAddress(saved.id);
+                  setAddrLine("");
+                  setAddrCity("");
+                } catch (err) {
+                  setError(err instanceof Error ? err.message : "Could not save address");
+                } finally {
+                  setAddrBusy(false);
+                }
+              }}
+            >
+              {addrBusy ? "Saving…" : "Save address"}
+            </button>
+          </>
+        ) : null}
+      </section>
 
-      {geoError && !selectedAddress?.latitude && (
+      {geoError && source !== "address" && (
         <p className="nearby-kitchens__geo-hint">
           {geoError}{" "}
-          <button type="button" className="btn btn--ghost" onClick={refreshGeo}>Retry GPS</button>
+          <button type="button" className="btn btn--ghost" onClick={() => void useGps()}>Retry GPS</button>
         </p>
       )}
-      {geoStatus === "granted" && !selectedAddress?.latitude && (
+      {source === "gps" && geoStatus === "granted" && (
         <p className="nearby-kitchens__geo-hint">Using your GPS for distance-based delivery fees.</p>
       )}
-      {selectedAddress?.latitude != null && (
+      {source === "address" && selectedAddress && (
         <p className="nearby-kitchens__geo-hint">
-          Using saved pin for {selectedAddress.label} for delivery distance.
+          Delivering to {selectedAddress.label}
+          {selectedAddress.phone ? ` · ${selectedAddress.phone}` : ""}
+          {" "}— kitchens and fees use this pin.
         </p>
       )}
 

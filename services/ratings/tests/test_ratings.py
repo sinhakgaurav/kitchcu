@@ -75,3 +75,35 @@ async def test_rejects_duplicate_rating(client: AsyncClient, ratings_ctx):
         headers=headers,
     )
     assert second.status_code == 400
+
+
+@pytest.mark.asyncio
+async def test_get_order_ratings_returns_existing_scores(client: AsyncClient, ratings_ctx):
+    order_id = ratings_ctx["order_id"]
+    dish_id = ratings_ctx["dish_id"]
+    headers = {"Authorization": f"Bearer {ratings_ctx['customer_token']}"}
+
+    empty = await client.get(
+        f"/api/v1/customers/me/orders/{order_id}/ratings",
+        headers=headers,
+    )
+    assert empty.status_code == 200
+    assert empty.json()["ratings"] == []
+
+    created = await client.post(
+        f"/api/v1/customers/me/orders/{order_id}/ratings",
+        json={"ratings": [{"dish_id": str(dish_id), "home_taste_score": 5, "quality_score": 4}]},
+        headers=headers,
+    )
+    assert created.status_code == 201
+
+    shown = await client.get(
+        f"/api/v1/customers/me/orders/{order_id}/ratings",
+        headers=headers,
+    )
+    assert shown.status_code == 200
+    rows = shown.json()["ratings"]
+    assert len(rows) == 1
+    assert rows[0]["home_taste_score"] == 5
+    assert rows[0]["quality_score"] == 4
+    assert rows[0]["dish_id"] == str(dish_id)

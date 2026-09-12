@@ -3,6 +3,7 @@ import uuid
 import pytest
 from pydantic import ValidationError
 
+from app.customer_dashboard import CustomerAddressCreateRequest
 from app.schemas import (
     KitchenProfileUpdate,
     OwnerRegisterRequest,
@@ -101,6 +102,43 @@ async def test_generate_kitchen_code_ncr_and_up_cities():
         assert (await generate_kitchen_code(session, "Lucknow")).startswith("CKLKO")
         assert (await generate_kitchen_code(session, "Prayagraj")).startswith("CKIXD")
         assert (await generate_kitchen_code(session, "Jhansi")).startswith("CKJHS")
+
+
+class TestCustomerAddressPhone:
+    def test_normalizes_ten_digit_contact(self):
+        req = CustomerAddressCreateRequest(
+            label="Home",
+            address_line="Lane 7",
+            city="Pune",
+            phone="9123456789",
+        )
+        assert req.phone == "+919123456789"
+
+    def test_keeps_e164_contact(self):
+        req = CustomerAddressCreateRequest(
+            label="Work",
+            address_line="Linking Road",
+            city="Mumbai",
+            phone="+919123456789",
+        )
+        assert req.phone == "+919123456789"
+
+    def test_rejects_missing_contact(self):
+        with pytest.raises(ValidationError):
+            CustomerAddressCreateRequest(
+                label="Home",
+                address_line="Lane 7",
+                city="Pune",
+            )
+
+    def test_rejects_short_contact(self):
+        with pytest.raises(ValidationError):
+            CustomerAddressCreateRequest(
+                label="Home",
+                address_line="Lane 7",
+                city="Pune",
+                phone="12345",
+            )
 
 
 class TestKitchenProfileUpdate:

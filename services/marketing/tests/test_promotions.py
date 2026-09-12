@@ -89,3 +89,21 @@ async def test_deactivate_promotion(client: AsyncClient, marketing_ctx):
     active = await client.get(f"/api/v1/kitchens/{kid}/promotions/active")
     assert active.status_code == 200
     assert active.json()["promotions"] == []
+
+
+@pytest.mark.asyncio
+async def test_active_promotions_schema_says_auth_is_optional(client: AsyncClient):
+    """Swagger must not show a padlock on a route that serves anonymous callers.
+
+    The endpoint personalises by segment when a customer token is present and
+    falls back to segment='all' without one. FastAPI records HTTPBearer as a
+    hard requirement, so the operation has to spell out the anonymous option
+    itself -- otherwise the published contract tells integrators a token is
+    mandatory while the code happily answers without one.
+    """
+    spec = (await client.get("/openapi.json")).json()
+    operation = spec["paths"]["/api/v1/kitchens/{kitchen_id}/promotions/active"]["get"]
+    security = operation.get("security")
+    assert security, "operation should still advertise that a token is understood"
+    assert {} in security, f"optional auth must include an empty requirement: {security}"
+    assert any("HTTPBearer" in requirement for requirement in security)

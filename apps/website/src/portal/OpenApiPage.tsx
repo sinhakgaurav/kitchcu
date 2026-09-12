@@ -140,8 +140,10 @@ export function OpenApiPage() {
           <strong>summary</strong>, detailed <strong>description</strong> (auth, request body, expected
           success response), typed schemas with field descriptions/examples, and documented error
           responses (<code>400</code>/<code>401</code>/<code>403</code>/<code>404</code>/<code>422</code>
-          ). Authorize with a Bearer JWT (owner OTP, customer OTP/OAuth, or admin), then use{" "}
-          <em>Try it out</em> against <code>/api/v1/*</code>.
+          ). Public operations have no padlock — use <em>Try it out</em> without
+          Authorize. Padlocked operations: click <strong>Authorize</strong> and use{" "}
+          <em>OAuth2Password</em> (phone + OTP, or admin email + password) or paste an{" "}
+          <code>access_token</code> into HTTPBearer.
           {pathCount != null ? (
             <>
               {" "}

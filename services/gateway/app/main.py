@@ -290,7 +290,12 @@ async def swagger_ui() -> Response:
     return get_swagger_ui_html(
         openapi_url="/openapi.json",
         title="kitchCU API — OpenAPI",
-        swagger_ui_parameters={"persistAuthorization": True},
+        swagger_ui_parameters={
+            "persistAuthorization": True,
+            "tryItOutEnabled": True,
+            "filter": True,
+            "displayRequestDuration": True,
+        },
     )
 
 

@@ -12,11 +12,39 @@ SYNC_DB_URL = os.environ["DATABASE_SYNC_URL"]
 
 
 @pytest.mark.asyncio
-async def test_admin_login_hint_always_reveals_password(client: AsyncClient, monkeypatch):
+async def test_admin_login_hint_hides_password_in_production(client: AsyncClient, monkeypatch):
     monkeypatch.setattr("app.admin_routes.settings.admin_email", "admin@kitchcu.com")
     monkeypatch.setattr("app.admin_routes.settings.admin_password", "gcp-meta-secret")
+    monkeypatch.setattr("app.admin_routes.settings.app_env", "production")
     monkeypatch.delenv("ADMIN_LOGIN_REVEAL_PASSWORD", raising=False)
-    monkeypatch.setenv("APP_ENV", "production")
+    res = await client.get("/api/v1/admin/auth/login-hint")
+    assert res.status_code == 200, res.text
+    body = res.json()
+    assert body["email"] == "admin@kitchcu.com"
+    assert body["revealed"] is False
+    assert body["password"] is None
+
+
+@pytest.mark.asyncio
+async def test_admin_login_hint_reveals_password_in_non_production(client: AsyncClient, monkeypatch):
+    monkeypatch.setattr("app.admin_routes.settings.admin_email", "admin@kitchcu.dev")
+    monkeypatch.setattr("app.admin_routes.settings.admin_password", "admin123456")
+    monkeypatch.setattr("app.admin_routes.settings.app_env", "test")
+    monkeypatch.delenv("ADMIN_LOGIN_REVEAL_PASSWORD", raising=False)
+    res = await client.get("/api/v1/admin/auth/login-hint")
+    assert res.status_code == 200, res.text
+    body = res.json()
+    assert body["email"] == "admin@kitchcu.dev"
+    assert body["revealed"] is True
+    assert body["password"] == "admin123456"
+
+
+@pytest.mark.asyncio
+async def test_admin_login_hint_reveals_password_with_explicit_flag(client: AsyncClient, monkeypatch):
+    monkeypatch.setattr("app.admin_routes.settings.admin_email", "admin@kitchcu.com")
+    monkeypatch.setattr("app.admin_routes.settings.admin_password", "gcp-meta-secret")
+    monkeypatch.setattr("app.admin_routes.settings.app_env", "production")
+    monkeypatch.setenv("ADMIN_LOGIN_REVEAL_PASSWORD", "1")
     res = await client.get("/api/v1/admin/auth/login-hint")
     assert res.status_code == 200, res.text
     body = res.json()
@@ -26,16 +54,22 @@ async def test_admin_login_hint_always_reveals_password(client: AsyncClient, mon
 
 
 @pytest.mark.asyncio
-async def test_admin_login_hint_reveals_password_with_explicit_flag(client: AsyncClient, monkeypatch):
-    monkeypatch.setattr("app.admin_routes.settings.admin_email", "admin@kitchcu.com")
-    monkeypatch.setattr("app.admin_routes.settings.admin_password", "gcp-meta-secret")
-    monkeypatch.setenv("ADMIN_LOGIN_REVEAL_PASSWORD", "1")
-    res = await client.get("/api/v1/admin/auth/login-hint")
-    assert res.status_code == 200, res.text
-    body = res.json()
-    assert body["email"] == "admin@kitchcu.com"
-    assert body["revealed"] is True
-    assert body["password"] == "gcp-meta-secret"
+async def test_oauth_password_token_issues_admin_jwt(client: AsyncClient, monkeypatch):
+    monkeypatch.setattr("app.admin_routes.settings.admin_email", "admin@kitchcu.dev")
+    monkeypatch.setattr("app.admin_routes.settings.admin_password", "admin123456")
+    response = await client.post(
+        "/api/v1/auth/token",
+        data={"username": "admin@kitchcu.dev", "password": "admin123456", "grant_type": "password"},
+    )
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["access_token"]
+    me = await client.get(
+        "/api/v1/admin/me",
+        headers={"Authorization": f"Bearer {body['access_token']}"},
+    )
+    assert me.status_code == 200
+    assert me.json()["email"] == "admin@kitchcu.dev"
 
 
 @pytest.mark.asyncio

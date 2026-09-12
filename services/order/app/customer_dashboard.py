@@ -10,7 +10,7 @@ from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import OrderItem
-from app.schemas import OrderResponse, list_customer_orders, order_to_response
+from app.schemas import OrderResponse, list_customer_orders, load_order_rating_stats, order_to_response
 
 
 class EnrichedOrderItem(BaseModel):
@@ -31,6 +31,9 @@ class DashboardOrder(BaseModel):
     order: OrderResponse
     items: list[EnrichedOrderItem]
     can_rate: bool
+    is_rated: bool = False
+    rating_home_taste: float | None = None
+    rating_quality: float | None = None
     tracking_token: str | None = None
     has_live_media: bool = False
     diets: list[str] = Field(default_factory=list)
@@ -116,6 +119,7 @@ async def build_customer_dashboard(
     live_media_only: bool = False,
 ) -> CustomerDashboardResponse:
     orders = await list_customer_orders(session, customer_phone)
+    rating_stats = await load_order_rating_stats(session, [o.id for o in orders]) if orders else {}
     if not orders:
         return CustomerDashboardResponse(
             orders=[],
@@ -236,11 +240,16 @@ async def build_customer_dashboard(
             continue
 
         order_resp = await order_to_response(session, order)
+        rated_row = rating_stats.get(order.id)
+        rated = rated_row is not None
         dash_orders.append(
             DashboardOrder(
                 order=order_resp,
                 items=enriched_items,
-                can_rate=order.status == "delivered",
+                can_rate=order.status == "delivered" and not rated,
+                is_rated=rated,
+                rating_home_taste=rated_row[1] if rated_row else None,
+                rating_quality=rated_row[2] if rated_row else None,
                 tracking_token=order.tracking_token,
                 has_live_media=has_live,
                 diets=sorted(order_diets),

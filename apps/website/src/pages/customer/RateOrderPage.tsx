@@ -1,10 +1,15 @@
 import { Link, Navigate, useParams } from "react-router-dom";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { Order } from "../../shared/api";
 import { getCustomerToken } from "../../shared/customerApi";
 import { useCustomerAuth } from "../../shared/customerAuth";
 import { fetchMyOrder } from "../../shared/customerCheckoutApi";
-import { submitOrderRatings, type DishRatingInput } from "../../shared/customerRatingsApi";
+import {
+  fetchOrderRatings,
+  submitOrderRatings,
+  type DishRating,
+  type DishRatingInput,
+} from "../../shared/customerRatingsApi";
 
 type ItemRating = {
   dish_id: string;
@@ -12,6 +17,7 @@ type ItemRating = {
   home_taste_score: number;
   quality_score: number;
   media_url: string;
+  given?: DishRating;
 };
 
 export function RateOrderPage() {
@@ -27,22 +33,32 @@ export function RateOrderPage() {
 
   useEffect(() => {
     if (!token || !orderId) return;
-    fetchMyOrder(orderId)
-      .then((found) => {
-        if (found.status !== "delivered") throw new Error("Only delivered orders can be rated");
+    Promise.all([fetchMyOrder(orderId), fetchOrderRatings(orderId)])
+      .then(([found, existing]) => {
+        if (found.status !== "delivered" && existing.ratings.length === 0) {
+          throw new Error("Only delivered orders can be rated");
+        }
         setOrder(found);
+        const byDish = Object.fromEntries(existing.ratings.map((row) => [row.dish_id, row]));
         setRatings(
-          found.items.map((item) => ({
-            dish_id: item.dish_id,
-            dish_name: item.dish_name,
-            home_taste_score: 5,
-            quality_score: 5,
-            media_url: "",
-          })),
+          found.items.map((item) => {
+            const given = byDish[item.dish_id];
+            return {
+              dish_id: item.dish_id,
+              dish_name: item.dish_name,
+              home_taste_score: given?.home_taste_score ?? 5,
+              quality_score: given?.quality_score ?? 5,
+              media_url: given?.media_url ?? "",
+              given,
+            };
+          }),
         );
       })
       .catch((err) => setError(err instanceof Error ? err.message : "Could not load order"));
   }, [token, orderId]);
+
+  const pending = useMemo(() => ratings.filter((row) => !row.given), [ratings]);
+  const alreadyRated = ratings.length > 0 && pending.length === 0;
 
   if (loading) {
     return <p className="app-loading">Checking sign-in…</p>;
@@ -53,11 +69,11 @@ export function RateOrderPage() {
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!orderId) return;
+    if (!orderId || pending.length === 0) return;
     setBusy(true);
     setError("");
     try {
-      const payload: DishRatingInput[] = ratings.map((r) => ({
+      const payload: DishRatingInput[] = pending.map((r) => ({
         dish_id: r.dish_id,
         home_taste_score: r.home_taste_score,
         quality_score: r.quality_score,
@@ -101,8 +117,12 @@ export function RateOrderPage() {
       <Link to="/orders" className="owner-back">← Back to orders</Link>
       <header className="owner-page__head">
         <div>
-          <h1>Rate your meal</h1>
-          <p>Home taste vs restaurant — only verified delivered orders count.</p>
+          <h1>{alreadyRated ? "Your rating" : "Rate your meal"}</h1>
+          <p>
+            {alreadyRated
+              ? "You already rated this delivered order. Here is what you submitted."
+              : "Home taste vs restaurant — only verified delivered orders count."}
+          </p>
         </div>
       </header>
 
@@ -115,55 +135,65 @@ export function RateOrderPage() {
           {ratings.map((item, idx) => (
             <fieldset key={item.dish_id} className="owner-card">
               <legend>{item.dish_name}</legend>
-              <label>
-                Home taste (1–5)
-                <input
-                  type="range"
-                  min={1}
-                  max={5}
-                  value={item.home_taste_score}
-                  onChange={(e) => {
-                    const next = [...ratings];
-                    next[idx] = { ...item, home_taste_score: Number(e.target.value) };
-                    setRatings(next);
-                  }}
-                />
-                <span>{item.home_taste_score}/5</span>
-              </label>
-              <label>
-                Quality (1–5)
-                <input
-                  type="range"
-                  min={1}
-                  max={5}
-                  value={item.quality_score}
-                  onChange={(e) => {
-                    const next = [...ratings];
-                    next[idx] = { ...item, quality_score: Number(e.target.value) };
-                    setRatings(next);
-                  }}
-                />
-                <span>{item.quality_score}/5</span>
-              </label>
-              <label>
-                Optional review video URL (anonymous)
-                <input
-                  className="owner-input"
-                  type="url"
-                  placeholder="https://…"
-                  value={item.media_url}
-                  onChange={(e) => {
-                    const next = [...ratings];
-                    next[idx] = { ...item, media_url: e.target.value };
-                    setRatings(next);
-                  }}
-                />
-              </label>
+              {item.given ? (
+                <p className="report-rank__meta">
+                  Your score — taste {item.given.home_taste_score}/5 · quality {item.given.quality_score}/5
+                </p>
+              ) : (
+                <>
+                  <label>
+                    Home taste (1–5)
+                    <input
+                      type="range"
+                      min={1}
+                      max={5}
+                      value={item.home_taste_score}
+                      onChange={(e) => {
+                        const next = [...ratings];
+                        next[idx] = { ...item, home_taste_score: Number(e.target.value) };
+                        setRatings(next);
+                      }}
+                    />
+                    <span>{item.home_taste_score}/5</span>
+                  </label>
+                  <label>
+                    Quality (1–5)
+                    <input
+                      type="range"
+                      min={1}
+                      max={5}
+                      value={item.quality_score}
+                      onChange={(e) => {
+                        const next = [...ratings];
+                        next[idx] = { ...item, quality_score: Number(e.target.value) };
+                        setRatings(next);
+                      }}
+                    />
+                    <span>{item.quality_score}/5</span>
+                  </label>
+                  <label>
+                    Optional review video URL (anonymous)
+                    <input
+                      className="owner-input"
+                      type="url"
+                      placeholder="https://…"
+                      value={item.media_url}
+                      onChange={(e) => {
+                        const next = [...ratings];
+                        next[idx] = { ...item, media_url: e.target.value };
+                        setRatings(next);
+                      }}
+                    />
+                  </label>
+                </>
+              )}
             </fieldset>
           ))}
-          <button type="submit" className="btn btn--primary" disabled={busy}>
-            {busy ? "Submitting…" : "Submit ratings"}
-          </button>
+          {pending.length > 0 && (
+            <button type="submit" className="btn btn--primary" disabled={busy}>
+              {busy ? "Submitting…" : "Submit ratings"}
+            </button>
+          )}
         </form>
       )}
     </div>

@@ -5,6 +5,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.admin_routes import router as admin_router
+from app.auth_token import router as auth_token_router
 from app.customer_routes import router as customer_router
 from app.internal_routes import router as internal_router
 from app.referral_routes import router as referral_router
@@ -71,6 +72,7 @@ app.add_middleware(
 app.add_middleware(CorrelationMiddleware)
 
 app.include_router(router, prefix="/api/v1")
+app.include_router(auth_token_router, prefix="/api/v1")
 app.include_router(customer_router, prefix="/api/v1")
 app.include_router(referral_router, prefix="/api/v1")
 app.include_router(admin_router, prefix="/api/v1")

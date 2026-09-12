@@ -374,6 +374,19 @@
       "useLocation": "Use my location",
       "noResults": "No kitchens match your filters"
     },
+    "delivery": {
+      "deliverTo": "Deliver to",
+      "useGps": "Current location (GPS)",
+      "demoPune": "Demo: Pune kitchens",
+      "manage": "Manage addresses",
+      "addAddress": "Add an address",
+      "editAddress": "Edit address",
+      "editThisAddress": "Edit this address",
+      "updateAddress": "Update address",
+      "cancelEdit": "Cancel edit",
+      "signInToSave": "Sign in to save addresses",
+      "contactPhone": "Contact number"
+    },
     "checkout": {
       "title": "Checkout",
       "placeOrder": "Place order",

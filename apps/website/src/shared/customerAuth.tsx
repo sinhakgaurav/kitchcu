@@ -20,6 +20,7 @@ import {
   setCustomerSession,
   type CustomerSession,
 } from "./customerSession";
+import { clearStoredDeliverySelection } from "./customerDeliveryLocation";
 
 type CustomerAuthState = {
   session: CustomerSession | null;
@@ -64,6 +65,7 @@ export function CustomerAuthProvider({ children }: { children: ReactNode }) {
   const logout = useCallback(() => {
     clearCustomerSession();
     clearCustomerToken();
+    clearStoredDeliverySelection();
     setSessionState(null);
   }, []);
 

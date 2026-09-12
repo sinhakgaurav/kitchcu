@@ -75,6 +75,15 @@ class OrderRatingsCreateResponse(BaseModel):
     )
 
 
+class OrderRatingsListResponse(BaseModel):
+    """Existing ratings the signed-in customer already left on an order."""
+
+    ratings: list[DishRatingResponse] = Field(
+        default_factory=list,
+        description="One row per dish already rated for this order. Empty if none yet.",
+    )
+
+
 class DishRatingSummaryResponse(BaseModel):
     """Live-aggregated rating summary for one dish."""
 
@@ -399,6 +408,47 @@ async def get_dish_summary(
             overall_rating=0.0,
         )
     return aggregate_to_summary(agg)
+
+
+async def _load_customer_order(
+    session: AsyncSession,
+    order_id: uuid.UUID,
+    customer_phone: str,
+) -> dict:
+    result = await session.execute(
+        text(
+            """
+            SELECT id, kitchen_id, status, customer_phone
+            FROM ckac_orders.orders
+            WHERE id = :oid
+            LIMIT 1
+            """
+        ),
+        {"oid": order_id},
+    )
+    row = result.mappings().one_or_none()
+    if not row or row["customer_phone"] != customer_phone:
+        raise ValueError("Order not found")
+    return dict(row)
+
+
+async def list_order_ratings(
+    session: AsyncSession,
+    order_id: uuid.UUID,
+    customer_id: uuid.UUID,
+    customer_phone: str,
+) -> OrderRatingsListResponse:
+    await _load_customer_order(session, order_id, customer_phone)
+    result = await session.execute(
+        select(DishRating)
+        .where(
+            DishRating.order_id == order_id,
+            DishRating.customer_id == customer_id,
+        )
+        .order_by(DishRating.created_at.asc())
+    )
+    rows = result.scalars().all()
+    return OrderRatingsListResponse(ratings=[rating_to_response(r) for r in rows])
 
 
 async def list_kitchen_summaries(

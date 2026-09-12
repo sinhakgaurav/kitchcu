@@ -1,8 +1,8 @@
 # KitchCu — Production Portals, Credentials & Feature QA
 
 **Audience:** CEO · CPO · CTO · QA · Ops · Support  
-**Last updated:** 2026-09-07  
-**Related:** [DEPLOYMENT-GCP.md](./DEPLOYMENT-GCP.md) · [QA-INSTRUCTION-PACK.md](./QA-INSTRUCTION-PACK.md) · [ADVANCEMENT-TRACKER.md](./ADVANCEMENT-TRACKER.md)
+**Last updated:** 2026-09-12  
+**Related:** [DEPLOYMENT-GCP.md](./DEPLOYMENT-GCP.md) · [TESTER-INSTRUCTION-PACK.md](./TESTER-INSTRUCTION-PACK.md) (numbered UI + API) · [QA-INSTRUCTION-PACK.md](./QA-INSTRUCTION-PACK.md) · [ADVANCEMENT-TRACKER.md](./ADVANCEMENT-TRACKER.md)
 
 This pack is the single place for **production portal URLs**, **who logs in where**, **demo vs production credentials policy**, and a **feature → responsibility → test steps** matrix.
 
@@ -97,12 +97,12 @@ Locally: `python scripts/seed-bulk-data.py` or `.\scripts\seed-bulk-data.ps1`. C
 | Portal explorer | http://localhost:13000/openapi | https://kitchcu.com/openapi |
 | Super Admin (shows username/password + these links) | http://localhost:13003 | https://admin.kitchcu.com |
 
-1. Open Super Admin — username and password are always printed on the Sign in card (and prefilled). Production uses `admin@kitchcu.com` + the live `ADMIN_PASSWORD`.
-2. `POST /api/v1/admin/auth/login` with that email + password → `access_token`.
-3. Swagger **Authorize** → paste the JWT. Or `Authorization: Bearer <token>` on curl.
-4. Owner/customer routes use OTP (`123456` in demo), not the admin password.
+1. Open Super Admin — username and password print on the Sign in card when `APP_ENV` is `development`/`test` **or** `ADMIN_LOGIN_REVEAL_PASSWORD=1` (GCP/startup still write `1`). Production uses `admin@kitchcu.com` + the live `ADMIN_PASSWORD`.
+2. Prefer Swagger **Authorize → OAuth2Password** (`POST /api/v1/auth/token`): admin email + password, or owner/customer phone + OTP. Local: `admin@kitchcu.dev` / `admin123456`, `9876543210` / `123456`, `9123456789` / `123456`.
+3. Or `POST /api/v1/admin/auth/login` then **HTTPBearer** paste the JWT (`Authorization: Bearer <token>` on curl).
+4. Public operations have no padlock — leftover tokens are not sent. Owner JWT must be `type=owner`.
 
-Full cheat-sheet: [`API.md`](./API.md) §1.1.
+Full cheat-sheet: [`API.md`](./API.md) §1.1–1.2.
 
 ---
 

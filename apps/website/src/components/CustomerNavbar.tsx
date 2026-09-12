@@ -7,6 +7,7 @@ import { CUSTOMER_HOST } from "../shared/brand";
 import { useCustomerAuth } from "../shared/customerAuth";
 import { kitchenUrl } from "../shared/urls";
 import { SuperAdminLink } from "./SuperAdminAccess";
+import { DeliveryAddressPicker } from "./DeliveryAddressPicker";
 
 export function CustomerNavbar() {
   const { t } = useTranslation();
@@ -36,6 +37,7 @@ export function CustomerNavbar() {
         <BrandNavMark to="/" subtitle={CUSTOMER_HOST} height={40} />
 
         <nav className={`nav__links ${open ? "nav__links--open" : ""}`}>
+          {session?.customerId ? <DeliveryAddressPicker variant="nav" /> : null}
           <a href={hashLink("/#near-you")} onClick={() => setOpen(false)}>
             {t("customer.nav.nearYou")}
           </a>

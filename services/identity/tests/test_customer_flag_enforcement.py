@@ -65,6 +65,7 @@ async def test_addresses_blocked_when_flag_disabled(client: AsyncClient):
                 "label": "Home",
                 "address_line": "1 Main St",
                 "city": "Pune",
+                "phone": "9123456789",
                 "pincode": "411001",
                 "latitude": 18.52,
                 "longitude": 73.85,

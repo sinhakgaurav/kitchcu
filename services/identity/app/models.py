@@ -76,6 +76,7 @@ class CustomerAddress(Base):
     state: Mapped[str | None] = mapped_column(String(100), nullable=True)
     pincode: Mapped[str | None] = mapped_column(String(12), nullable=True)
     landmark: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    phone: Mapped[str | None] = mapped_column(String(16), nullable=True)
     latitude: Mapped[float | None] = mapped_column(Numeric(10, 7), nullable=True)
     longitude: Mapped[float | None] = mapped_column(Numeric(10, 7), nullable=True)
     is_default: Mapped[bool] = mapped_column(Boolean, default=False)

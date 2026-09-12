@@ -3,15 +3,18 @@
 | Field | Value |
 |-------|-------|
 | Document | `QA-INSTRUCTION-PACK.md` |
-| Version | 1.1 |
+| Version | 1.2 |
 | Date | September 2026 |
 | Audience | QA Lead, engineers, founders doing release verification |
 | Companion PDF | `docs/QA-INSTRUCTION-PACK.pdf` — generate via `python scripts/generate_qa_instruction_pdf.py` |
+| Full tester steps | [`TESTER-INSTRUCTION-PACK.md`](./TESTER-INSTRUCTION-PACK.md) · [`TESTER-INSTRUCTION-PACK.pdf`](./TESTER-INSTRUCTION-PACK.pdf) — numbered UI + Swagger/API for every persona |
 | Scope | Local Docker demo + GCP production smoke; owner kitchen lists/UI polish; F19/F19b stock + bulk prep |
 
 ---
 
 ## 0. How to use this pack
+
+**Testers:** follow [`TESTER-INSTRUCTION-PACK.md`](./TESTER-INSTRUCTION-PACK.md) for every numbered click and Swagger call. Use this file as the short Must/Should gate.
 
 1. Run **§1 Setup** once per environment.
 2. Execute **§2 Smoke** (blocking — must pass before deep QA).
@@ -69,7 +72,7 @@ Follow `docs/DEPLOYMENT-GCP.md`. Confirm `*.kitchcu.com` health and same persona
 | S3 | Customer login OTP → home | Menu/discovery loads | |
 | S4 | Admin login → overview | Dashboard KPIs/panels load; Sign in card shows **username + password**; API docs links (Swagger / ReDoc / portal explorer) work | |
 | S5 | Portal home | Brand-first hero; no console crash | |
-| S6 | OpenAPI via gateway `/docs` or portal `/openapi` | Schema loads; Swagger **Authorize** accepts admin JWT from `POST /admin/auth/login` | |
+| S6 | OpenAPI via gateway `/docs` or portal `/openapi` | Schema loads; public routes have no padlock; **Authorize → OAuth2Password** (`POST /api/v1/auth/token`) accepts admin email+password or owner/customer phone+OTP; HTTPBearer still accepts a pasted JWT | |
 
 **Fail any of S1–S4 → stop deep QA; fix infra first.**
 
@@ -223,6 +226,7 @@ Workaround:
 
 | Need | Doc |
 |------|-----|
+| Numbered UI + API tester book | `docs/TESTER-INSTRUCTION-PACK.md` (+ PDF) |
 | Flows + APIs | `docs/CKAC-USERFLOWS.md` (Flow 8b Ingredients + Bulk prep) |
 | F19 / F19b design | `docs/F19-INGREDIENTS-DESIGN.md`, `docs/design/F19B-BULK-PREP-STOCK-ON-PREPARED-DESIGN.md` |
 | Feature acceptance | `docs/CKAC-COMPLETE-PLANNING-BENCHMARK.md` |
@@ -237,3 +241,4 @@ Workaround:
 |--------|------|
 | Initial QA pack (lists/UI polish + F19b stock/bulk prep) | 2026-07-20 |
 | P41: kitchen profile edit, ratings, settlements, GCP bulk + weekly seed | 2026-09-07 |
+| Pointer to Tester Instruction Pack (numbered UI + API) | 2026-09-12 |

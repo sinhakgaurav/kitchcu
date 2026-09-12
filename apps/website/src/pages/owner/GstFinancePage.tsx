@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { OwnerPageShell, OwnerPanel, OwnerEmpty } from "../../components/owner/OwnerPageShell";
 import { useKitchen } from "../../lib/kitchen";
 import {
@@ -88,12 +88,15 @@ export function GstFinancePage() {
     default_tax_rate: "5",
     is_active: true,
   });
+  const loadGen = useRef(0);
 
   const loadData = async (kitchenId: string, y: number, m: number) => {
+    const gen = ++loadGen.current;
     setError("");
     setLoading(true);
     try {
       const prof = await fetchGstProfile(kitchenId);
+      if (gen !== loadGen.current) return;
       setProfile(prof);
       if (prof) {
         setForm({
@@ -109,6 +112,7 @@ export function GstFinancePage() {
           fetchGstAudit(kitchenId, y, m),
           fetchGstBalanceSheet(kitchenId, y, m),
         ]);
+        if (gen !== loadGen.current) return;
         setReport(rep);
         setAudit(aud);
         setBalanceSheet(sheet);
@@ -118,9 +122,10 @@ export function GstFinancePage() {
         setBalanceSheet(null);
       }
     } catch (err) {
+      if (gen !== loadGen.current) return;
       setError(err instanceof Error ? err.message : "Could not load GST data");
     } finally {
-      setLoading(false);
+      if (gen === loadGen.current) setLoading(false);
     }
   };
 
@@ -239,7 +244,7 @@ export function GstFinancePage() {
           <label className="kc-field">
             <span className="kc-field__label">Year</span>
             <select className="kc-select" value={year} onChange={(e) => setYear(Number(e.target.value))}>
-              {[year - 1, year, year + 1].map((y) => (
+              {[now.getFullYear() - 1, now.getFullYear(), now.getFullYear() + 1].map((y) => (
                 <option key={y} value={y}>{y}</option>
               ))}
             </select>

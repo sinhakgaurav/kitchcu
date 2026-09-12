@@ -4,16 +4,17 @@
 
 | Field | Value |
 |-------|-------|
-| Version | **3.2.5** |
-| Status | Phase 1 **S1–S18** + post-S18 **P19–P41**; prod `*.kitchcu.com`; multi-city presence; i18n parity; owner/admin audit gap close; GCP bulk seed + weekly cron; portals/QA pack [`PRODUCTION-PORTALS-CREDENTIALS-QA.md`](./PRODUCTION-PORTALS-CREDENTIALS-QA.md); tracker [`ADVANCEMENT-TRACKER.md`](./ADVANCEMENT-TRACKER.md); **E1/E2** design pack only |
+| Version | **3.2.6** |
+| Status | Phase 1 **S1–S18** + post-S18 **P19–P47**; prod `*.kitchcu.com`; multi-city presence; i18n parity; Swagger/OpenAPI tester (padlock only on JWT routes; `POST /api/v1/auth/token`); owner JWT `type=owner`; login-hint gated; 6-month demo history seed; portals/QA pack [`PRODUCTION-PORTALS-CREDENTIALS-QA.md`](./PRODUCTION-PORTALS-CREDENTIALS-QA.md); tracker [`ADVANCEMENT-TRACKER.md`](./ADVANCEMENT-TRACKER.md); **E1/E2** design pack only |
 | Audience | CEO, CPO, CTO, Product, Engineering, DBA, QA, Investors, AI coding agents |
-| Last updated | 2026-09-07 |
-| Supersedes | `CKAC-COMPLETE-GUIDE.md` v3.2.4 (August 2026) |
+| Last updated | 2026-09-12 |
+| Supersedes | `CKAC-COMPLETE-GUIDE.md` v3.2.5 (2026-09-07) |
 | Operating charter | [`.cursor/rules/kitchcu-executive-operating-charter.mdc`](../.cursor/rules/kitchcu-executive-operating-charter.mdc) — always-on, non-negotiable |
 | Engineering constitution | [`KITCHCU-ENGINEERING-STANDARDS.md`](./KITCHCU-ENGINEERING-STANDARDS.md) |
 | Agent quick spec | [`AGENTS.md`](../AGENTS.md) |
 | Design pack in flight | [`E1-E2-KITCHEN-QUALITY-LOOP-DESIGN.md`](./E1-E2-KITCHEN-QUALITY-LOOP-DESIGN.md) |
 | Full user journeys | [`CKAC-USERFLOWS.md`](./CKAC-USERFLOWS.md) · [`CKAC-USERFLOWS.pdf`](./CKAC-USERFLOWS.pdf) |
+| Tester book (UI + API steps) | [`TESTER-INSTRUCTION-PACK.md`](./TESTER-INSTRUCTION-PACK.md) · [`TESTER-INSTRUCTION-PACK.pdf`](./TESTER-INSTRUCTION-PACK.pdf) |
 | Production portals & feature QA | [`PRODUCTION-PORTALS-CREDENTIALS-QA.md`](./PRODUCTION-PORTALS-CREDENTIALS-QA.md) · [`PRODUCTION-PORTALS-CREDENTIALS-QA.pdf`](./PRODUCTION-PORTALS-CREDENTIALS-QA.pdf) |
 | Public API reference | [`API.md`](./API.md) · aggregated spec at gateway `/openapi.json`, `/docs`, `/redoc` · portal explorer `/openapi` |
 | UI reference screenshots | [`docs/assets/ui/`](./assets/ui/) |
@@ -1034,7 +1035,7 @@ start http://localhost:13000/openapi          # Portal explorer (same schema)
 curl "http://localhost:18000/openapi.json?refresh=true"   # force refresh after route changes
 ```
 
-**Hitting login-required APIs:** public health/OpenAPI need no token. For `/api/v1/admin/*`, use the username + password shown on Super Admin Sign in → `POST /api/v1/admin/auth/login` → Swagger **Authorize** with the JWT (or `Authorization: Bearer <token>`). Owner/customer routes use OTP, not the admin password. See [`API.md`](./API.md) §1.1. Production Swagger: https://api.kitchcu.com/docs.
+**Hitting login-required APIs:** public health/OpenAPI need no token. Open gateway [`/docs`](http://localhost:18000/docs) → **Authorize**. Prefer **OAuth2Password** (`POST /api/v1/auth/token`): owner `9876543210` / `123456`, customer `9123456789` / `123456`, admin `admin@kitchcu.dev` / `admin123456`. Or paste a JWT into **HTTPBearer**. Aggregated OpenAPI sets `security: []` on public routes so leftover tokens are **not** sent on public Try it out (padlock only on JWT routes). Super Admin **Sign in** shows username + password only when `APP_ENV` is `development`/`test` **or** `ADMIN_LOGIN_REVEAL_PASSWORD=1` (GCP/local dry-run still set this to `1`). Owner JWT must be `type=owner` (`GET /owners/me` rejects customer tokens). See [`API.md`](./API.md) §1.1–1.2. Production Swagger: https://api.kitchcu.com/docs.
 
 ## 16. Build Status Matrix
 
@@ -1074,6 +1075,8 @@ curl "http://localhost:18000/openapi.json?refresh=true"   # force refresh after 
 | Super-admin ops console (orders/tickets/settlements/health) | P39 | ✅ |
 | Platform i18n (10 locales) + HTML/API-key/login-hint harden | P40 | ✅ |
 | Kitchen profile edit + owner ratings/inbox + admin RBAC/stream summary + live-capture-safe GCP seed | P41 | ✅ |
+| Admin login-hint gated (`development`/`test` or `ADMIN_LOGIN_REVEAL_PASSWORD=1`) | P45 | ✅ |
+| Swagger tester: `POST /api/v1/auth/token`, public `security: []`, owner JWT type-check, community/refunds 500s closed | P47 | ✅ |
 | **Purchases ledger + chef-standard lock (E1/E2)** | **S19 proposed** | **📋 Design only — not started** |
 
 ---
@@ -1273,7 +1276,7 @@ See [`DELIVERY-PAYER-MODE-DESIGN.md`](./DELIVERY-PAYER-MODE-DESIGN.md) for the c
 
 Gateway note: admin **billing** paths (packages, refunds, payment-gateway, GST) are registered **before** the identity admin catch-all so they proxy correctly.
 
-**Security (P40 / P45):** Dish HTML is sanitized server- and client-side. API Keys stay masked after save. `GET /admin/auth/login-hint` always returns plaintext `ADMIN_PASSWORD` so Super Admin Sign in can print it.
+**Security (P40 / P45 / P47):** Dish HTML is sanitized server- and client-side. API Keys stay masked after save. `GET /admin/auth/login-hint` returns plaintext `ADMIN_PASSWORD` only when `APP_ENV` is `development`/`test` **or** `ADMIN_LOGIN_REVEAL_PASSWORD=1` (GCP/startup still write `1`). Swagger publishes `security: []` on public ops and `POST /api/v1/auth/token` for Authorize. Owner JWT must be `type=owner`.
 
 ---
 
@@ -1464,7 +1467,11 @@ The `.kc-field` flex-column pattern (`display: flex; flex-direction: column; gap
 | Platform admin (local) | `admin@kitchcu.dev` | `admin123456` | Platform-scope only — no owner JWT accepted |
 | Platform admin (prod) | `admin@kitchcu.com` | `ADMIN_PASSWORD` from GCE metadata | Same JWT type=admin; password re-synced from env on login |
 
-All OTPs are the fixed dev value `123456` (`ckac_common` dev OTP provider) — production OTP delivery via WhatsApp/SMS is a named target, not yet wired. Seed data is generated by `scripts/seed-dev-data.py` and `scripts/bulk_demo_data.py` / `scripts/demo_data.py`, kept in sync with `apps/website/src/shared/demo.ts` (the single frontend source of truth for these values — never hardcode a demo phone number elsewhere).
+All OTPs are the fixed dev value `123456` (`ckac_common` dev OTP provider) — production OTP delivery via WhatsApp/SMS is a named target, not yet wired. Seed data is generated by `scripts/seed-dev-data.py` and `scripts/seed-bulk-data.py`, kept in sync with `apps/website/src/shared/demo.ts` (the single frontend source of truth for these values — never hardcode a demo phone number elsewhere).
+
+**Six-month demo history:** `$env:CKAC_BULK_MONTHS=6; python scripts/seed-bulk-data.py` stamps IST service-hour orders across ~183 days (age-aware status, diner pool, AOV ~₹450–550). Owner Reports expose a 6-month range. See [`ADVANCEMENT-TRACKER.md`](./ADVANCEMENT-TRACKER.md) § Six-month trading history.
+
+**Swagger Authorize:** `POST /api/v1/auth/token` (OAuth2 password form) accepts admin email + password or owner/customer phone + OTP. Same demo values as the table above.
 
 ## 21. Ports Table
 
@@ -1577,12 +1584,13 @@ Full acceptance criteria for every feature: [`CKAC-COMPLETE-PLANNING-BENCHMARK.m
 
 | Doc | Role |
 |-----|------|
-| **This guide (v3.2.5)** | CEO/CPO/CTO master encyclopedia |
+| **This guide (v3.2.6)** | CEO/CPO/CTO master encyclopedia |
 | [`PLATFORM-SOLUTION-BLUEPRINT.md`](./PLATFORM-SOLUTION-BLUEPRINT.md) | Expectations → CEO/CPO solution → CTO impl → arch/DB/UX per journey & admin controls |
 | [`PLATFORM-PERSONA-DEEP-DIVE.md`](./PLATFORM-PERSONA-DEEP-DIVE.md) | Persona lived experience + scorecards |
 | [`PLATFORM-STRATEGIC-ANALYSIS.md`](./PLATFORM-STRATEGIC-ANALYSIS.md) | Competitive honesty + Waves A–D |
 | [`ADVANCEMENT-TRACKER.md`](./ADVANCEMENT-TRACKER.md) | Living ship board |
 | [`CKAC-USERFLOWS.md`](./CKAC-USERFLOWS.md) / [`.pdf`](./CKAC-USERFLOWS.pdf) | Full user journey pack — every persona, every screen, every API call |
+| [`TESTER-INSTRUCTION-PACK.md`](./TESTER-INSTRUCTION-PACK.md) / [`.pdf`](./TESTER-INSTRUCTION-PACK.pdf) | Numbered UI + Swagger/API steps for testers |
 | [`API.md`](./API.md) | Public API reference — auth cheat-sheet, quick-start examples, error catalog |
 | Gateway `/openapi.json`, `/docs`, `/redoc` · Portal `/openapi` (`/api-docs`) | Live, always-current aggregated OpenAPI contract (see §15.5) |
 | [`E1-E2-KITCHEN-QUALITY-LOOP-DESIGN.md`](./E1-E2-KITCHEN-QUALITY-LOOP-DESIGN.md) | Next-sprint design pack (S19 proposed) |
@@ -1604,6 +1612,7 @@ Full acceptance criteria for every feature: [`CKAC-COMPLETE-PLANNING-BENCHMARK.m
 
 | Version | Date | Changes |
 |---------|------|---------|
+| **3.2.6** | 2026-09-12 | **P47** Swagger/OpenAPI: padlock only on JWT routes; `POST /api/v1/auth/token`; owner JWT `type=owner`; login-hint gated (`ADMIN_LOGIN_REVEAL_PASSWORD`); 6-month bulk history seed; community orphan-recipe + customer-refunds 500s closed; docs/PDFs refresh. |
 | **3.2.5** | 2026-09-07 | P41: owner/admin kitchen profile PATCH (code immutable); owner dish list includes drafts; Ratings page; order filters/draft remap; settlements + payment-mix; admin RBAC UI + stream summary; Super Admin links; live-capture-safe bulk seed; weekly cron path `/opt/ckac`; docs/PDFs refresh. |
 | **3.2.4** | 2026-08-02 | Portals/QA pack, multi-city presence, i18n parity, weekly QA cohort seed. |
 | **3.2.3** | July 2026 | Platform Solution Blueprint + Persona Deep Dive + Strategic Analysis linked from tracker/index; multilevel admin & package planner solution matrices. |
@@ -1618,4 +1627,4 @@ Full acceptance criteria for every feature: [`CKAC-COMPLETE-PLANNING-BENCHMARK.m
 
 ---
 
-*KitchCu Complete Executive & Engineering Guide v3.2.5 — Confidential — September 2026*
+*KitchCu Complete Executive & Engineering Guide v3.2.6 — Confidential — September 2026*

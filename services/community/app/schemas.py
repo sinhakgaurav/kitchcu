@@ -245,7 +245,11 @@ async def list_shared_recipes(
     rows = list((await session.execute(q)).scalars().all())
     recipes: list[SharedRecipeResponse] = []
     for row in rows:
-        code, name, _, _ = await _kitchen_meta(session, row.kitchen_id)
+        try:
+            code, name, _, _ = await _kitchen_meta(session, row.kitchen_id)
+        except ValueError:
+            # Reseed / deleted kitchen must not 500 the public feed.
+            continue
         recipes.append(
             SharedRecipeResponse(
                 id=row.id,

@@ -20,23 +20,19 @@ import {
   type SubscriptionSummary,
   type TopDishes,
 } from "../../lib/api";
+import { bucketRevenuePoints, chartGrainLabel, chartPointLabel } from "../../lib/reportSeries";
 import { useKitchen } from "../../lib/kitchen";
 
 const RANGES = [
   { days: 7, label: "7 days" },
   { days: 30, label: "30 days" },
   { days: 90, label: "90 days" },
+  { days: 180, label: "6 months" },
 ];
 
 const inr = (n: number) => `₹${Math.round(n).toLocaleString("en-IN")}`;
 const pct = (n: number) => `${(n * 100).toFixed(1)}%`;
 const deltaPct = (n: number) => `${n > 0 ? "+" : ""}${n.toFixed(1)}% vs prior period`;
-
-function chartDayLabel(isoDate: string): string {
-  const d = new Date(isoDate);
-  if (Number.isNaN(d.getTime())) return "";
-  return d.toLocaleDateString("en-IN", { weekday: "short" });
-}
 
 function ReportsSkeleton() {
   return (
@@ -107,9 +103,13 @@ export function ReportsPage() {
       });
   }, [kitchen, days]);
 
+  const chartPoints = useMemo(
+    () => bucketRevenuePoints(series?.points ?? [], days),
+    [series, days],
+  );
   const maxRevenue = useMemo(
-    () => Math.max(1, ...(series?.points.map((p) => p.revenue) ?? [1])),
-    [series],
+    () => Math.max(1, ...chartPoints.map((p) => p.revenue), 1),
+    [chartPoints],
   );
   const maxHour = useMemo(
     () => Math.max(1, ...(peak?.hours.map((h) => h.orders) ?? [1])),
@@ -123,6 +123,7 @@ export function ReportsPage() {
     () => Object.fromEntries(ratings.map((r) => [r.dish_id, r])),
     [ratings],
   );
+  const hasPrior = (compare?.previous.completed_orders ?? 0) > 0;
 
   if (!kitchen) return null;
 
@@ -188,7 +189,7 @@ export function ReportsPage() {
                 <strong>{inr(summary.gross_revenue)}</strong>
                 <span>Revenue ({summary.window_days}d)</span>
                 <em>
-                  {compare
+                  {hasPrior && compare
                     ? deltaPct(compare.delta_pct.revenue)
                     : `${summary.completed_orders} completed orders`}
                 </em>
@@ -200,7 +201,9 @@ export function ReportsPage() {
                 <strong>{summary.completed_orders}</strong>
                 <span>Orders</span>
                 <em>
-                  {compare ? deltaPct(compare.delta_pct.orders) : `${summary.active_orders} still active`}
+                  {hasPrior && compare
+                    ? deltaPct(compare.delta_pct.orders)
+                    : `${summary.active_orders} still active`}
                 </em>
               </div>
             </div>
@@ -209,7 +212,7 @@ export function ReportsPage() {
               <div>
                 <strong>{inr(summary.avg_order_value)}</strong>
                 <span>Avg order value</span>
-                <em>{compare ? deltaPct(compare.delta_pct.aov) : "Per completed order"}</em>
+                <em>{hasPrior && compare ? deltaPct(compare.delta_pct.aov) : "Per completed order"}</em>
               </div>
             </div>
             <div className="od-kpi dash-card">
@@ -275,20 +278,20 @@ export function ReportsPage() {
             <header className="od-panel__head">
               <div>
                 <h2>Revenue trend</h2>
-                <p>Daily gross revenue over the selected period</p>
+                <p>{chartGrainLabel(series?.window_days ?? days)}</p>
               </div>
             </header>
-            {series && series.points.every((p) => p.revenue === 0) ? (
+            {chartPoints.every((p) => p.revenue === 0) ? (
               <p className="od-panel__empty">No revenue in this period yet — share your menu link to get started.</p>
             ) : (
-              <div className="report-bars od-reports__bars">
-                {series?.points.map((p) => (
+              <div className={`report-bars od-reports__bars${days > 31 ? " od-reports__bars--rolled" : ""}`}>
+                {chartPoints.map((p) => (
                   <div key={p.date} className="report-bars__col" title={`${p.date}: ${inr(p.revenue)} · ${p.orders} orders`}>
                     <div
                       className="report-bars__fill"
                       style={{ height: `${(p.revenue / maxRevenue) * 100}%` }}
                     />
-                    <span className="report-bars__label">{chartDayLabel(p.date)}</span>
+                    <span className="report-bars__label">{chartPointLabel(p.date, days)}</span>
                   </div>
                 ))}
               </div>

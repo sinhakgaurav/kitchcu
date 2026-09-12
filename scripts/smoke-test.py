@@ -158,7 +158,9 @@ def main() -> None:
             token=token,
         )
         sub_id = sub.get("id") if isinstance(sub, dict) else None
-        check("billing create subscription", status == 201 and bool(sub_id))
+        # Idempotent per owner: 201 on a fresh owner, 200 returning the live
+        # subscription once one exists. A seeded stack takes the second path.
+        check("billing create subscription", status in (200, 201) and bool(sub_id))
 
         if sub_id:
             status, activated = api(

@@ -381,6 +381,7 @@ export function AdminCustomers({ canWrite = false }: { canWrite?: boolean } = {}
               {selected.addresses.map((a) => (
                 <li key={a.id}>
                   {a.label}: {a.address_line}, {a.city}
+                  {a.phone ? ` · ${a.phone}` : ""}
                   {a.latitude != null ? ` · ${a.latitude.toFixed(4)}, ${a.longitude?.toFixed(4)}` : ""}
                 </li>
               ))}

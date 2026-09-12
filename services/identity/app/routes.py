@@ -3,7 +3,6 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-from jose import JWTError, jwt
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -39,7 +38,7 @@ from app.schemas import (
     update_kitchen_profile,
     update_kitchen_whatsapp_integration,
 )
-from ckac_common.auth import stream_key
+from ckac_common.auth import decode_owner_id, stream_key
 from ckac_common.config import get_settings
 from ckac_common.database import get_db
 from ckac_common.event_bus import EventPublisher
@@ -67,13 +66,7 @@ async def get_current_owner(
 ) -> Owner:
     if not credentials:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
-    try:
-        payload = jwt.decode(
-            credentials.credentials, settings.jwt_secret, algorithms=[settings.jwt_algorithm]
-        )
-        owner_id = uuid.UUID(payload["sub"])
-    except (JWTError, ValueError) as exc:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token") from exc
+    owner_id = decode_owner_id(credentials.credentials)
 
     result = await session.execute(select(Owner).where(Owner.id == owner_id))
     owner = result.scalar_one_or_none()

@@ -7,13 +7,16 @@ $failed = $false
 Write-Host "kitchCU engineering standards check" -ForegroundColor Cyan
 
 # 1. No TODO/FIXME in production Python (exclude tests)
-$todoPattern = '(TODO|FIXME|HACK|XXX)\b'
+# Anchored on both sides: an unanchored `XXX\b` matches the tail of the
+# `+91XXXXXXXXXX` phone placeholder in our API descriptions.
+$todoPattern = '\b(TODO|FIXME|HACK|XXX)\b'
 $pyPaths = @(
-    "$root\services\*\app\*.py",
-    "$root\packages\ckac-common\ckac_common\*.py"
+    "$root\services\*\app",
+    "$root\packages\ckac-common\ckac_common"
 )
 foreach ($glob in $pyPaths) {
-    Get-ChildItem -Path $glob -ErrorAction SilentlyContinue | ForEach-Object {
+    # Recursive: domain logic also lives in subpackages such as app\domain\.
+    Get-ChildItem -Path $glob -Recurse -Filter *.py -ErrorAction SilentlyContinue | ForEach-Object {
         $matches = Select-String -Path $_.FullName -Pattern $todoPattern
         if ($matches) {
             $failed = $true

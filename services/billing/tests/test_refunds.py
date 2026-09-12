@@ -3,12 +3,14 @@
 import asyncio
 import io
 import uuid
+from datetime import UTC, datetime, timedelta
 
 import psycopg2
 import pytest
 from httpx import AsyncClient
+from jose import jwt
 
-from tests.conftest import SYNC_DB_URL
+from tests.conftest import JWT_SECRET, SYNC_DB_URL
 
 
 def _seed_customer_with_payout(phone: str, *, upi: str = "priya@okaxis") -> uuid.UUID:
@@ -234,3 +236,27 @@ async def test_refund_webhook_completes_gateway_refund(client: AsyncClient, bill
     assert listed.status_code == 200
     assert listed.json()[0]["status"] == "completed"
     assert listed.json()[0]["razorpay_refund_id"] == "rfnd_test_webhook_1"
+
+
+@pytest.mark.asyncio
+async def test_customer_refunds_me_empty_list(client: AsyncClient):
+    from datetime import UTC, datetime, timedelta
+
+    from jose import jwt
+
+    customer_id = _seed_customer_with_payout("+9191988776655", upi="empty@okaxis")
+    token = jwt.encode(
+        {
+            "sub": str(customer_id),
+            "type": "customer",
+            "exp": datetime.now(UTC) + timedelta(hours=1),
+        },
+        JWT_SECRET,
+        algorithm="HS256",
+    )
+    listed = await client.get(
+        "/api/v1/billing/refunds/customer/me",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert listed.status_code == 200, listed.text
+    assert listed.json() == []

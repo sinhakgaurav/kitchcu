@@ -19,10 +19,11 @@
 | `docs/PLATFORM-SOLUTION-BLUEPRINT.md` | **Solution blueprint** — expectations → CEO/CPO solution → CTO impl → arch/DB/UX per journey & admin controls |
 | `docs/PLATFORM-STRATEGIC-ANALYSIS.md` | **Strategic analysis** — competitive, gaps, Waves A–D |
 | `docs/PLATFORM-PERSONA-DEEP-DIVE.md` | **Persona deep dive** — lived experience, scorecards, RBAC reality |
-| `docs/CKAC-COMPLETE-GUIDE.md` | **Master guide v3.2.3** — CEO + CPO + CTO encyclopedia (definitions, how/why, flows, UI Catalog, aggregated OpenAPI reference + PDF) |
+| `docs/CKAC-COMPLETE-GUIDE.md` | **Master guide v3.2.6** — CEO + CPO + CTO encyclopedia (definitions, how/why, flows, UI Catalog, aggregated OpenAPI reference + PDF) |
 | `docs/CKAC-USERFLOWS.md` | **Full user journey pack** — every persona, every screen, every API call, step-by-step (+ PDF) |
 | `docs/QA-INSTRUCTION-PACK.md` | **QA instruction pack** — smoke, list/UI polish, F19b stock/bulk prep, sign-off (+ PDF) |
-| `docs/API.md` | **Public API reference** — auth, how to Authorize login-required routes (§1.1); live OpenAPI at gateway `/docs`/`/redoc`/`/openapi.json` + portal `/openapi`; Super Admin shows username/password + the same links |
+| `docs/TESTER-INSTRUCTION-PACK.md` | **Tester book** — numbered UI + Swagger/API steps for every persona (+ PDF) |
+| `docs/API.md` | **Public API reference** — auth, how to Authorize login-required routes (§1.1–1.2: OAuth2Password `POST /api/v1/auth/token` or HTTPBearer); live OpenAPI at gateway `/docs`/`/redoc`/`/openapi.json` + portal `/openapi`; Super Admin shows username/password when login-hint reveal is on |
 | `docs/CKAC-ARCHITECTURE-CTO.md` | **CTO layers + CPO product ↔ code map** |
 | `docs/CKAC-PRODUCT-DEPTH-GUIDE.md` | Product depth guide (superseded by Complete Guide) |
 | `docs/CKAC-IMPLEMENTATION-GUIDE.md` | **What's built — mapped to planning & system benchmarks** |
@@ -465,4 +466,4 @@ Delivered order only → home_taste (1–5) + quality (1–5) → optional anony
 
 ---
 
-*Last updated: Phase 1 S1–S18 + P19–P41 · audit gap close · live-capture-safe GCP bulk seed · weekly cron at `/opt/ckac`. Tracker: `docs/ADVANCEMENT-TRACKER.md`. Portals/QA: `docs/PRODUCTION-PORTALS-CREDENTIALS-QA.md`. Guide: `docs/CKAC-COMPLETE-GUIDE.md` v3.2.5. Prod: `*.kitchcu.com`. Next: kitchen staff build · live Razorpay · E1–E2.*
+*Last updated: Phase 1 S1–S18 + P19–P47 · Swagger tester (`POST /api/v1/auth/token`) · owner JWT type-check · gated login-hint · 6-month bulk history seed. Tracker: `docs/ADVANCEMENT-TRACKER.md`. Portals/QA: `docs/PRODUCTION-PORTALS-CREDENTIALS-QA.md`. Guide: `docs/CKAC-COMPLETE-GUIDE.md` v3.2.6. Prod: `*.kitchcu.com`. Next: kitchen staff build · live Razorpay · E1–E2.*

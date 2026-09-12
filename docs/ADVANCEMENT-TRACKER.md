@@ -7,8 +7,9 @@
 | Baseline | Phase 1 **S1–S18** complete (gateway + 13 domain services + 4 PWAs + GST) |
 | Production | `*.kitchcu.com` (GCP VM + Caddy) |
 | Local demo | `*.kitchcu.in` / `admin@kitchcu.dev` |
-| Last updated | 2026-09-07 |
+| Last updated | 2026-09-12 |
 | Portals / QA pack | [PRODUCTION-PORTALS-CREDENTIALS-QA.md](./PRODUCTION-PORTALS-CREDENTIALS-QA.md) (+ PDF) |
+| Tester book | [TESTER-INSTRUCTION-PACK.md](./TESTER-INSTRUCTION-PACK.md) (+ [PDF](./TESTER-INSTRUCTION-PACK.pdf)) — numbered UI + API steps |
 | Architecture flows | [PLATFORM-ARCHITECTURE-FLOWS.md](./PLATFORM-ARCHITECTURE-FLOWS.md) |
 
 ---
@@ -29,7 +30,8 @@ For **solution blueprint** (expectations → CEO/CPO solution → CTO impl → a
 For **strategic waves** see [PLATFORM-STRATEGIC-ANALYSIS.md](./PLATFORM-STRATEGIC-ANALYSIS.md).  
 For **persona lived experience** see [PLATFORM-PERSONA-DEEP-DIVE.md](./PLATFORM-PERSONA-DEEP-DIVE.md).  
 For **architecture + end-to-end flows** see [PLATFORM-ARCHITECTURE-FLOWS.md](./PLATFORM-ARCHITECTURE-FLOWS.md).  
-For **manual QA / release sign-off** see [QA-INSTRUCTION-PACK.md](./QA-INSTRUCTION-PACK.md) (+ [PDF](./QA-INSTRUCTION-PACK.pdf)).
+For **numbered tester steps** (UI + Swagger/API) see [TESTER-INSTRUCTION-PACK.md](./TESTER-INSTRUCTION-PACK.md) (+ [PDF](./TESTER-INSTRUCTION-PACK.pdf)).  
+For **manual QA / release sign-off** (short Must/Should) see [QA-INSTRUCTION-PACK.md](./QA-INSTRUCTION-PACK.md) (+ [PDF](./QA-INSTRUCTION-PACK.pdf)).
 
 ---
 
@@ -43,7 +45,7 @@ For **manual QA / release sign-off** see [QA-INSTRUCTION-PACK.md](./QA-INSTRUCTI
 | i18n | 12 locales (en + hi/mr/ta/te/kn/ml/bn/gu/pa/bho/mai) — catalog parity green; admin stays EN |
 | Cities | Presence strip on portal / customer / kitchen; seed kitchens in Delhi NCR, UP, Dehradun, Mumbai |
 | Delivery | Cost-share + Self/Porter modes; book on accept (P32/P32.1) |
-| Trust | Admin RBAC + audit · HTML sanitize · API-key mask · login-hint always prints ADMIN_PASSWORD |
+| Trust | Admin RBAC + audit · HTML sanitize · API-key mask · login-hint gated (`ADMIN_LOGIN_REVEAL_PASSWORD`) · Swagger padlock only on JWT routes |
 | Growth | Dual referral program + GST monthly Excel/PDF |
 | Open | Kitchen staff build · tiffin recurring · Wave C/D |
 
@@ -106,8 +108,9 @@ For **manual QA / release sign-off** see [QA-INSTRUCTION-PACK.md](./QA-INSTRUCTI
 | P42 | **Live Razorpay Checkout** | Billing live Orders API + signed capture · customer Checkout.js · kitchen/platform keys · webhook backup | 🟡 | Demo path unchanged without keys; Route transfers still pending in prod. Design `LIVE-RAZORPAY-CHECKOUT-DESIGN.md` |
 | P43 | **Order CSV + parse match-rate** | Owner `export.csv` + drafts parse-stats; admin kitchen Orders CSV/stats; first-party (no Meta/Razorpay) | ✅ | Design `ORDER-CSV-AND-PARSE-STATS-DESIGN.md`; cap 10k rows |
 | P44 | **Admin API docs + login creds** | Super Admin Sign in shows username/password + Swagger/ReDoc/portal links; how-to Authorize in `API.md` §1.1 | ✅ | Admin login / sidebar / overview |
-| P45 | **Always show admin password** | `GET /admin/auth/login-hint` always returns `ADMIN_PASSWORD`; Sign in + portal/kitchen/customer strips print it; startup writes reveal=1 | ✅ | Identity login-hint; no flag gate |
+| P45 | **Gated admin login-hint** | `GET /admin/auth/login-hint` returns `ADMIN_PASSWORD` only in `development`/`test` **or** when `ADMIN_LOGIN_REVEAL_PASSWORD=1`; Sign in + portal/kitchen/customer strips print it when revealed; GCP/startup still write reveal=1 | ✅ | Identity `_should_reveal_admin_password`; `test_admin_password_sync.py` |
 | P46 | **QA tracker close-out (13 issues, 3 sheets)** | Discovery `q` + KNN `nearest` fallback; honest demo-OTP response; dish photo truth table; nearby reveal CSS; social buttons; nav overlay; scroll listener; refund actions; orders empty state | ✅ | See table below. Guardrail `scripts/tests/test_dish_media_truth.py` |
+| P47 | **Swagger tester + auth QA** | Aggregated OpenAPI: public ops `security: []` (no leftover token on Try it out); `POST /api/v1/auth/token` OAuth2 password form (admin email+password or owner/customer phone+OTP); owner JWT `type=owner`; `scripts/audit-api-auth.py`; community public recipes skip orphan kitchens; customer refunds list returns `[]` not 500 | ✅ | Gateway `openapi_aggregate.py`; identity `auth_token.py`; community `list_shared_recipes`; billing refunds SQL |
 
 ---
 
@@ -137,7 +140,7 @@ Source: QA workbook, sheets **Bug Issue** · **Bug Resolved** · **API Bug Repor
 | Environment | Admin email | Password |
 |-------------|-------------|----------|
 | Local / Docker demo | `admin@kitchcu.dev` | `admin123456` |
-| Production (`admin.kitchcu.com`) | `admin@kitchcu.com` | GCE metadata `admin-password` → VM `ADMIN_PASSWORD` (printed on Sign in via login-hint; synced to DB on login) |
+| Production (`admin.kitchcu.com`) | `admin@kitchcu.com` | GCE metadata `admin-password` → VM `ADMIN_PASSWORD` (printed on Sign in when `ADMIN_LOGIN_REVEAL_PASSWORD=1`; synced to DB on login) |
 
 Owners (all envs with seed): `9876543210`–`9876543213`, OTP `123456`.  
 Customers: `9123456789`, `9123456780`, `9988776655`, `9123456781`, `9123456782`, OTP `123456`.
@@ -179,6 +182,55 @@ support ticket. Identifiers are derived from the ISO year+week
 week reuses the accounts and only tops orders up. Current cohort is written to
 `/var/lib/ckac/weekly-cohort.json`. Repo on the VM is `/opt/ckac`. See [DEPLOYMENT-GCP.md](./DEPLOYMENT-GCP.md) §11.7–§11.7c.
 
+### Six-month trading history
+
+`CKAC_BULK_MONTHS=6` makes the bulk seeder produce history that reads like six months a
+kitchen actually worked, rather than a flat line stamped at the moment the seeder ran.
+
+```powershell
+$env:CKAC_BULK_MONTHS=6; python scripts/seed-bulk-data.py
+```
+
+| Control | Default | Purpose |
+|---------|---------|---------|
+| `CKAC_BULK_MONTHS` | `0` (uses `CKAC_BULK_BACKDATE_DAYS=30`) | Window in months; `6` → 183 days |
+| `CKAC_BULK_ORDERS_PER_KITCHEN` | `max(40, window_days)` | ≥1 order/day so no daily bucket is empty |
+| `CKAC_BULK_PRIMARY_ORDERS` | `window_days × 3` | Denser history on the demo kitchen |
+| `CKAC_POSTGRES_CONTAINER` | auto | Force the target DB when several stacks are up |
+
+The distribution lives in `scripts/order_history.py` and is asserted without a database in
+`scripts/tests/test_order_history.py`:
+
+- **Service hours (IST)** — breakfast/lunch/snacks/dinner windows with lunch and dinner
+  peaks. The old `NOW() - random() * 12 hours` could not reach dinner at all, so the
+  peak-hours report was an artefact of when the seeder happened to run.
+- **Weekly rhythm and growth** — weekend lift plus a trend, so a 6-month revenue chart shows
+  a kitchen that grew.
+- **Age-aware status** — anything older than two days is delivered or cancelled; yesterday
+  keeps only late-stage stragglers (`ready`, `out_for_delivery`); the live queue is today's.
+- **Linked rows move too** — status events, payments, refunds, settlements, GST invoices
+  (including `invoice_date`) and dish ratings shift with their parent order, so GST periods
+  and payment mix line up with the orders they describe.
+- **A diner pool that scales with volume** — roughly one distinct diner per 3.5 orders, split
+  into a loyal core, regulars and a one-off tail, so CRM, customer segments and churn risk
+  have something to segment. Registered city diners lead the core, keeping their logins rich.
+  Every generated diner gets a distinct name and a `+9174…` number that cannot shadow a
+  seeded login.
+- **A plausible basket** — mostly one dish for one person. The old 1–3 dishes × quantity 1–3
+  averaged four units, which billed a home-food order at over ₹1,000.
+- **GST invoice numbers follow the dated month** — numbers minted as `CKCODE-GST-YYYYMM-SEQ`
+  at create time are rewritten after dating so March filings are not a September series.
+- **Owner Reports** expose a 6-month range; 90/180-day charts roll up to weeks/months instead
+  of 180 unreadable daily bars. Period-over-period deltas hide when the prior window is empty.
+
+Bugs found while verifying this, all of which also affected the previous backdating:
+
+| Bug | Effect | Fix |
+|-----|--------|-----|
+| CRM profiles are aggregated on request (`?refresh=true`), and the only sync call sat inside the marketing-assets block | On any re-run the coupon already existed, the block short-circuited on 409, and the CRM page stayed empty — 2 profiles against 210 orders. The dish-trial step then found no invite candidates and skipped promote | Sync CRM after the dating pass (so `last_order_at` matches the dated history) and refresh on the reads that need candidates |
+| `resolve_postgres_container()` returned the first `*-postgres-1` from `docker ps` | With the GCP parity dry-run also up, seed SQL updated `ckac-gcp-dry-postgres-1` while the API calls went to the dev gateway — every row matched, psql exited 0, dev data stayed undated | Deterministic preference for the dev stack, warn on ambiguity, and the dating step now raises if it matches fewer orders than it was given |
+| psql input encoded as cp1252 on Windows | Any dash or rupee sign in the SQL aborted the transaction with `invalid byte sequence for encoding "UTF8"` | Pin `encoding="utf-8"` and `PGCLIENTENCODING=UTF8` |
+
 ---
 
 ## Next (prioritized — see strategic analysis)
@@ -200,6 +252,18 @@ node scripts/check-ui-reach.mjs          # Brand + DataTable reach graph
 ```
 
 Both must exit 0 before calling a UI surface “done.”
+
+## API auth verification
+
+```powershell
+python scripts/audit-api-auth.py         # needs the stack up + demo seed
+```
+
+Probes every operation in the gateway's published OpenAPI and fails if enforcement
+disagrees with the schema: declared-protected must reject anonymous, declared-public must
+serve anonymous, and a real JWT must get a protected read through. Currently **301
+operations, 0 mismatches**. Details and the per-class table are in
+[API.md §1.2–1.3](./API.md).
 
 ---
 

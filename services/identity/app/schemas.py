@@ -488,6 +488,11 @@ class KitchenNearbyResponse(KitchenPublicResponse):
     has_non_veg: bool = Field(default=False, description="True if the kitchen has an active non-veg-category dish.")
     has_live_capture: bool = Field(default=False, description="True if the kitchen has a live-capture (non-stock-photo) hero dish image.")
     is_live_now: bool = Field(default=False, description="True if the kitchen is currently streaming a live prep session.")
+    avg_rating: float | None = Field(
+        default=None,
+        description="Kitchen-level average of dish overall ratings (0.6 home-taste + 0.4 quality). Null when unrated.",
+    )
+    rating_count: int = Field(default=0, description="Total verified dish ratings across the kitchen.")
 
 
 class KitchenNearbyListResponse(BaseModel):
@@ -899,7 +904,7 @@ async def list_kitchens_nearby(
     q: str | None = None,
 ) -> list[KitchenNearbyResponse]:
     """Active kitchens within max_km, ordered by distance (asc = nearest first)."""
-    from app.discovery import _search_term, kitchen_search_sql
+    from app.discovery import _search_term, kitchen_rating_select_sql, kitchen_search_sql
 
     order = "ASC" if sort.lower() != "desc" else "DESC"
     max_m = max_km * 1000.0
@@ -988,7 +993,8 @@ async def list_kitchens_nearby(
                     WHERE s.kitchen_id = ckac_identity.kitchens.id
                       AND s.status = 'live'
                       AND st.live_sharing_enabled = true
-                ) AS is_live_now
+                ) AS is_live_now,
+                {kitchen_rating_select_sql("ckac_identity.kitchens.id")}
             FROM ckac_identity.kitchens
             WHERE status = 'active'
               AND ST_DWithin(
@@ -1022,6 +1028,8 @@ def _nearby_row_to_response(row) -> KitchenNearbyResponse:
         has_non_veg=bool(row.has_non_veg),
         has_live_capture=bool(row.has_live_capture),
         is_live_now=bool(row.is_live_now),
+        avg_rating=round(float(row.avg_rating), 2) if getattr(row, "avg_rating", None) is not None else None,
+        rating_count=int(getattr(row, "rating_count", 0) or 0),
     )
 
 
@@ -1042,7 +1050,7 @@ async def list_nearest_kitchens(
     sorting every kitchen by `ST_Distance`, so this stays index-backed as the
     kitchen table grows.
     """
-    from app.discovery import _search_term, kitchen_search_sql
+    from app.discovery import _search_term, kitchen_rating_select_sql, kitchen_search_sql
     from ckac_common.platform_config import hard_mode_missing_feature_sql
 
     limit = min(max(limit, 1), 20)
@@ -1093,7 +1101,8 @@ async def list_nearest_kitchens(
                     WHERE s.kitchen_id = ckac_identity.kitchens.id
                       AND s.status = 'live'
                       AND st.live_sharing_enabled = true
-                ) AS is_live_now
+                ) AS is_live_now,
+                {kitchen_rating_select_sql("ckac_identity.kitchens.id")}
             FROM ckac_identity.kitchens
             WHERE status = 'active'
               {hard_mode_missing_feature_sql("ckac_identity.kitchens.id", "discovery")}

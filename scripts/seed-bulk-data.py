@@ -10,6 +10,25 @@ Usage:
   CKAC_BULK_ORDERS=300 python scripts/seed-bulk-data.py
   $env:CKAC_BULK_OWNERS=5; .\\scripts\\seed-bulk-data.ps1
 
+Six months of trading history (reports, GST periods, CRM cohorts):
+  $env:CKAC_BULK_MONTHS=6; python scripts/seed-bulk-data.py
+
+  Order volume tracks the window automatically — one order per kitchen per day,
+  three per day on the primary demo kitchen. Override with
+  CKAC_BULK_ORDERS_PER_KITCHEN / CKAC_BULK_PRIMARY_ORDERS. Each order costs one
+  POST plus up to four status PATCHes, so a 6-month × 30-kitchen run is a long
+  job; drop CKAC_BULK_KITCHENS for a faster pass.
+
+  Orders are placed in real service hours (IST breakfast/lunch/snacks/dinner)
+  with weekend lift and a growth trend, and anything older than two days is
+  already delivered or cancelled. Payments, refunds, settlements, GST invoices
+  and ratings are shifted with their parent order.
+
+  Diners scale with the window (roughly one per 3.5 orders, split into a loyal
+  core, regulars and one-off visitors) so CRM, customer segments and churn risk
+  have something to segment. CRM profiles are re-aggregated after dating, since
+  `last_order_at` is what churn risk reads.
+
 GCP (VM repo is /opt/ckac):
   sudo systemctl start kitchcu-bulk-seed.service
   sudo bash /opt/ckac/infra/gcp-vm/bulk-seed.sh
@@ -26,6 +45,8 @@ import random
 import subprocess
 import sys
 import time
+import uuid
+from datetime import UTC, datetime
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -39,14 +60,23 @@ from bulk_demo_data import (  # noqa: E402
     captured_at,
     city_customer_specs,
     enriched_dishes,
-    order_status_plan,
     owner_kitchen_specs,
 )
-from demo_data import DEMO_KITCHEN_CODE, DEMO_OTP, DEMO_OWNER  # noqa: E402
+from order_history import (  # noqa: E402
+    DAYS_PER_MONTH,
+    OrderSlot,
+    basket_shape,
+    diner_pool,
+    order_history_plan,
+    plan_summary,
+    slot_to_utc,
+)
+from demo_data import DEMO_CUSTOMER_ADDRESSES, DEMO_KITCHEN_CODE, DEMO_OTP, DEMO_OWNER  # noqa: E402
 from seed_common import (  # noqa: E402
     ApiError,
     cuisine_map,
     dish_create_payload,
+    ensure_customer_addresses,
     ensure_dish_recipes,
     ensure_ingredients,
     login_customer,
@@ -55,7 +85,13 @@ from seed_common import (  # noqa: E402
     resolve_postgres_container,
     wait_for_gateway,
 )
-from seed_platform_extras import seed_kitchen_integrations, seed_kitchen_modules, seed_platform_extras  # noqa: E402
+from seed_platform_extras import (  # noqa: E402
+    ensure_customer_sessions,
+    ensure_ratings,
+    seed_kitchen_integrations,
+    seed_kitchen_modules,
+    seed_platform_extras,
+)
 from ingredient_demo_data import DEMO_PANTRY, DISH_PREP_STEPS, DISH_RECIPES  # noqa: E402
 
 def env_int(name: str, default: int, *, minimum: int = 0) -> int:
@@ -76,12 +112,32 @@ BULK_ORDERS = env_int("CKAC_BULK_ORDERS", 250)
 BULK_DRAFTS = env_int("CKAC_BULK_DRAFTS", 25)
 BULK_ORDERS_PER_OWNER = env_int("CKAC_BULK_ORDERS_PER_OWNER", 40)
 BULK_DRAFTS_PER_OWNER = env_int("CKAC_BULK_DRAFTS_PER_OWNER", 5)
-BULK_ORDERS_PER_KITCHEN = env_int("CKAC_BULK_ORDERS_PER_KITCHEN", 40)
 BULK_DRAFTS_PER_KITCHEN = env_int("CKAC_BULK_DRAFTS_PER_KITCHEN", 5)
 BULK_DISHES_PER_KITCHEN = env_int("CKAC_BULK_DISHES_PER_KITCHEN", 6, minimum=1)
-BACKDATE_DAYS = env_int("CKAC_BULK_BACKDATE_DAYS", 30)
 BULK_CUSTOMERS_PER_CITY = env_int("CKAC_BULK_CUSTOMERS_PER_CITY", 3, minimum=0)
 BULK_FULL = os.environ.get("CKAC_BULK_FULL", "1").strip().lower() not in ("0", "false", "no")
+
+# History window. CKAC_BULK_MONTHS is the headline control ("6 months of data");
+# CKAC_BULK_BACKDATE_DAYS still works for anyone who wants exact days.
+BULK_MONTHS = env_int("CKAC_BULK_MONTHS", 0)
+if BULK_MONTHS:
+    BACKDATE_DAYS = round(BULK_MONTHS * DAYS_PER_MONTH)
+else:
+    BACKDATE_DAYS = env_int("CKAC_BULK_BACKDATE_DAYS", 30)
+
+# Volume has to track the window or a 6-month chart is mostly gaps. One order per
+# day per kitchen is the floor that keeps every daily bucket populated; the
+# primary demo kitchen gets ~3/day so its Reports page has something to say.
+# Every order costs one POST plus up to four status PATCHes, so these are the
+# knobs to turn when a run has to finish faster.
+BULK_ORDERS_PER_KITCHEN = env_int(
+    "CKAC_BULK_ORDERS_PER_KITCHEN", max(40, BACKDATE_DAYS)
+)
+# Governs the demo kitchen in both modes. The max() keeps the 30-day default at
+# CKAC_BULK_ORDERS, so only a longer window raises it.
+BULK_PRIMARY_ORDERS = env_int(
+    "CKAC_BULK_PRIMARY_ORDERS", max(BULK_ORDERS, BACKDATE_DAYS * 3)
+)
 
 random.seed(42)
 
@@ -223,11 +279,8 @@ def ensure_dishes(
 def pick_order_items(dish_ids: dict[str, str], rng: random.Random) -> list[dict]:
     names = list(dish_ids.keys())
     rng.shuffle(names)
-    count = rng.randint(1, min(3, len(names)))
-    items = []
-    for name in names[:count]:
-        items.append({"dish_id": dish_ids[name], "quantity": rng.randint(1, 3)})
-    return items
+    count, quantity = basket_shape(rng, available=len(names))
+    return [{"dish_id": dish_ids[name], "quantity": quantity} for name in names[:count]]
 
 
 def advance_order(token: str, order_id: str, chain_key: str) -> None:
@@ -239,6 +292,21 @@ def advance_order(token: str, order_id: str, chain_key: str) -> None:
         request("PATCH", f"/api/v1/orders/{order_id}/status", body, token=token)
 
 
+def history_plan_for(kitchen_id: str, count: int) -> list[OrderSlot]:
+    """Per-kitchen order history, so no two kitchens share an identical curve."""
+    seed = int(uuid.UUID(kitchen_id)) % (2**32)
+    return order_history_plan(count, days=BACKDATE_DAYS, seed=seed)
+
+
+# Orders are dated in one pass at the very end of the run. Dating mid-run would
+# strand every payment, rating and GST invoice created afterwards at NOW(), and
+# the shift is computed from the order's current timestamp so a second pass is a
+# no-op rather than a correction.
+PLACED_ORDERS: dict[str, list[tuple[str, OrderSlot]]] = {}
+# Owner token per kitchen, so the post-dating CRM sync can reach each tenant.
+KITCHEN_TOKENS: dict[str, str] = {}
+
+
 def ensure_orders(
     token: str,
     kitchen_id: str,
@@ -246,41 +314,52 @@ def ensure_orders(
     target: int,
     *,
     city_customers: list[dict] | None = None,
-) -> int:
+) -> list[tuple[str, OrderSlot]]:
+    """Create orders oldest-first; return (order_id, slot) in creation order.
+
+    Status still moves through the real API state machine, so lifecycle events
+    are published exactly as they are in production — only the timestamps are
+    rewritten afterwards.
+    """
     if not dish_ids:
         log("  ! No dishes — skipping orders")
-        return 0
+        return []
 
+    KITCHEN_TOKENS[kitchen_id] = token
     orders_resp = request("GET", f"/api/v1/kitchens/{kitchen_id}/orders", token=token)
     current = orders_resp.get("total", 0)
     if current >= target:
         log(f"  Orders already at {current} (target {target}) — skipped.")
-        return 0
+        return []
 
     need = target - current
-    plan = order_status_plan(need)
+    # The plan decides both when an order was placed and how far it got: an order
+    # from five months ago is delivered or cancelled, never left "preparing".
+    slots = history_plan_for(kitchen_id, need)
+    plan = [s.chain_key for s in slots]
+    placed: list[tuple[str, OrderSlot]] = []
     rng = random.Random(42)
     created = 0
 
-    # Prefer real city diners so CRM / nearby / order history match the kitchen city.
+    # Registered city diners lead the pool so CRM / nearby / order history match
+    # the kitchen city; the rest of the pool is the walk-in tail that customer
+    # segments and churn risk need in order to mean anything.
     located = [(c["name"], c["phone_e164"]) for c in (city_customers or []) if c.get("phone_e164")]
-    pool_size = max(8, need // 6)
-    if located:
-        customer_pool = located
-        pool_weights = [max(1, len(located) - idx) for idx in range(len(located))]
-    else:
-        customer_pool = [
-            (rng.choice(CUSTOMER_NAMES), f"+9198{rng.randint(10000000, 99999999)}")
-            for _ in range(pool_size)
-        ]
-        pool_weights = [pool_size - idx for idx in range(pool_size)]
+    pool = diner_pool(need, located, seed=int(uuid.UUID(kitchen_id)) % (2**32))
+    customer_pool = list(pool.diners)
+    pool_weights = list(pool.weights)
 
-    log(f"  Creating {need} orders (current {current}, target {target})...")
+    log(
+        f"  Creating {need} orders (current {current}, target {target}) "
+        f"across {len(customer_pool)} diners..."
+    )
     for i, chain_key in enumerate(plan):
         delivery = "delivery" if chain_key in ("out_for_delivery", "delivered_delivery") or rng.random() < 0.45 else "pickup"
         payment = rng.choice(["cod", "upi", "online"])
         delivery_fee = 40.0 if delivery == "delivery" else 0.0
-        if rng.random() < 0.15 and not located:
+        # A slice of counter pickups leave no phone behind — they should stay out
+        # of CRM rather than inflate a diner's history.
+        if delivery == "pickup" and rng.random() < 0.08:
             cust_name, cust_phone = rng.choice(CUSTOMER_NAMES), None
         else:
             cust_name, cust_phone = rng.choices(customer_pool, weights=pool_weights, k=1)[0]
@@ -302,6 +381,8 @@ def ensure_orders(
                 payload["delivery_fee_payment"] = rng.choice(["prepaid", "pay_on_delivery"])
         order = request("POST", f"/api/v1/kitchens/{kitchen_id}/orders/manual", payload, token=token)
         advance_order(token, order["id"], chain_key)
+        placed.append((order["id"], slots[i]))
+        PLACED_ORDERS.setdefault(kitchen_id, []).append((order["id"], slots[i]))
         created += 1
         if created % 25 == 0:
             log(f"    ... {created}/{need} orders")
@@ -309,8 +390,8 @@ def ensure_orders(
         if created % 10 == 0:
             time.sleep(0.35)
 
-    log(f"  Created {created} orders.")
-    return created
+    log(f"  Created {created} orders — {plan_summary(slots)}.")
+    return placed
 
 
 def ensure_drafts(token: str, kitchen_id: str, target: int) -> int:
@@ -334,29 +415,36 @@ def ensure_drafts(token: str, kitchen_id: str, target: int) -> int:
     return created
 
 
-def backdate_orders(kitchen_id: str) -> None:
-    """Spread order created_at over the last N days for report-style charts."""
-    if BACKDATE_DAYS <= 0:
-        return
-    sql = f"""
-    WITH ranked AS (
-      SELECT id, ROW_NUMBER() OVER (ORDER BY created_at) AS rn,
-             COUNT(*) OVER () AS total
-      FROM ckac_orders.orders
-      WHERE kitchen_id = '{kitchen_id}'::uuid
-    )
-    UPDATE ckac_orders.orders o
-    SET created_at = NOW() - ((r.total - r.rn) * {BACKDATE_DAYS} / GREATEST(r.total, 1)) * INTERVAL '1 day'
-                        - (random() * INTERVAL '12 hours'),
-        updated_at = NOW() - ((r.total - r.rn) * {BACKDATE_DAYS} / GREATEST(r.total, 1)) * INTERVAL '1 day'
-    FROM ranked r
-    WHERE o.id = r.id;
+# Every row that has to move with its parent order. Reports read these directly,
+# so leaving them stamped NOW() would put six months of orders against one month
+# of payments and a single month of GST invoices.
+# Missing tables and columns are skipped at runtime, so a service that is not
+# deployed in a given environment costs nothing here.
+ORDER_LINKED_TIMESTAMPS: tuple[tuple[str, tuple[str, ...]], ...] = (
+    ("ckac_orders.order_status_events", ("created_at",)),
+    ("ckac_billing.payments", ("created_at", "updated_at")),
+    ("ckac_billing.refunds", ("created_at", "updated_at", "completed_at")),
+    ("ckac_billing.settlements", ("created_at", "settled_at")),
+    ("ckac_billing.gst_tax_invoices", ("created_at", "invoice_date")),
+    ("ckac_ratings.dish_ratings", ("created_at",)),
+)
+
+
+def _run_psql(sql: str, *, timeout: int = 300) -> tuple[bool, str]:
+    """Pipe a script to psql inside the Postgres container.
+
+    The encoding is pinned because Windows would otherwise send the script as
+    cp1252 and Postgres rejects the result as invalid UTF-8 the moment a comment
+    or message contains a dash or rupee sign.
     """
     try:
         proc = subprocess.run(
             [
                 "docker",
                 "exec",
+                "-i",
+                "-e",
+                "PGCLIENTENCODING=UTF8",
                 resolve_postgres_container(),
                 "psql",
                 "-U",
@@ -365,19 +453,174 @@ def backdate_orders(kitchen_id: str) -> None:
                 "ckac",
                 "-v",
                 "ON_ERROR_STOP=1",
-                "-c",
-                sql,
+                "-q",
+                "-f",
+                "-",
             ],
+            input=sql,
             capture_output=True,
             text=True,
-            timeout=180,
+            encoding="utf-8",
+            timeout=timeout,
         )
-        if proc.returncode == 0:
-            log(f"  Backdated orders over {BACKDATE_DAYS} days for reporting.")
-        else:
-            log(f"  ! Backdate skipped: {proc.stderr.strip() or proc.stdout.strip()}")
     except (FileNotFoundError, subprocess.TimeoutExpired) as exc:
-        log(f"  ! Backdate skipped ({exc})")
+        return False, str(exc)
+    if proc.returncode != 0:
+        return False, (proc.stderr.strip() or proc.stdout.strip())
+    return True, ""
+
+
+def apply_order_history(kitchen_id: str, placed: list[tuple[str, OrderSlot]]) -> None:
+    """Stamp each order with its planned instant and drag dependent rows along.
+
+    Everything related to an order shifts by the same interval, so lifecycle
+    ordering, payment-after-order and rating-after-delivery all survive.
+    """
+    if BACKDATE_DAYS <= 0 or not placed:
+        return
+    now = datetime.now(UTC)
+    values = ",".join(
+        f"('{order_id}'::uuid,'{slot_to_utc(slot, now=now).isoformat()}'::timestamptz)"
+        for order_id, slot in placed
+    )
+    cascade = ",".join(
+        f"('{table}','{column}')"
+        for table, columns in ORDER_LINKED_TIMESTAMPS
+        for column in columns
+    )
+    sql = f"""
+BEGIN;
+CREATE TEMP TABLE planned (order_id uuid PRIMARY KEY, placed_at timestamptz) ON COMMIT DROP;
+INSERT INTO planned VALUES {values};
+
+-- One delta per order keeps every dependent row's relative position intact.
+CREATE TEMP TABLE shifted (order_id uuid PRIMARY KEY, delta interval) ON COMMIT DROP;
+INSERT INTO shifted
+SELECT p.order_id, p.placed_at - o.created_at
+FROM planned p
+JOIN ckac_orders.orders o ON o.id = p.order_id
+WHERE o.kitchen_id = '{kitchen_id}'::uuid;
+
+-- Refuse to report success for orders we did not touch. Without this a seeder
+-- pointed at the wrong Postgres container updates nothing, exits 0, and leaves
+-- the reports it was meant to populate empty.
+DO $$
+DECLARE matched int;
+BEGIN
+  SELECT count(*) INTO matched FROM shifted;
+  IF matched <> {len(placed)} THEN
+    RAISE EXCEPTION
+      'dating matched % of % orders for kitchen {kitchen_id} — wrong database?',
+      matched, {len(placed)};
+  END IF;
+END $$;
+
+UPDATE ckac_orders.orders o
+SET created_at = o.created_at + s.delta,
+    updated_at = o.updated_at + s.delta
+FROM shifted s
+WHERE o.id = s.order_id;
+
+DO $$
+DECLARE v_tbl text; v_col text;
+BEGIN
+  FOR v_tbl, v_col IN SELECT * FROM (VALUES {cascade}) AS v(tbl, col) LOOP
+    IF to_regclass(v_tbl) IS NULL THEN CONTINUE; END IF;
+    IF NOT EXISTS (
+      SELECT 1 FROM information_schema.columns c
+      WHERE c.table_schema = split_part(v_tbl, '.', 1)
+        AND c.table_name = split_part(v_tbl, '.', 2)
+        AND c.column_name = v_col
+    ) THEN CONTINUE; END IF;
+    EXECUTE format(
+      'UPDATE %s x SET %I = x.%I + s.delta FROM shifted s WHERE x.order_id = s.order_id',
+      v_tbl, v_col, v_col
+    );
+  END LOOP;
+END $$;
+
+-- Invoice numbers are minted as CKCODE-GST-YYYYMM-SEQ at create time. After
+-- dating, the YYYYMM must follow invoice_date or March filings show a
+-- September series.
+UPDATE ckac_billing.gst_tax_invoices g
+SET invoice_number = left(g.invoice_number, 40) || '-t' || left(g.id::text, 8)
+WHERE g.kitchen_id = '{kitchen_id}'::uuid
+  AND EXISTS (SELECT 1 FROM shifted s WHERE s.order_id = g.order_id);
+
+UPDATE ckac_billing.gst_tax_invoices g
+SET invoice_number = n.fresh
+FROM (
+  SELECT
+    g2.id,
+    k.code || '-GST-' || to_char(g2.invoice_date AT TIME ZONE 'UTC', 'YYYYMM')
+      || '-' || lpad(
+        row_number() OVER (
+          PARTITION BY g2.kitchen_id, to_char(g2.invoice_date AT TIME ZONE 'UTC', 'YYYYMM')
+          ORDER BY g2.invoice_date, g2.id
+        )::text,
+        4, '0'
+      ) AS fresh
+  FROM ckac_billing.gst_tax_invoices g2
+  JOIN ckac_identity.kitchens k ON k.id = g2.kitchen_id
+  WHERE g2.kitchen_id = '{kitchen_id}'::uuid
+    AND EXISTS (SELECT 1 FROM shifted s WHERE s.order_id = g2.order_id)
+) n
+WHERE g.id = n.id;
+
+COMMIT;
+"""
+    ok, err = _run_psql(sql)
+    if ok:
+        log(f"  Dated {len(placed)} orders across {BACKDATE_DAYS} days (+ linked rows).")
+    else:
+        log(f"  ! History dating FAILED for {kitchen_id}: {err}")
+        log(f"    Postgres container: {resolve_postgres_container()} (CKAC_POSTGRES_CONTAINER)")
+
+
+def date_all_history() -> int:
+    """Single dating pass over every order created in this run."""
+    if BACKDATE_DAYS <= 0 or not PLACED_ORDERS:
+        return 0
+    total = sum(len(v) for v in PLACED_ORDERS.values())
+    months = BACKDATE_DAYS / DAYS_PER_MONTH
+    log("")
+    log(
+        f"Dating history: {total} orders across {len(PLACED_ORDERS)} kitchens "
+        f"over {BACKDATE_DAYS} days (~{months:.1f} months)"
+    )
+    log("-" * 50)
+    for kitchen_id, placed in PLACED_ORDERS.items():
+        apply_order_history(kitchen_id, placed)
+    return total
+
+
+def refresh_crm_profiles() -> int:
+    """Rebuild CRM profiles for every kitchen that got orders.
+
+    CRM aggregates are built on request (`?refresh=true`), so this has to run
+    after dating: `last_order_at` drives churn risk, and a profile synced before
+    the dating pass would claim every diner ordered today.
+    """
+    synced = 0
+    # Every kitchen whose orders this run touched, not only the ones it created,
+    # so an idempotent re-run still leaves a populated CRM behind.
+    for kitchen_id, token in KITCHEN_TOKENS.items():
+        try:
+            resp = request(
+                "GET",
+                f"/api/v1/kitchens/{kitchen_id}/crm/customers?refresh=true",
+                token=token,
+            )
+            synced += int(resp.get("total") or 0)
+        except ApiError as exc:
+            # CRM is entitlement-gated (`loyalty_crm`); a kitchen without the
+            # package is a correct refusal, not a seeding failure.
+            if any(code in str(exc) for code in (" 402", " 403")):
+                continue
+            log(f"  ! CRM sync {kitchen_id[:8]}: {exc}")
+    if synced:
+        log(f"  CRM profiles synced: {synced}")
+    return synced
 
 
 def primary_kitchen(kitchens: list[dict]) -> dict:
@@ -404,7 +647,6 @@ def ensure_kitchen_complete(
     log(f"    pantry: {len(ingredient_ids)} ingredients, recipes on {len(DISH_RECIPES)} dishes")
     ensure_orders(token, kid, dish_ids, orders_target, city_customers=city_customers)
     ensure_drafts(token, kid, drafts_target)
-    backdate_orders(kid)
     if with_modules:
         seed_kitchen_modules(token, kid, dish_ids)
         first_dish = next(iter(dish_ids.values()), None)
@@ -463,6 +705,7 @@ def ensure_located_customers(cities: list[dict]) -> dict[str, list[dict]]:
                         "city": spec["city"],
                         "state": spec["state"],
                         "pincode": spec["pincode"],
+                        "phone": spec["phone_e164"],
                         "latitude": spec["latitude"],
                         "longitude": spec["longitude"],
                         "is_default": True,
@@ -547,14 +790,19 @@ def main() -> None:
         f"{BULK_KITCHENS_PER_OWNER} kitchens | {len(SEED_CITIES)} cities × "
         f"{BULK_CUSTOMERS_PER_CITY} customers"
     )
+    log(
+        f"History: {BACKDATE_DAYS} days (~{BACKDATE_DAYS / DAYS_PER_MONTH:.1f} months), "
+        f"weekday/weekend rhythm, lunch + dinner peaks (IST), growth trend"
+    )
     if BULK_FULL:
         log(
-            f"Per kitchen: full menu, pantry, {BULK_ORDERS_PER_KITCHEN} orders, "
+            f"Per kitchen: full menu, pantry, {BULK_ORDERS_PER_KITCHEN} orders "
+            f"({BULK_PRIMARY_ORDERS} on {DEMO_KITCHEN_CODE}), "
             f"{BULK_DRAFTS_PER_KITCHEN} drafts, integrations"
         )
     else:
         log(
-            f"Primary: {BULK_ORDERS} orders / {BULK_DRAFTS} drafts | "
+            f"Primary: {BULK_PRIMARY_ORDERS} orders / {BULK_DRAFTS} drafts | "
             f"Secondary: {BULK_DISHES_PER_KITCHEN} dishes"
         )
     log("")
@@ -579,6 +827,13 @@ def main() -> None:
 
     customer_cities = _cities_for_customer_seed(demo_specs + extra_specs)
     customers_by_city = ensure_located_customers(customer_cities)
+    for spec in DEMO_CUSTOMER_ADDRESSES:
+        try:
+            token = login_customer(spec["phone_e164"], DEMO_OTP)
+            added = ensure_customer_addresses(token, spec["addresses"])
+            log(f"Demo diner {spec['phone_e164']}: +{added} saved address(es)")
+        except ApiError as exc:
+            log(f"  ! demo diner addresses {spec['phone_e164']}: {exc}")
 
     primary = primary_kitchen(demo_kitchens)
     all_dishes = enriched_dishes()
@@ -594,7 +849,13 @@ def main() -> None:
                 demo_token,
                 k,
                 all_dishes,
-                orders_target=BULK_ORDERS_PER_KITCHEN,
+                # The demo kitchen is the one every walkthrough opens, so it
+                # carries the densest history.
+                orders_target=(
+                    BULK_PRIMARY_ORDERS
+                    if k["id"] == primary["id"]
+                    else BULK_ORDERS_PER_KITCHEN
+                ),
                 drafts_target=BULK_DRAFTS_PER_KITCHEN,
                 city_customers=customers_by_city.get(str(k.get("city") or ""), []),
             )
@@ -635,11 +896,10 @@ def main() -> None:
             demo_token,
             primary["id"],
             primary_dish_ids,
-            BULK_ORDERS,
+            BULK_PRIMARY_ORDERS,
             city_customers=customers_by_city.get(str(primary.get("city") or ""), []),
         )
         ensure_drafts(demo_token, primary["id"], BULK_DRAFTS)
-        backdate_orders(primary["id"])
 
     seed_platform_extras(
         owner_token=demo_token,
@@ -696,10 +956,9 @@ def main() -> None:
                 owner_primary["id"],
                 BULK_DRAFTS_PER_OWNER,
             )
-            backdate_orders(owner_primary["id"])
             log(
                 f"  {owner['name']}: {len(kitchens)} kitchen(s), "
-                f"{created_orders} new orders, {created_drafts} new drafts"
+                f"{len(created_orders)} new orders, {created_drafts} new drafts"
             )
         seeded_owners.append((owner, kitchens))
         if BULK_FULL:
@@ -712,6 +971,22 @@ def main() -> None:
         dish_ids_by_kitchen,
         demo_token,
     )
+
+    dated = date_all_history()
+    refresh_crm_profiles()
+    # Ratings can only be posted by a signed-in customer on their own delivered
+    # orders. Do this after dating so home-taste aggregates sit on the historic
+    # window, not on the handful of extra PWA orders created today.
+    located_sessions = [
+        diner
+        for diners in customers_by_city.values()
+        for diner in diners
+        if diner.get("token")
+    ]
+    try:
+        ensure_ratings(ensure_customer_sessions() + located_sessions, primary["id"])
+    except Exception as exc:  # noqa: BLE001 — extras already log per-customer failures
+        log(f"  ! historic ratings: {exc}")
 
     # Summary
     nearby = request(
@@ -727,6 +1002,10 @@ def main() -> None:
     log("-" * 50)
     total_kitchens = len(all_kitchens)
     log(f"  Kitchens seeded (total): {total_kitchens}")
+    log(
+        f"  History window:          {BACKDATE_DAYS} days "
+        f"(~{BACKDATE_DAYS / DAYS_PER_MONTH:.1f} months), {dated} orders dated"
+    )
     log(f"  Nearby Pune (50km):      {nearby.get('total', 0)}")
     for city in SEED_CITIES[1:6]:
         try:

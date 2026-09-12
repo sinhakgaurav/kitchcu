@@ -2,7 +2,7 @@
 
 | Field | Value |
 |-------|-------|
-| Version | 1.0 |
+| Version | 1.1 |
 | Base URL | Gateway `http://localhost:18000` (or same-origin `/api` via PWAs) |
 | Prefix | `/api/v1` |
 | Live explorer | Portal [`/openapi`](http://localhost:13000/openapi) · Gateway [`/docs`](http://localhost:18000/docs) · [`/redoc`](http://localhost:18000/redoc) |
@@ -38,16 +38,64 @@
 
 **Admin APIs** (`/api/v1/admin/*` except `GET /admin/auth/login-hint`):
 
-1. Username + password are always printed on Super Admin Sign in (and on portal/kitchen/customer credential strips) via `GET /api/v1/admin/auth/login-hint`. Local: `admin@kitchcu.dev` / `admin123456`. Production: `admin@kitchcu.com` + the VM `ADMIN_PASSWORD` value.
+1. Username + password appear on Super Admin Sign in (and portal/kitchen/customer credential strips) via `GET /api/v1/admin/auth/login-hint` only when `APP_ENV` is `development`/`test` **or** `ADMIN_LOGIN_REVEAL_PASSWORD=1` (GCP/startup still write `1`). Local: `admin@kitchcu.dev` / `admin123456`. Production: `admin@kitchcu.com` + the VM `ADMIN_PASSWORD` value.
 2. `POST /api/v1/admin/auth/login` with `{"email":"<username>","password":"<password>"}`.
-3. Copy `access_token`. In Swagger click **Authorize** and paste the JWT only (the UI adds `Bearer`). On curl: `Authorization: Bearer <token>`.
+3. In Swagger click **Authorize** and either:
+   - **OAuth2Password** — username + password (admin email + password, or owner/customer phone + OTP). Local: `admin@kitchcu.dev` / `admin123456`, `9876543210` / `123456`, `9123456789` / `123456`. This hits `POST /api/v1/auth/token`.
+   - **HTTPBearer** — paste the `access_token` only (the UI adds `Bearer`). Same token from `POST /admin/auth/login`, `POST /auth/otp/verify`, or `POST /auth/customer/whatsapp/verify`.
 4. Call any login-required admin route. `401` = missing/invalid token; `403` = JWT valid but RBAC denies the permission.
+5. Public operations have **no padlock** — Try it out without Authorize. A leftover token is not sent on those calls.
 
 **Owner APIs:** OTP `POST /api/v1/auth/otp/request` → `verify` (dev OTP `123456`) — not the admin password.  
 **Customer APIs:** customer OTP or OAuth — same Bearer pattern, `type: customer`.  
 **Internal:** `X-Internal-Key` only between services; never from Swagger in a browser.
 
 The Super Admin console also links Swagger / ReDoc / portal explorer on the login card, sidebar, and overview.
+
+### 1.2 How the schema declares auth
+
+Security is applied **per operation** — there is no document-level requirement. Public operations publish `security: []` so Swagger does not attach a token.
+
+```json
+"components": { "securitySchemes": {
+  "HTTPBearer": { "type": "http", "scheme": "bearer", "bearerFormat": "JWT" },
+  "OAuth2Password": { "type": "oauth2", "flows": { "password": { "tokenUrl": "/api/v1/auth/token" } } }
+} }
+```
+
+| Operation declares | Meaning | Anonymous call |
+|---|---|---|
+| `HTTPBearer` / `OAuth2Password` | Token required | `401` |
+| `security: []` | Public — Try it out with no Authorize | Served |
+| `security` including `{}` | Token optional — response is personalised when present | Served |
+| `/internal/*` | Service-to-service (`X-Internal-Key`) | Not routed from the edge |
+| `/webhooks/*` | Provider signature, not JWT | Provider-dependent |
+
+`401` means the token is missing, malformed, or the wrong `type`; `403` means the JWT is valid but the caller does not own the `kitchen_id` in the path (or RBAC denies an admin permission). Both are distinct on purpose — see §5.
+
+### 1.3 Verifying enforcement matches the schema
+
+Swagger only states intent, so `scripts/audit-api-auth.py` probes the running gateway and compares behaviour against every published operation: declared-protected routes must refuse an anonymous caller, declared-public routes must serve one, and a real JWT must get a protected read through. Required query parameters are filled with valid dummies first so a `422` can never be mistaken for an auth rejection, and mutating routes are probed only against non-existent ids.
+
+```powershell
+python scripts/audit-api-auth.py                     # exits non-zero on any mismatch
+python scripts/audit-api-auth.py --json report.json  # full per-operation table
+$env:CKAC_GATEWAY_URL='https://api.kitchcu.com'; python scripts/audit-api-auth.py
+```
+
+Last run against the local stack — **302 operations, 0 FAIL** (298 PASS, 4 INFO webhooks):
+
+| Class | Operations | Verified |
+|---|---|---|
+| Owner JWT | 142 | Anonymous `401`; owner token accepted |
+| Admin JWT | 72 | Anonymous `401`; admin token accepted |
+| Customer JWT | 31 | Anonymous `401`; customer token accepted |
+| Public | 33 | Served without any token (`POST /api/v1/auth/token` included) |
+| Optional token | 1 | Served anonymously, personalised with a token |
+| Internal | 19 | Not reachable through the gateway |
+| Webhook | 4 | Signature-verified; reported, not asserted |
+
+Webhooks fail closed in production: the WhatsApp receiver verifies `X-Hub-Signature-256` when `whatsapp_app_secret` is set and returns `503` if it is missing outside development, so an unsigned call is only accepted on a dev stack.
 
 ---
 

@@ -169,3 +169,24 @@ export function liveCities(): CityPresence[] {
 export function featuredCities(): CityPresence[] {
   return CITIES_PRESENCE.filter((c) => c.featured).sort((a, b) => a.sortOrder - b.sortOrder);
 }
+
+const CITY_ALIASES: Record<string, string> = {
+  gurgaon: "gurugram",
+  bangalore: "bengaluru",
+  bombay: "mumbai",
+  calcutta: "kolkata",
+  benares: "varanasi",
+  allahabad: "prayagraj",
+  "new delhi": "delhi",
+  "delhi ncr": "delhi",
+};
+
+export function cityCenterByName(name: string): { lat: number; lng: number } | null {
+  const raw = name.trim().toLowerCase();
+  if (!raw) return null;
+  const key = CITY_ALIASES[raw] ?? raw;
+  const hit = CITIES_PRESENCE.find(
+    (c) => c.name.toLowerCase() === key || c.slug === key || c.name.toLowerCase() === raw,
+  );
+  return hit ? { ...hit.center } : null;
+}

@@ -428,6 +428,19 @@
       "upiQrHint": "Optional — owners can use this when sending a direct UPI refund.",
       "upiQrTitle": "UPI QR / scanner image",
       "uploadImage": "Upload image"
+    },
+    "delivery": {
+      "addAddress": "Add an address",
+      "deliverTo": "Deliver to",
+      "demoPune": "Demo: Pune kitchens",
+      "manage": "Manage addresses",
+      "signInToSave": "Sign in to save addresses",
+      "useGps": "Current location (GPS)",
+      "contactPhone": "Contact number",
+      "cancelEdit": "Cancel edit",
+      "editAddress": "Edit address",
+      "editThisAddress": "Edit this address",
+      "updateAddress": "Update address"
     }
   },
   "cities": {

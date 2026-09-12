@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { OwnerEmpty, OwnerPageShell, OwnerPanel } from "../../components/owner/OwnerPageShell";
 import {
   fetchDishSuggestions,
-  fetchMenu,
+  fetchOwnerDishes,
   fetchOwnerRatingSummaries,
   updateDishSuggestion,
   type DishRatingSummary,
@@ -31,15 +31,15 @@ export function RatingsPage() {
     setLoading(true);
     setError("");
     try {
-      const [ratings, pending, menu] = await Promise.all([
+      const [ratings, pending, dishes] = await Promise.all([
         fetchOwnerRatingSummaries(kitchen.id),
-        fetchDishSuggestions(kitchen.id, "pending"),
-        fetchMenu(kitchen.id).catch(() => null),
+        fetchDishSuggestions(kitchen.id, "pending").catch(() => ({ suggestions: [] })),
+        fetchOwnerDishes(kitchen.id).catch(() => ({ dishes: [], total: 0 })),
       ]);
       setSummaries(ratings.summaries);
       setSuggestions(pending.suggestions);
       const names: Record<string, string> = {};
-      for (const dish of menu?.dishes ?? []) names[dish.id] = dish.name;
+      for (const dish of dishes.dishes) names[dish.id] = dish.name;
       setDishNames(names);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not load ratings");
@@ -56,6 +56,18 @@ export function RatingsPage() {
     () => [...summaries].sort((a, b) => b.overall_rating - a.overall_rating),
     [summaries],
   );
+
+  const kitchenStats = useMemo(() => {
+    const total = summaries.reduce((n, row) => n + row.rating_count, 0);
+    if (!total) return null;
+    const overall =
+      summaries.reduce((n, row) => n + row.overall_rating * row.rating_count, 0) / total;
+    const taste =
+      summaries.reduce((n, row) => n + row.avg_home_taste * row.rating_count, 0) / total;
+    const quality =
+      summaries.reduce((n, row) => n + row.avg_quality * row.rating_count, 0) / total;
+    return { total, overall, taste, quality };
+  }, [summaries]);
 
   const decide = async (row: DishSuggestion, status: "accepted" | "rejected") => {
     if (!kitchen) return;
@@ -94,6 +106,18 @@ export function RatingsPage() {
         <p className="od-panel__empty dash-card od-panel">Loading ratings…</p>
       ) : (
         <>
+          {kitchenStats && (
+            <OwnerPanel title="Kitchen score" description="Weighted from verified purchase ratings">
+              <p className="od-ratings__kitchen-score">
+                <strong>{stars(kitchenStats.overall)}</strong>
+                <span className="report-rank__meta">
+                  Taste {stars(kitchenStats.taste)} · Quality {stars(kitchenStats.quality)} ·{" "}
+                  {kitchenStats.total} rating{kitchenStats.total === 1 ? "" : "s"}
+                </span>
+              </p>
+            </OwnerPanel>
+          )}
+
           <OwnerPanel title="Dish scores" description="Verified purchase ratings only">
             {ranked.length === 0 ? (
               <OwnerEmpty message="No ratings yet — scores appear after delivered orders are rated." />

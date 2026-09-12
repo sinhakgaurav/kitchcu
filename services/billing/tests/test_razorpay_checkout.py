@@ -128,6 +128,63 @@ async def test_live_capture_accepts_valid_signature(client: AsyncClient, billing
 
 
 @pytest.mark.asyncio
+async def test_master_kill_switch_blocks_live_razorpay(client: AsyncClient, billing_ctx, monkeypatch):
+    """Kitchen keys must not reach Razorpay while third-party calls are off.
+
+    Every other outbound integration (Meta, Porter, LiveKit, OAuth, support AI)
+    already honours this switch; Checkout order creation has to as well, or a
+    kitchen with keys saved makes the whole payment path fail on a stack where
+    integrations are deliberately disabled.
+    """
+    _, _, order_id, _, token = billing_ctx
+    headers = {"Authorization": f"Bearer {token}"}
+
+    async def _creds_row(_session, _kitchen_id):
+        return ("rzp_test_keyid", "rzp_test_secret")
+
+    async def _must_not_call(**_kwargs):
+        raise AssertionError("Razorpay must not be called while integrations are disabled")
+
+    monkeypatch.setattr("app.razorpay_checkout._kitchen_or_platform_creds", _creds_row)
+    monkeypatch.setattr("app.schemas.create_razorpay_order", _must_not_call)
+    monkeypatch.setenv("THIRD_PARTY_INTEGRATIONS", "0")
+
+    response = await client.post(
+        "/api/v1/billing/payments",
+        json={"order_id": str(order_id), "method": "online"},
+        headers=headers,
+    )
+    assert response.status_code == 201, response.text
+    data = response.json()
+    assert data["provider_mode"] == "demo"
+    assert data["razorpay_order_id"].startswith("order_dev_")
+
+
+@pytest.mark.asyncio
+async def test_live_razorpay_runs_when_switch_is_on(client: AsyncClient, billing_ctx, monkeypatch):
+    _, _, order_id, _, token = billing_ctx
+    headers = {"Authorization": f"Bearer {token}"}
+
+    async def _creds_row(_session, _kitchen_id):
+        return ("rzp_test_keyid", "rzp_test_secret")
+
+    async def _create_order(**_kwargs):
+        return "order_RZswitch001"
+
+    monkeypatch.setattr("app.razorpay_checkout._kitchen_or_platform_creds", _creds_row)
+    monkeypatch.setattr("app.schemas.create_razorpay_order", _create_order)
+    monkeypatch.setenv("THIRD_PARTY_INTEGRATIONS", "1")
+
+    response = await client.post(
+        "/api/v1/billing/payments",
+        json={"order_id": str(order_id), "method": "online"},
+        headers=headers,
+    )
+    assert response.status_code == 201, response.text
+    assert response.json()["provider_mode"] == "live"
+
+
+@pytest.mark.asyncio
 async def test_demo_create_still_mocks_without_keys(client: AsyncClient, billing_ctx):
     _, _, order_id, _, token = billing_ctx
     headers = {"Authorization": f"Bearer {token}"}

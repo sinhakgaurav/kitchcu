@@ -21,10 +21,12 @@ from app.schemas import (
     KitchenRatingSummariesResponse,
     OrderRatingsCreateRequest,
     OrderRatingsCreateResponse,
+    OrderRatingsListResponse,
     create_suggestion,
     get_dish_summary,
     list_anonymous_reviews,
     list_kitchen_summaries,
+    list_order_ratings,
     list_suggestions,
     submit_order_ratings,
     update_suggestion,
@@ -94,6 +96,31 @@ async def create_order_ratings(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
     await session.commit()
     return result
+
+
+@router.get(
+    "/customers/me/orders/{order_id}/ratings",
+    response_model=OrderRatingsListResponse,
+    tags=[TAG_RATINGS],
+    summary="Read ratings the customer already left on an order",
+    description=(
+        "**Auth:** Customer JWT — the order must belong to the caller's phone.\n\n"
+        "**Response:** `OrderRatingsListResponse`. Empty `ratings` if the diner has not "
+        "rated this order yet. Used by the rate page to show given scores instead of "
+        "asking again."
+    ),
+    responses={**auth_errors(), 400: RESP_400},
+)
+async def get_order_ratings(
+    order_id: uuid.UUID,
+    customer_id: Annotated[uuid.UUID, Depends(get_current_customer_id)],
+    session: Annotated[AsyncSession, Depends(get_db)],
+) -> OrderRatingsListResponse:
+    phone = await load_customer_phone(customer_id, session)
+    try:
+        return await list_order_ratings(session, order_id, customer_id, phone)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
 
 
 @router.get(

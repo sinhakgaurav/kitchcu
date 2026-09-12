@@ -1,4 +1,14 @@
-import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import {
+  type Dispatch,
+  type FormEvent,
+  type RefObject,
+  type SetStateAction,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { Link, Navigate, useNavigate, useSearchParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import {
@@ -26,7 +36,10 @@ import {
   type CustomerTicket,
   type DashboardOrder,
 } from "../../shared/customerDashboardApi";
+import { CITIES_PRESENCE, cityCenterByName, liveCities } from "../../data/citiesPresence";
 import { openStreetMapEmbedUrl } from "../../lib/locationMaps";
+import { useCustomerDelivery } from "../../shared/customerDelivery";
+import { formatAddressLine } from "../../shared/customerDeliveryLocation";
 import {
   bulkCustomerKitchenReferrals,
   customerReferralTemplateUrl,
@@ -42,6 +55,7 @@ import { PhoneField } from "../../components/PhoneField";
 import {
   firstError,
   otpInputValue,
+  parsePhoneInput,
   pincodeInputValue,
   toE164,
   validateEmail,
@@ -197,11 +211,28 @@ export function CustomerDashboardPage() {
         const nextParams = new URLSearchParams(prev);
         if (next === "overview") nextParams.delete("tab");
         else nextParams.set("tab", next);
+        if (next !== "addresses") nextParams.delete("edit");
         return nextParams;
       },
       { replace: true },
     );
   };
+
+  const setAddressEditId = useCallback(
+    (id: string | null) => {
+      setSearchParams(
+        (prev) => {
+          const nextParams = new URLSearchParams(prev);
+          nextParams.set("tab", "addresses");
+          if (id) nextParams.set("edit", id);
+          else nextParams.delete("edit");
+          return nextParams;
+        },
+        { replace: true },
+      );
+    },
+    [setSearchParams],
+  );
 
   if (!token) {
     return <Navigate to="/login?next=/dashboard" replace />;
@@ -317,7 +348,12 @@ export function CustomerDashboardPage() {
           busy={busy}
           setBusy={setBusy}
           setError={setError}
-          onRefresh={async () => setAddresses(await fetchMyAddresses())}
+          requestedEditId={searchParams.get("edit")}
+          onEditIdChange={setAddressEditId}
+          onRefresh={async () => {
+            const list = await fetchMyAddresses();
+            setAddresses(list);
+          }}
         />
       )}
       {!loading && tab === "account" && profile && (
@@ -507,6 +543,12 @@ function OrderCard({
           >
             Repeat
           </button>
+          {row.is_rated && (
+            <Link className="btn btn--ghost btn--sm" to={`/orders/${row.order.id}/rate`}>
+              ★ {row.rating_home_taste?.toFixed(1) ?? "—"} taste
+              {row.rating_quality != null ? ` · ${row.rating_quality.toFixed(1)} quality` : ""}
+            </Link>
+          )}
           {row.can_rate && (
             <Link className="btn btn--ghost btn--sm" to={`/orders/${row.order.id}/rate`}>
               Rate
@@ -1095,32 +1137,341 @@ function ComplaintsPanel({
   );
 }
 
+type AddressFieldErrors = {
+  label?: string;
+  line?: string;
+  city?: string;
+  pincode?: string;
+  phone?: string;
+};
+
+function AddressBookForm({
+  mode,
+  busy,
+  formRef,
+  labelInputRef,
+  label,
+  setLabel,
+  line,
+  setLine,
+  city,
+  applyCity,
+  state,
+  setState,
+  pincode,
+  setPincode,
+  landmark,
+  setLandmark,
+  phoneNational,
+  setPhoneNational,
+  lat,
+  lng,
+  makeDefault,
+  setMakeDefault,
+  fieldErrors,
+  setFieldErrors,
+  pinHere,
+  onSubmit,
+  onCancel,
+}: {
+  mode: "add" | "edit";
+  busy: boolean;
+  formRef: RefObject<HTMLFormElement | null>;
+  labelInputRef: RefObject<HTMLInputElement | null>;
+  label: string;
+  setLabel: (v: string) => void;
+  line: string;
+  setLine: (v: string) => void;
+  city: string;
+  applyCity: (name: string) => void;
+  state: string;
+  setState: (v: string) => void;
+  pincode: string;
+  setPincode: (v: string) => void;
+  landmark: string;
+  setLandmark: (v: string) => void;
+  phoneNational: string;
+  setPhoneNational: (v: string) => void;
+  lat: number | null;
+  lng: number | null;
+  makeDefault: boolean;
+  setMakeDefault: (v: boolean) => void;
+  fieldErrors: AddressFieldErrors;
+  setFieldErrors: Dispatch<SetStateAction<AddressFieldErrors>>;
+  pinHere: () => void;
+  onSubmit: (e: FormEvent) => void;
+  onCancel?: () => void;
+}) {
+  const { t } = useTranslation();
+  const editing = mode === "edit";
+  return (
+    <form
+      ref={formRef}
+      className={editing ? "customer-dash__addr-form" : "glass customer-dash__card"}
+      onSubmit={onSubmit}
+    >
+      <h2>{editing ? t("customer.delivery.editAddress") : "Add another address"}</h2>
+      <p>
+        {editing
+          ? "Change the pin, contact number, or label. Discovery and checkout use this address when it is selected."
+          : "Save Home, Work, or a family house. Discovery and checkout use the address you pick."}
+      </p>
+      <label>
+        Label
+        <input
+          ref={labelInputRef}
+          value={label}
+          onChange={(e) => {
+            setLabel(e.target.value);
+            setFieldErrors((f) => ({ ...f, label: undefined }));
+          }}
+          required
+          maxLength={40}
+          className={fieldErrors.label ? "input-invalid" : undefined}
+          aria-invalid={Boolean(fieldErrors.label)}
+        />
+        {fieldErrors.label ? <span className="field-error">{fieldErrors.label}</span> : null}
+      </label>
+      <label>
+        Address line
+        <input
+          value={line}
+          onChange={(e) => {
+            setLine(e.target.value);
+            setFieldErrors((f) => ({ ...f, line: undefined }));
+          }}
+          required
+          maxLength={240}
+          className={fieldErrors.line ? "input-invalid" : undefined}
+          aria-invalid={Boolean(fieldErrors.line)}
+        />
+        {fieldErrors.line ? <span className="field-error">{fieldErrors.line}</span> : null}
+      </label>
+      <label>
+        Landmark (optional)
+        <input
+          value={landmark}
+          onChange={(e) => setLandmark(e.target.value)}
+          maxLength={120}
+          placeholder="Tower / gate / society"
+        />
+      </label>
+      <label>
+        City
+        <select
+          value={liveCities().some((c) => c.name === city) ? city : "__other__"}
+          onChange={(e) => {
+            if (e.target.value === "__other__") {
+              setFieldErrors((f) => ({ ...f, city: undefined }));
+              return;
+            }
+            applyCity(e.target.value);
+            setFieldErrors((f) => ({ ...f, city: undefined }));
+          }}
+        >
+          {liveCities().map((c) => (
+            <option key={c.slug} value={c.name}>
+              {c.name}
+            </option>
+          ))}
+          <option value="__other__">Other city</option>
+        </select>
+      </label>
+      {!liveCities().some((c) => c.name === city) ? (
+        <label>
+          City name
+          <input
+            value={city}
+            onChange={(e) => {
+              applyCity(e.target.value);
+              setFieldErrors((f) => ({ ...f, city: undefined }));
+            }}
+            required
+            maxLength={80}
+            className={fieldErrors.city ? "input-invalid" : undefined}
+            aria-invalid={Boolean(fieldErrors.city)}
+          />
+          {fieldErrors.city ? <span className="field-error">{fieldErrors.city}</span> : null}
+        </label>
+      ) : null}
+      <label>
+        State
+        <input value={state} onChange={(e) => setState(e.target.value)} />
+      </label>
+      <label>
+        Pincode
+        <input
+          value={pincode}
+          onChange={(e) => {
+            setPincode(pincodeInputValue(e.target.value));
+            setFieldErrors((f) => ({ ...f, pincode: undefined }));
+          }}
+          inputMode="numeric"
+          maxLength={6}
+          placeholder="411001"
+          className={fieldErrors.pincode ? "input-invalid" : undefined}
+          aria-invalid={Boolean(fieldErrors.pincode)}
+        />
+        {fieldErrors.pincode ? <span className="field-error">{fieldErrors.pincode}</span> : null}
+      </label>
+      <PhoneField
+        label={t("customer.delivery.contactPhone")}
+        value={phoneNational}
+        onChange={(national) => {
+          setPhoneNational(national);
+          setFieldErrors((f) => ({ ...f, phone: undefined }));
+        }}
+        required
+        error={fieldErrors.phone}
+        hint="Kitchen and rider call this number at this address."
+      />
+      <label className="customer-dash__check">
+        <input
+          type="checkbox"
+          checked={makeDefault}
+          onChange={(e) => setMakeDefault(e.target.checked)}
+        />
+        Default address
+      </label>
+      <div className="customer-dash__pin-actions">
+        <button type="button" className="btn btn--ghost btn--sm" onClick={pinHere}>
+          Use my location
+        </button>
+        <span>
+          Pin: {lat?.toFixed(5)}, {lng?.toFixed(5)}
+        </span>
+      </div>
+      {lat != null && lng != null && (
+        <iframe
+          title="Address map pin"
+          className="customer-dash__map"
+          src={openStreetMapEmbedUrl(lat, lng)}
+        />
+      )}
+      <div className="customer-dash__addr-actions">
+        <button type="submit" className="btn btn--primary" disabled={busy}>
+          {editing ? t("customer.delivery.updateAddress") : "Save address"}
+        </button>
+        {editing && onCancel ? (
+          <button type="button" className="btn btn--ghost" onClick={onCancel}>
+            {t("customer.delivery.cancelEdit")}
+          </button>
+        ) : null}
+      </div>
+    </form>
+  );
+}
+
 function AddressesPanel({
   addresses,
   busy,
   setBusy,
   setError,
+  requestedEditId,
+  onEditIdChange,
   onRefresh,
 }: {
   addresses: CustomerAddress[];
   busy: boolean;
   setBusy: (v: boolean) => void;
   setError: (v: string) => void;
+  requestedEditId: string | null;
+  onEditIdChange: (id: string | null) => void;
   onRefresh: () => Promise<void>;
 }) {
+  const { t } = useTranslation();
+  const { session } = useCustomerAuth();
+  const { selectedAddressId, selectAddress, refreshAddresses } = useCustomerDelivery();
+  const loginNational = parsePhoneInput(session?.phone || "").national;
+  const formRef = useRef<HTMLFormElement>(null);
+  const labelInputRef = useRef<HTMLInputElement>(null);
+  const skipUrlOpen = useRef(false);
+  const [editId, setEditId] = useState<string | null>(null);
   const [label, setLabel] = useState("Home");
   const [line, setLine] = useState("");
   const [city, setCity] = useState("Pune");
   const [state, setState] = useState("Maharashtra");
   const [pincode, setPincode] = useState("");
+  const [landmark, setLandmark] = useState("");
+  const [phoneNational, setPhoneNational] = useState(loginNational);
   const [lat, setLat] = useState<number | null>(18.5204);
   const [lng, setLng] = useState<number | null>(73.8567);
-  const [fieldErrors, setFieldErrors] = useState<{
-    label?: string;
-    line?: string;
-    city?: string;
-    pincode?: string;
-  }>({});
+  const [makeDefault, setMakeDefault] = useState(addresses.length === 0);
+  const [fieldErrors, setFieldErrors] = useState<AddressFieldErrors>({});
+
+  useEffect(() => {
+    if (editId || phoneNational || !loginNational) return;
+    setPhoneNational(loginNational);
+  }, [editId, phoneNational, loginNational]);
+
+  const resetForm = useCallback(() => {
+    skipUrlOpen.current = true;
+    setEditId(null);
+    setLabel("Home");
+    setLine("");
+    setCity("Pune");
+    setState("Maharashtra");
+    setPincode("");
+    setLandmark("");
+    setPhoneNational(loginNational);
+    setLat(18.5204);
+    setLng(73.8567);
+    setMakeDefault(addresses.length === 0);
+    setFieldErrors({});
+    onEditIdChange(null);
+  }, [addresses.length, loginNational, onEditIdChange]);
+
+  const fillForm = useCallback(
+    (a: CustomerAddress, syncUrl = true) => {
+      setEditId(a.id);
+      setLabel(a.label);
+      setLine(a.address_line);
+      setCity(a.city);
+      setState(a.state || "");
+      setPincode(a.pincode || "");
+      setLandmark(a.landmark || "");
+      setPhoneNational(parsePhoneInput(a.phone || loginNational).national);
+      setLat(a.latitude);
+      setLng(a.longitude);
+      setMakeDefault(a.is_default);
+      setFieldErrors({});
+      if (syncUrl) onEditIdChange(a.id);
+    },
+    [loginNational, onEditIdChange],
+  );
+
+  useEffect(() => {
+    if (!requestedEditId) {
+      skipUrlOpen.current = false;
+      return;
+    }
+    if (skipUrlOpen.current) return;
+    if (editId === requestedEditId) return;
+    const found = addresses.find((row) => row.id === requestedEditId);
+    if (found) fillForm(found, false);
+  }, [requestedEditId, addresses, editId, fillForm]);
+
+  useEffect(() => {
+    if (!editId) return;
+    formRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    labelInputRef.current?.focus();
+  }, [editId]);
+
+  const applyCity = (name: string) => {
+    setCity(name);
+    const known = CITIES_PRESENCE.find((c) => c.name === name);
+    if (known) {
+      setState(known.state);
+      setLat(known.center.lat);
+      setLng(known.center.lng);
+      return;
+    }
+    const center = cityCenterByName(name);
+    if (center) {
+      setLat(center.lat);
+      setLng(center.lng);
+    }
+  };
 
   const pinHere = () => {
     if (!navigator.geolocation) {
@@ -1136,6 +1487,22 @@ function AddressesPanel({
     );
   };
 
+  const persistAndRefresh = async (savedId?: string) => {
+    await onRefresh();
+    const list = await refreshAddresses();
+    if (savedId) selectAddress(savedId);
+    else if (selectedAddressId && !list.some((row) => row.id === selectedAddressId)) {
+      const next = list.find((row) => row.is_default) ?? list[0];
+      if (next) selectAddress(next.id);
+    }
+  };
+
+  const contactPhoneFor = (address: CustomerAddress): string => {
+    if (address.phone) return address.phone;
+    if (loginNational) return toE164(loginNational);
+    return "";
+  };
+
   const submit = async (e: FormEvent) => {
     e.preventDefault();
     const nextErrors = {
@@ -1143,6 +1510,7 @@ function AddressesPanel({
       line: validateText(line, "the address", { min: 5, max: 240 }) ?? undefined,
       city: validateText(city, "a city", { max: 80 }) ?? undefined,
       pincode: validatePincode(pincode, { required: false }) ?? undefined,
+      phone: validateNationalPhone(phoneNational) ?? undefined,
     };
     setFieldErrors(nextErrors);
     const firstMessage = firstError(nextErrors);
@@ -1152,20 +1520,25 @@ function AddressesPanel({
     }
     setBusy(true);
     setError("");
+    const updatingId = editId;
     try {
-      await saveAddress({
-        label,
-        address_line: line,
-        city,
-        state,
-        pincode: pincode || null,
-        landmark: null,
-        latitude: lat,
-        longitude: lng,
-        is_default: addresses.length === 0,
-      });
-      setLine("");
-      await onRefresh();
+      const saved = await saveAddress(
+        {
+          label,
+          address_line: line,
+          city,
+          state: state || null,
+          pincode: pincode || null,
+          landmark: landmark.trim() || null,
+          phone: toE164(phoneNational),
+          latitude: lat,
+          longitude: lng,
+          is_default: makeDefault || addresses.length === 0,
+        },
+        updatingId ?? undefined,
+      );
+      resetForm();
+      await persistAndRefresh(updatingId ? undefined : saved.id);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not save address");
     } finally {
@@ -1173,136 +1546,148 @@ function AddressesPanel({
     }
   };
 
+  const formProps = {
+    busy,
+    formRef,
+    labelInputRef,
+    label,
+    setLabel,
+    line,
+    setLine,
+    city,
+    applyCity,
+    state,
+    setState,
+    pincode,
+    setPincode,
+    landmark,
+    setLandmark,
+    phoneNational,
+    setPhoneNational,
+    lat,
+    lng,
+    makeDefault,
+    setMakeDefault,
+    fieldErrors,
+    setFieldErrors,
+    pinHere,
+    onSubmit: submit,
+  };
+
   return (
-    <div className="customer-dash__split">
-      <form className="glass customer-dash__card" onSubmit={submit}>
-        <h2>Add address with map pin</h2>
-        <label>
-          Label
-          <input
-            value={label}
-            onChange={(e) => {
-              setLabel(e.target.value);
-              setFieldErrors((f) => ({ ...f, label: undefined }));
-            }}
-            required
-            maxLength={40}
-            className={fieldErrors.label ? "input-invalid" : undefined}
-            aria-invalid={Boolean(fieldErrors.label)}
-          />
-          {fieldErrors.label ? <span className="field-error">{fieldErrors.label}</span> : null}
-        </label>
-        <label>
-          Address line
-          <input
-            value={line}
-            onChange={(e) => {
-              setLine(e.target.value);
-              setFieldErrors((f) => ({ ...f, line: undefined }));
-            }}
-            required
-            maxLength={240}
-            className={fieldErrors.line ? "input-invalid" : undefined}
-            aria-invalid={Boolean(fieldErrors.line)}
-          />
-          {fieldErrors.line ? <span className="field-error">{fieldErrors.line}</span> : null}
-        </label>
-        <label>
-          City
-          <input
-            value={city}
-            onChange={(e) => {
-              setCity(e.target.value);
-              setFieldErrors((f) => ({ ...f, city: undefined }));
-            }}
-            required
-            maxLength={80}
-            className={fieldErrors.city ? "input-invalid" : undefined}
-            aria-invalid={Boolean(fieldErrors.city)}
-          />
-          {fieldErrors.city ? <span className="field-error">{fieldErrors.city}</span> : null}
-        </label>
-        <label>
-          State
-          <input value={state} onChange={(e) => setState(e.target.value)} />
-        </label>
-        <label>
-          Pincode
-          <input
-            value={pincode}
-            onChange={(e) => {
-              setPincode(pincodeInputValue(e.target.value));
-              setFieldErrors((f) => ({ ...f, pincode: undefined }));
-            }}
-            inputMode="numeric"
-            maxLength={6}
-            placeholder="411001"
-            className={fieldErrors.pincode ? "input-invalid" : undefined}
-            aria-invalid={Boolean(fieldErrors.pincode)}
-          />
-          {fieldErrors.pincode ? <span className="field-error">{fieldErrors.pincode}</span> : null}
-        </label>
-        <div className="customer-dash__pin-actions">
-          <button type="button" className="btn btn--ghost btn--sm" onClick={pinHere}>
-            Use my location
-          </button>
-          <span>
-            Pin: {lat?.toFixed(5)}, {lng?.toFixed(5)}
-          </span>
-        </div>
-        {lat != null && lng != null && (
-          <iframe
-            title="Address map pin"
-            className="customer-dash__map"
-            src={openStreetMapEmbedUrl(lat, lng)}
-          />
-        )}
-        <button type="submit" className="btn btn--primary" disabled={busy}>
-          Save address
-        </button>
-      </form>
+    <div className="customer-dash__address-book">
       <section className="glass customer-dash__card">
         <h2>Saved addresses</h2>
+        <p>Pick one for discovery and checkout. Tap Edit to change the pin or contact number.</p>
         {addresses.length === 0 ? (
           <p>No saved addresses yet.</p>
         ) : (
-          <ul className="customer-dash__tips">
+          <ul className="customer-dash__addr-list">
             {addresses.map((a) => (
-              <li key={a.id}>
-                <strong>
-                  {a.label}
-                  {a.is_default ? " · default" : ""}
-                </strong>
-                <span>
-                  {a.address_line}, {a.city}
-                  {a.pincode ? ` · ${a.pincode}` : ""}
-                  {a.latitude != null && a.longitude != null
-                    ? ` · ${a.latitude.toFixed(4)}, ${a.longitude.toFixed(4)}`
-                    : ""}
-                </span>
-                <button
-                  type="button"
-                  className="btn btn--ghost btn--sm"
-                  disabled={busy}
-                  onClick={async () => {
-                    setBusy(true);
-                    try {
-                      await deleteAddress(a.id);
-                      await onRefresh();
-                    } catch (err) {
-                      setError(err instanceof Error ? err.message : "Delete failed");
-                    } finally {
-                      setBusy(false);
-                    }
-                  }}
-                >
-                  Delete
-                </button>
+              <li
+                key={a.id}
+                className={
+                  editId === a.id
+                    ? "customer-dash__addr-card customer-dash__addr-card--editing"
+                    : "customer-dash__addr-card"
+                }
+              >
+                {editId === a.id ? (
+                  <AddressBookForm mode="edit" onCancel={resetForm} {...formProps} />
+                ) : (
+                  <>
+                    <strong>
+                      {a.label}
+                      {a.is_default ? " · default" : ""}
+                      {selectedAddressId === a.id ? " · in use" : ""}
+                    </strong>
+                    <span>{formatAddressLine(a)}</span>
+                    {a.landmark ? <span>{a.landmark}</span> : null}
+                    <div className="customer-dash__addr-actions">
+                      <button
+                        type="button"
+                        className="btn btn--primary btn--sm"
+                        disabled={busy || selectedAddressId === a.id}
+                        onClick={() => selectAddress(a.id)}
+                      >
+                        Use for orders
+                      </button>
+                      {!a.is_default ? (
+                        <button
+                          type="button"
+                          className="btn btn--ghost btn--sm"
+                          disabled={busy}
+                          onClick={async () => {
+                            const phone = contactPhoneFor(a);
+                            if (!phone) {
+                              setError("Add a contact number before setting a default address.");
+                              fillForm(a);
+                              return;
+                            }
+                            setBusy(true);
+                            try {
+                              await saveAddress(
+                                {
+                                  label: a.label,
+                                  address_line: a.address_line,
+                                  city: a.city,
+                                  state: a.state,
+                                  pincode: a.pincode,
+                                  landmark: a.landmark,
+                                  phone,
+                                  latitude: a.latitude,
+                                  longitude: a.longitude,
+                                  is_default: true,
+                                },
+                                a.id,
+                              );
+                              await persistAndRefresh(a.id);
+                            } catch (err) {
+                              setError(err instanceof Error ? err.message : "Could not set default");
+                            } finally {
+                              setBusy(false);
+                            }
+                          }}
+                        >
+                          Set default
+                        </button>
+                      ) : null}
+                      <button
+                        type="button"
+                        className="btn btn--ghost btn--sm"
+                        disabled={busy}
+                        onClick={() => fillForm(a)}
+                      >
+                        {t("customer.delivery.editAddress")}
+                      </button>
+                      <button
+                        type="button"
+                        className="btn btn--ghost btn--sm"
+                        disabled={busy}
+                        onClick={async () => {
+                          setBusy(true);
+                          try {
+                            await deleteAddress(a.id);
+                            if (editId === a.id) resetForm();
+                            await persistAndRefresh();
+                          } catch (err) {
+                            setError(err instanceof Error ? err.message : "Delete failed");
+                          } finally {
+                            setBusy(false);
+                          }
+                        }}
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  </>
+                )}
               </li>
             ))}
           </ul>
         )}
       </section>
+      {!editId ? <AddressBookForm mode="add" {...formProps} /> : null}
     </div>
   );
 }

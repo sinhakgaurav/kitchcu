@@ -9,7 +9,7 @@ from pathlib import Path
 
 from pdf_guide import GuidePDF
 
-GUIDE_VERSION = "1.1"
+GUIDE_VERSION = "1.2"
 GUIDE_DATE = "September 2026"
 OUTPUT = Path(__file__).resolve().parent.parent / "docs" / "QA-INSTRUCTION-PACK.pdf"
 
@@ -34,7 +34,7 @@ def build() -> GuidePDF:
             "Owner list toolbars: search, sort, filter chips (Orders, Menu, Ingredients,",
             "Bulk prep, CRM, Coupons) + header/dropdown/layout polish checks",
             "F19/F19b: pantry, recipes, deduct modes, mark prepared, Ready-time stock",
-            "P41: kitchen profile edit, Ratings, settlements, GCP bulk + weekly seed",
+            "P47: Swagger OAuth2Password /api/v1/auth/token; public ops no padlock",
             "Security, correlation IDs, tenant isolation, pytest focus commands",
         ],
     )
@@ -130,7 +130,7 @@ def build() -> GuidePDF:
             ["S3", "Customer OTP login -> home", "Discovery/menu loads"],
             ["S4", "Admin login -> overview", "Dashboard loads; username/password + API docs links visible"],
             ["S5", "Portal home", "Brand hero; no crash"],
-            ["S6", "Gateway /docs or portal /openapi", "Schema loads; Authorize with admin JWT"],
+            ["S6", "Gateway /docs or portal /openapi", "Schema loads; OAuth2Password Authorize; public no padlock"],
         ],
         widths=[18, 72, 80],
     )

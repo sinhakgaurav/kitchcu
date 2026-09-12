@@ -1,5 +1,6 @@
 """Platform admin API — full control over owners, kitchens, orders."""
 
+import os
 import uuid
 from datetime import UTC, datetime, timedelta
 from typing import Annotated
@@ -119,14 +120,14 @@ class AdminTokenResponse(BaseModel):
 class AdminLoginHintResponse(BaseModel):
     """Public bootstrap hint for the admin login form.
 
-    Always includes plaintext ``ADMIN_PASSWORD`` so Super Admin Sign in
-    (and portal/kitchen/customer strips) can print username + password.
+    Email is always returned. Plaintext ``ADMIN_PASSWORD`` is included only in
+    non-production or when ``ADMIN_LOGIN_REVEAL_PASSWORD=1``.
     """
 
     email: str = Field(..., description="Expected admin login email from ADMIN_EMAIL.")
     password: str | None = Field(
         default=None,
-        description="ADMIN_PASSWORD from env (always included when set).",
+        description="ADMIN_PASSWORD when reveal is allowed; otherwise null.",
     )
     revealed: bool = Field(
         ...,
@@ -588,19 +589,31 @@ async def ensure_default_admin(session: AsyncSession) -> None:
     await session.flush()
 
 
+def _should_reveal_admin_password() -> bool:
+    """Plaintext ADMIN_PASSWORD is never the default on production."""
+    raw = os.environ.get("ADMIN_LOGIN_REVEAL_PASSWORD", "").strip().lower()
+    if raw in ("1", "true", "yes"):
+        return True
+    if raw in ("0", "false", "no"):
+        return False
+    return settings.app_env in ("development", "test")
+
+
 @router.get(
     "/auth/login-hint",
     response_model=AdminLoginHintResponse,
     summary="Admin login credential hint (bring-up)",
     description=(
-        "Returns the expected admin email and plaintext `ADMIN_PASSWORD` so operators "
-        "can sign in and Authorize Swagger without looking up GCE metadata."
+        "Returns the expected admin email. Plaintext `ADMIN_PASSWORD` is included "
+        "only in `development`/`test`, or when `ADMIN_LOGIN_REVEAL_PASSWORD=1` "
+        "(GCP startup writes that flag for operator bring-up)."
     ),
     tags=["Admin"],
 )
 async def admin_login_hint() -> AdminLoginHintResponse:
     email = settings.admin_email.lower().strip()
-    password = settings.admin_password or None
+    reveal = _should_reveal_admin_password()
+    password = (settings.admin_password or None) if reveal else None
     return AdminLoginHintResponse(
         email=email,
         password=password,
@@ -1497,6 +1510,7 @@ async def admin_customer_detail(
                 "city": a.city,
                 "state": a.state,
                 "pincode": a.pincode,
+                "phone": a.phone,
                 "latitude": float(a.latitude) if a.latitude is not None else None,
                 "longitude": float(a.longitude) if a.longitude is not None else None,
                 "is_default": a.is_default,

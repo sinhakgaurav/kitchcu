@@ -662,20 +662,28 @@ async def customer_refunds_list(
     except HTTPException:
         phone = None
 
-    result = await session.execute(
-        text(
-            """
+    if phone:
+        sql = """
             SELECT r.id
             FROM ckac_billing.refunds r
             LEFT JOIN ckac_orders.orders o ON o.id = r.order_id
             WHERE r.customer_id = :cid
-               OR (:phone IS NOT NULL AND o.customer_phone = :phone)
+               OR o.customer_phone = :phone
             ORDER BY r.created_at DESC
             LIMIT 100
             """
-        ),
-        {"cid": customer_id, "phone": phone},
-    )
+        params = {"cid": customer_id, "phone": phone}
+    else:
+        sql = """
+            SELECT r.id
+            FROM ckac_billing.refunds r
+            WHERE r.customer_id = :cid
+            ORDER BY r.created_at DESC
+            LIMIT 100
+            """
+        params = {"cid": customer_id}
+
+    result = await session.execute(text(sql), params)
     ids = [row[0] for row in result.all()]
     if not ids:
         return []

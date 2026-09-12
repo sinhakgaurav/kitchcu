@@ -63,3 +63,44 @@ def test_merge_openapi_specs_prefixes_schemas_and_tags():
     ]
     assert merged["info"]["title"] == "kitchCU Public API"
     assert "HTTPBearer" in merged["components"]["securitySchemes"]
+    assert "OAuth2Password" in merged["components"]["securitySchemes"]
+    assert merged.get("security") in (None, [])
+    assert merged["paths"]["/api/v1/auth/otp/request"]["post"]["security"] == []
+    assert merged["paths"]["/api/v1/kitchens/{kitchen_id}/menu"]["get"]["security"] == []
+
+
+def test_merge_binds_auth_only_where_the_service_declared_it():
+    specs = [
+        (
+            "identity",
+            {
+                "openapi": "3.1.0",
+                "paths": {
+                    "/api/v1/owners/me": {
+                        "get": {
+                            "security": [{"HTTPBearer": []}],
+                            "responses": {"200": {"description": "ok"}},
+                        }
+                    },
+                    "/api/v1/auth/otp/request": {
+                        "post": {"responses": {"202": {"description": "ok"}}},
+                    },
+                    "/api/v1/kitchens/{kitchen_id}/promotions/active": {
+                        "get": {
+                            "security": [{"HTTPBearer": []}, {}, {"HTTPBearer": []}],
+                            "responses": {"200": {"description": "ok"}},
+                        }
+                    },
+                },
+            },
+        )
+    ]
+    merged = merge_openapi_specs(specs)
+    assert merged["paths"]["/api/v1/owners/me"]["get"]["security"] == [
+        {"HTTPBearer": []},
+        {"OAuth2Password": []},
+    ]
+    assert merged["paths"]["/api/v1/auth/otp/request"]["post"]["security"] == []
+    assert merged["paths"]["/api/v1/kitchens/{kitchen_id}/promotions/active"]["get"][
+        "security"
+    ] == [{}, {"HTTPBearer": []}, {"OAuth2Password": []}]

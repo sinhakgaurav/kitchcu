@@ -13,7 +13,18 @@ GATEWAY_INFO = {
         "Unified OpenAPI contract exposed through the API Gateway. "
         "All public clients call /api/v1/* on the gateway; paths below are "
         "merged from identity, catalog, order, billing, marketing, ratings, "
-        "growth, delivery, learning, community, streaming, and notification."
+        "growth, delivery, learning, community, streaming, and notification.\n\n"
+        "**Swagger Try it out**\n"
+        "- Operations without a padlock are public — execute them with no Authorize step.\n"
+        "- Padlocked operations need a JWT. Click **Authorize**:\n"
+        "  - **OAuth2Password**: username + password (admin email + password, or "
+        "owner/customer phone + OTP). Local demo: `9876543210` / `123456`, "
+        "`9123456789` / `123456`, `admin@kitchcu.dev` / `admin123456`.\n"
+        "  - **HTTPBearer**: paste an `access_token` only (no `Bearer ` prefix) from "
+        "`POST /auth/otp/verify`, `POST /auth/customer/whatsapp/verify`, or "
+        "`POST /admin/auth/login`.\n"
+        "- A token is never sent on public operations, so Authorize does not block "
+        "anonymous Try it out."
     ),
 }
 
@@ -39,6 +50,25 @@ def _prefix_ref(ref: str, prefix: str) -> str:
         return ref
     name = ref[len(marker) :]
     return f"{marker}{prefix}{name}"
+
+
+_HTTP_METHODS = frozenset({"get", "put", "post", "delete", "options", "head", "patch", "trace"})
+
+
+def _normalize_operation_security(operation: dict[str, Any]) -> None:
+    """Bind JWT only where the service declared it. Public ops get security: [].
+
+    Swagger UI treats a missing security array as inherit-or-guess and then
+    attaches a leftover Authorize token to anonymous Try it out. An empty
+    list is the OpenAPI way to say this operation is public.
+    """
+    raw = operation.get("security")
+    if not raw:
+        operation["security"] = []
+        return
+    optional = any(not requirement for requirement in raw)
+    schemes = [{"HTTPBearer": []}, {"OAuth2Password": []}]
+    operation["security"] = ([{}] + schemes) if optional else schemes
 
 
 def _rewrite_refs(node: Any, prefix: str) -> Any:
@@ -77,8 +107,26 @@ def merge_openapi_specs(
                     "type": "http",
                     "scheme": "bearer",
                     "bearerFormat": "JWT",
-                    "description": "Owner, customer, or admin JWT from Identity",
-                }
+                    "description": (
+                        "Paste the access_token only (Swagger adds Bearer). "
+                        "Required only on padlocked operations. Public operations "
+                        "do not use this value."
+                    ),
+                },
+                "OAuth2Password": {
+                    "type": "oauth2",
+                    "description": (
+                        "Swagger Authorize helper. Username is an admin email or "
+                        "an owner/customer phone; password is the admin password "
+                        "or the OTP (local demo 123456)."
+                    ),
+                    "flows": {
+                        "password": {
+                            "tokenUrl": "/api/v1/auth/token",
+                            "scopes": {},
+                        }
+                    },
+                },
             },
         },
     }
@@ -130,6 +178,8 @@ def merge_openapi_specs(
                         "x-kitchcu-service",
                         service_key,
                     )
+                    if method.lower() in _HTTP_METHODS:
+                        _normalize_operation_security(operation)
             merged["paths"][path] = rewritten
 
     if openapi_versions and all(v.startswith("3.0") for v in openapi_versions):

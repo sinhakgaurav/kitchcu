@@ -269,6 +269,8 @@ WHATSAPP_MESSAGES = [
     "1 vegan buddha bowl\nno peanuts",
 ]
 
+# PATCH sequences an order walks after creation. How these are chosen depends on
+# how old the order is meant to be — see scripts/order_history.py.
 STATUS_CHAINS: dict[str, list[str]] = {
     "received": [],
     "accepted": ["accepted"],
@@ -280,19 +282,6 @@ STATUS_CHAINS: dict[str, list[str]] = {
     "cancelled": ["cancelled"],
     "cancelled_late": ["accepted", "cancelled"],
 }
-
-# Weighted distribution for ~250 orders
-ORDER_STATUS_WEIGHTS: list[tuple[str, int]] = [
-    ("received", 18),
-    ("accepted", 15),
-    ("preparing", 22),
-    ("ready", 14),
-    ("out_for_delivery", 12),
-    ("delivered", 130),
-    ("delivered_delivery", 25),
-    ("cancelled", 8),
-    ("cancelled_late", 6),
-]
 
 
 def dish_with_media(dish: dict) -> dict:
@@ -414,20 +403,6 @@ def city_customer_specs(per_city: int = 3, *, cities: list[dict] | None = None) 
                 }
             )
     return specs
-
-
-def order_status_plan(total: int) -> list[str]:
-    pool: list[str] = []
-    for status, weight in ORDER_STATUS_WEIGHTS:
-        pool.extend([status] * weight)
-    random.shuffle(pool)
-    while len(pool) < total:
-        pool.extend([s for s, _ in ORDER_STATUS_WEIGHTS for _ in range(3)])
-    return pool[:total]
-
-
-def random_phone() -> str:
-    return f"+9198{random.randint(10000000, 99999999)}"
 
 
 def captured_at() -> str:

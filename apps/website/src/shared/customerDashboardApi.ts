@@ -46,6 +46,9 @@ export type DashboardOrder = {
     saved_vs_restaurant: number;
   }>;
   can_rate: boolean;
+  is_rated?: boolean;
+  rating_home_taste?: number | null;
+  rating_quality?: number | null;
   tracking_token: string | null;
   has_live_media: boolean;
   diets: string[];
@@ -85,6 +88,7 @@ export type CustomerAddress = {
   state: string | null;
   pincode: string | null;
   landmark: string | null;
+  phone: string | null;
   latitude: number | null;
   longitude: number | null;
   is_default: boolean;

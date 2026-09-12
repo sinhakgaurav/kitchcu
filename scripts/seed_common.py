@@ -15,11 +15,20 @@ MAX_WAIT_SEC = int(os.environ.get("CKAC_SEED_WAIT_SEC", "600"))
 REQUIRED_SERVICES = ("identity", "catalog", "order", "billing")
 
 
-def resolve_postgres_container() -> str:
-    """Return the running Postgres container name (local `ckac-postgres-1` or GCP `gcp-vm-postgres-1`)."""
-    override = os.environ.get("CKAC_POSTGRES_CONTAINER", "").strip()
-    if override:
-        return override
+DEFAULT_POSTGRES_CONTAINER = "ckac-postgres-1"
+
+# When more than one stack is up, `docker ps` order must not pick the database.
+# The GCP parity dry-run (which the pre-push gate runs) leaves
+# `ckac-gcp-dry-postgres-1` behind, and it sorted ahead of the dev container —
+# so seed SQL silently updated rows in a database the gateway never reads.
+_POSTGRES_PREFERENCE = (
+    "ckac-postgres-1",  # docker-compose.yml — the stack the dev gateway uses
+    "ckac_postgres_1",  # older underscore compose naming
+    "gcp-vm-postgres-1",  # infra/gcp-vm/docker-compose.prod.yml on the VM
+)
+
+
+def _docker_container_names() -> list[str]:
     try:
         out = subprocess.check_output(
             ["docker", "ps", "--format", "{{.Names}}"],
@@ -27,15 +36,35 @@ def resolve_postgres_container() -> str:
             timeout=15,
         )
     except (FileNotFoundError, subprocess.CalledProcessError, subprocess.TimeoutExpired):
-        return "ckac-postgres-1"
-    names = [line.strip() for line in out.splitlines() if line.strip()]
-    for name in names:
-        if name.endswith("-postgres-1") or name.endswith("_postgres_1"):
-            return name
-    for name in names:
-        if "postgres" in name.lower():
-            return name
-    return "ckac-postgres-1"
+        return []
+    return [line.strip() for line in out.splitlines() if line.strip()]
+
+
+def resolve_postgres_container() -> str:
+    """Name the Postgres container that backs the gateway being seeded.
+
+    Set ``CKAC_POSTGRES_CONTAINER`` to override; otherwise the dev stack wins
+    over any parity or prod stack that happens to be running alongside it.
+    """
+    override = os.environ.get("CKAC_POSTGRES_CONTAINER", "").strip()
+    if override:
+        return override
+    names = _docker_container_names()
+    if not names:
+        return DEFAULT_POSTGRES_CONTAINER
+    running = set(names)
+    for preferred in _POSTGRES_PREFERENCE:
+        if preferred in running:
+            return preferred
+    candidates = [
+        n for n in names if n.endswith(("-postgres-1", "_postgres_1"))
+    ] or [n for n in names if "postgres" in n.lower()]
+    if len(candidates) > 1:
+        print(
+            f"  ! Multiple Postgres containers running ({', '.join(candidates)}); "
+            f"using {candidates[0]}. Set CKAC_POSTGRES_CONTAINER to choose."
+        )
+    return candidates[0] if candidates else DEFAULT_POSTGRES_CONTAINER
 
 
 class ApiError(Exception):
@@ -186,6 +215,30 @@ def login_owner(phone_e164: str, otp: str) -> str:
     request("POST", "/api/v1/auth/otp/request", {"phone": phone_e164})
     token_resp = request("POST", "/api/v1/auth/otp/verify", {"phone": phone_e164, "otp": otp})
     return token_resp["access_token"]
+
+
+def ensure_customer_addresses(token: str, addresses: list[dict]) -> int:
+    """Idempotent: add labelled pins the diner does not already have."""
+    try:
+        existing = request("GET", "/api/v1/customers/me/addresses", token=token) or []
+    except ApiError as exc:
+        log(f"  ! list addresses: {exc}")
+        return 0
+    have = {
+        (str(row.get("label", "")).strip().lower(), str(row.get("city", "")).strip().lower())
+        for row in existing
+    }
+    added = 0
+    for spec in addresses:
+        key = (str(spec.get("label", "")).strip().lower(), str(spec.get("city", "")).strip().lower())
+        if key in have:
+            continue
+        try:
+            request("POST", "/api/v1/customers/me/addresses", spec, token=token)
+            added += 1
+        except ApiError as exc:
+            log(f"  ! address {spec.get('label')} {spec.get('city')}: {exc}")
+    return added
 
 
 def login_customer(phone_e164: str, otp: str) -> str:

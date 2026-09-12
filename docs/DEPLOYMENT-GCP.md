@@ -175,9 +175,12 @@ secrets) — never re-echo the full secret. The Terraform-managed `WHATSAPP_VERI
 env var is a throwaway bootstrap placeholder — the DB value above takes precedence per
 `get_platform_secret()`.
 
-**Admin login hint:** `GET /api/v1/admin/auth/login-hint` always returns plaintext
-`ADMIN_PASSWORD` so Super Admin Sign in can print username + password. Startup
-writes `ADMIN_LOGIN_REVEAL_PASSWORD=1` into `.env` (kept for older images).
+**Admin login hint:** `GET /api/v1/admin/auth/login-hint` returns plaintext
+`ADMIN_PASSWORD` only when `APP_ENV` is `development`/`test` **or**
+`ADMIN_LOGIN_REVEAL_PASSWORD=1`. Startup writes `ADMIN_LOGIN_REVEAL_PASSWORD=1`
+into `.env` so Super Admin Sign in still prints username + password on GCP
+and local dry-run. Do not rely on “always print” — production without the
+flag hides the password.
 
 **Change the default admin password and demo OTP behavior before real traffic**:
 `allows_fixed_dev_otp()` is already gated to `development`/`test` — confirm

@@ -2,12 +2,13 @@ import { FormEvent, useCallback, useEffect, useState, type ReactNode } from "rea
 import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { BrandLogo } from "../../components/BrandLogo";
+import { DeliveryAddressPicker } from "../../components/DeliveryAddressPicker";
 import { NearbyKitchensList } from "../../components/NearbyKitchensList";
 import { SuperAdminLink } from "../../components/SuperAdminAccess";
 import { CitiesPresence } from "../../components/CitiesPresence";
 import { images } from "../../data/content";
-import { useGeolocation } from "../../hooks/useGeolocation";
 import { DEMO } from "../../shared/demo";
+import { useCustomerDelivery } from "../../shared/customerDelivery";
 import type { KitchenPublic, LiveKitchenSummary } from "../../shared/api";
 import { fetchLiveKitchens } from "../../shared/api";
 import { useCustomerAuth } from "../../shared/customerAuth";
@@ -194,7 +195,16 @@ export function CustomerDiscoveryHome() {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const { session, updateSession } = useCustomerAuth();
-  const { coords, status, error: geoError, refresh, setCoords } = useGeolocation(DEMO.defaultLocation);
+  const {
+    coords,
+    source,
+    selectedAddress,
+    geoStatus,
+    geoError,
+    loading: deliveryLoading,
+    useGps,
+    useDemo,
+  } = useCustomerDelivery();
   const [maxKm, setMaxKm] = useState(25);
   const [feed, setFeed] = useState<DiscoveryHome | null>(null);
   const [loading, setLoading] = useState(true);
@@ -207,7 +217,12 @@ export function CustomerDiscoveryHome() {
   const [liveByKitchen, setLiveByKitchen] = useState<Record<string, LiveKitchenSummary>>({});
 
   const kmFromDemo = distanceKm(coords, DEMO.defaultLocation);
-  const farFromDemo = kmFromDemo > 80;
+  const farFromDemo = kmFromDemo > 80 && source !== "address";
+  const placeLabel = selectedAddress
+    ? `${selectedAddress.label}, ${selectedAddress.city}`
+    : source === "demo"
+      ? DEMO.defaultLocation.label
+      : null;
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -238,8 +253,9 @@ export function CustomerDiscoveryHome() {
   }, [coords.latitude, coords.longitude, maxKm, activeQuery]);
 
   useEffect(() => {
+    if (deliveryLoading) return;
     void load();
-  }, [load]);
+  }, [load, deliveryLoading]);
 
   // Search runs server-side across every kitchen in radius, so typing (not just Enter)
   // is enough — the client only debounces to keep the request rate sane.
@@ -328,7 +344,7 @@ export function CustomerDiscoveryHome() {
   };
 
   const useDemoPin = () => {
-    setCoords(DEMO.defaultLocation);
+    useDemo();
     setMaxKm((km) => (km < 50 ? 50 : km));
   };
 
@@ -377,15 +393,16 @@ export function CustomerDiscoveryHome() {
               />
             </label>
             <div className="disc-home__loc">
+              <DeliveryAddressPicker variant="hero" />
               <button
                 type="button"
                 className="btn btn--ghost btn--sm"
                 onClick={() => {
-                  void refresh();
+                  void useGps();
                 }}
-                disabled={status === "loading"}
+                disabled={geoStatus === "loading"}
               >
-                {status === "loading" ? t("common.loading") : t("customer.discovery.useLocation")}
+                {geoStatus === "loading" ? t("common.loading") : t("customer.discovery.useLocation")}
               </button>
               <label>
                 <span className="visually-hidden">Radius</span>
@@ -436,7 +453,10 @@ export function CustomerDiscoveryHome() {
                 </>
               ) : (
                 <>
-                  <p>No kitchens within {maxKm} km of you yet.</p>
+                  <p>
+                    No kitchens within {maxKm} km
+                    {placeLabel ? ` of ${placeLabel}` : " of you"} yet.
+                  </p>
                   {maxKm < 100 ? (
                     <button
                       type="button"
@@ -496,7 +516,11 @@ export function CustomerDiscoveryHome() {
             <Rail
               id="near-you"
               title="Near you"
-              subtitle={`${feed.total_kitchens} within ${maxKm} km`}
+              subtitle={
+                placeLabel
+                  ? `${feed.total_kitchens} near ${placeLabel}`
+                  : `${feed.total_kitchens} within ${maxKm} km`
+              }
               empty="No kitchens in this radius. Widen search or try demo kitchens."
             >
               {nearYou.map((k) => (

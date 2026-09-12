@@ -1,5 +1,6 @@
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { CustomerAuthProvider } from "../shared/customerAuth";
+import { CustomerDeliveryProvider } from "../shared/customerDelivery";
 import { CustomerNavbar } from "../components/CustomerNavbar";
 import { CustomerFooter } from "../components/CustomerFooter";
 import { CustomerLoginPage } from "./pages/CustomerPages";
@@ -33,7 +34,8 @@ export default function CustomerApp() {
   return (
     <BrowserRouter>
       <CustomerAuthProvider>
-        <Routes>
+        <CustomerDeliveryProvider>
+          <Routes>
           <Route
             path="/"
             element={
@@ -142,7 +144,8 @@ export default function CustomerApp() {
             }
           />
           <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
+          </Routes>
+        </CustomerDeliveryProvider>
       </CustomerAuthProvider>
     </BrowserRouter>
   );

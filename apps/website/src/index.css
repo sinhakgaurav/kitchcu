@@ -4330,6 +4330,74 @@ html.theme-brand-light .social-btn {
   display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; margin-bottom: 0.5rem;
   font-size: 0.85rem; color: var(--text-muted);
 }
+.customer-dash__addr-actions {
+  display: flex; flex-wrap: wrap; gap: 0.4rem; align-items: center; margin-top: 0.45rem;
+}
+.customer-dash__address-book {
+  display: grid;
+  gap: 1rem;
+}
+.customer-dash__addr-list {
+  list-style: none;
+  padding: 0;
+  margin: 0.75rem 0 0;
+  display: grid;
+  gap: 0.75rem;
+}
+.customer-dash__addr-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  padding: 0.9rem 1rem;
+  border: 1px solid var(--surface-border);
+  border-radius: 12px;
+}
+.customer-dash__addr-card span { color: var(--text-muted); font-size: 0.9rem; }
+.customer-dash__addr-card--editing {
+  border-color: var(--accent, #c45c26);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent, #c45c26) 45%, transparent);
+}
+.customer-dash__addr-form { margin: 0; }
+.deliver-picker {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  min-width: 12rem;
+}
+.deliver-picker__field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  font-size: 0.8rem;
+}
+.deliver-picker__label { color: var(--text-muted); }
+.deliver-picker select {
+  padding: 0.5rem 0.7rem;
+  border-radius: 8px;
+  border: 1px solid var(--surface-border, rgba(0, 0, 0, 0.12));
+  background: var(--veil-5, #fff);
+  color: var(--text);
+  font: inherit;
+  max-width: 22rem;
+}
+.deliver-picker__hint {
+  margin: 0;
+  font-size: 0.82rem;
+  color: var(--text-muted);
+}
+.deliver-picker__actions { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+.deliver-picker--nav {
+  min-width: 10rem;
+  margin-right: 0.35rem;
+}
+.deliver-picker--nav .deliver-picker__label { display: none; }
+.deliver-picker--nav select {
+  max-width: 14rem;
+  font-size: 0.85rem;
+}
+.nav--customer .deliver-picker--nav select {
+  background: rgba(255, 255, 255, 0.92);
+}
 .customer-dash__toggle {
   display: flex;
   flex-direction: row;

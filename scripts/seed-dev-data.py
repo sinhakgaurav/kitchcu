@@ -31,9 +31,21 @@ from demo_data import (  # noqa: E402
     DEMO_OWNER,
     DEMO_OWNERS_EXTRA,
     DEMO_ADMIN,
+    DEMO_CUSTOMER_ADDRESSES,
     DEMO_CUSTOMERS,
 )
-from seed_common import ApiError, cuisine_map, dish_create_payload, ensure_dish_recipes, ensure_ingredients, login_owner, request, wait_for_gateway  # noqa: E402
+from seed_common import (  # noqa: E402
+    ApiError,
+    cuisine_map,
+    dish_create_payload,
+    ensure_customer_addresses,
+    ensure_dish_recipes,
+    ensure_ingredients,
+    login_customer,
+    login_owner,
+    request,
+    wait_for_gateway,
+)
 from ingredient_demo_data import DEMO_PANTRY, DISH_PREP_STEPS, DISH_RECIPES  # noqa: E402
 from seed_platform_extras import seed_kitchen_integrations, seed_kitchen_modules  # noqa: E402
 
@@ -244,6 +256,17 @@ def main() -> None:
     print("Extra demo owners")
     print("-" * 40)
     extra = ensure_extra_owners()
+
+    print()
+    print("Demo customer addresses")
+    print("-" * 40)
+    for spec in DEMO_CUSTOMER_ADDRESSES:
+        try:
+            diner_token = login_customer(spec["phone_e164"], DEMO_OTP)
+            added = ensure_customer_addresses(diner_token, spec["addresses"])
+            print(f"  {spec['phone_e164']}: +{added} address(es)")
+        except ApiError as exc:
+            print(f"  ! {spec['phone_e164']}: {exc}")
 
     print()
     print("Demo credentials")

@@ -27,7 +27,7 @@ from datetime import UTC, datetime, timedelta
 from typing import Literal
 
 from pydantic import BaseModel, Field, field_validator, model_validator
-from sqlalchemy import func, or_, select, text
+from sqlalchemy import bindparam, func, or_, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import MasterOrder, Order, OrderItem, OrderStatusEvent, can_transition
@@ -349,6 +349,16 @@ class OrderResponse(BaseModel):
     customer_longitude: float | None = Field(default=None)
     tracking_token: str | None = Field(
         default=None, description="Opaque public tracking token for `GET /api/v1/delivery/track/{token}` on the delivery service. Set only for delivery orders."
+    )
+    is_rated: bool = Field(
+        default=False,
+        description="True when this customer already submitted at least one dish rating for the order.",
+    )
+    rating_home_taste: float | None = Field(
+        default=None, description="Average home-taste score the customer already left (1-5)."
+    )
+    rating_quality: float | None = Field(
+        default=None, description="Average quality score the customer already left (1-5)."
     )
     coupon_code: str | None = Field(default=None, description="Applied coupon code, if any.")
     discount_amount: float = Field(
@@ -1195,6 +1205,57 @@ async def list_customer_orders(
         .limit(limit)
     )
     return list(result.scalars().all())
+
+
+async def load_order_rating_stats(
+    session: AsyncSession,
+    order_ids: list[uuid.UUID],
+) -> dict[uuid.UUID, tuple[int, float, float]]:
+    """Cross-schema read of the customer's existing dish ratings, keyed by order."""
+    if not order_ids:
+        return {}
+    result = await session.execute(
+        text(
+            """
+            SELECT order_id,
+                   count(*)::int AS rating_count,
+                   avg(home_taste_score)::float AS avg_home_taste,
+                   avg(quality_score)::float AS avg_quality
+            FROM ckac_ratings.dish_ratings
+            WHERE order_id IN :ids
+            GROUP BY order_id
+            """
+        ).bindparams(bindparam("ids", expanding=True)),
+        {"ids": list(order_ids)},
+    )
+    stats: dict[uuid.UUID, tuple[int, float, float]] = {}
+    for row in result.mappings():
+        oid = row["order_id"]
+        if not isinstance(oid, uuid.UUID):
+            oid = uuid.UUID(str(oid))
+        stats[oid] = (
+            int(row["rating_count"]),
+            round(float(row["avg_home_taste"]), 2),
+            round(float(row["avg_quality"]), 2),
+        )
+    return stats
+
+
+def attach_rating_stats(
+    resp: OrderResponse,
+    stats: dict[uuid.UUID, tuple[int, float, float]],
+) -> OrderResponse:
+    row = stats.get(resp.id)
+    if not row:
+        return resp
+    count, home, quality = row
+    return resp.model_copy(
+        update={
+            "is_rated": count > 0,
+            "rating_home_taste": home,
+            "rating_quality": quality,
+        }
+    )
 
 
 async def repeat_customer_order(

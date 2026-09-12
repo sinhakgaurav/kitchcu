@@ -48,13 +48,27 @@ const kitchenSetup = read("apps/website/src/pages/owner/KitchenSetupPage.tsx");
 
 assert(exists("apps/website/src/pages/owner/BrandPage.tsx"), "BrandPage.tsx exists");
 assert(ownerLayout.includes('to: "/dashboard/brand"'), "Owner nav → /dashboard/brand");
-assert(ownerLayout.includes('label: "Brand page"'), "Owner nav label Brand page");
+// Owner nav labels are i18n keys, so the key has to resolve in the base catalog
+// or the sidebar renders the raw key.
+assert(ownerLayout.includes('labelKey: "owner.nav.brand"'), "Owner nav labelKey owner.nav.brand");
+// Assert the key resolves, not the wording — the copy is a UX choice and is
+// translated into 12 locales.
+assert(
+  typeof JSON.parse(read("apps/website/src/i18n/locales/en.json")).owner?.nav?.brand === "string",
+  "en catalog resolves owner.nav.brand",
+);
 assert(kitchenApp.includes('path="brand"'), "Kitchen router registers brand route");
 assert(kitchenApp.includes("BrandPage"), "Kitchen router imports BrandPage");
 assert(brandPage.includes("updateKitchenBrandedPage"), "BrandPage calls updateKitchenBrandedPage");
-assert(brandPage.includes("uploadKitchenMedia"), "BrandPage uploads logo/background via media API");
-assert(brandPage.includes("brand_logo"), "BrandPage uses brand_logo context");
-assert(brandPage.includes("brand_background"), "BrandPage uses brand_background context");
+assert(brandPage.includes("uploadKitchenBrandedMedia"), "BrandPage uploads logo/background via media API");
+// The page posts a slot; identity maps it to the catalog media context. Assert
+// both ends so a rename on either side fails here instead of at upload time.
+assert(brandPage.includes('"logo"') && brandPage.includes('"background"'), "BrandPage sends logo/background slots");
+const brandMedia = read("services/identity/app/brand_media.py");
+assert(
+  brandMedia.includes('"brand_logo" if slot == "logo" else "brand_background"'),
+  "identity maps brand slots to media contexts",
+);
 assert(brandPage.includes("/dashboard/templates"), "BrandPage links to message templates");
 assert(ownerApi.includes("/branded-page"), "shared/api has owner branded-page PATCH");
 assert(ownerApi.includes("logo_url"), "shared/api branded page includes logo_url");

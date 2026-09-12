@@ -8,7 +8,7 @@
 | Status | **S1–S18 shipped** + post-S18 **P19–P28** (packages, templates, employees RBAC, kitchen workspace); E1/E2 = design pack only |
 | Last updated | September 2026 |
 | Advancement | **[ADVANCEMENT-TRACKER.md](./ADVANCEMENT-TRACKER.md)** — sprint board + release gate |
-| Encyclopedia | **[CKAC-COMPLETE-GUIDE.md](./CKAC-COMPLETE-GUIDE.md) v3.2.5** — through P41 (profile edit, owner ratings, admin RBAC/stream, live-capture-safe seed); UI Catalog; OpenAPI |
+| Encyclopedia | **[CKAC-COMPLETE-GUIDE.md](./CKAC-COMPLETE-GUIDE.md) v3.2.6** — through P47 (Swagger `POST /api/v1/auth/token`, owner JWT type-check, gated login-hint, 6-month seed); UI Catalog; OpenAPI |
 | Companion docs | [Planning Benchmark](./CKAC-COMPLETE-PLANNING-BENCHMARK.md) · [System Benchmark](./CKAC-SYSTEM-BENCHMARK.md) · [CPO Blueprint v4.2](./CKAC-CPO-PRODUCT-BLUEPRINT.md) · [CTO Architecture](./CKAC-ARCHITECTURE-CTO.md) · [Development Phases](./DEVELOPMENT-PHASES.md) · [User Flows](./CKAC-USERFLOWS.md) · [API.md](./API.md) · [AGENTS.md](../AGENTS.md) · [UI shots](./assets/ui/) |
 
 > For deep definitions, module logic, Mermaid flows, and annotated screenshots, prefer the Complete Guide. This file remains the **code ↔ feature map** (what's wired where).
@@ -474,7 +474,7 @@ Base URL (dev): `http://localhost:18000/api/v1`
 | GET | `/webhooks/whatsapp` | Verify token | Meta setup |
 | POST | `/webhooks/whatsapp` | Meta | F01 intake |
 
-OpenAPI (aggregated): `http://localhost:18000/docs` · portal `http://localhost:13000/openapi` · raw `http://localhost:18000/openapi.json` · human index [`API.md`](./API.md)
+OpenAPI (aggregated): `http://localhost:18000/docs` · portal `http://localhost:13000/openapi` · raw `http://localhost:18000/openapi.json` · human index [`API.md`](./API.md) §1.1–1.2 (OAuth2Password `POST /api/v1/auth/token`; public ops `security: []`)
 
 ---
 

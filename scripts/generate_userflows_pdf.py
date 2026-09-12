@@ -9,7 +9,7 @@ from pathlib import Path
 
 from pdf_guide import GuidePDF
 
-GUIDE_VERSION = "1.4"
+GUIDE_VERSION = "1.5"
 GUIDE_DATE = "September 2026"
 OUTPUT = Path(__file__).resolve().parent.parent / "docs" / "CKAC-USERFLOWS.pdf"
 UI = Path(__file__).resolve().parent.parent / "docs" / "assets" / "ui"
@@ -37,7 +37,7 @@ def build() -> GuidePDF:
             "Order status state machine + JWT auth types table",
             "Gateway proxy map + cross-links to API.md, Complete Guide, UI screenshots",
             "Every route/event traced directly from services/*/app source, September 2026",
-            "P41: kitchen profile PATCH (code immutable), owner Ratings, draft-inclusive menu",
+            "P47: Swagger OAuth2Password POST /api/v1/auth/token; owner JWT type=owner",
         ],
     )
 
@@ -407,8 +407,10 @@ def build() -> GuidePDF:
         "Gateway-owned (not forwarded): GET /, /health/live, /health/ready, "
         "/openapi.json (aggregated, ?refresh=true), /docs, /redoc. Portal /openapi "
         "renders this same aggregated schema for non-technical browsing. "
-        "Login-required admin calls: Super Admin Sign in shows username/password; "
-        "POST /admin/auth/login then Swagger Authorize (API.md 1.1). Owner/customer use OTP."
+        "Swagger Authorize: OAuth2Password POST /api/v1/auth/token (admin email+password "
+        "or owner/customer phone+OTP) or HTTPBearer paste JWT. Public ops have no padlock "
+        "(security: []). Login-hint prints username/password only when reveal gate is on. "
+        "See API.md 1.1-1.2."
     )
 
     pdf.chapter("Cross-References")
@@ -469,17 +471,17 @@ def build() -> GuidePDF:
         ["Field", "Value"],
         [
             ["Document", "CKAC-USERFLOWS.md / .pdf"],
-            ["Version", "1.1"],
-            ["Date", "July 2026"],
+            ["Version", "1.5"],
+            ["Date", "September 2026"],
             ["Traceability", "Every route/event read directly from services/*/app source"],
             ["Change policy", "Update .md whenever a route/event/status changes; regenerate PDF same change"],
-            ["Supersedes", "v1.2; aligned with Complete Guide v3.2.3 (P37–P40)"],
+            ["Supersedes", "v1.4; aligned with Complete Guide v3.2.6 (P47 Swagger tester)"],
         ],
         [40, 130],
         size=7,
     )
     pdf.quote(
-        "KitchCu User Flow Documentation Pack v1.1 - Confidential - July 2026."
+        "KitchCu User Flow Documentation Pack v1.5 - Confidential - September 2026."
     )
 
     return pdf

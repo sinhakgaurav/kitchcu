@@ -75,6 +75,20 @@ def run() -> None:
     assert_ok(len(recipe_check.get("lines", [])) >= 1, "Recipe missing ingredient lines")
     print(f"Recipe prep steps: {len(recipe_check['prep_steps'])} · lines: {len(recipe_check['lines'])}")
 
+    # Order a dish whose recipe actually consumes the ingredient starved below, so
+    # the shortfall warning and the deduct-on-accept assertions mean something.
+    # Naming a dish outright is not safe: one without a live-capture hero stays
+    # inactive and never reaches the public menu.
+    order_dish_name = next(
+        (
+            name
+            for name, lines in DISH_RECIPES.items()
+            if name in dish_ids and any(line[0] == "Lal Mirch" for line in lines)
+        ),
+        None,
+    )
+    assert_ok(order_dish_name is not None, "No live dish consumes Lal Mirch — check DISH_RECIPES")
+
     lal_mirch_id = ingredient_ids.get("Lal Mirch")
     if lal_mirch_id:
         before = next(
@@ -94,7 +108,7 @@ def run() -> None:
         "POST",
         f"/api/v1/kitchens/{kitchen_id}/orders/manual",
         {
-            "items": [{"dish_id": paneer_tikka_id, "quantity": 2}],
+            "items": [{"dish_id": dish_ids[order_dish_name], "quantity": 2}],
             "delivery_type": "pickup",
             "payment_method": "cod",
             "customer_name": "E2E Tester",
@@ -103,14 +117,13 @@ def run() -> None:
     )
     order_id = order["id"]
     assert_ok(order["status"] == "received", f"Expected received, got {order['status']}")
-    print(f"Order created: {order['order_code']}")
+    print(f"Order created: {order['order_code']} ({order_dish_name} x2)")
 
     # Stock warnings before accept
     warnings = request("GET", f"/api/v1/orders/{order_id}/stock-warnings", token=token)
     assert_ok("warnings" in warnings, "Stock warnings response missing")
     print(f"Stock warnings: {len(warnings['warnings'])} (has_shortfall={warnings.get('has_shortfall')})")
 
-    # Accept → triggers stock deduct via order → catalog internal
     accepted = request(
         "PATCH",
         f"/api/v1/orders/{order_id}/status",
@@ -118,15 +131,46 @@ def run() -> None:
         token=token,
     )
     assert_ok(accepted["status"] == "accepted", "Accept failed")
-    print("Order accepted — stock deduct dispatched")
+    print("Order accepted")
 
-    if lal_mirch_id:
-        after = next(
-            i for i in request("GET", f"/api/v1/kitchens/{kitchen_id}/ingredients", token=token)["ingredients"]
+    def lal_mirch_stock() -> float:
+        row = next(
+            i
+            for i in request("GET", f"/api/v1/kitchens/{kitchen_id}/ingredients", token=token)["ingredients"]
             if i["id"] == lal_mirch_id
         )
-        assert_ok(after["current_stock"] <= 5, "Stock should have deducted on accept")
-        print(f"Lal Mirch stock after accept: {after['current_stock']}g")
+        return float(row["current_stock"])
+
+    # Stock moves on `ready`, not on `accepted` (F19/S15b) — assert both halves,
+    # otherwise a deduct that silently stopped firing still looks like a pass.
+    if lal_mirch_id:
+        assert_ok(lal_mirch_stock() == 5.0, "Stock must not deduct before the order is ready")
+        print("Stock unchanged on accept (deduct happens at ready)")
+
+    for next_status in ("preparing", "ready"):
+        moved = request(
+            "PATCH",
+            f"/api/v1/orders/{order_id}/status",
+            {"status": next_status},
+            token=token,
+        )
+        assert_ok(moved["status"] == next_status, f"Transition to {next_status} failed")
+    print("Order marked ready — stock deduct dispatched")
+
+    if lal_mirch_id:
+        settings = request("GET", f"/api/v1/kitchens/{kitchen_id}/stock-settings", token=token)
+        mode = settings.get("deduct_mode")
+        after = lal_mirch_stock()
+        if mode == "prep_batch_only":
+            # F19b: bulk kitchens deduct when a prep batch is prepared, so an
+            # order must not touch the pantry at all.
+            assert_ok(after == 5.0, f"prep_batch_only kitchen must not deduct on ready (got {after}g)")
+            print(f"Lal Mirch stock after ready: {after}g (prep_batch_only — no order deduct)")
+        else:
+            # Recipe needs 5g per plate and the order is for two, against 5g of
+            # stock — the deduct clamps at zero rather than going negative.
+            assert_ok(after == 0.0, f"Expected Lal Mirch to deduct to 0g on ready, got {after}g")
+            print(f"Lal Mirch stock after ready: {after}g (deducted, clamped at 0)")
 
     # Analytics smoke
     summary = request("GET", f"/api/v1/kitchens/{kitchen_id}/analytics/summary?days=30", token=token)

@@ -126,7 +126,12 @@ const features = [
     checks: () => {
       ok(hasNav("/dashboard/menu") && hasRoute("menu"), "Owner Menu nav+route");
       ok(hasRoute("menu/new"), "Add dish route");
-      ok(pageCalls("apps/website/src/pages/owner/MenuPage.tsx", "fetchMenu"), "MenuPage→fetchMenu");
+      // Owner listing must show dishes the public menu hides — a dish without a
+      // live-capture hero stays inactive, and the owner still has to find it.
+      ok(
+        pageCalls("apps/website/src/pages/owner/MenuPage.tsx", "fetchOwnerDishes"),
+        "MenuPage→fetchOwnerDishes (includes inactive)",
+      );
       ok(pageCalls("apps/website/src/pages/owner/AddDishPage.tsx", "createDish"), "AddDish→createDish");
       ok(hasCustomerRoute("/kitchen/:kitchenId/menu") || hasCustomerRoute("KitchenMenuPage"), "Customer menu route");
     },
@@ -433,9 +438,15 @@ for (const p of navPaths) {
   }
 }
 
+// Discovery is the customer home, and the old /browse page it replaced must stay
+// a redirect so share links and flyers printed against it still land somewhere.
 ok(
-  customerApp.includes("CustomerBrowsePage") && hasCustomerRoute("/browse"),
-  "CustomerBrowsePage routed at /browse → brand-first /k/:code",
+  customerApp.includes("CustomerDiscoveryHome") && hasCustomerRoute('path="/"'),
+  "Discovery home mounted at /",
+);
+ok(
+  hasCustomerRoute('path="/browse"') && customerApp.includes("Navigate"),
+  "Legacy /browse redirects to discovery home",
 );
 
 // Run feature checks

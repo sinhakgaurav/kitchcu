@@ -2297,7 +2297,7 @@ function AdminKitchens({
                         setGstReport(rep);
                       }}
                     >
-                      {[gstYear - 1, gstYear, gstYear + 1].map((y) => (
+                      {[gstNow.getFullYear() - 1, gstNow.getFullYear(), gstNow.getFullYear() + 1].map((y) => (
                         <option key={y} value={y}>{y}</option>
                       ))}
                     </select>

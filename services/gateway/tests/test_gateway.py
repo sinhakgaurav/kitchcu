@@ -368,6 +368,7 @@ async def test_docs_page_serves_swagger_ui(gateway_client):
     response = await client.get("/docs")
     assert response.status_code == 200
     assert "swagger" in response.text.lower() or "openapi" in response.text.lower()
+    assert "tryItOutEnabled" in response.text
 
 
 @pytest.mark.asyncio

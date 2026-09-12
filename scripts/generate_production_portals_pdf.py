@@ -8,7 +8,7 @@ from pathlib import Path
 
 from pdf_guide import GuidePDF
 
-GUIDE_VERSION = "1.1"
+GUIDE_VERSION = "1.2"
 GUIDE_DATE = "September 2026"
 OUTPUT = Path(__file__).resolve().parent.parent / "docs" / "PRODUCTION-PORTALS-CREDENTIALS-QA.pdf"
 
@@ -104,9 +104,10 @@ def build() -> GuidePDF:
     pdf.bullets(
         [
             "Swagger: localhost:18000/docs (prod https://api.kitchcu.com/docs)",
-            "Super Admin Sign in prints username + password and links Swagger / ReDoc / portal /openapi",
-            "POST /api/v1/admin/auth/login then Swagger Authorize with the JWT",
-            "Owner/customer APIs use OTP, not the admin password — docs/API.md 1.1",
+            "Swagger Authorize: OAuth2Password POST /api/v1/auth/token (admin email+password or owner/customer phone+OTP) or HTTPBearer JWT",
+            "Public operations have no padlock — leftover tokens are not sent on Try it out",
+            "Login-hint prints username/password only when APP_ENV is development/test or ADMIN_LOGIN_REVEAL_PASSWORD=1",
+            "Owner JWT must be type=owner — docs/API.md 1.1-1.2",
         ]
     )
 

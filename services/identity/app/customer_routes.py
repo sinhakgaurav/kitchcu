@@ -451,7 +451,7 @@ async def customer_addresses_list(
     "/customers/me/addresses",
     response_model=CustomerAddressResponse,
     status_code=status.HTTP_201_CREATED,
-    summary="Add a saved address with optional map pin",
+    summary="Add a saved address with contact number and optional map pin",
     tags=["Customer Dashboard"],
     responses={401: RESP_401, 400: RESP_400},
 )

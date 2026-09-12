@@ -119,6 +119,22 @@ def kitchen_search_sql(alias: str = "k") -> str:
 
 _KITCHEN_SEARCH_SQL = kitchen_search_sql("k")
 
+
+def kitchen_rating_select_sql(kitchen_id_sql: str) -> str:
+    """Live home-taste stats from rating aggregates (empty kitchen → NULL / 0)."""
+    return f"""
+                (
+                    SELECT AVG(a.overall_rating)::float
+                    FROM ckac_ratings.dish_rating_aggregates a
+                    WHERE a.kitchen_id = {kitchen_id_sql} AND a.rating_count > 0
+                ) AS avg_rating,
+                (
+                    SELECT COALESCE(SUM(a.rating_count), 0)::int
+                    FROM ckac_ratings.dish_rating_aggregates a
+                    WHERE a.kitchen_id = {kitchen_id_sql}
+                ) AS rating_count
+"""
+
 _DISH_SEARCH_SQL = """
           AND (
             d.name ILIKE :q

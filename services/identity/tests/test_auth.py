@@ -62,6 +62,24 @@ async def test_request_otp_rejects_undeliverable_phone(client: AsyncClient, phon
 
 
 @pytest.mark.asyncio
+async def test_oauth_password_token_issues_owner_jwt(client: AsyncClient, registered_owner: dict):
+    response = await client.post(
+        "/api/v1/auth/token",
+        data={"username": registered_owner["phone"], "password": "123456", "grant_type": "password"},
+    )
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["token_type"] == "bearer"
+    assert body["access_token"]
+    me = await client.get(
+        "/api/v1/owners/me",
+        headers={"Authorization": f"Bearer {body['access_token']}"},
+    )
+    assert me.status_code == 200
+    assert me.json()["id"] == registered_owner["id"]
+
+
+@pytest.mark.asyncio
 async def test_verify_otp_unregistered_phone(client: AsyncClient):
     phone = "+919999999999"
     await client.post("/api/v1/auth/otp/request", json={"phone": phone})

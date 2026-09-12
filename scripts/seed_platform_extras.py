@@ -192,7 +192,7 @@ def ensure_ratings(customers: list[dict], kitchen_id: str) -> int:
     for idx, cust in enumerate(customers):
         try:
             orders = request("GET", "/api/v1/customers/me/orders", token=cust["token"])
-            for order in orders.get("orders", [])[:2]:
+            for order in orders.get("orders", [])[:8]:
                 if order.get("status") != "delivered":
                     continue
                 items = order.get("items") or []
@@ -219,6 +219,8 @@ def ensure_ratings(customers: list[dict], kitchen_id: str) -> int:
                 )
                 count += 1
         except ApiError as exc:
+            if "Already rated" in str(exc):
+                continue
             log(f"  ! rating for {cust['name']}: {exc}")
     log(f"  Ratings submitted: {count}")
     return count
@@ -830,7 +832,14 @@ def ensure_learning_trial(owner_token: str, kitchen_id: str) -> None:
             log("  Dish trial already promoted — skipped")
             return
 
-        crm = request("GET", f"/api/v1/kitchens/{kitchen_id}/crm/customers", token=owner_token)
+        # CRM profiles are aggregated on request, so invite candidates only exist
+        # after a refresh — without it this read returns whatever an earlier run
+        # left behind and the trial silently skips its invites.
+        crm = request(
+            "GET",
+            f"/api/v1/kitchens/{kitchen_id}/crm/customers?refresh=true",
+            token=owner_token,
+        )
         candidate_ids = [c["customer_id"] for c in crm.get("customers", []) if c.get("customer_id")]
         if len(candidate_ids) < MIN_TRIAL_INVITES:
             log(
@@ -1023,7 +1032,11 @@ def ensure_referrals(
 def ensure_crm_and_coupon_extras(owner_token: str, kitchen_id: str, customers: list[dict]) -> None:
     """CRM tag update + coupon validation + active-promotion read (F36-F38 polish)."""
     try:
-        crm = request("GET", f"/api/v1/kitchens/{kitchen_id}/crm/customers", token=owner_token)
+        crm = request(
+            "GET",
+            f"/api/v1/kitchens/{kitchen_id}/crm/customers?refresh=true",
+            token=owner_token,
+        )
         top_customer = next(iter(crm.get("customers", [])), None)
         if top_customer:
             request(

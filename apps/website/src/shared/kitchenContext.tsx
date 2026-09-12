@@ -34,15 +34,17 @@ export function KitchenProvider({ children }: { children: ReactNode }) {
     }
     setLoading(true);
     try {
-      const list = await fetchKitchens();
+      const list = [...(await fetchKitchens())].sort((a, b) => a.code.localeCompare(b.code));
       setKitchens(list);
       const stored = getStoredKitchenId();
       const valid = list.find((k) => k.id === stored);
       if (valid) {
         setKitchenIdState(valid.id);
       } else if (list.length > 0) {
-        setKitchenIdState(list[0].id);
-        setStoredKitchenId(list[0].id);
+        const preferred =
+          list.find((k) => k.code === "CKPNQ001") ?? list[0];
+        setKitchenIdState(preferred.id);
+        setStoredKitchenId(preferred.id);
       } else {
         setKitchenIdState(null);
       }

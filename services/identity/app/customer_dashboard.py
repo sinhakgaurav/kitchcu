@@ -13,6 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import Customer, CustomerAddress
 from app.customer_schemas import verify_customer_otp
+from app.schemas import normalize_india_phone
 
 
 class CustomerProfileUpdateRequest(BaseModel):
@@ -36,6 +37,7 @@ class CustomerAddressCreateRequest(BaseModel):
     state: str | None = Field(default=None, max_length=100)
     pincode: str | None = Field(default=None, max_length=12)
     landmark: str | None = Field(default=None, max_length=255)
+    phone: str = Field(..., description="Contact mobile at this address (E.164 India).", examples=["+919123456789"])
     latitude: float | None = Field(default=None, ge=-90, le=90)
     longitude: float | None = Field(default=None, ge=-180, le=180)
     is_default: bool = False
@@ -48,6 +50,11 @@ class CustomerAddressCreateRequest(BaseModel):
         digits = re.sub(r"\D", "", v)
         return digits or None
 
+    @field_validator("phone")
+    @classmethod
+    def normalize_contact_phone(cls, v: str) -> str:
+        return normalize_india_phone(v)
+
 
 class CustomerAddressResponse(BaseModel):
     id: uuid.UUID
@@ -57,6 +64,7 @@ class CustomerAddressResponse(BaseModel):
     state: str | None
     pincode: str | None
     landmark: str | None
+    phone: str | None
     latitude: float | None
     longitude: float | None
     is_default: bool
@@ -74,6 +82,7 @@ def address_to_response(addr: CustomerAddress) -> CustomerAddressResponse:
         state=addr.state,
         pincode=addr.pincode,
         landmark=addr.landmark,
+        phone=addr.phone,
         latitude=float(addr.latitude) if addr.latitude is not None else None,
         longitude=float(addr.longitude) if addr.longitude is not None else None,
         is_default=bool(addr.is_default),
@@ -149,6 +158,7 @@ async def create_address(
         state=body.state.strip() if body.state else None,
         pincode=body.pincode,
         landmark=body.landmark.strip() if body.landmark else None,
+        phone=body.phone,
         latitude=body.latitude,
         longitude=body.longitude,
         is_default=body.is_default,
@@ -179,6 +189,7 @@ async def update_address(
     addr.state = body.state.strip() if body.state else None
     addr.pincode = body.pincode
     addr.landmark = body.landmark.strip() if body.landmark else None
+    addr.phone = body.phone
     addr.latitude = body.latitude
     addr.longitude = body.longitude
     addr.is_default = body.is_default

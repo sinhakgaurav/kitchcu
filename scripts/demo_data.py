@@ -54,6 +54,64 @@ DEMO_ADMIN = {
 }
 
 # Customer WhatsApp OTP demos (dev OTP always DEMO_OTP)
+# Extra saved pins for the primary diner so discovery can switch cities.
+DEMO_CUSTOMER_ADDRESSES = [
+    {
+        "phone_e164": "+919123456789",
+        "addresses": [
+            {
+                "label": "Home",
+                "address_line": "Koregaon Park Lane 7",
+                "city": "Pune",
+                "state": "Maharashtra",
+                "pincode": "411001",
+                "phone": "+919123456789",
+                "latitude": 18.5362,
+                "longitude": 73.8958,
+                "is_default": True,
+            },
+            {
+                "label": "Work",
+                "address_line": "Bandra West, Linking Road",
+                "city": "Mumbai",
+                "state": "Maharashtra",
+                "pincode": "400050",
+                "phone": "+919123456789",
+                "latitude": 19.0596,
+                "longitude": 72.8295,
+                "is_default": False,
+            },
+        ],
+    },
+    {
+        "phone_e164": "+919123456780",
+        "addresses": [
+            {
+                "label": "Home",
+                "address_line": "Kothrud main road",
+                "city": "Pune",
+                "state": "Maharashtra",
+                "pincode": "411038",
+                "phone": "+919123456780",
+                "latitude": 18.5074,
+                "longitude": 73.8077,
+                "is_default": True,
+            },
+            {
+                "label": "Parents",
+                "address_line": "Gomti Nagar Extension",
+                "city": "Lucknow",
+                "state": "Uttar Pradesh",
+                "pincode": "226010",
+                "phone": "+919123456780",
+                "latitude": 26.8467,
+                "longitude": 80.9462,
+                "is_default": False,
+            },
+        ],
+    },
+]
+
 DEMO_CUSTOMERS = [
     {
         "phone": "9123456789",

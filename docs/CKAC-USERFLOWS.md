@@ -4,10 +4,10 @@
 
 | Field | Value |
 |-------|-------|
-| Version | **1.4** |
-| Date | 2026-09-07 |
+| Version | **1.5** |
+| Date | 2026-09-12 |
 | Audience | CPO, Product, Engineering, QA, Investors |
-| Status | Traces to code shipped through **S1–S18 + P19–P41** (kitchen profile edit, owner ratings, admin RBAC/stream, live-capture-safe seed) |
+| Status | Traces to code shipped through **S1–S18 + P19–P47** (Swagger `POST /api/v1/auth/token`, owner JWT `type=owner`, gated login-hint, 6-month demo history) |
 | Companion PDF | [`docs/CKAC-USERFLOWS.pdf`](./CKAC-USERFLOWS.pdf) (generate with `scripts/generate_userflows_pdf.py`) |
 
 ---
@@ -488,7 +488,7 @@ flowchart LR
 
 ### Preconditions
 - Admin account: local `admin@kitchcu.dev` / `admin123456`; production `admin@kitchcu.com` + VM `ADMIN_PASSWORD` (see [ADVANCEMENT-TRACKER.md](./ADVANCEMENT-TRACKER.md)).
-- Sign in always prints username + password from `GET /admin/auth/login-hint`.
+- Sign in prints username + password from `GET /admin/auth/login-hint` when `APP_ENV` is `development`/`test` **or** `ADMIN_LOGIN_REVEAL_PASSWORD=1` (local/GCP still set this to `1`).
 - RBAC: mutations require permissions such as `employees:write`, `packages:write`, `kitchens:write` (superadmin = `*`).
 
 ### Step-by-step UI actions
@@ -856,7 +856,7 @@ Public clients only ever call the gateway. The gateway's `resolve_service_url()`
 
 Gateway-owned (not forwarded): `GET /`, `GET /health/live`, `GET /health/ready`, `GET /openapi.json` (aggregated via `services/gateway/app/openapi_aggregate.py`, cache-refreshable with `?refresh=true`), `GET /docs`, `GET /redoc`. The Portal's `/openapi` route (`apps/website/src/portal/OpenApiPage.tsx`) renders this same aggregated schema for non-technical browsing.
 
-**How to authorize login-required calls:** Super Admin Sign in prints username + password and links to Swagger (`/docs`). `POST /api/v1/admin/auth/login` → paste `access_token` in Swagger **Authorize**. Owner/customer APIs use OTP, not that password. Full steps: [`docs/API.md`](./API.md) §1.1.
+**How to authorize login-required calls:** Open gateway `/docs` → **Authorize**. Prefer **OAuth2Password** (`POST /api/v1/auth/token`): owner `9876543210` / `123456`, customer `9123456789` / `123456`, admin `admin@kitchcu.dev` / `admin123456`. Or paste a JWT into **HTTPBearer**. Public operations have no padlock (`security: []`) — leftover tokens are not sent on those Try it out calls. Super Admin Sign in shows username + password only when the login-hint reveal gate is on. Full steps: [`docs/API.md`](./API.md) §1.1–1.2.
 
 ---
 
@@ -869,6 +869,7 @@ Gateway-owned (not forwarded): `GET /`, `GET /health/live`, `GET /health/ready`,
 | UI reference screenshots per surface | [`docs/assets/ui/`](./assets/ui/) — portal, customer home/login, kitchen login, owner dashboard, admin login/overview/Control (8 surfaces) |
 | Feature acceptance criteria (F01–F48) | `docs/CKAC-COMPLETE-PLANNING-BENCHMARK.md` |
 | Architecture / scale / TDD+EDD rationale | `docs/CKAC-ARCHITECTURE-CTO.md`, `docs/KITCHCU-ENGINEERING-STANDARDS.md` |
+| Numbered tester steps (UI + Swagger) | [`TESTER-INSTRUCTION-PACK.md`](./TESTER-INSTRUCTION-PACK.md) · [`TESTER-INSTRUCTION-PACK.pdf`](./TESTER-INSTRUCTION-PACK.pdf) |
 | Build status per module | `docs/CKAC-IMPLEMENTATION-GUIDE.md` |
 
 ---
@@ -878,11 +879,11 @@ Gateway-owned (not forwarded): `GET /`, `GET /health/live`, `GET /health/ready`,
 | Field | Value |
 |-------|-------|
 | Document | `CKAC-USERFLOWS.md` |
-| Version | 1.4 |
+| Version | 1.5 |
 | Date | September 2026 |
 | Author | KitchCu engineering (AI-assisted, human-reviewed) |
 | Traceability | Every route/event cited here was read directly from `services/*/app/routes.py`, `schemas.py`, and `main.py` in this repository as of July 2026 — not inferred from memory |
 | Companion | `docs/CKAC-USERFLOWS.pdf` — generate/refresh via `python scripts/generate_userflows_pdf.py` |
 | QA checklist | `docs/QA-INSTRUCTION-PACK.md` (+ PDF) — smoke, lists/UI, F19b; `python scripts/generate_qa_instruction_pdf.py` |
 | Change policy | Update this file whenever a route, event name, or status transition changes; regenerate the PDF in the same change |
-| Supersedes | v1.3; aligned with Complete Guide v3.2.5 (P41 profile edit, owner ratings, admin RBAC/stream, seed) |
+| Supersedes | v1.4; aligned with Complete Guide v3.2.6 (P47 Swagger tester, owner JWT type-check, gated login-hint, 6-month seed) |

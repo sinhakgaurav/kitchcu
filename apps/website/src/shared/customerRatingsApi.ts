@@ -60,6 +60,12 @@ export async function fetchKitchenRatingSummaries(
   return ratingsFetch(`/api/v1/kitchens/${kitchenId}/ratings/summaries`);
 }
 
+export async function fetchOrderRatings(
+  orderId: string,
+): Promise<{ ratings: DishRating[] }> {
+  return ratingsFetch(`/api/v1/customers/me/orders/${orderId}/ratings`);
+}
+
 export async function submitOrderRatings(
   orderId: string,
   ratings: DishRatingInput[],

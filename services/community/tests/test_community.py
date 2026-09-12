@@ -94,3 +94,39 @@ async def test_compute_city_rankings(client: AsyncClient, community_ctx):
     listed = await client.get("/api/v1/community/rankings?scope=city&region_key=Pune")
     assert listed.status_code == 200
     assert listed.json()["total"] >= 1
+
+
+@pytest.mark.asyncio
+async def test_public_recipes_skip_orphaned_kitchen(client: AsyncClient, community_ctx):
+    import os
+    import uuid as uuid_mod
+
+    import psycopg2
+
+    kid = community_ctx["kitchen_id"]
+    owner_headers = {"Authorization": f"Bearer {community_ctx['owner_token']}"}
+    kept = await client.post(
+        f"/api/v1/kitchens/{kid}/community/recipes",
+        json={"title": "Live Dal", "recipe_html": "<p>Boil.</p>"},
+        headers=owner_headers,
+    )
+    assert kept.status_code == 201
+
+    conn = psycopg2.connect(os.environ["DATABASE_SYNC_URL"])
+    conn.autocommit = True
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            INSERT INTO ckac_community.shared_recipes
+            (id, kitchen_id, owner_id, title, recipe_html, status)
+            VALUES (%s::uuid, %s::uuid, %s::uuid, 'Ghost Kitchen Recipe', '<p>x</p>', 'published')
+            """,
+            (str(uuid_mod.uuid4()), str(uuid_mod.uuid4()), str(uuid_mod.uuid4())),
+        )
+    conn.close()
+
+    public = await client.get("/api/v1/community/recipes")
+    assert public.status_code == 200, public.text
+    titles = [r["title"] for r in public.json()["recipes"]]
+    assert "Live Dal" in titles
+    assert "Ghost Kitchen Recipe" not in titles
