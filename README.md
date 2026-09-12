@@ -13,8 +13,10 @@ copy .env.example .env
 # Start infrastructure + services
 docker compose up --build
 
-# Seed demo owner, kitchen, menu (11 dishes live + house classics as drafts), and sample orders
-python scripts/seed-dev-data.py
+# Full seed: baseline + bulk/feature-volume + weekly QA cohort
+.\scripts\seed-all.ps1
+# Thin baseline only:
+# python scripts/seed-dev-data.py
 
 # Customer app:  http://localhost:13001  (customer.kitchcu.in)
 # Kitchen app:   http://localhost:13002  (kitchen.kitchcu.in)
@@ -39,7 +41,7 @@ python scripts/seed-dev-data.py
 - **Customers:** http://localhost:13001
 - **Admin:** http://localhost:13003
 
-Re-run `python scripts/seed-dev-data.py` anytime — it is idempotent.
+Re-run `.\scripts\seed-all.ps1` (or `bash scripts/seed-all.sh`) anytime — every seeder is idempotent.
 
 ## Services
 

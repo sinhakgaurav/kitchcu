@@ -1,10 +1,13 @@
 import { Link } from "react-router-dom";
 import { BrandNavMark } from "./BrandNavMark";
 import { APP_NAME, CUSTOMER_HOST } from "../shared/brand";
+import { isCustomerSignedIn, useCustomerAuth } from "../shared/customerAuth";
 import { kitchenUrl } from "../shared/urls";
 import { SuperAdminLink } from "./SuperAdminAccess";
 
 export function CustomerFooter() {
+  const { session } = useCustomerAuth();
+  const signedIn = isCustomerSignedIn(session);
   return (
     <footer className="footer footer--customer">
       <div className="container footer__inner">
@@ -18,7 +21,11 @@ export function CustomerFooter() {
           <a href="/#near-you">Near you</a>
           <a href="/#featured">Featured</a>
           <a href="/#by-code">Kitchen code</a>
-          <Link to="/login">Customer sign in</Link>
+          {signedIn ? (
+            <Link to="/dashboard">My space</Link>
+          ) : (
+            <Link to="/login">Customer sign in</Link>
+          )}
           <a href={kitchenUrl("/login")} target="_blank" rel="noopener noreferrer">Kitchen owner login</a>
           <SuperAdminLink />
         </div>

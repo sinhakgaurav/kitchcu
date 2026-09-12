@@ -23,9 +23,12 @@ from __future__ import annotations
 
 import random
 from dataclasses import dataclass
-from datetime import UTC, datetime, time, timedelta
+from datetime import datetime, time, timedelta, timezone
 from string import ascii_uppercase
 from zoneinfo import ZoneInfo
+
+# Host Python on the GCP VM is 3.10 — datetime.UTC exists only in 3.11+.
+UTC = timezone.utc
 
 IST = ZoneInfo("Asia/Kolkata")
 

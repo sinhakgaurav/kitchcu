@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# One-shot GCP bulk seeder — owners, kitchens, menus, orders, extras.
+# One-shot GCP full seeder — dev baseline + bulk/feature-volume + weekly cohort.
 # Idempotent. Does not wipe existing data. Safe to re-run.
 #
 # Invoked by:
@@ -52,12 +52,15 @@ set -a
 source infra/gcp-vm/.env
 set +a
 
-CKAC_GATEWAY_URL="${CKAC_GATEWAY_URL:-http://127.0.0.1:18000}" \
-CKAC_SEED_WAIT_SEC="${CKAC_SEED_WAIT_SEC:-120}" \
-CKAC_BULK_KITCHENS="${CKAC_BULK_KITCHENS:-30}" \
-CKAC_BULK_FULL="${CKAC_BULK_FULL:-1}" \
-CKAC_BULK_MONTHS="${CKAC_BULK_MONTHS:-6}" \
-  python3 scripts/seed-bulk-data.py
+export CKAC_GATEWAY_URL="${CKAC_GATEWAY_URL:-http://127.0.0.1:18000}"
+export CKAC_SEED_WAIT_SEC="${CKAC_SEED_WAIT_SEC:-120}"
+export CKAC_BULK_KITCHENS="${CKAC_BULK_KITCHENS:-30}"
+export CKAC_BULK_FULL="${CKAC_BULK_FULL:-1}"
+export CKAC_BULK_MONTHS="${CKAC_BULK_MONTHS:-6}"
+export CKAC_FEATURE_VOLUME="${CKAC_FEATURE_VOLUME:-1}"
+export CKAC_SEED_EXTRAS="${CKAC_SEED_EXTRAS:-1}"
+export CKAC_WEEKLY_MANIFEST="${CKAC_WEEKLY_MANIFEST:-$STATE_DIR/weekly-cohort.json}"
+bash "$REPO_DIR/scripts/seed-all.sh"
 
 touch "$SEED_MARKER"
 echo "=== bulk seed end: $(date -u) ==="

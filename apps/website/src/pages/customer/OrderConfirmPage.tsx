@@ -7,6 +7,7 @@ import {
   fetchMyOrder,
 } from "../../shared/customerCheckoutApi";
 import { getCustomerToken } from "../../shared/customerApi";
+import { useCustomerAuth } from "../../shared/customerAuth";
 import { STATUS_LABELS, type Order, type Payment, type UpiIntent } from "../../shared/api";
 import { readCheckoutSignature } from "../../shared/razorpayCheckout";
 
@@ -33,6 +34,7 @@ export function OrderConfirmPage() {
   const { orderId } = useParams<{ orderId: string }>();
   const location = useLocation();
   const branded = useBrandedStorefront();
+  const { loading: authLoading } = useCustomerAuth();
   const navState = location.state as ConfirmState | null;
 
   const [order, setOrder] = useState<Order | null>(
@@ -114,7 +116,7 @@ export function OrderConfirmPage() {
     }
   };
 
-  if (loading) {
+  if (authLoading || loading) {
     return (
       <div className="container customer-confirm">
         <p className="customer-confirm__loading">Loading your order…</p>

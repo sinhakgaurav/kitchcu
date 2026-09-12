@@ -5,6 +5,7 @@
 #   CKAC_BULK_ORDERS, CKAC_BULK_ORDERS_PER_OWNER
 #   CKAC_BULK_DRAFTS, CKAC_BULK_DRAFTS_PER_OWNER
 #   CKAC_SEED_EXTRAS=1  (customers, ratings, CRM, coupons, enterprise sub, recipes)
+#   CKAC_FEATURE_VOLUME=1 (default — fill every kitchen + diner across every module)
 # For full stack: .\scripts\seed-all.ps1
 $ErrorActionPreference = "Stop"
 $root = Split-Path -Parent $PSScriptRoot

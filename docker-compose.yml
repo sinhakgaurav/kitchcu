@@ -453,7 +453,10 @@ services:
     working_dir: /scripts
     environment:
       CKAC_GATEWAY_URL: http://gateway:8000
-    command: ["python", "seed-dev-data.py"]
+    command:
+      - sh
+      - -c
+      - python seed-dev-data.py && python seed-bulk-data.py && python weekly_test_data.py
     depends_on:
       gateway:
         condition: service_healthy

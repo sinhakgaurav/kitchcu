@@ -9,6 +9,7 @@ import {
 import { Link, Navigate, Outlet, useParams } from "react-router-dom";
 import { APP_NAME } from "../shared/brand";
 import { fetchKitchenByCode, type BrandAlign, type KitchenPublic } from "../shared/api";
+import { customerAccountLabel, isCustomerSignedIn, useCustomerAuth } from "../shared/customerAuth";
 import { saveKitchenToSession } from "../shared/customerSession";
 import { portalUrl } from "../shared/urls";
 
@@ -46,6 +47,8 @@ export function resolveBrandAssetUrl(url: string | null | undefined): string | n
 
 /** Kitchen-first shell: menu → checkout → bill, with Powered by kitchCU. */
 export function BrandedStorefrontLayout() {
+  const { session } = useCustomerAuth();
+  const signedIn = isCustomerSignedIn(session);
   const { code = "" } = useParams<{ code: string }>();
   const [kitchen, setKitchen] = useState<KitchenPublic | null>(null);
   const [error, setError] = useState("");
@@ -159,9 +162,15 @@ export function BrandedStorefrontLayout() {
               <Link to={`${ctx.basePath}/menu`} className="branded-store__menu-link">
                 Menu
               </Link>
-              <Link to="/login" className="branded-store__nav-link">
-                Sign in
-              </Link>
+              {signedIn ? (
+                <Link to="/dashboard" className="branded-store__nav-link">
+                  {customerAccountLabel(session, "Account")}
+                </Link>
+              ) : (
+                <Link to="/login" className="branded-store__nav-link">
+                  Sign in
+                </Link>
+              )}
             </nav>
           </header>
         </div>

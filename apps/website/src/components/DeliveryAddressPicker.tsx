@@ -1,6 +1,6 @@
 import { Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
-import { useCustomerAuth } from "../shared/customerAuth";
+import { isCustomerSignedIn, useCustomerAuth } from "../shared/customerAuth";
 import { useCustomerDelivery } from "../shared/customerDelivery";
 import { formatAddressChoice, formatAddressLine } from "../shared/customerDeliveryLocation";
 
@@ -21,7 +21,7 @@ export function DeliveryAddressPicker({ variant = "bar" }: { variant?: Variant }
     hint,
   } = useCustomerDelivery();
 
-  const signedIn = Boolean(session?.customerId);
+  const signedIn = isCustomerSignedIn(session);
   const selectValue =
     source === "demo" ? "__demo__" : source === "gps" || !selectedAddressId ? "__gps__" : selectedAddressId;
 

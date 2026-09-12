@@ -151,7 +151,7 @@ After GCP reset: `infra/gcp-vm/reset-fresh.sh` re-exports `ADMIN_*` and re-seeds
 
 ## Seed coverage checklist
 
-Run `.\scripts\seed-all.ps1` (or GCP `run-seed=1`) after migrations.
+Run `.\scripts\seed-all.ps1` / `bash scripts/seed-all.sh` (or GCP `run-seed=1` → `bulk-seed.sh` → `seed-all.sh`) after migrations. Chain: `seed-dev-data` → `seed-bulk-data` + feature volume → `weekly_test_data`.
 
 | Persona / module | Seed path | Status |
 |------------------|-----------|--------|
@@ -169,6 +169,7 @@ Run `.\scripts\seed-all.ps1` (or GCP `run-seed=1`) after migrations.
 | Tiffin plans (thali / single_dish / combo) | `ensure_tiffin_plans` | ✅ |
 | Weekly QA cohort (5 owners · 10 customers · 21 orders/kitchen over 7 days · Saturday 03:30 IST) | `scripts/weekly_test_data.py` via `kitchcu-weekly-seed.timer` | ✅ |
 | GCP bulk seeder (30 kitchens · 6-month history · 15 cities · 3 customers/city · live-capture-safe) | `infra/gcp-vm/bulk-seed.sh` → `scripts/seed-bulk-data.py` · `kitchcu-bulk-seed.service` | ✅ |
+| Feature volume (every kitchen + every diner: coupons, templates, tiffin, GST, refunds, prep batches, tickets, ratings, referrals) | `scripts/seed_feature_volume.py` via `CKAC_FEATURE_VOLUME=1` (default on) | ✅ |
 
 ### Weekly QA cohort
 
@@ -198,6 +199,7 @@ python scripts/seed-bulk-data.py
 | Control | Default | Purpose |
 |---------|---------|---------|
 | `CKAC_BULK_MONTHS` | `6` (183 days) | Set `0` to use `CKAC_BULK_BACKDATE_DAYS` (30) |
+| `CKAC_FEATURE_VOLUME` | `1` | Every kitchen + diner: coupons, templates, tiffin, GST, refunds, prep batches, tickets, ratings, referrals. Set `0` on dry-run smoke. |
 | `CKAC_BULK_ORDERS_PER_KITCHEN` | `max(40, window_days)` | ≥1 order/day so no daily bucket is empty |
 | `CKAC_BULK_PRIMARY_ORDERS` | `window_days × 3` | Denser history on the demo kitchen |
 | `CKAC_POSTGRES_CONTAINER` | auto | Force the target DB when several stacks are up |

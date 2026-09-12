@@ -6,6 +6,7 @@ import {
   fetchMyMasterOrder,
 } from "../../shared/customerCheckoutApi";
 import { getCustomerToken } from "../../shared/customerApi";
+import { useCustomerAuth } from "../../shared/customerAuth";
 import type { MasterOrder, Settlement } from "../../shared/api";
 import { readCheckoutSignature } from "../../shared/razorpayCheckout";
 
@@ -30,6 +31,7 @@ function masterUpiUri(master: MasterOrder): string {
 export function MasterOrderConfirmPage() {
   const { masterOrderId } = useParams<{ masterOrderId: string }>();
   const location = useLocation();
+  const { loading: authLoading } = useCustomerAuth();
   const navState = location.state as ConfirmState | null;
 
   const [master, setMaster] = useState<MasterOrder | null>(
@@ -106,7 +108,7 @@ export function MasterOrderConfirmPage() {
     }
   };
 
-  if (loading) {
+  if (authLoading || loading) {
     return (
       <div className="container customer-confirm">
         <p className="customer-confirm__loading">Loading master receipt…</p>

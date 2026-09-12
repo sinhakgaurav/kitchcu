@@ -128,6 +128,7 @@ function formatWhen(iso: string): string {
 export function CustomerDashboardPage() {
   const { t } = useTranslation();
   const token = getCustomerToken();
+  const { loading: authLoading } = useCustomerAuth();
   const [searchParams, setSearchParams] = useSearchParams();
   const [tab, setTab] = useState<Tab>(() => {
     const requested = searchParams.get("tab");
@@ -234,6 +235,9 @@ export function CustomerDashboardPage() {
     [setSearchParams],
   );
 
+  if (authLoading) {
+    return <p className="app-loading">Checking sign-in…</p>;
+  }
   if (!token) {
     return <Navigate to="/login?next=/dashboard" replace />;
   }

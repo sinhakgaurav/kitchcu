@@ -13,7 +13,7 @@ import { useCustomerAuth } from "../../shared/customerAuth";
 export function CustomerAccountPage() {
   const { t } = useTranslation();
   const token = getCustomerToken();
-  const { logout } = useCustomerAuth();
+  const { logout, loading: authLoading } = useCustomerAuth();
   const navigate = useNavigate();
   const [profile, setProfile] = useState<CustomerProfile | null>(null);
   const [upi, setUpi] = useState("");
@@ -36,6 +36,9 @@ export function CustomerAccountPage() {
       .catch((err) => setError(err instanceof Error ? err.message : t("common.error")));
   }, [token, t]);
 
+  if (authLoading) {
+    return <p className="app-loading">{t("common.loading")}</p>;
+  }
   if (!token) {
     return <Navigate to="/login?next=/account" replace />;
   }

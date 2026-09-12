@@ -70,13 +70,13 @@ Override volumes with `--owners`, `--customers`, `--orders-per-kitchen`, `--week
 
 ### 2.1c Bulk demo seed (first boot + on demand)
 
-First boot with metadata `run-seed=1` runs `infra/gcp-vm/bulk-seed.sh` → `scripts/seed-bulk-data.py` (default 30 kitchens, **6-month** history, full extras). Dishes without a live-capture hero stay inactive; orders use active dishes only. Re-run on the VM:
+First boot with metadata `run-seed=1` runs `infra/gcp-vm/bulk-seed.sh` → `scripts/seed-all.sh` (dev baseline + 30-kitchen **6-month** bulk + feature volume + current weekly cohort). Dishes without a live-capture hero stay inactive; orders use active dishes only. Re-run on the VM:
 
 ```bash
 gcloud compute ssh ckac-vm --zone=asia-south1-a --command="sudo systemctl start kitchcu-bulk-seed.service"
 ```
 
-Locally: `python scripts/seed-bulk-data.py` or `.\scripts\seed-bulk-data.ps1`. Cron install: [DEPLOYMENT-GCP.md](./DEPLOYMENT-GCP.md) §11.7c.
+Locally: `.\scripts\seed-all.ps1` or `bash scripts/seed-all.sh`. Cron install: [DEPLOYMENT-GCP.md](./DEPLOYMENT-GCP.md) §11.7c.
 
 ### 2.2 Production (`*.kitchcu.com`)
 

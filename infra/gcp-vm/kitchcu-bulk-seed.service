@@ -1,5 +1,5 @@
 [Unit]
-Description=kitchCU one-shot bulk demo seed (owners, kitchens, menus, orders, extras)
+Description=kitchCU one-shot full seed (dev baseline + bulk/feature-volume + weekly cohort)
 After=docker.service network-online.target
 Wants=network-online.target
 

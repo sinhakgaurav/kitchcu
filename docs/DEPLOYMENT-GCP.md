@@ -328,7 +328,8 @@ but DNS must resolve first.
 
 With `run-seed=1` in VM metadata (recommended for demo VMs), `startup.sh` waits for
 the gateway and runs `infra/gcp-vm/bulk-seed.sh` **once** on first boot
-(marker: `/var/lib/ckac/.bulk-seeded`). That wrapper calls `scripts/seed-bulk-data.py`
+(marker: `/var/lib/ckac/.bulk-seeded`). That wrapper waits for the gateway, then runs
+`scripts/seed-all.sh` (`seed-dev-data` → `seed-bulk-data` + feature volume → `weekly_test_data`).
 (30 kitchens, **6-month** order history, full extras by default). Dishes without a live-capture hero stay
 **inactive**; orders are built only from active dishes. Set `demo-mode=1` (or
 `run-seed=1` alone) to force `APP_ENV=development` so demo OTP `123456` works.
@@ -349,8 +350,8 @@ gcloud compute ssh ckac-vm --zone=asia-south1-a --command="sudo bash /opt/ckac/i
 
 **Demo logins after seed:** owner `9876543210` / OTP `123456`, customers `9123456789` etc. / OTP `123456`.
 
-Locally: `python scripts/seed-bulk-data.py` or `.\scripts\seed-bulk-data.ps1`.
-Defaults to `CKAC_BULK_MONTHS=6`. Overrides: `CKAC_BULK_KITCHENS`, `CKAC_BULK_ORDERS`, `CKAC_BULK_FULL=1`, `CKAC_BULK_MONTHS=0` for a 30-day window.
+Locally: `.\scripts\seed-all.ps1` or `bash scripts/seed-all.sh` (dev + bulk + weekly). Bulk only: `python scripts/seed-bulk-data.py`.
+Defaults to `CKAC_BULK_MONTHS=6` and `CKAC_FEATURE_VOLUME=1` (every kitchen and diner gets coupons, tiffin, tickets, ratings, GST, refunds). Overrides: `CKAC_BULK_KITCHENS`, `CKAC_BULK_ORDERS`, `CKAC_BULK_FULL=1`, `CKAC_BULK_MONTHS=0` for a 30-day window, `CKAC_FEATURE_VOLUME=0` to skip the per-module fill.
 
 ### 11.7b Weekly QA cohort seed (automatic)
 

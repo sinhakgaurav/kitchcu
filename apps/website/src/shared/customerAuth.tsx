@@ -96,9 +96,14 @@ export function CustomerAuthProvider({ children }: { children: ReactNode }) {
         setCustomerSession(next);
         setSessionState(next);
       })
-      .catch(() => {
-        if (!cancelled) {
+      .catch((err) => {
+        if (cancelled) return;
+        // Only a dead JWT logs the diner out. A gateway blip must not dump them on /login.
+        const detail = err instanceof Error ? err.message : "";
+        if (isCustomerAuthFailure(detail)) {
           clearCustomerToken();
+          clearCustomerSession();
+          setSessionState(null);
         }
       })
       .finally(() => {
@@ -124,7 +129,19 @@ export function useCustomerAuth() {
   return ctx;
 }
 
-export function isCustomerSignedIn(session: CustomerSession | null): boolean {
-  // Prefer JWT-backed session so checkout never gets stuck in a soft-login loop
-  return Boolean(session?.customerId && getCustomerToken());
+export function isCustomerAuthFailure(detail: string): boolean {
+  return /invalid token|not authenticated|invalid token type|expired/i.test(detail);
+}
+
+export function isCustomerSignedIn(_session?: CustomerSession | null): boolean {
+  // JWT is the source of truth. A name/phone stash without a token is not signed in
+  // (that used to loop checkout → /login → checkout).
+  return Boolean(getCustomerToken());
+}
+
+export function customerAccountLabel(session: CustomerSession | null, fallback: string): string {
+  const raw = (session?.name || "").trim();
+  if (!raw) return fallback;
+  const first = raw.split(/\s+/)[0] || raw;
+  return first.length > 14 ? `${first.slice(0, 12)}…` : first;
 }

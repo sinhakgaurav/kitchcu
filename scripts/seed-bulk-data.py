@@ -2,7 +2,10 @@
 """Seed a large demo dataset for full UI / report verification.
 
 Creates owners, kitchens in every presence city (Pune → Kolkata), city
-customers with home addresses, dishes, orders, and WhatsApp drafts.
+customers with home addresses, dishes, orders, WhatsApp drafts, and — unless
+``CKAC_FEATURE_VOLUME=0`` — a full module fill on **every** kitchen and diner
+(coupons, templates, tiffin, GST, refunds, prep batches, tickets, ratings,
+referrals, branded page, streaming, learning, community).
 
 Usage:
   python scripts/seed-bulk-data.py
@@ -46,8 +49,11 @@ import random
 import sys
 import time
 import uuid
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from pathlib import Path
+
+# Host Python on the GCP VM is 3.10 — datetime.UTC exists only in 3.11+.
+UTC = timezone.utc
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
@@ -86,6 +92,7 @@ from seed_common import (  # noqa: E402
     resolve_postgres_container,
     wait_for_gateway,
 )
+from seed_feature_volume import seed_feature_volume  # noqa: E402
 from seed_platform_extras import (  # noqa: E402
     ensure_customer_sessions,
     ensure_ratings,
@@ -117,6 +124,12 @@ BULK_DRAFTS_PER_KITCHEN = env_int("CKAC_BULK_DRAFTS_PER_KITCHEN", 5)
 BULK_DISHES_PER_KITCHEN = env_int("CKAC_BULK_DISHES_PER_KITCHEN", 6, minimum=1)
 BULK_CUSTOMERS_PER_CITY = env_int("CKAC_BULK_CUSTOMERS_PER_CITY", 3, minimum=0)
 BULK_FULL = os.environ.get("CKAC_BULK_FULL", "1").strip().lower() not in ("0", "false", "no")
+# Every kitchen + every diner gets coupons, tiffin, tickets, addresses, ratings…
+FEATURE_VOLUME = os.environ.get("CKAC_FEATURE_VOLUME", "1").strip().lower() not in (
+    "0",
+    "false",
+    "no",
+)
 
 # History window. CKAC_BULK_MONTHS is the headline control ("6 months of data");
 # CKAC_BULK_BACKDATE_DAYS still works for anyone who wants exact days.
@@ -480,6 +493,17 @@ def primary_kitchen(kitchens: list[dict]) -> dict:
     return next((k for k in kitchens if k.get("code") == DEMO_KITCHEN_CODE), kitchens[0])
 
 
+def kitchen_volume_ctx(token: str, kitchen: dict, dish_ids: dict[str, str]) -> dict:
+    return {
+        "id": kitchen["id"],
+        "code": kitchen.get("code"),
+        "name": kitchen["name"],
+        "city": kitchen.get("city"),
+        "token": token,
+        "dish_ids": dish_ids,
+    }
+
+
 def ensure_kitchen_complete(
     token: str,
     kitchen: dict,
@@ -647,6 +671,9 @@ def main() -> None:
         f"History: {BACKDATE_DAYS} days (~{BACKDATE_DAYS / DAYS_PER_MONTH:.1f} months), "
         f"weekday/weekend rhythm, lunch + dinner peaks (IST), growth trend"
     )
+    log(
+        f"Feature volume: {'on — every kitchen + diner' if FEATURE_VOLUME else 'off'}"
+    )
     if BULK_FULL:
         log(
             f"Per kitchen: full menu, pantry, {BULK_ORDERS_PER_KITCHEN} orders "
@@ -692,6 +719,7 @@ def main() -> None:
     all_dishes = enriched_dishes()
     primary_dish_ids: dict[str, str] = {}
     dish_ids_by_kitchen: dict[str, dict[str, str]] = {}
+    kitchen_ctxs: list[dict] = []
 
     if BULK_FULL:
         log("")
@@ -713,6 +741,7 @@ def main() -> None:
                 city_customers=customers_by_city.get(str(k.get("city") or ""), []),
             )
             dish_ids_by_kitchen[k["id"]] = dish_ids
+            kitchen_ctxs.append(kitchen_volume_ctx(demo_token, k, dish_ids))
             if k["id"] == primary["id"]:
                 primary_dish_ids = dish_ids
         if not primary_dish_ids:
@@ -744,6 +773,14 @@ def main() -> None:
             )
             secondary += 1
         log(f"Seeded mini menus on {secondary} secondary kitchens")
+        for k in demo_kitchens:
+            kitchen_ctxs.append(
+                kitchen_volume_ctx(
+                    demo_token,
+                    k,
+                    dish_ids_by_kitchen.get(k["id"]) or {},
+                )
+            )
 
         ensure_orders(
             demo_token,
@@ -783,6 +820,7 @@ def main() -> None:
                     city_customers=customers_by_city.get(str(k.get("city") or ""), []),
                 )
                 dish_ids_by_kitchen[k["id"]] = dish_ids
+                kitchen_ctxs.append(kitchen_volume_ctx(token, k, dish_ids))
                 if j == 0:
                     owner_primary_dishes = dish_ids
         else:
@@ -793,6 +831,7 @@ def main() -> None:
                     chunk = subset
                 dish_ids = ensure_dishes(token, k["id"], chunk, limit=BULK_DISHES_PER_KITCHEN)
                 dish_ids_by_kitchen[k["id"]] = dish_ids
+                kitchen_ctxs.append(kitchen_volume_ctx(token, k, dish_ids))
                 if j == 0:
                     owner_primary_dishes = dish_ids
 
@@ -825,19 +864,36 @@ def main() -> None:
         demo_token,
     )
 
-    dated = date_all_history()
-    refresh_crm_profiles()
-    # Ratings can only be posted by a signed-in customer on their own delivered
-    # orders. Do this after dating so home-taste aggregates sit on the historic
-    # window, not on the handful of extra PWA orders created today.
     located_sessions = [
         diner
         for diners in customers_by_city.values()
         for diner in diners
         if diner.get("token")
     ]
+    volume_customers = ensure_customer_sessions()
+    seen_phones = {
+        str(c.get("phone") or c.get("phone_e164") or "")
+        for c in volume_customers
+    }
+    for diner in located_sessions:
+        key = str(diner.get("phone") or diner.get("phone_e164") or "")
+        if key and key not in seen_phones:
+            volume_customers.append(diner)
+            seen_phones.add(key)
+    if FEATURE_VOLUME:
+        seed_feature_volume(
+            kitchens=kitchen_ctxs,
+            customers=volume_customers,
+            customers_by_city=customers_by_city,
+        )
+
+    dated = date_all_history()
+    refresh_crm_profiles()
+    # Ratings can only be posted by a signed-in customer on their own delivered
+    # orders. Do this after dating so home-taste aggregates sit on the historic
+    # window, not only on the extra PWA orders created today.
     try:
-        ensure_ratings(ensure_customer_sessions() + located_sessions, primary["id"])
+        ensure_ratings(volume_customers, primary["id"])
     except Exception as exc:  # noqa: BLE001 — extras already log per-customer failures
         log(f"  ! historic ratings: {exc}")
 
@@ -871,6 +927,7 @@ def main() -> None:
         except ApiError as exc:
             log(f"  ! Nearby {city['name']}: {exc}")
     diner_total = sum(len(v) for v in customers_by_city.values())
+    log(f"  Feature volume:         {'on' if FEATURE_VOLUME else 'off'} ({len(kitchen_ctxs)} kitchens, {len(volume_customers)} diners)")
     log(f"  City customers:         {diner_total} across {len(customers_by_city)} cities")
     log(f"  Primary menu dishes:    {len(menu_final.get('dishes', []))}")
     log(f"  Primary orders:         {orders_final.get('total', 0)}")

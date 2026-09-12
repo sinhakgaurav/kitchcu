@@ -4,7 +4,7 @@ import { useTranslation } from "react-i18next";
 import { BrandNavMark } from "./BrandNavMark";
 import { LanguageSwitcher } from "../i18n/LanguageSwitcher";
 import { CUSTOMER_HOST } from "../shared/brand";
-import { useCustomerAuth } from "../shared/customerAuth";
+import { customerAccountLabel, isCustomerSignedIn, useCustomerAuth } from "../shared/customerAuth";
 import { kitchenUrl } from "../shared/urls";
 import { SuperAdminLink } from "./SuperAdminAccess";
 import { DeliveryAddressPicker } from "./DeliveryAddressPicker";
@@ -13,8 +13,9 @@ export function CustomerNavbar() {
   const { t } = useTranslation();
   const [scrolled, setScrolled] = useState(false);
   const [open, setOpen] = useState(false);
-  const { session, logout } = useCustomerAuth();
+  const { session, loading, logout } = useCustomerAuth();
   const location = useLocation();
+  const signedIn = isCustomerSignedIn(session);
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 40);
@@ -24,12 +25,7 @@ export function CustomerNavbar() {
   }, []);
 
   const hashLink = (href: string) => (location.pathname !== "/" ? href : href.replace(/^\//, ""));
-  const accountLabel = (() => {
-    const raw = (session?.name || "").trim();
-    if (!raw) return t("customer.nav.account");
-    const first = raw.split(/\s+/)[0] || raw;
-    return first.length > 14 ? `${first.slice(0, 12)}…` : first;
-  })();
+  const accountLabel = customerAccountLabel(session, t("customer.nav.account"));
 
   return (
     <header className={`nav nav--customer ${scrolled ? "nav--scrolled" : ""}`}>
@@ -37,7 +33,7 @@ export function CustomerNavbar() {
         <BrandNavMark to="/" subtitle={CUSTOMER_HOST} height={40} />
 
         <nav className={`nav__links ${open ? "nav__links--open" : ""}`}>
-          {session?.customerId ? <DeliveryAddressPicker variant="nav" /> : null}
+          {signedIn ? <DeliveryAddressPicker variant="nav" /> : null}
           <a href={hashLink("/#near-you")} onClick={() => setOpen(false)}>
             {t("customer.nav.nearYou")}
           </a>
@@ -47,7 +43,7 @@ export function CustomerNavbar() {
           <a href={hashLink("/#by-code")} onClick={() => setOpen(false)}>
             {t("customer.nav.kitchenCode")}
           </a>
-          {session ? (
+          {signedIn ? (
             <>
               <Link to="/orders" onClick={() => setOpen(false)}>
                 {t("customer.nav.myOrders")}
@@ -87,6 +83,10 @@ export function CustomerNavbar() {
                 </div>
               </div>
             </>
+          ) : loading ? (
+            <span className="nav__auth-btn" aria-busy="true">
+              {t("common.loading")}
+            </span>
           ) : (
             <Link to="/login" className="btn btn--primary btn--sm nav__auth-btn" onClick={() => setOpen(false)}>
               {t("customer.nav.signIn")}

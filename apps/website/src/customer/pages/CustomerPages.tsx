@@ -29,7 +29,6 @@ import { SuperAdminCredentials } from "../../components/SuperAdminAccess";
 import { useInView } from "../../hooks/useParallax";
 import { AnimatedMesh } from "../../components/AnimatedMesh";
 import {
-  getCustomerToken,
   requestCustomerWhatsAppOtp,
   verifyCustomerWhatsAppOtp,
 } from "../../shared/customerApi";
@@ -37,7 +36,7 @@ import { otpDeliveryNotice } from "../../shared/api";
 
 export function CustomerLoginPage() {
   const { t } = useTranslation();
-  const { session, applyAuthResult } = useCustomerAuth();
+  const { session, loading, applyAuthResult } = useCustomerAuth();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const nextPath = searchParams.get("next") || "/";
@@ -53,7 +52,10 @@ export function CustomerLoginPage() {
   const [policiesAgreed, setPoliciesAgreed] = useState(false);
   const [fieldErrors, setFieldErrors] = useState<{ name?: string; phone?: string; otp?: string }>({});
 
-  if (isCustomerSignedIn(session) && getCustomerToken()) {
+  if (loading) {
+    return <p className="app-loading">{t("common.loading")}</p>;
+  }
+  if (isCustomerSignedIn(session)) {
     return <Navigate to={nextPath.startsWith("/") ? nextPath : "/"} replace />;
   }
 

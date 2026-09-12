@@ -14,7 +14,9 @@ from __future__ import annotations
 
 import sys
 from collections import Counter
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta, timezone
+
+UTC = timezone.utc
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
@@ -194,6 +196,13 @@ def test_different_seeds_give_different_kitchens_different_days() -> None:
 
 
 # ── UTC conversion ───────────────────────────────────────────────────────────
+
+
+def test_utc_alias_works_on_python_310() -> None:
+    """GCP host python3 is 3.10; datetime.UTC is 3.11+ only."""
+    import order_history
+
+    assert order_history.UTC is timezone.utc
 
 
 def test_slot_converts_ist_wall_clock_to_utc() -> None:

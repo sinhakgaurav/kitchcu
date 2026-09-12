@@ -19,7 +19,11 @@ Write-Host "`n[1/6] Parse seed scripts..."
 python -c @"
 import ast, pathlib
 files = [
+  'scripts/seed-dev-data.py',
   'scripts/seed-bulk-data.py',
+  'scripts/seed_feature_volume.py',
+  'scripts/feature_volume.py',
+  'scripts/weekly_test_data.py',
   'scripts/seed_platform_extras.py',
   'scripts/demo_data.py',
   'scripts/bulk_demo_data.py',
@@ -128,6 +132,7 @@ $env:CKAC_BULK_KITCHENS = "1"
 $env:CKAC_BULK_FULL = "0"
 $env:CKAC_BULK_MONTHS = "0"
 $env:CKAC_BULK_BACKDATE_DAYS = "7"
+$env:CKAC_FEATURE_VOLUME = "0"
 python scripts/seed-bulk-data.py
 if ($LASTEXITCODE -ne 0) { throw "seed smoke failed" }
 
