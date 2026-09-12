@@ -1,14 +1,16 @@
 #!/usr/bin/env python3
 """Weekly QA cohort seed — a fresh, fully-exercised slice of the platform each ISO week.
 
-Driven by a systemd timer on the GCP VM (``infra/gcp-vm/weekly-seed.sh``) so QA always has
-untouched accounts *and* realistic data for the current week without wiping earlier cohorts.
+Driven by a Saturday systemd timer on the GCP VM (``infra/gcp-vm/weekly-seed.sh``)
+so QA always has untouched accounts *and* a full week of trading data without
+wiping earlier cohorts.
 
 Each run seeds, per week:
 
 * 5 owners, each with a kitchen in a rotating city and a full menu
 * 10 new customers
-* 10 orders per kitchen, mixing this week's new diners with the previous cohort's
+* 21 orders per kitchen (3/day × 7 days), stamped across the trailing week in
+  IST service hours, mixing this week's new diners with the previous cohort's
   returning diners, every order walked through the lifecycle to ``delivered``
 * ratings on delivered orders (feeds home-taste aggregates and dish scores)
 * promo rotation — last cohort's QA coupon and promotion are deactivated, this week's
@@ -32,7 +34,7 @@ the block if it ever collides with real traffic.
 Usage::
 
     python scripts/weekly_test_data.py
-    python scripts/weekly_test_data.py --owners 5 --customers 10 --orders-per-kitchen 10
+    python scripts/weekly_test_data.py --owners 5 --customers 10 --orders-per-kitchen 21
     python scripts/weekly_test_data.py --week 2026-W40 --dry-run
     python scripts/weekly_test_data.py --manifest /var/lib/ckac/weekly-cohort.json
 """
@@ -54,8 +56,10 @@ from demo_data import (  # noqa: E402
     DEMO_KITCHENS_CITIES,
     DEMO_OTP,
 )
+from order_history import order_history_plan, slot_to_utc  # noqa: E402
 from seed_common import (  # noqa: E402
     ApiError,
+    apply_planned_order_times,
     cuisine_map,
     dish_create_payload,
     log,
@@ -69,7 +73,12 @@ OWNER_PREFIX = os.environ.get("CKAC_WEEKLY_OWNER_PREFIX", "7")
 CUSTOMER_PREFIX = os.environ.get("CKAC_WEEKLY_CUSTOMER_PREFIX", "8")
 DEFAULT_OWNERS = int(os.environ.get("CKAC_WEEKLY_OWNERS", "5"))
 DEFAULT_CUSTOMERS = int(os.environ.get("CKAC_WEEKLY_CUSTOMERS", "10"))
-DEFAULT_ORDERS_PER_KITCHEN = int(os.environ.get("CKAC_WEEKLY_ORDERS_PER_KITCHEN", "10"))
+# Saturday cron fills a trailing ISO-style week: 3 orders/day × 7 days.
+WEEK_FILL_DAYS = int(os.environ.get("CKAC_WEEKLY_DAYS", "7"))
+WEEK_ORDERS_PER_DAY = int(os.environ.get("CKAC_WEEKLY_ORDERS_PER_DAY", "3"))
+DEFAULT_ORDERS_PER_KITCHEN = int(
+    os.environ.get("CKAC_WEEKLY_ORDERS_PER_KITCHEN", str(WEEK_FILL_DAYS * WEEK_ORDERS_PER_DAY))
+)
 
 # Every QA marketing artefact carries this prefix so rotation can find last week's
 # offers without touching coupons a real kitchen created.
@@ -114,6 +123,32 @@ LIFECYCLE_DELIVERY = ("accepted", "preparing", "ready", "out_for_delivery", "del
 
 
 # --------------------------------------------------------------------------- cohort
+
+
+def week_fill_target(days: int | None = None, per_day: int | None = None) -> int:
+    """Orders each kitchen should receive so every day of the week has traffic."""
+    return (days if days is not None else WEEK_FILL_DAYS) * (
+        per_day if per_day is not None else WEEK_ORDERS_PER_DAY
+    )
+
+
+def week_fill_slots(count: int, *, days: int = WEEK_FILL_DAYS, seed: int = 42):
+    """IST meal-window slots covering ``days`` (oldest first)."""
+    return order_history_plan(count, days=days, seed=seed)
+
+
+def date_week_orders(kitchen_id: str, order_ids: list[str], *, days: int = WEEK_FILL_DAYS) -> None:
+    """Stamp newly placed orders across the trailing week."""
+    if not order_ids:
+        return
+    slots = week_fill_slots(len(order_ids), days=days, seed=hash(kitchen_id) % 10_000)
+    now = dt.datetime.now(dt.timezone.utc)
+    stamps = [(order_id, slot_to_utc(slot, now=now)) for order_id, slot in zip(order_ids, slots)]
+    ok, err = apply_planned_order_times(kitchen_id, stamps)
+    if ok:
+        log(f"    dated {len(stamps)} orders across {days} days")
+    else:
+        log(f"    ! week dating failed: {err}")
 
 
 def resolve_week(spec: str | None) -> tuple[int, int]:
@@ -427,6 +462,7 @@ def seed_kitchen_orders(
         return {"orders": 0, "ratings": 0}
 
     placed = rated = 0
+    placed_ids: list[str] = []
     for slot in range(wanted):
         diner = roster[slot % len(roster)]
         shape = ORDER_SHAPES[(slot + offset) % len(ORDER_SHAPES)]
@@ -434,6 +470,7 @@ def seed_kitchen_orders(
             order = place_order(diner, kitchen, shape, dish_names, slot)
             advance_to_delivered(order["id"], kitchen["token"], shape["delivery_type"])
             placed += 1
+            placed_ids.append(order["id"])
         except ApiError as exc:
             log(f"    ! order for {diner['phone']}: {exc}")
             continue
@@ -442,9 +479,10 @@ def seed_kitchen_orders(
                 rated += 1
         except ApiError as exc:
             log(f"    ! rating for {diner['phone']}: {exc}")
+    date_week_orders(kitchen["kitchen_id"], placed_ids)
     log(
         f"    orders: {placed} new (+{existing} already present), {rated} rated"
-        f" — target {target}"
+        f" — target {target} across {WEEK_FILL_DAYS} days"
     )
     return {"orders": placed, "ratings": rated}
 

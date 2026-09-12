@@ -6,5 +6,5 @@ Wants=network-online.target
 [Service]
 Type=oneshot
 ExecStart=/bin/bash /opt/ckac/infra/gcp-vm/bulk-seed.sh
-# 30 kitchens + extras on e2-small; script waits on /health/ready internally.
-TimeoutStartSec=7200
+# 30 kitchens × 6-month history on e2-small; script waits on /health/ready internally.
+TimeoutStartSec=21600

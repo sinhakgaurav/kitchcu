@@ -329,7 +329,7 @@ but DNS must resolve first.
 With `run-seed=1` in VM metadata (recommended for demo VMs), `startup.sh` waits for
 the gateway and runs `infra/gcp-vm/bulk-seed.sh` **once** on first boot
 (marker: `/var/lib/ckac/.bulk-seeded`). That wrapper calls `scripts/seed-bulk-data.py`
-(30 kitchens, full extras by default). Dishes without a live-capture hero stay
+(30 kitchens, **6-month** order history, full extras by default). Dishes without a live-capture hero stay
 **inactive**; orders are built only from active dishes. Set `demo-mode=1` (or
 `run-seed=1` alone) to force `APP_ENV=development` so demo OTP `123456` works.
 
@@ -350,18 +350,20 @@ gcloud compute ssh ckac-vm --zone=asia-south1-a --command="sudo bash /opt/ckac/i
 **Demo logins after seed:** owner `9876543210` / OTP `123456`, customers `9123456789` etc. / OTP `123456`.
 
 Locally: `python scripts/seed-bulk-data.py` or `.\scripts\seed-bulk-data.ps1`.
-Overrides: `CKAC_BULK_KITCHENS`, `CKAC_BULK_ORDERS`, `CKAC_BULK_FULL=1`.
+Defaults to `CKAC_BULK_MONTHS=6`. Overrides: `CKAC_BULK_KITCHENS`, `CKAC_BULK_ORDERS`, `CKAC_BULK_FULL=1`, `CKAC_BULK_MONTHS=0` for a 30-day window.
 
 ### 11.7b Weekly QA cohort seed (automatic)
 
-`startup.sh` installs a systemd **timer** that seeds a **fresh cohort every Monday
-03:30 IST** (Sunday 22:00 UTC), leaving earlier cohorts untouched. It never wipes
-data and is safe to re-run: identifiers are derived from the ISO year+week, so a
-repeat run within the same week reuses the same accounts and only tops orders up.
+`startup.sh` installs a systemd **timer** that seeds a **fresh cohort every Saturday
+03:30 IST** (Friday 22:00 UTC) and fills **the trailing 7 days** of orders (3/day
+per kitchen). It never wipes data and is safe to re-run: identifiers are derived
+from the ISO year+week, so a repeat run within the same week reuses the same
+accounts and only tops orders up.
 
-Each run seeds **5 owners** (kitchen + full menu each), **10 customers**, and **10
-delivered, rated orders per kitchen** drawn from a mix of this week's new diners and
-last week's returning ones. It also rotates marketing — this week's `QA{cohort}` coupon
+Each run seeds **5 owners** (kitchen + full menu each), **10 customers**, and **21
+delivered, rated orders per kitchen** (3 per day across 7 IST service-hour days)
+drawn from a mix of this week's new diners and last week's returning ones. It also
+rotates marketing — this week's `QA{cohort}` coupon
 and promotion go live while the previous cohort's are deactivated — and adds a tiffin
 plan with a subscriber, a CRM refresh, growth suggestions mined from the week's orders,
 and one open support ticket.

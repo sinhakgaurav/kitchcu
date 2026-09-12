@@ -167,33 +167,37 @@ Run `.\scripts\seed-all.ps1` (or GCP `run-seed=1`) after migrations.
 | Platform features / seed packages | billing migration `008` seed | ✅ |
 | Learning trials / community | extras (`cover_url` on community recipe) | ✅ |
 | Tiffin plans (thali / single_dish / combo) | `ensure_tiffin_plans` | ✅ |
-| Weekly QA cohort (5 owners · 10 customers · 10 orders/kitchen · marketing rotation · growth) | `scripts/weekly_test_data.py` via `kitchcu-weekly-seed.timer` | ✅ |
-| GCP bulk seeder (30 kitchens across 15 cities · 3 customers/city · live-capture-safe) | `infra/gcp-vm/bulk-seed.sh` → `scripts/seed-bulk-data.py` · `kitchcu-bulk-seed.service` | ✅ |
+| Weekly QA cohort (5 owners · 10 customers · 21 orders/kitchen over 7 days · Saturday 03:30 IST) | `scripts/weekly_test_data.py` via `kitchcu-weekly-seed.timer` | ✅ |
+| GCP bulk seeder (30 kitchens · 6-month history · 15 cities · 3 customers/city · live-capture-safe) | `infra/gcp-vm/bulk-seed.sh` → `scripts/seed-bulk-data.py` · `kitchcu-bulk-seed.service` | ✅ |
 
 ### Weekly QA cohort
 
 Systemd timer on the VM (`infra/gcp-vm/kitchcu-weekly-seed.{service,timer}`) runs every
-Monday 03:30 IST and adds a new cohort without touching earlier ones: **5 owners** with
-kitchens and menus, **10 customers**, **10 delivered + rated orders per kitchen** mixing
-new and returning diners, a rotated `QA{cohort}` coupon and promotion (previous cohort's
-deactivated), a tiffin plan with a subscriber, CRM refresh, growth suggestions, and a
-support ticket. Identifiers are derived from the ISO year+week
+Saturday 03:30 IST and adds a new cohort without touching earlier ones: **5 owners** with
+kitchens and menus, **10 customers**, **21 delivered + rated orders per kitchen** (3/day
+across the trailing 7 days, IST meal windows) mixing new and returning diners, a rotated
+`QA{cohort}` coupon and promotion (previous cohort's deactivated), a tiffin plan with a
+subscriber, CRM refresh, growth suggestions, and a support ticket. Identifiers are derived
+from the ISO year+week
 (`{prefix}{YY}{WW}{index}`; owners `7…`, customers `8…`), so re-running inside the same
 week reuses the accounts and only tops orders up. Current cohort is written to
 `/var/lib/ckac/weekly-cohort.json`. Repo on the VM is `/opt/ckac`. See [DEPLOYMENT-GCP.md](./DEPLOYMENT-GCP.md) §11.7–§11.7c.
 
 ### Six-month trading history
 
-`CKAC_BULK_MONTHS=6` makes the bulk seeder produce history that reads like six months a
-kitchen actually worked, rather than a flat line stamped at the moment the seeder ran.
+The bulk seeder **defaults to six months** (`CKAC_BULK_MONTHS=6` in
+`infra/gcp-vm/bulk-seed.sh` and `scripts/seed-bulk-data.py`) so first-boot and
+`kitchcu-bulk-seed.service` produce history that reads like six months a kitchen
+actually worked.
 
 ```powershell
-$env:CKAC_BULK_MONTHS=6; python scripts/seed-bulk-data.py
+python scripts/seed-bulk-data.py
+# 30-day smoke: $env:CKAC_BULK_MONTHS=0; python scripts/seed-bulk-data.py
 ```
 
 | Control | Default | Purpose |
 |---------|---------|---------|
-| `CKAC_BULK_MONTHS` | `0` (uses `CKAC_BULK_BACKDATE_DAYS=30`) | Window in months; `6` → 183 days |
+| `CKAC_BULK_MONTHS` | `6` (183 days) | Set `0` to use `CKAC_BULK_BACKDATE_DAYS` (30) |
 | `CKAC_BULK_ORDERS_PER_KITCHEN` | `max(40, window_days)` | ≥1 order/day so no daily bucket is empty |
 | `CKAC_BULK_PRIMARY_ORDERS` | `window_days × 3` | Denser history on the demo kitchen |
 | `CKAC_POSTGRES_CONTAINER` | auto | Force the target DB when several stacks are up |

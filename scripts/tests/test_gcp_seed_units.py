@@ -37,6 +37,14 @@ def test_bulk_units_use_opt_ckac() -> None:
     assert "ExecStart=/bin/bash /opt/ckac/infra/gcp-vm/bulk-seed.sh" in service
     assert 'CKAC_REPO_DIR:-/opt/ckac}' in script
     assert "scripts/seed-bulk-data.py" in script
+    assert 'CKAC_BULK_MONTHS="${CKAC_BULK_MONTHS:-6}"' in script
+
+
+def test_weekly_timer_runs_saturday_morning_ist() -> None:
+    """Saturday 03:30 IST == Friday 22:00 UTC on the VM clock."""
+    timer = (GCP / "kitchcu-weekly-seed.timer").read_text(encoding="utf-8")
+    assert "OnCalendar=Fri *-*-* 22:00:00 UTC" in timer
+    assert "Saturday" in timer
 
 
 def test_startup_installs_weekly_timer_and_bulk_oneshot() -> None:

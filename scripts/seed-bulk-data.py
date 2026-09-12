@@ -10,8 +10,9 @@ Usage:
   CKAC_BULK_ORDERS=300 python scripts/seed-bulk-data.py
   $env:CKAC_BULK_OWNERS=5; .\\scripts\\seed-bulk-data.ps1
 
-Six months of trading history (reports, GST periods, CRM cohorts):
-  $env:CKAC_BULK_MONTHS=6; python scripts/seed-bulk-data.py
+Default is six months of trading history (reports, GST periods, CRM cohorts).
+  python scripts/seed-bulk-data.py
+  $env:CKAC_BULK_MONTHS=0; python scripts/seed-bulk-data.py   # 30-day window
 
   Order volume tracks the window automatically — one order per kitchen per day,
   three per day on the primary demo kitchen. Override with
@@ -42,7 +43,6 @@ from __future__ import annotations
 
 import os
 import random
-import subprocess
 import sys
 import time
 import uuid
@@ -74,6 +74,7 @@ from order_history import (  # noqa: E402
 from demo_data import DEMO_CUSTOMER_ADDRESSES, DEMO_KITCHEN_CODE, DEMO_OTP, DEMO_OWNER  # noqa: E402
 from seed_common import (  # noqa: E402
     ApiError,
+    apply_planned_order_times,
     cuisine_map,
     dish_create_payload,
     ensure_customer_addresses,
@@ -119,7 +120,7 @@ BULK_FULL = os.environ.get("CKAC_BULK_FULL", "1").strip().lower() not in ("0", "
 
 # History window. CKAC_BULK_MONTHS is the headline control ("6 months of data");
 # CKAC_BULK_BACKDATE_DAYS still works for anyone who wants exact days.
-BULK_MONTHS = env_int("CKAC_BULK_MONTHS", 0)
+BULK_MONTHS = env_int("CKAC_BULK_MONTHS", 6)
 if BULK_MONTHS:
     BACKDATE_DAYS = round(BULK_MONTHS * DAYS_PER_MONTH)
 else:
@@ -415,161 +416,13 @@ def ensure_drafts(token: str, kitchen_id: str, target: int) -> int:
     return created
 
 
-# Every row that has to move with its parent order. Reports read these directly,
-# so leaving them stamped NOW() would put six months of orders against one month
-# of payments and a single month of GST invoices.
-# Missing tables and columns are skipped at runtime, so a service that is not
-# deployed in a given environment costs nothing here.
-ORDER_LINKED_TIMESTAMPS: tuple[tuple[str, tuple[str, ...]], ...] = (
-    ("ckac_orders.order_status_events", ("created_at",)),
-    ("ckac_billing.payments", ("created_at", "updated_at")),
-    ("ckac_billing.refunds", ("created_at", "updated_at", "completed_at")),
-    ("ckac_billing.settlements", ("created_at", "settled_at")),
-    ("ckac_billing.gst_tax_invoices", ("created_at", "invoice_date")),
-    ("ckac_ratings.dish_ratings", ("created_at",)),
-)
-
-
-def _run_psql(sql: str, *, timeout: int = 300) -> tuple[bool, str]:
-    """Pipe a script to psql inside the Postgres container.
-
-    The encoding is pinned because Windows would otherwise send the script as
-    cp1252 and Postgres rejects the result as invalid UTF-8 the moment a comment
-    or message contains a dash or rupee sign.
-    """
-    try:
-        proc = subprocess.run(
-            [
-                "docker",
-                "exec",
-                "-i",
-                "-e",
-                "PGCLIENTENCODING=UTF8",
-                resolve_postgres_container(),
-                "psql",
-                "-U",
-                "ckac",
-                "-d",
-                "ckac",
-                "-v",
-                "ON_ERROR_STOP=1",
-                "-q",
-                "-f",
-                "-",
-            ],
-            input=sql,
-            capture_output=True,
-            text=True,
-            encoding="utf-8",
-            timeout=timeout,
-        )
-    except (FileNotFoundError, subprocess.TimeoutExpired) as exc:
-        return False, str(exc)
-    if proc.returncode != 0:
-        return False, (proc.stderr.strip() or proc.stdout.strip())
-    return True, ""
-
-
 def apply_order_history(kitchen_id: str, placed: list[tuple[str, OrderSlot]]) -> None:
-    """Stamp each order with its planned instant and drag dependent rows along.
-
-    Everything related to an order shifts by the same interval, so lifecycle
-    ordering, payment-after-order and rating-after-delivery all survive.
-    """
+    """Stamp each order with its planned instant and drag dependent rows along."""
     if BACKDATE_DAYS <= 0 or not placed:
         return
     now = datetime.now(UTC)
-    values = ",".join(
-        f"('{order_id}'::uuid,'{slot_to_utc(slot, now=now).isoformat()}'::timestamptz)"
-        for order_id, slot in placed
-    )
-    cascade = ",".join(
-        f"('{table}','{column}')"
-        for table, columns in ORDER_LINKED_TIMESTAMPS
-        for column in columns
-    )
-    sql = f"""
-BEGIN;
-CREATE TEMP TABLE planned (order_id uuid PRIMARY KEY, placed_at timestamptz) ON COMMIT DROP;
-INSERT INTO planned VALUES {values};
-
--- One delta per order keeps every dependent row's relative position intact.
-CREATE TEMP TABLE shifted (order_id uuid PRIMARY KEY, delta interval) ON COMMIT DROP;
-INSERT INTO shifted
-SELECT p.order_id, p.placed_at - o.created_at
-FROM planned p
-JOIN ckac_orders.orders o ON o.id = p.order_id
-WHERE o.kitchen_id = '{kitchen_id}'::uuid;
-
--- Refuse to report success for orders we did not touch. Without this a seeder
--- pointed at the wrong Postgres container updates nothing, exits 0, and leaves
--- the reports it was meant to populate empty.
-DO $$
-DECLARE matched int;
-BEGIN
-  SELECT count(*) INTO matched FROM shifted;
-  IF matched <> {len(placed)} THEN
-    RAISE EXCEPTION
-      'dating matched % of % orders for kitchen {kitchen_id} — wrong database?',
-      matched, {len(placed)};
-  END IF;
-END $$;
-
-UPDATE ckac_orders.orders o
-SET created_at = o.created_at + s.delta,
-    updated_at = o.updated_at + s.delta
-FROM shifted s
-WHERE o.id = s.order_id;
-
-DO $$
-DECLARE v_tbl text; v_col text;
-BEGIN
-  FOR v_tbl, v_col IN SELECT * FROM (VALUES {cascade}) AS v(tbl, col) LOOP
-    IF to_regclass(v_tbl) IS NULL THEN CONTINUE; END IF;
-    IF NOT EXISTS (
-      SELECT 1 FROM information_schema.columns c
-      WHERE c.table_schema = split_part(v_tbl, '.', 1)
-        AND c.table_name = split_part(v_tbl, '.', 2)
-        AND c.column_name = v_col
-    ) THEN CONTINUE; END IF;
-    EXECUTE format(
-      'UPDATE %s x SET %I = x.%I + s.delta FROM shifted s WHERE x.order_id = s.order_id',
-      v_tbl, v_col, v_col
-    );
-  END LOOP;
-END $$;
-
--- Invoice numbers are minted as CKCODE-GST-YYYYMM-SEQ at create time. After
--- dating, the YYYYMM must follow invoice_date or March filings show a
--- September series.
-UPDATE ckac_billing.gst_tax_invoices g
-SET invoice_number = left(g.invoice_number, 40) || '-t' || left(g.id::text, 8)
-WHERE g.kitchen_id = '{kitchen_id}'::uuid
-  AND EXISTS (SELECT 1 FROM shifted s WHERE s.order_id = g.order_id);
-
-UPDATE ckac_billing.gst_tax_invoices g
-SET invoice_number = n.fresh
-FROM (
-  SELECT
-    g2.id,
-    k.code || '-GST-' || to_char(g2.invoice_date AT TIME ZONE 'UTC', 'YYYYMM')
-      || '-' || lpad(
-        row_number() OVER (
-          PARTITION BY g2.kitchen_id, to_char(g2.invoice_date AT TIME ZONE 'UTC', 'YYYYMM')
-          ORDER BY g2.invoice_date, g2.id
-        )::text,
-        4, '0'
-      ) AS fresh
-  FROM ckac_billing.gst_tax_invoices g2
-  JOIN ckac_identity.kitchens k ON k.id = g2.kitchen_id
-  WHERE g2.kitchen_id = '{kitchen_id}'::uuid
-    AND EXISTS (SELECT 1 FROM shifted s WHERE s.order_id = g2.order_id)
-) n
-WHERE g.id = n.id;
-
-COMMIT;
-"""
-    ok, err = _run_psql(sql)
+    stamps = [(order_id, slot_to_utc(slot, now=now)) for order_id, slot in placed]
+    ok, err = apply_planned_order_times(kitchen_id, stamps)
     if ok:
         log(f"  Dated {len(placed)} orders across {BACKDATE_DAYS} days (+ linked rows).")
     else:

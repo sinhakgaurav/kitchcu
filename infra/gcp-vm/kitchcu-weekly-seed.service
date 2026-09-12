@@ -1,5 +1,5 @@
 [Unit]
-Description=kitchCU weekly QA cohort seed (owners, customers, orders, marketing, growth)
+Description=kitchCU Saturday weekly QA cohort + 7-day order fill
 After=docker.service network-online.target
 Wants=network-online.target
 

@@ -8,6 +8,7 @@ import subprocess
 import time
 import urllib.error
 import urllib.request
+from datetime import datetime
 
 GATEWAY = os.environ.get("CKAC_GATEWAY_URL", "http://localhost:18000").rstrip("/")
 # GCP VM alembic on e2-small can take several minutes after compose up.
@@ -382,3 +383,146 @@ def dish_create_payload(
     else:
         payload["is_active"] = False
     return payload
+
+
+# Rows that must move with their parent order when history is dated.
+_ORDER_LINKED_TIMESTAMPS: tuple[tuple[str, tuple[str, ...]], ...] = (
+    ("ckac_orders.order_status_events", ("created_at",)),
+    ("ckac_billing.payments", ("created_at", "updated_at")),
+    ("ckac_billing.refunds", ("created_at", "updated_at", "completed_at")),
+    ("ckac_billing.settlements", ("created_at", "settled_at")),
+    ("ckac_billing.gst_tax_invoices", ("created_at", "invoice_date")),
+    ("ckac_ratings.dish_ratings", ("created_at",)),
+)
+
+
+def run_psql(sql: str, *, timeout: int = 300) -> tuple[bool, str]:
+    """Pipe a script to psql inside the Postgres container the gateway uses."""
+    try:
+        proc = subprocess.run(
+            [
+                "docker",
+                "exec",
+                "-i",
+                "-e",
+                "PGCLIENTENCODING=UTF8",
+                resolve_postgres_container(),
+                "psql",
+                "-U",
+                "ckac",
+                "-d",
+                "ckac",
+                "-v",
+                "ON_ERROR_STOP=1",
+                "-q",
+                "-f",
+                "-",
+            ],
+            input=sql,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            timeout=timeout,
+        )
+    except (FileNotFoundError, subprocess.TimeoutExpired) as exc:
+        return False, str(exc)
+    if proc.returncode != 0:
+        return False, (proc.stderr.strip() or proc.stdout.strip())
+    return True, ""
+
+
+def apply_planned_order_times(
+    kitchen_id: str,
+    stamps: list[tuple[str, datetime]],
+) -> tuple[bool, str]:
+    """Shift each order (and linked payment/rating/GST rows) to ``stamps``.
+
+    Used by the 6-month bulk seeder and the Saturday weekly fill. Returns
+    ``(ok, error)`` so callers can log without raising.
+    """
+    if not stamps:
+        return True, ""
+    values = ",".join(
+        f"('{order_id}'::uuid,'{when.isoformat()}'::timestamptz)"
+        for order_id, when in stamps
+    )
+    cascade = ",".join(
+        f"('{table}','{column}')"
+        for table, columns in _ORDER_LINKED_TIMESTAMPS
+        for column in columns
+    )
+    sql = f"""
+BEGIN;
+CREATE TEMP TABLE planned (order_id uuid PRIMARY KEY, placed_at timestamptz) ON COMMIT DROP;
+INSERT INTO planned VALUES {values};
+
+CREATE TEMP TABLE shifted (order_id uuid PRIMARY KEY, delta interval) ON COMMIT DROP;
+INSERT INTO shifted
+SELECT p.order_id, p.placed_at - o.created_at
+FROM planned p
+JOIN ckac_orders.orders o ON o.id = p.order_id
+WHERE o.kitchen_id = '{kitchen_id}'::uuid;
+
+DO $$
+DECLARE matched int;
+BEGIN
+  SELECT count(*) INTO matched FROM shifted;
+  IF matched <> {len(stamps)} THEN
+    RAISE EXCEPTION
+      'dating matched % of % orders for kitchen {kitchen_id} — wrong database?',
+      matched, {len(stamps)};
+  END IF;
+END $$;
+
+UPDATE ckac_orders.orders o
+SET created_at = o.created_at + s.delta,
+    updated_at = o.updated_at + s.delta
+FROM shifted s
+WHERE o.id = s.order_id;
+
+DO $$
+DECLARE v_tbl text; v_col text;
+BEGIN
+  FOR v_tbl, v_col IN SELECT * FROM (VALUES {cascade}) AS v(tbl, col) LOOP
+    IF to_regclass(v_tbl) IS NULL THEN CONTINUE; END IF;
+    IF NOT EXISTS (
+      SELECT 1 FROM information_schema.columns c
+      WHERE c.table_schema = split_part(v_tbl, '.', 1)
+        AND c.table_name = split_part(v_tbl, '.', 2)
+        AND c.column_name = v_col
+    ) THEN CONTINUE; END IF;
+    EXECUTE format(
+      'UPDATE %s x SET %I = x.%I + s.delta FROM shifted s WHERE x.order_id = s.order_id',
+      v_tbl, v_col, v_col
+    );
+  END LOOP;
+END $$;
+
+UPDATE ckac_billing.gst_tax_invoices g
+SET invoice_number = left(g.invoice_number, 40) || '-t' || left(g.id::text, 8)
+WHERE g.kitchen_id = '{kitchen_id}'::uuid
+  AND EXISTS (SELECT 1 FROM shifted s WHERE s.order_id = g.order_id);
+
+UPDATE ckac_billing.gst_tax_invoices g
+SET invoice_number = n.fresh
+FROM (
+  SELECT
+    g2.id,
+    k.code || '-GST-' || to_char(g2.invoice_date AT TIME ZONE 'UTC', 'YYYYMM')
+      || '-' || lpad(
+        row_number() OVER (
+          PARTITION BY g2.kitchen_id, to_char(g2.invoice_date AT TIME ZONE 'UTC', 'YYYYMM')
+          ORDER BY g2.invoice_date, g2.id
+        )::text,
+        4, '0'
+      ) AS fresh
+  FROM ckac_billing.gst_tax_invoices g2
+  JOIN ckac_identity.kitchens k ON k.id = g2.kitchen_id
+  WHERE g2.kitchen_id = '{kitchen_id}'::uuid
+    AND EXISTS (SELECT 1 FROM shifted s WHERE s.order_id = g2.order_id)
+) n
+WHERE g.id = n.id;
+
+COMMIT;
+"""
+    return run_psql(sql)

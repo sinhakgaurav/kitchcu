@@ -36,11 +36,12 @@ Local equivalents (dev): portal `:13000` · customer `:13001` · kitchen `:13002
 
 Seed: `.\scripts\seed-all.ps1` (includes multi-city kitchens: Delhi, Gurugram, Noida, Dehradun, Prayagraj, Varanasi, Kanpur, Lucknow, Jhansi, Mumbai).
 
-### 2.1b Weekly QA cohort (fresh accounts every Monday)
+### 2.1b Weekly QA cohort (fresh accounts every Saturday)
 
-A systemd timer on the VM seeds a new set of test accounts each ISO week and leaves
-earlier cohorts intact, so QA never has to reuse dirty accounts. Numbers are derived
-from the ISO year + week — `{prefix}{YY}{WW}{index}`, owners `7…`, customers `8…`.
+A systemd timer on the VM (Saturday 03:30 IST) seeds a new set of test accounts each
+ISO week, fills **7 days × 3 orders/kitchen**, and leaves earlier cohorts intact, so
+QA never has to reuse dirty accounts. Numbers are derived from the ISO year + week —
+`{prefix}{YY}{WW}{index}`, owners `7…`, customers `8…`.
 
 | Persona | Login pattern | Example (2026-W37) | Secret |
 |---------|---------------|--------------------|--------|
@@ -52,7 +53,7 @@ Each run also produces, per cohort kitchen:
 | Data | Volume | Why QA needs it |
 |------|--------|-----------------|
 | Kitchen + full menu | 1 kitchen, rotating city | Discovery, menu, and storefront screens |
-| Delivered orders | 10 per kitchen | Owner inbox, analytics, revenue, receipts |
+| Delivered orders | 21 per kitchen (3/day × 7 days) | Owner inbox, analytics, revenue, receipts |
 | Diner mix | ~⅔ this week's new, ~⅓ last week's returning | CRM `repeat`/`vip` segments are non-empty |
 | Ratings | one per delivered order | Home-taste aggregates, dish scores |
 | Coupon | `QA{cohort}` (e.g. `QAW2636`) | Checkout discount path; earlier QA codes are deactivated so only one is live |
@@ -69,7 +70,7 @@ Override volumes with `--owners`, `--customers`, `--orders-per-kitchen`, `--week
 
 ### 2.1c Bulk demo seed (first boot + on demand)
 
-First boot with metadata `run-seed=1` runs `infra/gcp-vm/bulk-seed.sh` → `scripts/seed-bulk-data.py` (default 30 kitchens, full extras). Dishes without a live-capture hero stay inactive; orders use active dishes only. Re-run on the VM:
+First boot with metadata `run-seed=1` runs `infra/gcp-vm/bulk-seed.sh` → `scripts/seed-bulk-data.py` (default 30 kitchens, **6-month** history, full extras). Dishes without a live-capture hero stay inactive; orders use active dishes only. Re-run on the VM:
 
 ```bash
 gcloud compute ssh ckac-vm --zone=asia-south1-a --command="sudo systemctl start kitchcu-bulk-seed.service"

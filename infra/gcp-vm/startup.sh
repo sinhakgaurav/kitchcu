@@ -130,7 +130,7 @@ if { [ "$RUN_SEED" = "1" ] || [ "$RUN_SEED" = "true" ]; } && [ ! -f "$SEED_MARKE
 fi
 
 # --- 7. Seed systemd units (weekly cron + on-demand bulk) ---------------------------
-# Weekly: fresh QA cohort every Monday 03:30 IST. Bulk: oneshot, start by hand.
+# Weekly: Saturday 03:30 IST cohort + 7-day order fill. Bulk: oneshot, 6-month history.
 install -m 0644 infra/gcp-vm/kitchcu-weekly-seed.service /etc/systemd/system/
 install -m 0644 infra/gcp-vm/kitchcu-weekly-seed.timer /etc/systemd/system/
 install -m 0644 infra/gcp-vm/kitchcu-bulk-seed.service /etc/systemd/system/

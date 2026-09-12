@@ -126,6 +126,8 @@ Write-Host "`n[6/6] Seed smoke (CKAC_BULK_KITCHENS=1)..."
 $env:CKAC_GATEWAY_URL = "http://127.0.0.1:28000"
 $env:CKAC_BULK_KITCHENS = "1"
 $env:CKAC_BULK_FULL = "0"
+$env:CKAC_BULK_MONTHS = "0"
+$env:CKAC_BULK_BACKDATE_DAYS = "7"
 python scripts/seed-bulk-data.py
 if ($LASTEXITCODE -ne 0) { throw "seed smoke failed" }
 

@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
 # Weekly QA cohort seed — invoked by the kitchcu-weekly-seed systemd timer.
 #
-# Seeds a fresh cohort for the current ISO week without touching earlier ones:
-# 5 owners + kitchens with menus, 10 customers, 10 delivered+rated orders per
-# kitchen (new and returning diners), this week's coupon/promotion (retiring the
-# last cohort's), a tiffin plan, CRM refresh, growth suggestions, and a ticket.
+# Saturday timer. Seeds a fresh cohort for the current ISO week without touching
+# earlier ones: 5 owners + kitchens with menus, 10 customers, 21 delivered+rated
+# orders per kitchen (3/day across the trailing 7 days), this week's
+# coupon/promotion (retiring the last cohort's), a tiffin plan, CRM refresh,
+# growth suggestions, and a ticket.
 #
 # Safe to re-run: identifiers are derived from the ISO year+week, so a repeat run
 # reuses the same accounts and only tops orders up to the target count.

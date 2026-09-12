@@ -158,3 +158,11 @@ def test_order_roster_works_without_a_returning_cohort() -> None:
 
 def test_order_roster_is_empty_when_no_diner_signed_in() -> None:
     assert wtd.order_roster([], [], offset=0) == []
+
+
+def test_week_fill_covers_seven_days_at_three_orders_per_day() -> None:
+    assert wtd.WEEK_FILL_DAYS == 7
+    assert wtd.week_fill_target() == 21
+    slots = wtd.week_fill_slots(21, days=7, seed=1)
+    assert len(slots) == 21
+    assert {slot.day_offset for slot in slots} == set(range(7))

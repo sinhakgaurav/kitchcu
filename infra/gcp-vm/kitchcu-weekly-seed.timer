@@ -2,8 +2,8 @@
 Description=Run the kitchCU weekly QA cohort seed every Monday
 
 [Timer]
-# Monday 03:30 IST == Sunday 22:00 UTC (VM clock is UTC) — before the QA week starts.
-OnCalendar=Sun *-*-* 22:00:00 UTC
+# Saturday 03:30 IST == Friday 22:00 UTC (VM clock is UTC) — fill the trailing week.
+OnCalendar=Fri *-*-* 22:00:00 UTC
 # Catch up if the VM was stopped at the scheduled time.
 Persistent=true
 Unit=kitchcu-weekly-seed.service

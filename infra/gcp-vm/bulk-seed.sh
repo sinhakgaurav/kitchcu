@@ -8,7 +8,7 @@
 #   sudo bash /opt/ckac/infra/gcp-vm/bulk-seed.sh
 #
 # Optional env (defaults match first-boot demo VM):
-#   CKAC_BULK_KITCHENS=30  CKAC_BULK_FULL=1  CKAC_BULK_ORDERS=250
+#   CKAC_BULK_KITCHENS=30  CKAC_BULK_FULL=1  CKAC_BULK_MONTHS=6
 
 set -euo pipefail
 
@@ -56,6 +56,7 @@ CKAC_GATEWAY_URL="${CKAC_GATEWAY_URL:-http://127.0.0.1:18000}" \
 CKAC_SEED_WAIT_SEC="${CKAC_SEED_WAIT_SEC:-120}" \
 CKAC_BULK_KITCHENS="${CKAC_BULK_KITCHENS:-30}" \
 CKAC_BULK_FULL="${CKAC_BULK_FULL:-1}" \
+CKAC_BULK_MONTHS="${CKAC_BULK_MONTHS:-6}" \
   python3 scripts/seed-bulk-data.py
 
 touch "$SEED_MARKER"
