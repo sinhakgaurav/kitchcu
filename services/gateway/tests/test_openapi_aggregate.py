@@ -67,6 +67,9 @@ def test_merge_openapi_specs_prefixes_schemas_and_tags():
     assert merged.get("security") in (None, [])
     assert merged["paths"]["/api/v1/auth/otp/request"]["post"]["security"] == []
     assert merged["paths"]["/api/v1/kitchens/{kitchen_id}/menu"]["get"]["security"] == []
+    assert merged["servers"] == [
+        {"url": "/", "description": "API Gateway (same origin / proxied)"},
+    ]
 
 
 def test_merge_binds_auth_only_where_the_service_declared_it():

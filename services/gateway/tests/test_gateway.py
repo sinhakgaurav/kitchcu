@@ -360,6 +360,48 @@ async def test_openapi_json_aggregates_upstream_specs(gateway_client):
     assert data["paths"]["/api/v1/owners/register"]["post"]["tags"] == [
         "Identity: owners"
     ]
+    assert data["servers"] == [
+        {"url": "/", "description": "API Gateway (same origin / proxied)"},
+    ]
+    token_url = data["components"]["securitySchemes"]["OAuth2Password"]["flows"]["password"][
+        "tokenUrl"
+    ]
+    assert token_url == "/api/v1/auth/token"
+
+
+@pytest.mark.asyncio
+async def test_openapi_servers_ignore_proxied_http_host(gateway_client):
+    """Swagger UI resolves OAuth tokenUrl against servers[0]. An http:// host
+    (Caddy/nginx → gateway) becomes mixed-content Failed to fetch on HTTPS /docs.
+    """
+    client, clients = gateway_client
+    empty = {
+        "openapi": "3.1.0",
+        "info": {"title": "empty", "version": "0.1"},
+        "paths": {},
+        "components": {"schemas": {}},
+    }
+
+    async def empty_get(url, **_kwargs):
+        if url == "/openapi.json":
+            return Response(200, json=empty)
+        return Response(404, json={"detail": "missing"})
+
+    for mock in clients.values():
+        mock.get = AsyncMock(side_effect=empty_get)
+
+    gateway_main._openapi_cache = {
+        "openapi": "3.1.0",
+        "info": {"title": "kitchCU Public API", "version": "1.0.0"},
+        "servers": [{"url": "http://kitchcu.com", "description": "API Gateway"}],
+        "paths": {},
+        "components": {"securitySchemes": {}},
+    }
+    response = await client.get("/openapi.json")
+    assert response.status_code == 200
+    assert response.json()["servers"] == [
+        {"url": "/", "description": "API Gateway (same origin / proxied)"},
+    ]
 
 
 @pytest.mark.asyncio

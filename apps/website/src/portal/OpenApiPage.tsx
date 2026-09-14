@@ -66,6 +66,9 @@ export function OpenApiPage() {
         }
         const schema = await meta.json();
         if (destroyed) return;
+        // Swagger OAuth resolves tokenUrl against servers[0]. A cached
+        // http:// host from the gateway (TLS terminator) is mixed content.
+        schema.servers = [{ url: window.location.origin, description: "same origin" }];
         setPathCount(Object.keys(schema.paths || {}).length);
 
         await loadStylesheet(SWAGGER_UI_CSS);
@@ -78,7 +81,7 @@ export function OpenApiPage() {
         mount.id = "swagger-ui-mount";
         hostRef.current.appendChild(mount);
         uiInstance = window.SwaggerUIBundle({
-          url: OPENAPI_URL,
+          spec: schema,
           dom_id: "#swagger-ui-mount",
           deepLinking: true,
           persistAuthorization: true,

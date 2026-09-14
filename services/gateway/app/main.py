@@ -8,7 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.openapi.docs import get_redoc_html, get_swagger_ui_html
 from fastapi.responses import JSONResponse
 
-from app.openapi_aggregate import build_gateway_openapi
+from app.openapi_aggregate import SAME_ORIGIN_SERVERS, build_gateway_openapi
 from app.rate_limit import check_rate_limit
 from ckac_common.config import get_settings
 from ckac_common.health import gateway_ready_response, live_response
@@ -269,20 +269,18 @@ async def root() -> dict[str, str]:
 
 
 @app.get("/openapi.json", include_in_schema=False)
-async def openapi_json(request: Request, refresh: bool = False) -> JSONResponse:
+async def openapi_json(refresh: bool = False) -> JSONResponse:
     """Aggregated OpenAPI from all upstream domain services."""
     global _openapi_cache
     if refresh or _openapi_cache is None:
-        _openapi_cache = await build_gateway_openapi(
-            http_clients,
-            servers=[
-                {
-                    "url": str(request.base_url).rstrip("/"),
-                    "description": "API Gateway",
-                }
-            ],
-        )
-    return JSONResponse(_openapi_cache)
+        # Never bake request.base_url into the spec. Behind Caddy/nginx the
+        # gateway sees http://kitchcu.com or http://gateway:8000; Swagger UI
+        # then posts OAuth tokens to that host and the browser throws
+        # TypeError: Failed to fetch (mixed content / unreachable hostname).
+        _openapi_cache = await build_gateway_openapi(http_clients)
+    spec = dict(_openapi_cache)
+    spec["servers"] = list(SAME_ORIGIN_SERVERS)
+    return JSONResponse(spec)
 
 
 @app.get("/docs", include_in_schema=False)

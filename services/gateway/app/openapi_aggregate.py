@@ -28,6 +28,10 @@ GATEWAY_INFO = {
     ),
 }
 
+SAME_ORIGIN_SERVERS = [
+    {"url": "/", "description": "API Gateway (same origin / proxied)"},
+]
+
 SERVICE_LABELS = {
     "identity": "Identity",
     "catalog": "Catalog",
@@ -94,10 +98,7 @@ def merge_openapi_specs(
     merged: dict[str, Any] = {
         "openapi": "3.1.0",
         "info": dict(GATEWAY_INFO),
-        "servers": servers
-        or [
-            {"url": "/", "description": "API Gateway (same origin / proxied)"},
-        ],
+        "servers": servers or list(SAME_ORIGIN_SERVERS),
         "tags": [],
         "paths": {},
         "components": {
