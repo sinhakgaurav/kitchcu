@@ -347,7 +347,9 @@
       "signIn": "ಗ್ರಾಹಕರು ಸೈನ್ ಇನ್ ಮಾಡಿ",
       "logout": "Log out",
       "notifications": "Notifications",
-      "profile": "My profile"
+      "profile": "My profile",
+      "addresses": "Addresses",
+      "payout": "Refund payout"
     },
     "auth": {
       "title": "ಗ್ರಾಹಕರು ಸೈನ್ ಇನ್ ಮಾಡಿ",
@@ -364,7 +366,8 @@
       "searchPlaceholder": "ಅಡುಗೆಮನೆ, ಪಾಕಪದ್ಧತಿ, ಖಾದ್ಯವನ್ನು ಹುಡುಕಿ …",
       "useLocation": "ನನ್ನ ಸ್ಥಾನ",
       "noResults": "ಯಾವುದೇ ಅಡಿಗೆಮನೆಗಳು ನಿಮ್ಮ ಫಿಲ್ಟರ್‌ಗಳಿಗೆ ಹೊಂದಿಕೆಯಾಗುವುದಿಲ್ಲ",
-      "lede": "Real dish photos, honest prep times, and fair delivery — order home taste."
+      "lede": "Real dish photos, honest prep times, and fair delivery — order home taste.",
+      "helloName": "Order home taste, {{name}}"
     },
     "checkout": {
       "title": "ಚೆಕ್ಟ್",
@@ -380,7 +383,11 @@
       "emptyHint": "ನೀವು ಮಾಡಿದ ಆರ್ಡರ್‌ಗಳು ಲೈವ್ ಸ್ಥಿತಿ ಮತ್ತು ಒಂದು-ಟ್ಯಾಪ್ ಮರುಆರ್ಡರ್‌ನೊಂದಿಗೆ ಇಲ್ಲಿ ಕಾಣಿಸುತ್ತವೆ.",
       "track": "ಹಾಡು",
       "repeat": "ರೆಕಾರ್ಡರ್",
-      "history": "ಆರ್ಡರ್ ಇತಿಹಾಸ"
+      "history": "ಆರ್ಡರ್ ಇತಿಹಾಸ",
+      "itemsCount": "{{count}} items",
+      "lede": "Track, rate, and reorder home meals from kitchens you trust.",
+      "masterReceipt": "Master receipt · {{count}} kitchens",
+      "rateMeal": "Rate meal"
     },
     "track": {
       "title": "ನನ್ನ ಆರ್ಡರ್ ಅನ್ನು ಟ್ರ್ಯಾಕ್ ಮಾಡಿ",
@@ -405,7 +412,26 @@
       "findFood": "Find food nearby",
       "moreTabs": "More",
       "refundDetails": "Where refunds go",
-      "subtitle": "Orders, addresses, and support — simple tools for everyday ordering."
+      "subtitle": "Orders, addresses, and support — simple tools for everyday ordering.",
+      "editProfile": "Edit profile",
+      "greeting": "Hi, {{name}}",
+      "moreSections": "Also in your space",
+      "payoutShortcut": "Refund payout",
+      "phoneUnlinked": "Phone not linked yet",
+      "resumeTitle": "Latest order",
+      "spaceEyebrow": "Your kitchen space",
+      "statFresh": "Home-cooked",
+      "statFreshHint": "Freshness score",
+      "statHelp": "Help",
+      "statHelpHint": "Open requests",
+      "statOrders": "Orders",
+      "statOrdersHint": "Tap to filter and reorder",
+      "statRefunds": "Refunds",
+      "statRefundsHint": "Completed to your payout",
+      "statSaved": "Saved",
+      "statSavedHint": "Vs typical restaurant pricing",
+      "tipsEmpty": "Order a few home meals — light walk and water tips will show up here.",
+      "tipsTitle": "Tips after your meals"
     },
     "account": {
       "title": "ಖಾತೆ",
@@ -427,7 +453,14 @@
       "upiId": "UPI ID",
       "upiQrHint": "Optional — owners can use this when sending a direct UPI refund.",
       "upiQrTitle": "UPI QR / scanner image",
-      "uploadImage": "Upload image"
+      "uploadImage": "Upload image",
+      "backToSpace": "Back to profile",
+      "enterAccount": "Enter account number",
+      "payoutStatusMissing": "Add UPI or bank so kitchens can refund you quickly.",
+      "payoutStatusReady": "Refunds can reach this UPI or bank account.",
+      "profileHint": "This name shows on orders and kitchen receipts.",
+      "qrChange": "Replace QR image",
+      "savedMasked": "Saved: {{masked}}"
     },
     "delivery": {
       "addAddress": "Add an address",

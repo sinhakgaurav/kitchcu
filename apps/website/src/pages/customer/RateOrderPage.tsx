@@ -94,7 +94,7 @@ export function RateOrderPage() {
   if (done) {
     return (
       <div className="container customer-checkout">
-        <section className="glass">
+        <section className="glass customer-dash__card">
           <h1>Thank you!</h1>
           <p>Your home-taste ratings help this kitchen grow with trust.</p>
           {healthNudge && (
@@ -114,8 +114,8 @@ export function RateOrderPage() {
 
   return (
     <div className="container customer-checkout">
-      <Link to="/orders" className="owner-back">← Back to orders</Link>
-      <header className="owner-page__head">
+      <Link to="/orders" className="customer-checkout__back">← Back to orders</Link>
+      <header className="customer-checkout__head">
         <div>
           <h1>{alreadyRated ? "Your rating" : "Rate your meal"}</h1>
           <p>

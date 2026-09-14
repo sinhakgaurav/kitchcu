@@ -347,7 +347,9 @@
       "signIn": "साइन इन",
       "logout": "Log out",
       "notifications": "Notifications",
-      "profile": "My profile"
+      "profile": "My profile",
+      "addresses": "पते",
+      "payout": "रिफ़ंड भुगतान"
     },
     "auth": {
       "title": "ऑर्डर करने के लिए साइन इन",
@@ -364,7 +366,8 @@
       "lede": "असली डिश फ़ोटो, सही तैयारी समय, और सही डिलीवरी — घर जैसा स्वाद ऑर्डर करें।",
       "searchPlaceholder": "किचन, व्यंजन, डिश खोजें…",
       "useLocation": "मेरा स्थान उपयोग करें",
-      "noResults": "आपके फ़िल्टर से कोई किचन मेल नहीं खाता"
+      "noResults": "आपके फ़िल्टर से कोई किचन मेल नहीं खाता",
+      "helloName": "घर जैसा स्वाद ऑर्डर करें, {{name}}"
     },
     "checkout": {
       "title": "चेकआउट",
@@ -380,7 +383,11 @@
       "emptyHint": "आपके ऑर्डर यहाँ लाइव स्टेटस और एक-टैप रीऑर्डर के साथ दिखेंगे।",
       "track": "ट्रैक करें",
       "repeat": "फिर से ऑर्डर करें",
-      "history": "ऑर्डर इतिहास"
+      "history": "ऑर्डर इतिहास",
+      "itemsCount": "{{count}} आइटम",
+      "lede": "ट्रैक करें, रेट करें, और भरोसेमंद किचन से दोबारा ऑर्डर करें।",
+      "masterReceipt": "मास्टर रसीद · {{count}} किचन",
+      "rateMeal": "भोजन रेट करें"
     },
     "track": {
       "title": "ऑर्डर ट्रैक करें",
@@ -405,7 +412,26 @@
       "tabPlans": "मील प्लान",
       "moreTabs": "और",
       "findFood": "पास का खाना खोजें",
-      "refundDetails": "रिफ़ंड कहाँ जाएँगे"
+      "refundDetails": "रिफ़ंड कहाँ जाएँगे",
+      "editProfile": "प्रोफ़ाइल बदलें",
+      "greeting": "नमस्ते, {{name}}",
+      "moreSections": "और भी आपकी स्पेस में",
+      "payoutShortcut": "रिफ़ंड भुगतान",
+      "phoneUnlinked": "फ़ोन अभी लिंक नहीं है",
+      "resumeTitle": "नवीनतम ऑर्डर",
+      "spaceEyebrow": "आपकी किचन स्पेस",
+      "statFresh": "घर का बना",
+      "statFreshHint": "ताज़गी स्कोर",
+      "statHelp": "मदद",
+      "statHelpHint": "खुली शिकायतें",
+      "statOrders": "ऑर्डर",
+      "statOrdersHint": "फ़िल्टर और रीऑर्डर के लिए टैप करें",
+      "statRefunds": "रिफ़ंड",
+      "statRefundsHint": "आपके भुगतान खाते में पूरे",
+      "statSaved": "बचत",
+      "statSavedHint": "रेस्टोरेंट कीमत के मुकाबले",
+      "tipsEmpty": "कुछ घर के भोजन ऑर्डर करें — चलने और पानी के सुझाव यहाँ दिखेंगे।",
+      "tipsTitle": "भोजन के बाद सुझाव"
     },
     "account": {
       "title": "रिफ़ंड कहाँ जाएँगे",
@@ -419,7 +445,7 @@
       "accountHolder": "खाताधारक का नाम",
       "bankAccount": "बैंक खाता संख्या",
       "ifsc": "IFSC",
-      "pageTitle": "अकाउंट",
+      "pageTitle": "रिफ़ंड भुगतान",
       "payoutSaved": "भुगतान विवरण सहेजे गए — किचन इस UPI या बैंक पर रिफ़ंड भेज सकते हैं।",
       "qrUploaded": "UPI QR छवि अपलोड हो गई।",
       "savePayout": "भुगतान विवरण सहेजें",
@@ -427,7 +453,14 @@
       "upiId": "UPI ID",
       "upiQrHint": "वैकल्पिक — सीधा UPI रिफ़ंड भेजते समय ओनर इसका उपयोग कर सकते हैं।",
       "upiQrTitle": "UPI QR / स्कैनर छवि",
-      "uploadImage": "छवि अपलोड करें"
+      "uploadImage": "छवि अपलोड करें",
+      "backToSpace": "प्रोफ़ाइल पर वापस",
+      "enterAccount": "खाता संख्या लिखें",
+      "payoutStatusMissing": "UPI या बैंक जोड़ें ताकि किचन आपको जल्दी रिफ़ंड भेज सकें।",
+      "payoutStatusReady": "रिफ़ंड इस UPI या बैंक तक पहुँच सकते हैं।",
+      "profileHint": "यह नाम ऑर्डर और किचन रसीद पर दिखता है।",
+      "qrChange": "QR छवि बदलें",
+      "savedMasked": "सेव्ड: {{masked}}"
     },
     "delivery": {
       "addAddress": "Add an address",

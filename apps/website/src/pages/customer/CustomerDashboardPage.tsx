@@ -51,7 +51,13 @@ import {
 import type { CustomerKitchenSubscription } from "../../shared/api";
 import { useCustomerAuth } from "../../shared/customerAuth";
 import { addItemsToCart, kitchenFromOrderCode } from "../../shared/customerCart";
+import { CustomerAvatar } from "../../components/CustomerAvatar";
 import { PhoneField } from "../../components/PhoneField";
+import {
+  customerStatusTone,
+  humanStatus,
+  maskCustomerPhone,
+} from "../../shared/customerUi";
 import {
   firstError,
   otpInputValue,
@@ -244,62 +250,72 @@ export function CustomerDashboardPage() {
 
   return (
     <div className="container customer-dash">
-      <header className="customer-dash__hero">
-        <div>
-          <p className="customer-dash__eyebrow">Your kitchCU space</p>
-          <h1>
-            {profile?.name
-              ? `Hi, ${profile.name.split(" ")[0]}`
-              : t("customer.dashboard.title")}
-          </h1>
-          <p>{t("customer.dashboard.subtitle")}</p>
+      <header className="customer-space__hero">
+        <div className="customer-space__identity">
+          <CustomerAvatar name={profile?.name} src={profile?.avatar_url} size="lg" />
+          <div>
+            <p className="customer-dash__eyebrow">{t("customer.dashboard.spaceEyebrow")}</p>
+            <h1>
+              {profile?.name
+                ? t("customer.dashboard.greeting", { name: profile.name.split(" ")[0] })
+                : t("customer.dashboard.title")}
+            </h1>
+            <p className="customer-space__meta">
+              {profile?.phone
+                ? maskCustomerPhone(profile.phone)
+                : t("customer.dashboard.phoneUnlinked")}
+              {profile?.email ? ` · ${profile.email}` : ""}
+            </p>
+          </div>
         </div>
         <div className="customer-dash__hero-actions">
           <Link to="/#near-you" className="btn btn--primary btn--sm">
             {t("customer.dashboard.findFood")}
           </Link>
-          <Link to="/account" className="btn btn--ghost btn--sm">
-            {t("customer.dashboard.refundDetails")}
-          </Link>
+          {tab === "account" ? (
+            <Link to="/account" className="btn btn--ghost btn--sm">
+              {t("customer.dashboard.payoutShortcut")}
+            </Link>
+          ) : (
+            <button type="button" className="btn btn--ghost btn--sm" onClick={() => selectTab("account")}>
+              {t("customer.dashboard.editProfile")}
+            </button>
+          )}
         </div>
       </header>
 
-      <nav className="customer-dash__tabs" aria-label="Dashboard sections">
-        {PRIMARY_TABS.map((item) => (
-          <button
-            key={item.id}
-            type="button"
-            className={tab === item.id ? "active" : ""}
-            onClick={() => selectTab(item.id)}
-          >
-            {t(item.labelKey)}
-          </button>
-        ))}
-        <label className="customer-dash__more">
-          <span className="visually-hidden">{t("customer.dashboard.moreTabs")}</span>
-          <select
-            value={MORE_TABS.some((m) => m.id === tab) ? tab : ""}
-            onChange={(e) => {
-              const next = e.target.value as Tab;
-              if (next) selectTab(next);
-            }}
-            aria-label={t("customer.dashboard.moreTabs")}
-          >
-            <option value="">{t("customer.dashboard.moreTabs")}</option>
-            {MORE_TABS.map((item) => (
-              <option key={item.id} value={item.id}>
-                {t(item.labelKey)}
-              </option>
-            ))}
-          </select>
-        </label>
-      </nav>
+      <div className="customer-dash__tab-rail">
+        <nav className="customer-dash__tabs" aria-label={t("customer.dashboard.title")}>
+          {PRIMARY_TABS.map((item) => (
+            <button
+              key={item.id}
+              type="button"
+              className={tab === item.id ? "active" : ""}
+              onClick={() => selectTab(item.id)}
+            >
+              {t(item.labelKey)}
+            </button>
+          ))}
+        </nav>
+        <nav className="customer-dash__tabs customer-dash__tabs--more" aria-label={t("customer.dashboard.moreSections")}>
+          {MORE_TABS.map((item) => (
+            <button
+              key={item.id}
+              type="button"
+              className={tab === item.id ? "active" : ""}
+              onClick={() => selectTab(item.id)}
+            >
+              {t(item.labelKey)}
+            </button>
+          ))}
+        </nav>
+      </div>
 
       {error && <div className="auth-card__error">{error}</div>}
       {loading && <p className="app-loading">Loading dashboard…</p>}
 
       {!loading && dash && tab === "overview" && (
-        <OverviewPanel dash={dash} refunds={refunds} tickets={tickets} onGo={setTab} />
+        <OverviewPanel dash={dash} refunds={refunds} tickets={tickets} onGo={selectTab} />
       )}
       {!loading && dash && tab === "orders" && (
         <OrdersPanel
@@ -311,7 +327,7 @@ export function CustomerDashboardPage() {
           setCuisine={setCuisine}
           setLiveOnly={setLiveOnly}
           onRaiseIssue={(code) => {
-            setTab("complaints");
+            selectTab("complaints");
             window.dispatchEvent(new CustomEvent("kitchcu-raise-issue", { detail: code }));
           }}
         />
@@ -384,36 +400,96 @@ function OverviewPanel({
   tickets: CustomerTicket[];
   onGo: (t: Tab) => void;
 }) {
-  const openTickets = tickets.filter((t) => !["resolved", "closed"].includes(t.status)).length;
+  const { t } = useTranslation();
+  const navigate = useNavigate();
+  const openTickets = tickets.filter((row) => !["resolved", "closed"].includes(row.status)).length;
   const completedRefunds = refunds.filter((r) => r.status === "completed");
+  const latest = dash.orders[0];
   return (
     <div className="customer-dash__grid">
+      {latest ? (
+        <section className="glass customer-dash__card customer-dash__span2 customer-dash__resume">
+          <p className="customer-dash__eyebrow">{t("customer.dashboard.resumeTitle")}</p>
+          <div className="customer-dash__resume-row">
+            <div>
+              <strong>{latest.order.order_code}</strong>
+              <span>
+                {formatWhen(latest.order.created_at)} · {inr(latest.order.total)}
+              </span>
+              <span className={`customer-status customer-status--${customerStatusTone(latest.order.status)}`}>
+                {humanStatus(latest.order.status)}
+              </span>
+            </div>
+            <div className="customer-dash__order-actions">
+              {latest.tracking_token ? (
+                <Link className="btn btn--ghost btn--sm" to={`/t/${latest.tracking_token}`}>
+                  {t("customer.orders.track")}
+                </Link>
+              ) : null}
+              <button
+                type="button"
+                className="btn btn--primary btn--sm"
+                disabled={latest.order.status === "cancelled" || latest.items.length === 0}
+                onClick={() => {
+                  if (!latest.items.length || latest.order.status === "cancelled") return;
+                  addItemsToCart(
+                    kitchenFromOrderCode(latest.order.kitchen_id, latest.order.order_code),
+                    latest.items.map((item) => ({
+                      dish_id: item.dish_id,
+                      dish_name: item.dish_name,
+                      quantity: item.quantity,
+                      unit_price: item.unit_price,
+                    })),
+                  );
+                  navigate("/checkout");
+                }}
+              >
+                {t("customer.orders.repeat")}
+              </button>
+              <button type="button" className="btn btn--ghost btn--sm" onClick={() => onGo("orders")}>
+                {t("customer.dashboard.tabOrders")}
+              </button>
+            </div>
+          </div>
+        </section>
+      ) : (
+        <section className="glass customer-dash__card customer-dash__span2 empty-state">
+          <p className="empty-state__title">{t("customer.orders.empty")}</p>
+          <p className="empty-state__hint">{t("customer.orders.emptyHint")}</p>
+          <Link to="/#near-you" className="btn btn--primary">
+            {t("customer.dashboard.findFood")}
+          </Link>
+        </section>
+      )}
       <button type="button" className="glass customer-dash__stat" onClick={() => onGo("orders")}>
+        <span className="customer-dash__stat-kicker">{t("customer.dashboard.statOrders")}</span>
         <strong>{dash.orders.length}</strong>
-        <span>Your orders</span>
+        <span>{t("customer.dashboard.statOrdersHint")}</span>
       </button>
       <button type="button" className="glass customer-dash__stat" onClick={() => onGo("savings")}>
+        <span className="customer-dash__stat-kicker">{t("customer.dashboard.statSaved")}</span>
         <strong>{inr(dash.savings.total_saved)}</strong>
-        <span>Saved vs eating out</span>
+        <span>{t("customer.dashboard.statSavedHint")}</span>
       </button>
       <button type="button" className="glass customer-dash__stat" onClick={() => onGo("health")}>
+        <span className="customer-dash__stat-kicker">{t("customer.dashboard.statFresh")}</span>
         <strong>{dash.health.home_freshness_score}</strong>
-        <span>Home-cooked score</span>
+        <span>{t("customer.dashboard.statFreshHint")}</span>
       </button>
       <button type="button" className="glass customer-dash__stat" onClick={() => onGo("refunds")}>
+        <span className="customer-dash__stat-kicker">{t("customer.dashboard.statRefunds")}</span>
         <strong>{completedRefunds.length}</strong>
-        <span>Refunds received</span>
+        <span>{t("customer.dashboard.statRefundsHint")}</span>
       </button>
       <button type="button" className="glass customer-dash__stat" onClick={() => onGo("complaints")}>
+        <span className="customer-dash__stat-kicker">{t("customer.dashboard.statHelp")}</span>
         <strong>{openTickets}</strong>
-        <span>Open help requests</span>
+        <span>{t("customer.dashboard.statHelpHint")}</span>
       </button>
       <section className="glass customer-dash__card customer-dash__span2">
-        <h2>Tips after your meals</h2>
+        <h2>{t("customer.dashboard.tipsTitle")}</h2>
         {dash.tips.length === 0 ? (
-          <p className="customer-dash__empty-hint">
-            Order a few home meals — light walk and water tips will show up here.
-          </p>
+          <p className="customer-dash__empty-hint">{t("customer.dashboard.tipsEmpty")}</p>
         ) : (
           <ul className="customer-dash__tips">
             {dash.tips.slice(0, 3).map((tip, i) => (
@@ -485,7 +561,13 @@ function OrdersPanel({
       </div>
 
       {dash.orders.length === 0 ? (
-        <p className="glass customer-dash__card">No orders match these filters.</p>
+        <div className="glass empty-state">
+          <p className="empty-state__title">No orders match these filters.</p>
+          <p className="empty-state__hint">Clear diet or cuisine filters, or find a kitchen nearby.</p>
+          <Link to="/#near-you" className="btn btn--primary">
+            Find food nearby
+          </Link>
+        </div>
       ) : (
         <ul className="customer-dash__orders">
           {dash.orders.map((row) => (
@@ -526,10 +608,14 @@ function OrderCard({
     <li className="glass customer-dash__order">
       <div className="customer-dash__order-head">
         <div>
-          <strong>{row.order.order_code}</strong>
+          <div className="customer-dash__order-title">
+            <strong>{row.order.order_code}</strong>
+            <span className={`customer-status customer-status--${customerStatusTone(row.order.status)}`}>
+              {humanStatus(row.order.status)}
+            </span>
+          </div>
           <span>
-            {formatWhen(row.order.created_at)} · {row.order.status.replace(/_/g, " ")} ·{" "}
-            {inr(row.order.total)}
+            {formatWhen(row.order.created_at)} · {inr(row.order.total)}
           </span>
           <span>
             {(row.cuisines.length ? row.cuisines.join(", ") : "—") +
@@ -879,15 +965,22 @@ function PlansPanel({
 
   return (
     <section className="glass customer-dash__card">
-      <h2>My thali / tiffin plans</h2>
-      <p className="owner-muted">
-        Request plans from a kitchen menu. The kitchen accepts or denies before billing starts.
-      </p>
-      {subs.length === 0 ? (
+      <header className="customer-dash__panel-head">
+        <h2>My thali / tiffin plans</h2>
         <p>
-          No plan requests yet.{" "}
-          <Link to="/#near-you">Find a kitchen</Link> and tap Request subscribe on their monthly plan.
+          Request plans from a kitchen menu. The kitchen accepts or denies before billing starts.
         </p>
+      </header>
+      {subs.length === 0 ? (
+        <div className="empty-state">
+          <p className="empty-state__title">No meal plans yet</p>
+          <p className="empty-state__hint">
+            Find a kitchen and tap Request subscribe on their monthly plan.
+          </p>
+          <Link to="/#near-you" className="btn btn--primary">
+            Find food nearby
+          </Link>
+        </div>
       ) : (
         <ul className="customer-dash__tips">
           {subs.map((s) => (
@@ -1005,15 +1098,29 @@ function HealthPanel({ dash }: { dash: CustomerDashboard }) {
 }
 
 function RefundsPanel({ refunds }: { refunds: CustomerRefund[] }) {
+  const { t } = useTranslation();
   return (
     <section className="glass customer-dash__card">
-      <h2>Refunds received</h2>
-      <p>
-        Gateway reverses and direct UPI/bank transfers (remark = order id). Manage payout details under{" "}
-        <Link to="/account">Payout details</Link>.
-      </p>
+      <header className="customer-dash__panel-head">
+        <h2>{t("customer.dashboard.tabRefunds")}</h2>
+        <p>
+          Gateway reverses and direct UPI/bank transfers (remark = order id).
+        </p>
+      </header>
+      <Link to="/account" className="btn btn--ghost btn--sm customer-dash__inline-cta">
+        {t("customer.dashboard.payoutShortcut")}
+      </Link>
       {refunds.length === 0 ? (
-        <p>No refunds yet.</p>
+        <div className="empty-state">
+          <p className="empty-state__title">No refunds yet</p>
+          <p className="empty-state__hint">
+            If a kitchen refunds you, the amount and channel show up here. Add UPI or bank so money
+            can reach you quickly.
+          </p>
+          <Link to="/account" className="btn btn--primary">
+            {t("customer.dashboard.payoutShortcut")}
+          </Link>
+        </div>
       ) : (
         <ul className="customer-dash__tips">
           {refunds.map((r) => (
@@ -1709,6 +1816,7 @@ function AccountPanel({
   setBusy: (v: boolean) => void;
   setError: (v: string) => void;
 }) {
+  const { t } = useTranslation();
   const { logout } = useCustomerAuth();
   const navigate = useNavigate();
   const [name, setName] = useState(profile.name);
@@ -1808,9 +1916,35 @@ function AccountPanel({
   };
 
   return (
-    <div className="customer-dash__split">
+    <div className="customer-dash__account">
+      <section className="glass customer-profile-id">
+        <CustomerAvatar name={profile.name} src={profile.avatar_url} size="lg" />
+        <div className="customer-profile-id__copy">
+          <h2>{profile.name || "Your profile"}</h2>
+          <p>
+            {profile.phone ? maskCustomerPhone(profile.phone) : t("customer.dashboard.phoneUnlinked")}
+            {profile.email ? ` · ${profile.email}` : ""}
+          </p>
+          <p className="customer-profile-id__status">
+            {profile.upi_vpa || profile.bank_account_number_masked
+              ? t("customer.account.payoutStatusReady")
+              : t("customer.account.payoutStatusMissing")}
+          </p>
+        </div>
+        <div className="customer-profile-id__actions">
+          <Link to="/dashboard?tab=addresses" className="btn btn--ghost btn--sm">
+            {t("customer.nav.addresses")}
+          </Link>
+          <Link to="/account" className="btn btn--primary btn--sm">
+            {t("customer.dashboard.payoutShortcut")}
+          </Link>
+        </div>
+      </section>
+
+      <div className="customer-dash__split">
       <form className="glass customer-dash__card" onSubmit={saveProfile}>
-        <h2>My profile</h2>
+        <h2>{t("customer.nav.profile")}</h2>
+        <p className="auth-card__hint">{t("customer.account.profileHint")}</p>
         <label>
           Name
           <input
@@ -1839,13 +1973,15 @@ function AccountPanel({
           />
           {fieldErrors.email ? <span className="field-error">{fieldErrors.email}</span> : null}
         </label>
-        <p className="auth-card__hint">Phone: {profile.phone || "not linked — use WhatsApp login"}</p>
+        <p className="auth-card__hint">
+          Phone: {profile.phone ? maskCustomerPhone(profile.phone) : "not linked — use WhatsApp login"}
+        </p>
         <button type="submit" className="btn btn--primary" disabled={busy}>
           Save profile
         </button>
       </form>
       <form className="glass customer-dash__card" onSubmit={savePassword}>
-        <h2>Change password</h2>
+        <h2>Password</h2>
         <p className="auth-card__hint">
           Customers primarily sign in with WhatsApp OTP / social login. An optional password can be
           added for convenience — first set requires WhatsApp OTP.
@@ -1896,6 +2032,7 @@ function AccountPanel({
           </button>
         </div>
       </form>
+      </div>
 
       <section id="notifications" className="glass customer-dash__card">
         <h2>Notifications</h2>
@@ -1934,9 +2071,8 @@ function AccountPanel({
         </label>
       </section>
 
-      <section className="glass customer-dash__card">
-        <h2>Sign out</h2>
-        <p className="auth-card__hint">
+      <section className="customer-dash__signout">
+        <p>
           Signs you out on this device. Your orders, addresses, and saved kitchens stay on your
           account.
         </p>

@@ -1,5 +1,5 @@
 import { FormEvent, useCallback, useEffect, useState, type ReactNode } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { BrandLogo } from "../../components/BrandLogo";
 import { DeliveryAddressPicker } from "../../components/DeliveryAddressPicker";
@@ -11,7 +11,7 @@ import { DEMO } from "../../shared/demo";
 import { useCustomerDelivery } from "../../shared/customerDelivery";
 import type { KitchenPublic, LiveKitchenSummary } from "../../shared/api";
 import { fetchLiveKitchens } from "../../shared/api";
-import { useCustomerAuth } from "../../shared/customerAuth";
+import { isCustomerSignedIn, useCustomerAuth } from "../../shared/customerAuth";
 import { saveKitchenToSession } from "../../shared/customerSession";
 import {
   fetchDiscoveryHome,
@@ -364,10 +364,17 @@ export function CustomerDiscoveryHome() {
           <BrandLogo variant="wordmark" className="brand-logo--lg disc-home__brand" />
           <h1>
             {heroName
-              ? `Order home taste, ${heroName}`
+              ? t("customer.discovery.helloName", { name: heroName })
               : t("customer.discovery.title")}
           </h1>
           <p className="disc-home__lede">{t("customer.discovery.lede")}</p>
+          {isCustomerSignedIn(session) ? (
+            <div className="disc-home__welcome">
+              <Link to="/dashboard">{t("customer.nav.dashboard")}</Link>
+              <Link to="/orders">{t("customer.nav.myOrders")}</Link>
+              <Link to="/dashboard?tab=account">{t("customer.nav.profile")}</Link>
+            </div>
+          ) : null}
           <p className="disc-home__ops">
             <SuperAdminLink className="disc-home__ops-link" />
           </p>

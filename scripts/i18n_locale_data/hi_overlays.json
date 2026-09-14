@@ -14,8 +14,42 @@
     "navCities": "शहर"
   },
   "customer": {
+    "nav": {
+      "addresses": "पते",
+      "payout": "रिफ़ंड भुगतान"
+    },
+    "discovery": {
+      "helloName": "घर जैसा स्वाद ऑर्डर करें, {{name}}"
+    },
+    "orders": {
+      "lede": "ट्रैक करें, रेट करें, और भरोसेमंद किचन से दोबारा ऑर्डर करें।",
+      "masterReceipt": "मास्टर रसीद · {{count}} किचन",
+      "itemsCount": "{{count}} आइटम",
+      "rateMeal": "भोजन रेट करें"
+    },
+    "dashboard": {
+      "spaceEyebrow": "आपकी किचन स्पेस",
+      "greeting": "नमस्ते, {{name}}",
+      "phoneUnlinked": "फ़ोन अभी लिंक नहीं है",
+      "moreSections": "और भी आपकी स्पेस में",
+      "editProfile": "प्रोफ़ाइल बदलें",
+      "payoutShortcut": "रिफ़ंड भुगतान",
+      "resumeTitle": "नवीनतम ऑर्डर",
+      "statOrders": "ऑर्डर",
+      "statOrdersHint": "फ़िल्टर और रीऑर्डर के लिए टैप करें",
+      "statSaved": "बचत",
+      "statSavedHint": "रेस्टोरेंट कीमत के मुकाबले",
+      "statFresh": "घर का बना",
+      "statFreshHint": "ताज़गी स्कोर",
+      "statRefunds": "रिफ़ंड",
+      "statRefundsHint": "आपके भुगतान खाते में पूरे",
+      "statHelp": "मदद",
+      "statHelpHint": "खुली शिकायतें",
+      "tipsTitle": "भोजन के बाद सुझाव",
+      "tipsEmpty": "कुछ घर के भोजन ऑर्डर करें — चलने और पानी के सुझाव यहाँ दिखेंगे।"
+    },
     "account": {
-      "pageTitle": "अकाउंट",
+      "pageTitle": "रिफ़ंड भुगतान",
       "upiId": "UPI ID",
       "bankAccount": "बैंक खाता संख्या",
       "ifsc": "IFSC",
@@ -25,8 +59,15 @@
       "upiQrTitle": "UPI QR / स्कैनर छवि",
       "upiQrHint": "वैकल्पिक — सीधा UPI रिफ़ंड भेजते समय ओनर इसका उपयोग कर सकते हैं।",
       "uploadImage": "छवि अपलोड करें",
+      "qrChange": "QR छवि बदलें",
       "payoutSaved": "भुगतान विवरण सहेजे गए — किचन इस UPI या बैंक पर रिफ़ंड भेज सकते हैं।",
-      "qrUploaded": "UPI QR छवि अपलोड हो गई।"
+      "qrUploaded": "UPI QR छवि अपलोड हो गई।",
+      "backToSpace": "प्रोफ़ाइल पर वापस",
+      "payoutStatusReady": "रिफ़ंड इस UPI या बैंक तक पहुँच सकते हैं।",
+      "payoutStatusMissing": "UPI या बैंक जोड़ें ताकि किचन आपको जल्दी रिफ़ंड भेज सकें।",
+      "savedMasked": "सेव्ड: {{masked}}",
+      "enterAccount": "खाता संख्या लिखें",
+      "profileHint": "यह नाम ऑर्डर और किचन रसीद पर दिखता है।"
     }
   }
 }

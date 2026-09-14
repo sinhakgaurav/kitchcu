@@ -353,6 +353,8 @@
       "dashboard": "My space",
       "account": "Account",
       "profile": "My profile",
+      "addresses": "Addresses",
+      "payout": "Refund payout",
       "notifications": "Notifications",
       "logout": "Log out",
       "signIn": "Sign in"
@@ -369,6 +371,7 @@
     },
     "discovery": {
       "title": "Home kitchens near you",
+      "helloName": "Order home taste, {{name}}",
       "lede": "Real dish photos, honest prep times, and fair delivery — order home taste.",
       "searchPlaceholder": "Search kitchen, dish, or cuisine…",
       "useLocation": "Use my location",
@@ -401,7 +404,11 @@
       "emptyHint": "Orders you place will show up here with live status and a one-tap reorder.",
       "track": "Track",
       "repeat": "Reorder",
-      "history": "Order history"
+      "history": "Order history",
+      "lede": "Track, rate, and reorder home meals from kitchens you trust.",
+      "masterReceipt": "Master receipt · {{count}} kitchens",
+      "itemsCount": "{{count}} items",
+      "rateMeal": "Rate meal"
     },
     "track": {
       "title": "Track order",
@@ -411,6 +418,9 @@
     "dashboard": {
       "title": "My kitchen space",
       "subtitle": "Orders, addresses, and support — simple tools for everyday ordering.",
+      "spaceEyebrow": "Your kitchen space",
+      "greeting": "Hi, {{name}}",
+      "phoneUnlinked": "Phone not linked yet",
       "savedKitchens": "Your kitchens",
       "referrals": "Referrals",
       "tickets": "Support",
@@ -425,8 +435,24 @@
       "tabPlans": "Meal plans",
       "tabAccount": "Profile",
       "moreTabs": "More",
+      "moreSections": "Also in your space",
       "findFood": "Find food nearby",
-      "refundDetails": "Where refunds go"
+      "refundDetails": "Where refunds go",
+      "editProfile": "Edit profile",
+      "payoutShortcut": "Refund payout",
+      "resumeTitle": "Latest order",
+      "statOrders": "Orders",
+      "statOrdersHint": "Tap to filter and reorder",
+      "statSaved": "Saved",
+      "statSavedHint": "Vs typical restaurant pricing",
+      "statFresh": "Home-cooked",
+      "statFreshHint": "Freshness score",
+      "statRefunds": "Refunds",
+      "statRefundsHint": "Completed to your payout",
+      "statHelp": "Help",
+      "statHelpHint": "Open requests",
+      "tipsTitle": "Tips after your meals",
+      "tipsEmpty": "Order a few home meals — light walk and water tips will show up here."
     },
     "account": {
       "title": "Where refunds go",
@@ -437,7 +463,7 @@
       "myOrders": "My orders",
       "mySpace": "My space",
       "logOut": "Log out",
-      "pageTitle": "Account",
+      "pageTitle": "Refund payout",
       "upiId": "UPI ID",
       "bankAccount": "Bank account number",
       "ifsc": "IFSC",
@@ -447,8 +473,15 @@
       "upiQrTitle": "UPI QR / scanner image",
       "upiQrHint": "Optional — owners can use this when sending a direct UPI refund.",
       "uploadImage": "Upload image",
+      "qrChange": "Replace QR image",
       "payoutSaved": "Payout details saved — kitchens can refund to this UPI or bank account.",
-      "qrUploaded": "UPI QR image uploaded."
+      "qrUploaded": "UPI QR image uploaded.",
+      "backToSpace": "Back to profile",
+      "payoutStatusReady": "Refunds can reach this UPI or bank account.",
+      "payoutStatusMissing": "Add UPI or bank so kitchens can refund you quickly.",
+      "savedMasked": "Saved: {{masked}}",
+      "enterAccount": "Enter account number",
+      "profileHint": "This name shows on orders and kitchen receipts."
     }
   }
 }

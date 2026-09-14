@@ -22,7 +22,11 @@ export function CustomerFooter() {
           <a href="/#featured">Featured</a>
           <a href="/#by-code">Kitchen code</a>
           {signedIn ? (
-            <Link to="/dashboard">My space</Link>
+            <>
+              <Link to="/dashboard">My space</Link>
+              <Link to="/orders">My orders</Link>
+              <Link to="/dashboard?tab=account">Profile</Link>
+            </>
           ) : (
             <Link to="/login">Customer sign in</Link>
           )}

@@ -2202,6 +2202,29 @@
   line-height: 1.45;
   text-shadow: 0 1px 12px rgba(0, 0, 0, 0.35);
 }
+.disc-home__welcome {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  margin-top: 0.9rem;
+}
+.disc-home__welcome a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 2.1rem;
+  padding: 0.28rem 0.85rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.16);
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  color: #fff;
+  font-weight: 700;
+  font-size: 0.82rem;
+  text-decoration: none;
+  backdrop-filter: blur(8px);
+}
+.disc-home__welcome a:hover {
+  background: rgba(46, 196, 182, 0.55);
+}
 .disc-home__ops {
   margin: 0.55rem 0 0;
 }

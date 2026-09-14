@@ -3,6 +3,7 @@ import { Link, useParams } from "react-router-dom";
 import { fetchTracking, type TrackingInfo } from "../../shared/api";
 import { STATUS_LABELS } from "../../lib/api";
 import { googleMapsDirectionsEmbedUrl, googleMapsRouteUrl } from "../../lib/locationMaps";
+import { customerStatusTone, humanStatus } from "../../shared/customerUi";
 
 export function TrackOrderPage() {
   const { token } = useParams<{ token: string }>();
@@ -39,11 +40,11 @@ export function TrackOrderPage() {
 
   return (
     <div className="container customer-checkout">
-      <Link to="/" className="owner-back">← Back to kitchCU</Link>
-      <header className="owner-page__head">
+      <Link to="/" className="customer-checkout__back">← Back to kitchCU</Link>
+      <header className="customer-checkout__head">
         <div>
           <h1>Order tracking</h1>
-          <p>Live status + Google Maps route from kitchen to you.</p>
+          <p>Live status from kitchen to your door.</p>
         </div>
       </header>
 
@@ -51,12 +52,15 @@ export function TrackOrderPage() {
       {error && <div className="auth-card__error">{error}</div>}
 
       {info && (
-        <section className="glass report-card">
+        <section className="glass customer-dash__card">
           <h2>{info.kitchen_name ?? "Kitchen"}</h2>
           <p className="owner-page__code">{info.order_code}</p>
+          <span className={`customer-status customer-status--${customerStatusTone(info.status)}`}>
+            {STATUS_LABELS[info.status] ?? humanStatus(info.status)}
+          </span>
           <div className="owner-stats report-kpis">
             <div className="owner-stat glass">
-              <strong>{STATUS_LABELS[info.status] ?? info.status}</strong>
+              <strong>{STATUS_LABELS[info.status] ?? humanStatus(info.status)}</strong>
               <span>Status</span>
             </div>
             {info.distance_km != null && (

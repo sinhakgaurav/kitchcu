@@ -6,6 +6,7 @@ import { getCustomerToken } from "../../shared/customerApi";
 import { useCustomerAuth } from "../../shared/customerAuth";
 import { addItemsToCart, kitchenFromOrderCode } from "../../shared/customerCart";
 import { fetchMyOrders } from "../../shared/customerCheckoutApi";
+import { customerStatusTone, humanStatus } from "../../shared/customerUi";
 
 function formatWhen(iso: string, locale: string): string {
   try {
@@ -103,13 +104,21 @@ export function OrdersPage() {
   };
 
   return (
-    <div className="container customer-checkout">
-      <header className="owner-page__head">
+    <div className="container customer-dash">
+      <header className="customer-space__hero">
         <div>
+          <p className="customer-dash__eyebrow">{t("customer.orders.history")}</p>
           <h1>{t("customer.orders.title")}</h1>
-          <p>{t("customer.orders.history")}</p>
+          <p className="customer-space__meta">{t("customer.orders.lede")}</p>
         </div>
-        <Link to="/#near-you" className="btn btn--ghost btn--sm">{t("customer.discovery.title")}</Link>
+        <div className="customer-dash__hero-actions">
+          <Link to="/#near-you" className="btn btn--primary btn--sm">
+            {t("customer.discovery.title")}
+          </Link>
+          <Link to="/dashboard" className="btn btn--ghost btn--sm">
+            {t("customer.nav.dashboard")}
+          </Link>
+        </div>
       </header>
 
       {error && <div className="auth-card__error">{error}</div>}
@@ -120,73 +129,75 @@ export function OrdersPage() {
         <section className="glass empty-state">
           <p className="empty-state__title">{t("customer.orders.empty")}</p>
           <p className="empty-state__hint">{t("customer.orders.emptyHint")}</p>
-          <Link to="/#near-you" className="btn btn--primary">{t("customer.discovery.title")}</Link>
+          <Link to="/#near-you" className="btn btn--primary">
+            {t("customer.discovery.title")}
+          </Link>
         </section>
       ) : (
-        <ul className="nearby-kitchens__list">
+        <ul className="customer-dash__orders">
           {groups.map((group) => (
-            <li key={group.key}>
+            <li key={group.key} className="customer-order-group">
               {group.masterOrderId && (
                 <div className="customer-order-group__head">
                   <Link
                     to={`/master-orders/${group.masterOrderId}/confirm`}
                     className="btn btn--ghost btn--sm"
                   >
-                    Master receipt · {group.orders.length} kitchens
+                    {t("customer.orders.masterReceipt", { count: group.orders.length })}
                   </Link>
                 </div>
               )}
               {group.orders.map((order) => (
-                <article
-                  key={order.id}
-                  className="glass nearby-kitchens__card"
-                  style={{ cursor: "default" }}
-                >
-                  <div className="nearby-kitchens__card-body">
-                    <strong>{order.order_code}</strong>
-                    <span className="nearby-kitchens__meta">
-                      {formatWhen(order.created_at, i18n.language || "en")} ·{" "}
-                      {t(`status.${order.status}`, { defaultValue: order.status.replace(/_/g, " ") })}
-                    </span>
-                    <span className="nearby-kitchens__meta">
-                      {order.items.length} item{order.items.length === 1 ? "" : "s"} · ₹{order.total.toFixed(0)}
-                    </span>
-                    <ul className="owner-detail-items">
-                      {order.items.slice(0, 4).map((item) => (
-                        <li key={item.id}>
-                          <span>{item.quantity}× {item.dish_name}</span>
-                        </li>
-                      ))}
-                      {order.items.length > 4 && (
-                        <li><span>+{order.items.length - 4} more</span></li>
+                <article key={order.id} className="glass customer-dash__order">
+                  <div className="customer-dash__order-head">
+                    <div>
+                      <div className="customer-dash__order-title">
+                        <strong>{order.order_code}</strong>
+                        <span className={`customer-status customer-status--${customerStatusTone(order.status)}`}>
+                          {t(`status.${order.status}`, { defaultValue: humanStatus(order.status) })}
+                        </span>
+                      </div>
+                      <span>
+                        {formatWhen(order.created_at, i18n.language || "en")} ·{" "}
+                        {t("customer.orders.itemsCount", { count: order.items.length })} · ₹
+                        {order.total.toFixed(0)}
+                      </span>
+                      <ul className="customer-dash__order-items">
+                        {order.items.slice(0, 4).map((item) => (
+                          <li key={item.id}>
+                            {item.quantity}× {item.dish_name}
+                          </li>
+                        ))}
+                        {order.items.length > 4 && (
+                          <li>+{order.items.length - 4} more</li>
+                        )}
+                      </ul>
+                    </div>
+                    <div className="customer-dash__order-actions">
+                      {order.tracking_token && (
+                        <Link to={`/t/${order.tracking_token}`} className="btn btn--ghost btn--sm">
+                          {t("customer.orders.track")}
+                        </Link>
                       )}
-                    </ul>
-                  </div>
-                  <div className="owner-actions">
-                    {order.tracking_token && (
-                      <Link to={`/t/${order.tracking_token}`} className="btn btn--ghost btn--sm">
-                        Track
-                      </Link>
-                    )}
-                    <button
-                      type="button"
-                      className="btn btn--primary btn--sm"
-                      disabled={repeatingId === order.id || order.status === "cancelled"}
-                      onClick={() => onRepeat(order)}
-                    >
-                      {repeatingId === order.id ? t("common.loading") : t("customer.orders.repeat")}
-                    </button>
-                    {order.status === "delivered" && order.is_rated && (
-                      <Link to={`/orders/${order.id}/rate`} className="btn btn--ghost btn--sm">
-                        ★ {order.rating_home_taste?.toFixed(1) ?? "—"} taste
-                        {order.rating_quality != null ? ` · ${order.rating_quality.toFixed(1)} quality` : ""}
-                      </Link>
-                    )}
-                    {order.status === "delivered" && !order.is_rated && (
-                      <Link to={`/orders/${order.id}/rate`} className="btn btn--ghost btn--sm">
-                        Rate meal
-                      </Link>
-                    )}
+                      <button
+                        type="button"
+                        className="btn btn--primary btn--sm"
+                        disabled={repeatingId === order.id || order.status === "cancelled"}
+                        onClick={() => onRepeat(order)}
+                      >
+                        {repeatingId === order.id ? t("common.loading") : t("customer.orders.repeat")}
+                      </button>
+                      {order.status === "delivered" && order.is_rated && (
+                        <Link to={`/orders/${order.id}/rate`} className="btn btn--ghost btn--sm">
+                          ★ {order.rating_home_taste?.toFixed(1) ?? "—"}
+                        </Link>
+                      )}
+                      {order.status === "delivered" && !order.is_rated && (
+                        <Link to={`/orders/${order.id}/rate`} className="btn btn--ghost btn--sm">
+                          {t("customer.orders.rateMeal")}
+                        </Link>
+                      )}
+                    </div>
                   </div>
                 </article>
               ))}

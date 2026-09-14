@@ -64,6 +64,16 @@ export function CustomerNavbar() {
                     {t("customer.nav.profile")}
                   </Link>
                   <Link
+                    to="/dashboard?tab=addresses"
+                    role="menuitem"
+                    onClick={() => setOpen(false)}
+                  >
+                    {t("customer.nav.addresses")}
+                  </Link>
+                  <Link to="/account" role="menuitem" onClick={() => setOpen(false)}>
+                    {t("customer.nav.payout")}
+                  </Link>
+                  <Link
                     to="/dashboard?tab=account#notifications"
                     role="menuitem"
                     onClick={() => setOpen(false)}

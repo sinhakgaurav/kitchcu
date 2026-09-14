@@ -347,7 +347,9 @@
       "signIn": "ग्राहक साइन इन करू",
       "logout": "Log out",
       "notifications": "Notifications",
-      "profile": "My profile"
+      "profile": "My profile",
+      "addresses": "Addresses",
+      "payout": "Refund payout"
     },
     "auth": {
       "title": "ग्राहक साइन इन करू",
@@ -364,7 +366,8 @@
       "searchPlaceholder": "खोज रसोई, व्यंजन, पकवान...",
       "useLocation": "हमर लोकेशन के प्रयोग करू",
       "noResults": "कोनो किचन अहाँक फिल्टर स मेल नहि खाइत अछि",
-      "lede": "Real dish photos, honest prep times, and fair delivery — order home taste."
+      "lede": "Real dish photos, honest prep times, and fair delivery — order home taste.",
+      "helloName": "Order home taste, {{name}}"
     },
     "checkout": {
       "title": "चेकआउट",
@@ -380,7 +383,11 @@
       "emptyHint": "अहाँक ऑर्डर एहिठाम लाइव स्टेटस आ एक-टैप रीऑर्डर संग देखाएत।",
       "track": "पगडंडी",
       "repeat": "पुनः क्रमबद्ध",
-      "history": "आदेश इतिहास"
+      "history": "आदेश इतिहास",
+      "itemsCount": "{{count}} items",
+      "lede": "Track, rate, and reorder home meals from kitchens you trust.",
+      "masterReceipt": "Master receipt · {{count}} kitchens",
+      "rateMeal": "Rate meal"
     },
     "track": {
       "title": "क्रम के ट्रैक",
@@ -405,7 +412,26 @@
       "findFood": "Find food nearby",
       "moreTabs": "More",
       "refundDetails": "Where refunds go",
-      "subtitle": "Orders, addresses, and support — simple tools for everyday ordering."
+      "subtitle": "Orders, addresses, and support — simple tools for everyday ordering.",
+      "editProfile": "Edit profile",
+      "greeting": "Hi, {{name}}",
+      "moreSections": "Also in your space",
+      "payoutShortcut": "Refund payout",
+      "phoneUnlinked": "Phone not linked yet",
+      "resumeTitle": "Latest order",
+      "spaceEyebrow": "Your kitchen space",
+      "statFresh": "Home-cooked",
+      "statFreshHint": "Freshness score",
+      "statHelp": "Help",
+      "statHelpHint": "Open requests",
+      "statOrders": "Orders",
+      "statOrdersHint": "Tap to filter and reorder",
+      "statRefunds": "Refunds",
+      "statRefundsHint": "Completed to your payout",
+      "statSaved": "Saved",
+      "statSavedHint": "Vs typical restaurant pricing",
+      "tipsEmpty": "Order a few home meals — light walk and water tips will show up here.",
+      "tipsTitle": "Tips after your meals"
     },
     "account": {
       "title": "खाता",
@@ -427,7 +453,14 @@
       "upiId": "UPI ID",
       "upiQrHint": "Optional — owners can use this when sending a direct UPI refund.",
       "upiQrTitle": "UPI QR / scanner image",
-      "uploadImage": "Upload image"
+      "uploadImage": "Upload image",
+      "backToSpace": "Back to profile",
+      "enterAccount": "Enter account number",
+      "payoutStatusMissing": "Add UPI or bank so kitchens can refund you quickly.",
+      "payoutStatusReady": "Refunds can reach this UPI or bank account.",
+      "profileHint": "This name shows on orders and kitchen receipts.",
+      "qrChange": "Replace QR image",
+      "savedMasked": "Saved: {{masked}}"
     },
     "delivery": {
       "addAddress": "Add an address",
