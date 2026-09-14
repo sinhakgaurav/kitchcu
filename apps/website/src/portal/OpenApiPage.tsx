@@ -91,6 +91,21 @@ export function OpenApiPage() {
           docExpansion: "list",
           defaultModelsExpandDepth: 1,
         });
+        document.addEventListener(
+          "click",
+          (event) => {
+            const target = event.target;
+            if (!(target instanceof Element) || !target.closest("button.execute")) {
+              return;
+            }
+            window.setTimeout(() => {
+              document
+                .querySelector(".live-responses-table")
+                ?.scrollIntoView({ behavior: "smooth", block: "center" });
+            }, 600);
+          },
+          true,
+        );
       } catch (err) {
         if (!destroyed) {
           setError(err instanceof Error ? err.message : "Failed to load OpenAPI explorer");

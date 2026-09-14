@@ -303,6 +303,29 @@ async def test_proxy_forwards_correlation_id(gateway_client):
 
 
 @pytest.mark.asyncio
+async def test_proxy_strips_upstream_cors_headers(gateway_client):
+    client, clients = gateway_client
+    clients["identity"].request = AsyncMock(
+        return_value=Response(
+            200,
+            content=b'{"ok":true}',
+            headers={
+                "content-type": "application/json",
+                "access-control-allow-origin": "https://evil.example",
+                "access-control-allow-credentials": "true",
+                "date": "Mon, 01 Jan 2020 00:00:00 GMT",
+                "server": "identity",
+            },
+        )
+    )
+    response = await client.get("/api/v1/kitchens/me")
+    assert response.status_code == 200
+    lowered = {k.lower() for k in response.headers}
+    assert "access-control-allow-origin" not in lowered
+    assert response.headers.get("server") != "identity"
+
+
+@pytest.mark.asyncio
 async def test_proxy_generates_correlation_id_when_missing(gateway_client):
     client, _ = gateway_client
     response = await client.get("/health/live")
@@ -411,6 +434,7 @@ async def test_docs_page_serves_swagger_ui(gateway_client):
     assert response.status_code == 200
     assert "swagger" in response.text.lower() or "openapi" in response.text.lower()
     assert "tryItOutEnabled" in response.text
+    assert "live-responses-table" in response.text
 
 
 @pytest.mark.asyncio

@@ -62,6 +62,29 @@ async def test_request_otp_rejects_undeliverable_phone(client: AsyncClient, phon
 
 
 @pytest.mark.asyncio
+async def test_otp_request_openapi_documents_live_body(client: AsyncClient):
+    spec = (await client.get("/openapi.json")).json()
+    content = spec["paths"]["/api/v1/auth/otp/request"]["post"]["responses"]["202"]["content"][
+        "application/json"
+    ]
+    ref = content["schema"]["$ref"].rsplit("/", 1)[-1]
+    props = spec["components"]["schemas"][ref]["properties"]
+    assert "demo_otp" in props
+    assert "delivered" in props
+    assert "429" in spec["paths"]["/api/v1/auth/otp/request"]["post"]["responses"]
+
+
+@pytest.mark.asyncio
+async def test_oauth_token_openapi_documents_access_token(client: AsyncClient):
+    spec = (await client.get("/openapi.json")).json()
+    content = spec["paths"]["/api/v1/auth/token"]["post"]["responses"]["200"]["content"][
+        "application/json"
+    ]
+    ref = content["schema"]["$ref"].rsplit("/", 1)[-1]
+    assert "access_token" in spec["components"]["schemas"][ref]["properties"]
+
+
+@pytest.mark.asyncio
 async def test_oauth_password_token_issues_owner_jwt(client: AsyncClient, registered_owner: dict):
     response = await client.post(
         "/api/v1/auth/token",

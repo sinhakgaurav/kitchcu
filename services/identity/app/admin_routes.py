@@ -44,6 +44,7 @@ from ckac_common.secret_box import decrypt_secret, encrypt_secret, mask_secret
 from ckac_common.config import get_settings
 from ckac_common.database import get_db
 from ckac_common.event_bus import EventPublisher
+from app.referral import AdminLeadGrantRequest, AdminLeadRejectRequest
 from ckac_common.openapi import RESP_400, RESP_401, RESP_422, auth_errors
 
 router = APIRouter(prefix="/admin", tags=["Admin"])
@@ -2377,17 +2378,16 @@ async def admin_referral_leads(
 )
 async def admin_referral_reject(
     lead_id: uuid.UUID,
-    body: dict,
+    body: AdminLeadRejectRequest,
     admin: Annotated[PlatformAdmin, Depends(get_current_admin)],
     session: Annotated[AsyncSession, Depends(get_db)],
 ):
     from app.admin_audit import record_admin_audit
     from app.rbac import assert_admin_permission
-    from app.referral import AdminLeadRejectRequest, lead_to_response, reject_lead
+    from app.referral import lead_to_response, reject_lead
 
     await assert_admin_permission(session, role=admin.role, permission="referrals:write")
-    data = AdminLeadRejectRequest.model_validate(body)
-    lead = await reject_lead(session, lead_id, reason=data.reason)
+    lead = await reject_lead(session, lead_id, reason=body.reason)
     await record_admin_audit(
         session,
         actor=admin,
@@ -2408,18 +2408,17 @@ async def admin_referral_reject(
 )
 async def admin_referral_grant(
     lead_id: uuid.UUID,
-    body: dict,
+    body: AdminLeadGrantRequest,
     admin: Annotated[PlatformAdmin, Depends(get_current_admin)],
     session: Annotated[AsyncSession, Depends(get_db)],
     publisher: Annotated[EventPublisher, Depends(get_publisher)],
 ):
     from app.admin_audit import record_admin_audit
     from app.rbac import assert_admin_permission
-    from app.referral import AdminLeadGrantRequest, admin_grant_lead, lead_to_response
+    from app.referral import admin_grant_lead, lead_to_response
 
     await assert_admin_permission(session, role=admin.role, permission="referrals:write")
-    data = AdminLeadGrantRequest.model_validate(body or {})
-    lead = await admin_grant_lead(session, lead_id, note=data.note, publisher=publisher)
+    lead = await admin_grant_lead(session, lead_id, note=body.note, publisher=publisher)
     await record_admin_audit(
         session,
         actor=admin,

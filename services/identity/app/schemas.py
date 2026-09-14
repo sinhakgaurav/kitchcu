@@ -512,6 +512,31 @@ class KitchenNearbyListResponse(BaseModel):
     sort: str = Field(..., description="Sort order applied.", examples=["asc", "desc"])
 
 
+class OTPDispatchResponse(BaseModel):
+    """Body for OTP request (owner or customer). Shown in Swagger Example Value."""
+
+    message: str = Field(
+        ...,
+        description="What happened. Demo mode says no SMS was sent.",
+        examples=["Demo mode — no message sent", "OTP sent via WhatsApp"],
+    )
+    delivered: bool = Field(
+        ...,
+        description="True only when an SMS/WhatsApp message was actually sent.",
+        examples=[False],
+    )
+    demo_otp: str | None = Field(
+        default=None,
+        description="Present in development/test so the caller knows which OTP to type.",
+        examples=["123456"],
+    )
+    dev_hint: str | None = Field(
+        default=None,
+        description="Present in development/test with the same OTP.",
+        examples=["Use 123456 in development"],
+    )
+
+
 class TokenResponse(BaseModel):
     """Bearer token issued after successful owner OTP verification.
 

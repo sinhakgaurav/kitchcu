@@ -31,6 +31,10 @@ RESP_403 = error_response("Forbidden — caller does not own this kitchen/resour
 RESP_404 = error_response("Not found", example_detail="Kitchen not found")
 RESP_409 = error_response("Conflict — duplicate or invalid state transition", example_detail="Owner with this phone already exists")
 RESP_422 = error_response("Validation error — Pydantic rejected the body/query", example_detail="Field required")
+RESP_429 = error_response(
+    "Too many requests — gateway rate limit (OTP is 5 / 10 min per IP)",
+    example_detail="Too many requests — try again in 60s",
+)
 
 
 def auth_errors(*, include_403: bool = False, include_404: bool = False) -> dict[int | str, dict[str, Any]]:

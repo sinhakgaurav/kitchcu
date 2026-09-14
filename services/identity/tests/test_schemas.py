@@ -6,6 +6,7 @@ from pydantic import ValidationError
 from app.customer_dashboard import CustomerAddressCreateRequest
 from app.schemas import (
     KitchenProfileUpdate,
+    OTPDispatchResponse,
     OwnerRegisterRequest,
     create_access_token,
     generate_kitchen_code,
@@ -159,3 +160,16 @@ class TestKitchenProfileUpdate:
         body = KitchenProfileUpdate(latitude=18.5362, longitude=73.8958)
         assert body.latitude == pytest.approx(18.5362)
         assert body.longitude == pytest.approx(73.8958)
+
+
+def test_otp_dispatch_response_documents_demo_fields():
+    body = OTPDispatchResponse(
+        message="Demo mode — no message sent",
+        delivered=False,
+        demo_otp="123456",
+        dev_hint="Use 123456 in development",
+    )
+    assert body.demo_otp == "123456"
+    schema = OTPDispatchResponse.model_json_schema()
+    assert "demo_otp" in schema["properties"]
+    assert "delivered" in schema["properties"]

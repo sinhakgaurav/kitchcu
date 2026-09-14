@@ -1,6 +1,6 @@
 """Tests for shared OpenAPI helpers."""
 
-from ckac_common.openapi import ErrorDetail, RESP_401, auth_errors, error_response
+from ckac_common.openapi import ErrorDetail, RESP_401, RESP_429, auth_errors, error_response
 
 
 def test_error_detail_schema_has_description():
@@ -22,3 +22,4 @@ def test_auth_errors_flags():
     full = auth_errors(include_403=True, include_404=True)
     assert 403 in full and 404 in full
     assert RESP_401["description"].startswith("Unauthorized")
+    assert "rate limit" in RESP_429["description"].lower()

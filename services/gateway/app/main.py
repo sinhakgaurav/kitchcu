@@ -6,7 +6,7 @@ import redis.asyncio as redis
 from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.openapi.docs import get_redoc_html, get_swagger_ui_html
-from fastapi.responses import JSONResponse
+from fastapi.responses import HTMLResponse, JSONResponse
 
 from app.openapi_aggregate import SAME_ORIGIN_SERVERS, build_gateway_openapi
 from app.rate_limit import check_rate_limit
@@ -51,6 +51,30 @@ GROWTH_PATH_MARKERS = ("/growth",)
 LEARNING_PATH_MARKERS = ("/learning",)
 COMMUNITY_PATH_MARKERS = ("/community",)
 STREAMING_PATH_MARKERS = ("/stream",)
+_DROP_UPSTREAM_HEADERS = frozenset(
+    {
+        "transfer-encoding",
+        "content-encoding",
+        "content-length",
+        "connection",
+        "keep-alive",
+        "proxy-authenticate",
+        "proxy-authorization",
+        "te",
+        "trailer",
+        "upgrade",
+        "date",
+        "server",
+        "vary",
+        "access-control-allow-origin",
+        "access-control-allow-credentials",
+        "access-control-allow-methods",
+        "access-control-allow-headers",
+        "access-control-expose-headers",
+        "access-control-max-age",
+    }
+)
+
 GATEWAY_OWNED_PATHS = {
     "/",
     "/docs",
@@ -284,8 +308,8 @@ async def openapi_json(refresh: bool = False) -> JSONResponse:
 
 
 @app.get("/docs", include_in_schema=False)
-async def swagger_ui() -> Response:
-    return get_swagger_ui_html(
+async def swagger_ui() -> HTMLResponse:
+    page = get_swagger_ui_html(
         openapi_url="/openapi.json",
         title="kitchCU API — OpenAPI",
         swagger_ui_parameters={
@@ -293,8 +317,22 @@ async def swagger_ui() -> Response:
             "tryItOutEnabled": True,
             "filter": True,
             "displayRequestDuration": True,
+            "syntaxHighlight.theme": "agate",
         },
     )
+    extra = (
+        b"<script>"
+        b"document.addEventListener('click',function(e){"
+        b"var t=e.target&&e.target.closest&&e.target.closest('button.execute');"
+        b"if(!t)return;"
+        b"setTimeout(function(){"
+        b"var n=document.querySelector('.live-responses-table');"
+        b"if(n)n.scrollIntoView({behavior:'smooth',block:'center'});"
+        b"},600);"
+        b"},true);"
+        b"</script>"
+    )
+    return HTMLResponse(content=page.body.replace(b"</body>", extra + b"</body>"))
 
 
 @app.get("/redoc", include_in_schema=False)
@@ -364,7 +402,7 @@ async def proxy(path: str, request: Request) -> Response:
         headers={
             k: v
             for k, v in upstream.headers.items()
-            if k.lower() not in ("transfer-encoding", "content-encoding", "content-length")
+            if k.lower() not in _DROP_UPSTREAM_HEADERS
         },
         media_type=upstream.headers.get("content-type"),
     )

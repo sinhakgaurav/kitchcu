@@ -51,11 +51,12 @@ from app.customer_dashboard import (
 from app.models import Customer
 from app.oauth import exchange_oauth_code, start_oauth
 from app.otp_delivery import demo_otp_response
+from app.schemas import OTPDispatchResponse
 from ckac_common.auth import stream_key
 from ckac_common.config import get_settings
 from ckac_common.database import get_db
 from ckac_common.event_bus import EventPublisher
-from ckac_common.openapi import RESP_400, RESP_401, RESP_404, RESP_422
+from ckac_common.openapi import RESP_400, RESP_401, RESP_404, RESP_422, RESP_429
 
 router = APIRouter()
 security = HTTPBearer(auto_error=False)
@@ -249,7 +250,8 @@ async def oauth_complete(
         "Outside that, returns 503 until WhatsApp outbound is configured.\n\n"
         "Follow up with `POST /auth/customer/whatsapp/verify`."
     ),
-    responses={422: RESP_422},
+    response_model=OTPDispatchResponse,
+    responses={422: RESP_422, 429: RESP_429},
     tags=["Customer Auth"],
 )
 async def customer_whatsapp_request(body: CustomerPhoneRequest) -> dict[str, object]:

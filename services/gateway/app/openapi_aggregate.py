@@ -24,7 +24,12 @@ GATEWAY_INFO = {
         "`POST /auth/otp/verify`, `POST /auth/customer/whatsapp/verify`, or "
         "`POST /admin/auth/login`.\n"
         "- A token is never sent on public operations, so Authorize does not block "
-        "anonymous Try it out."
+        "anonymous Try it out.\n"
+        "- After **Execute**, scroll to **Server response** for the live JSON. The "
+        "grey Example Value under each status code is the schema sample, not the live call.\n"
+        "- `POST /auth/otp/request` is rate-limited (5 / 10 min / IP). A **429** body "
+        "is the response — wait, or use **Authorize** (`POST /auth/token`) which is "
+        "not on that OTP budget."
     ),
 }
 

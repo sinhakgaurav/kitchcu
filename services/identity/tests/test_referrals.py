@@ -226,3 +226,76 @@ async def test_admin_referral_settings(client: AsyncClient):
 
     leads = await client.get("/api/v1/admin/referrals/leads", headers=ah)
     assert leads.status_code == 200
+
+
+async def _referral_admin_headers(client: AsyncClient) -> dict[str, str]:
+    import os
+
+    import psycopg2
+
+    from app.admin_routes import hash_password
+
+    admin_id = str(uuid.uuid4())
+    conn = psycopg2.connect(os.environ["DATABASE_SYNC_URL"])
+    conn.autocommit = True
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                INSERT INTO ckac_identity.platform_admins
+                  (id, email, password_hash, name, role, is_active)
+                VALUES (%s, %s, %s, %s, %s, true)
+                ON CONFLICT (email) DO UPDATE SET password_hash = EXCLUDED.password_hash
+                """,
+                (
+                    admin_id,
+                    "ref-admin@kitchcu.dev",
+                    hash_password("admin123456"),
+                    "Ref Admin",
+                    "superadmin",
+                ),
+            )
+    finally:
+        conn.close()
+    login = await client.post(
+        "/api/v1/admin/auth/login",
+        json={"email": "ref-admin@kitchcu.dev", "password": "admin123456"},
+    )
+    assert login.status_code == 200, login.text
+    return {"Authorization": f"Bearer {login.json()['access_token']}"}
+
+
+@pytest.mark.asyncio
+async def test_admin_reject_unknown_lead_is_404(client: AsyncClient):
+    ah = await _referral_admin_headers(client)
+    missing = uuid.uuid4()
+    response = await client.post(
+        f"/api/v1/admin/referrals/leads/{missing}/reject",
+        headers=ah,
+        json={"reason": "Not a real kitchen"},
+    )
+    assert response.status_code == 404, response.text
+    assert response.json()["detail"] == "Lead not found"
+
+
+@pytest.mark.asyncio
+async def test_admin_reject_empty_body_is_422_not_500(client: AsyncClient):
+    ah = await _referral_admin_headers(client)
+    response = await client.post(
+        f"/api/v1/admin/referrals/leads/{uuid.uuid4()}/reject",
+        headers=ah,
+        json={},
+    )
+    assert response.status_code == 422, response.text
+
+
+@pytest.mark.asyncio
+async def test_admin_grant_unknown_lead_is_404(client: AsyncClient):
+    ah = await _referral_admin_headers(client)
+    response = await client.post(
+        f"/api/v1/admin/referrals/leads/{uuid.uuid4()}/grant",
+        headers=ah,
+        json={},
+    )
+    assert response.status_code == 404, response.text
+    assert response.json()["detail"] == "Lead not found"

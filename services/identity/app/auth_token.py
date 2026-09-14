@@ -11,9 +11,9 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import Customer, Owner, PlatformAdmin
-from app.schemas import OTPVerifyRequest, create_access_token
+from app.schemas import OTPVerifyRequest, TokenResponse, create_access_token
 from ckac_common.database import get_db
-from ckac_common.openapi import RESP_401, RESP_422
+from ckac_common.openapi import RESP_401, RESP_422, RESP_429
 from ckac_common.platform_config import allows_fixed_dev_otp, get_demo_otp
 
 router = APIRouter()
@@ -100,7 +100,8 @@ async def _customer_otp_ok(phone: str, otp: str) -> bool:
         "(local demo `123456`). Does not create a new customer.\n\n"
         "**Response 200:** `access_token`, `token_type=bearer`, `expires_in`."
     ),
-    responses={401: RESP_401, 422: RESP_422},
+    response_model=TokenResponse,
+    responses={401: RESP_401, 422: RESP_422, 429: RESP_429},
     tags=["Auth"],
 )
 async def issue_oauth_password_token(
