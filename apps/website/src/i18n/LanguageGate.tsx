@@ -101,6 +101,13 @@ function LanguageChooser({
   );
 }
 
+const DOCS_EXPLORER_PATHS = new Set(["/openapi", "/api-docs"]);
+
+function isDocsExplorerPath(): boolean {
+  const path = window.location.pathname.replace(/\/+$/, "") || "/";
+  return DOCS_EXPLORER_PATHS.has(path);
+}
+
 function LanguageGateInner({ children }: { children: ReactNode }) {
   const { t } = useTranslation();
   const [state, setState] = useState<GateState>({ phase: "boot" });
@@ -110,6 +117,11 @@ function LanguageGateInner({ children }: { children: ReactNode }) {
     (async () => {
       await initI18n(readStoredLocale() ?? undefined);
       if (cancelled) return;
+
+      if (isDocsExplorerPath()) {
+        setState({ phase: "ready", skipPrompt: true });
+        return;
+      }
 
       if (hasChosenLocale()) {
         setState({ phase: "ready", skipPrompt: true });

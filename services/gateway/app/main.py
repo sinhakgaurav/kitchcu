@@ -8,7 +8,11 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.openapi.docs import get_redoc_html, get_swagger_ui_html
 from fastapi.responses import HTMLResponse, JSONResponse
 
-from app.openapi_aggregate import SAME_ORIGIN_SERVERS, build_gateway_openapi
+from app.openapi_aggregate import (
+    SWAGGER_REQUEST_INTERCEPTOR_JS,
+    build_gateway_openapi,
+    public_gateway_servers,
+)
 from app.rate_limit import check_rate_limit
 from ckac_common.config import get_settings
 from ckac_common.health import gateway_ready_response, live_response
@@ -246,6 +250,7 @@ app = FastAPI(
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origin_list,
+    allow_origin_regex=r"https://([a-z0-9-]+\.)*(kitchcu\.com|kitchcu\.in)",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -293,17 +298,16 @@ async def root() -> dict[str, str]:
 
 
 @app.get("/openapi.json", include_in_schema=False)
-async def openapi_json(refresh: bool = False) -> JSONResponse:
+async def openapi_json(request: Request, refresh: bool = False) -> JSONResponse:
     """Aggregated OpenAPI from all upstream domain services."""
     global _openapi_cache
     if refresh or _openapi_cache is None:
-        # Never bake request.base_url into the spec. Behind Caddy/nginx the
-        # gateway sees http://kitchcu.com or http://gateway:8000; Swagger UI
-        # then posts OAuth tokens to that host and the browser throws
-        # TypeError: Failed to fetch (mixed content / unreachable hostname).
+        # Never bake request.base_url into the cached spec. Per-request
+        # servers come from public_gateway_servers() so HTTPS /docs never
+        # inherits the internal http:// hop (mixed content → Failed to fetch).
         _openapi_cache = await build_gateway_openapi(http_clients)
     spec = dict(_openapi_cache)
-    spec["servers"] = list(SAME_ORIGIN_SERVERS)
+    spec["servers"] = public_gateway_servers(request)
     return JSONResponse(spec)
 
 
@@ -320,6 +324,11 @@ async def swagger_ui() -> HTMLResponse:
             "syntaxHighlight.theme": "agate",
         },
     )
+    html = page.body.replace(
+        b"const ui = SwaggerUIBundle({",
+        b"const ui = SwaggerUIBundle({" + SWAGGER_REQUEST_INTERCEPTOR_JS.encode("utf-8"),
+        1,
+    )
     extra = (
         b"<script>"
         b"document.addEventListener('click',function(e){"
@@ -332,7 +341,7 @@ async def swagger_ui() -> HTMLResponse:
         b"},true);"
         b"</script>"
     )
-    return HTMLResponse(content=page.body.replace(b"</body>", extra + b"</body>"))
+    return HTMLResponse(content=html.replace(b"</body>", extra + b"</body>"))
 
 
 @app.get("/redoc", include_in_schema=False)

@@ -1,6 +1,6 @@
 """Unit tests for OpenAPI merge (no live services)."""
 
-from app.openapi_aggregate import merge_openapi_specs
+from app.openapi_aggregate import SAME_ORIGIN_SERVERS, merge_openapi_specs
 
 
 def test_merge_openapi_specs_prefixes_schemas_and_tags():
@@ -67,9 +67,8 @@ def test_merge_openapi_specs_prefixes_schemas_and_tags():
     assert merged.get("security") in (None, [])
     assert merged["paths"]["/api/v1/auth/otp/request"]["post"]["security"] == []
     assert merged["paths"]["/api/v1/kitchens/{kitchen_id}/menu"]["get"]["security"] == []
-    assert merged["servers"] == [
-        {"url": "/", "description": "API Gateway (same origin / proxied)"},
-    ]
+    assert merged["servers"] == SAME_ORIGIN_SERVERS
+    assert merged["servers"][0]["url"] == ""
 
 
 def test_merge_binds_auth_only_where_the_service_declared_it():

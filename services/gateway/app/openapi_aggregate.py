@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import Any
 
 import httpx
+from starlette.requests import Request
 
 GATEWAY_INFO = {
     "title": "kitchCU Public API",
@@ -33,9 +34,84 @@ GATEWAY_INFO = {
     ),
 }
 
+# Fallback when Host is the ASGI test client / internal compose name.
+# Never use "/" — Swagger UI concatenates "/" + "/api/v1/..." into
+# "//api/v1/..." (protocol-relative host `api`) → browser Failed to fetch
+# ("URL scheme must be http or https for CORS request").
 SAME_ORIGIN_SERVERS = [
-    {"url": "/", "description": "API Gateway (same origin / proxied)"},
+    {"url": "", "description": "API Gateway (this host)"},
 ]
+
+_PUBLIC_HTTPS_ROOTS = ("kitchcu.com", "kitchcu.in")
+_INTERNAL_HOSTS = frozenset({"test", "testserver", "gateway"})
+
+# Keep in sync with apps/website/src/portal/OpenApiPage.tsx
+SWAGGER_REQUEST_INTERCEPTOR_JS = """
+        requestInterceptor: function(req) {
+          try {
+            var origin = window.location.origin;
+            var raw = String(req && req.url || "");
+            if (raw.indexOf("//") === 0) {
+              raw = window.location.protocol + raw;
+            }
+            var u = new URL(raw, origin);
+            var path = u.pathname + u.search + u.hash;
+            if (u.hostname === "api" && path.indexOf("/v1/") === 0) {
+              path = "/api" + path;
+            }
+            if (path.indexOf("/api/") === 0 || path.indexOf("/openapi") === 0) {
+              req.url = origin + path;
+            } else if (u.protocol === "http:" && origin.indexOf("https://") === 0) {
+              u.protocol = "https:";
+              req.url = u.href;
+            }
+            if (String(req.method || "GET").toUpperCase() === "GET" && req.headers) {
+              delete req.headers["Content-Type"];
+              delete req.headers["content-type"];
+            }
+          } catch (e) {}
+          return req;
+        },
+"""
+
+
+def _hostname(host_header: str) -> str:
+    host = host_header.split(",")[0].strip()
+    if host.startswith("["):
+        end = host.find("]")
+        return host[1:end].lower() if end != -1 else host.lower()
+    return host.split(":")[0].lower()
+
+
+def _public_https_host(hostname: str) -> bool:
+    return hostname in _PUBLIC_HTTPS_ROOTS or any(
+        hostname.endswith(f".{root}") for root in _PUBLIC_HTTPS_ROOTS
+    )
+
+
+def public_gateway_servers(request: Request | None = None) -> list[dict[str, str]]:
+    """Absolute server URL for Swagger Try it out.
+
+    Caddy terminates TLS, then nginx/$scheme is http. Baking that proto would
+    make HTTPS /docs call http://kitchcu.com (mixed content → Failed to fetch).
+    Public kitchcu hosts are always https. Local compose keeps http://host:port.
+    """
+    if request is None:
+        return list(SAME_ORIGIN_SERVERS)
+    host_header = request.headers.get("x-forwarded-host") or request.headers.get("host") or ""
+    hostname = _hostname(host_header)
+    if not hostname or hostname in _INTERNAL_HOSTS:
+        return list(SAME_ORIGIN_SERVERS)
+    proto = (request.headers.get("x-forwarded-proto") or request.url.scheme or "http")
+    proto = proto.split(",")[0].strip().lower()
+    if _public_https_host(hostname):
+        proto = "https"
+        url_host = hostname
+    else:
+        url_host = host_header.split(",")[0].strip() or hostname
+    if proto not in {"http", "https"}:
+        proto = "https" if _public_https_host(hostname) else "http"
+    return [{"url": f"{proto}://{url_host}", "description": "API Gateway (this host)"}]
 
 SERVICE_LABELS = {
     "identity": "Identity",

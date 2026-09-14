@@ -17,7 +17,10 @@ import pytest
 from httpx import ASGITransport, AsyncClient, Response
 
 from app import main as gateway_main
+from starlette.requests import Request
+
 from app.main import app, resolve_service_url
+from app.openapi_aggregate import SAME_ORIGIN_SERVERS, public_gateway_servers
 
 
 @pytest.fixture
@@ -383,9 +386,8 @@ async def test_openapi_json_aggregates_upstream_specs(gateway_client):
     assert data["paths"]["/api/v1/owners/register"]["post"]["tags"] == [
         "Identity: owners"
     ]
-    assert data["servers"] == [
-        {"url": "/", "description": "API Gateway (same origin / proxied)"},
-    ]
+    assert data["servers"] == SAME_ORIGIN_SERVERS
+    assert data["servers"][0]["url"] == ""
     token_url = data["components"]["securitySchemes"]["OAuth2Password"]["flows"]["password"][
         "tokenUrl"
     ]
@@ -420,11 +422,46 @@ async def test_openapi_servers_ignore_proxied_http_host(gateway_client):
         "paths": {},
         "components": {"securitySchemes": {}},
     }
-    response = await client.get("/openapi.json")
+    response = await client.get(
+        "/openapi.json",
+        headers={"Host": "kitchcu.com", "X-Forwarded-Proto": "http"},
+    )
     assert response.status_code == 200
     assert response.json()["servers"] == [
-        {"url": "/", "description": "API Gateway (same origin / proxied)"},
+        {"url": "https://kitchcu.com", "description": "API Gateway (this host)"},
     ]
+
+
+def test_public_gateway_servers_https_on_kitchcu_hosts():
+    def _req(host: str, proto: str = "http") -> Request:
+        headers = [(b"host", host.encode()), (b"x-forwarded-proto", proto.encode())]
+        return Request(
+            {
+                "type": "http",
+                "asgi": {"version": "3.0"},
+                "http_version": "1.1",
+                "method": "GET",
+                "scheme": "http",
+                "path": "/openapi.json",
+                "raw_path": b"/openapi.json",
+                "query_string": b"",
+                "headers": headers,
+                "client": ("127.0.0.1", 123),
+                "server": ("test", 80),
+            }
+        )
+
+    assert public_gateway_servers(_req("kitchcu.com", "http")) == [
+        {"url": "https://kitchcu.com", "description": "API Gateway (this host)"},
+    ]
+    assert public_gateway_servers(_req("api.kitchcu.com", "http")) == [
+        {"url": "https://api.kitchcu.com", "description": "API Gateway (this host)"},
+    ]
+    assert public_gateway_servers(_req("localhost:18000", "http")) == [
+        {"url": "http://localhost:18000", "description": "API Gateway (this host)"},
+    ]
+    assert public_gateway_servers(_req("test")) == SAME_ORIGIN_SERVERS
+    assert SAME_ORIGIN_SERVERS[0]["url"] == ""
 
 
 @pytest.mark.asyncio
@@ -435,6 +472,23 @@ async def test_docs_page_serves_swagger_ui(gateway_client):
     assert "swagger" in response.text.lower() or "openapi" in response.text.lower()
     assert "tryItOutEnabled" in response.text
     assert "live-responses-table" in response.text
+    assert "requestInterceptor" in response.text
+    assert "window.location.origin" in response.text
+
+
+@pytest.mark.asyncio
+async def test_cors_allows_kitchcu_subdomains(gateway_client):
+    client, _ = gateway_client
+    response = await client.options(
+        "/health/live",
+        headers={
+            "Origin": "https://customer.kitchcu.com",
+            "Access-Control-Request-Method": "GET",
+            "Access-Control-Request-Headers": "accept,authorization",
+        },
+    )
+    assert response.status_code in (200, 204)
+    assert response.headers.get("access-control-allow-origin") == "https://customer.kitchcu.com"
 
 
 @pytest.mark.asyncio

@@ -90,6 +90,30 @@ export function OpenApiPage() {
           filter: true,
           docExpansion: "list",
           defaultModelsExpandDepth: 1,
+          // Keep in sync with services/gateway/app/openapi_aggregate.py
+          requestInterceptor: (req: { url?: string; method?: string; headers?: Record<string, string> }) => {
+            try {
+              const origin = window.location.origin;
+              let raw = String(req.url || "");
+              if (raw.startsWith("//")) raw = `${window.location.protocol}${raw}`;
+              const parsed = new URL(raw, origin);
+              let path = `${parsed.pathname}${parsed.search}${parsed.hash}`;
+              if (parsed.hostname === "api" && path.startsWith("/v1/")) path = `/api${path}`;
+              if (path.startsWith("/api/") || path.startsWith("/openapi")) {
+                req.url = `${origin}${path}`;
+              } else if (parsed.protocol === "http:" && origin.startsWith("https://")) {
+                parsed.protocol = "https:";
+                req.url = parsed.href;
+              }
+              if (String(req.method || "GET").toUpperCase() === "GET" && req.headers) {
+                delete req.headers["Content-Type"];
+                delete req.headers["content-type"];
+              }
+            } catch {
+              /* keep original url */
+            }
+            return req;
+          },
         });
         document.addEventListener(
           "click",
