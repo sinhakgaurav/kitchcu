@@ -23,6 +23,7 @@ from app.schemas import (
     list_owner_dishes,
     get_menu,
     update_dish,
+    attach_dish_health,
 )
 from app.ingredients import (
     DishRecipeRequest,
@@ -79,6 +80,49 @@ def get_publisher() -> EventPublisher:
     from app.main import event_publisher
 
     return event_publisher
+
+
+@router.get(
+    "/dishes/health",
+    tags=[TAG_MENU],
+    summary="Ingredient health for dishes",
+    description=(
+        "Public — quantity-weighted health score plus benefits/disadvantages for F19-mapped recipes. "
+        "Pass up to 40 dish UUIDs. Stock is never returned. Not medical advice."
+    ),
+    responses={422: RESP_422},
+)
+async def dishes_health(
+    session: Annotated[AsyncSession, Depends(get_db)],
+    ids: Annotated[
+        str | None,
+        Query(description="Comma-separated dish UUIDs (max 40)."),
+    ] = None,
+):
+    from sqlalchemy import select
+
+    from app.ingredient_health import DishHealthListResponse, health_enabled, snapshots_for_dishes
+    from app.models import Dish
+
+    if not await health_enabled(session):
+        return DishHealthListResponse(dishes=[], total=0)
+    parsed: list[uuid.UUID] = []
+    for part in (ids or "").split(","):
+        raw = part.strip()
+        if not raw:
+            continue
+        try:
+            parsed.append(uuid.UUID(raw))
+        except ValueError:
+            continue
+        if len(parsed) >= 40:
+            break
+    if not parsed:
+        return DishHealthListResponse(dishes=[], total=0)
+    dishes = list((await session.execute(select(Dish).where(Dish.id.in_(parsed)))).scalars().all())
+    snaps = await snapshots_for_dishes(session, dishes)
+    ordered = [snaps[did] for did in parsed if did in snaps]
+    return DishHealthListResponse(dishes=ordered, total=len(ordered))
 
 
 @router.get(
@@ -175,6 +219,7 @@ async def menu_get(
     else:
         dishes = await get_menu(session, kitchen_id)
         enriched = [await dish_with_media(session, d) for d in dishes]
+        enriched = await attach_dish_health(session, enriched)
         cuisines = await list_cuisines(session, kitchen_id)
         categories = await list_categories(session, kitchen_id)
         grouped = build_menu_grouped(cuisines, categories, enriched)
@@ -549,6 +594,9 @@ async def dish_recipe_set(
     await verify_kitchen_owner(kitchen_id, owner_id, session)
     try:
         recipe = await set_dish_recipe(session, kitchen_id, dish_id, body, publisher)
+        from app.main import redis_client
+
+        await invalidate_menu_cache(redis_client, kitchen_id)
         return recipe
     except ValueError as exc:
         status_code = status.HTTP_404_NOT_FOUND if "not found" in str(exc).lower() else status.HTTP_400_BAD_REQUEST

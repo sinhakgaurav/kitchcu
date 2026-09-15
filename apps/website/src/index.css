@@ -3271,24 +3271,28 @@ html.theme-brand-light .contact__form label {
 .admin-login__api-docs-how {
   color: var(--text-muted);
 }
-.admin-table-wrap { overflow-x: auto; margin-top: 0; padding: 0.5rem; }
-.admin-table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+.admin-table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; overscroll-behavior-x: contain; max-width: 100%; margin-top: 0; padding: 0.5rem; }
+.admin-table { width: max-content; min-width: 100%; border-collapse: collapse; font-size: 0.9rem; }
 
 /* Full-width data lists — search / sort / filter / pagination */
 .data-table {
   width: 100%;
-  max-width: none;
+  max-width: 100%;
+  min-width: 0;
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
 }
 .data-table__frame {
   width: 100%;
+  max-width: 100%;
   margin: 0;
   padding: 0;
   overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-x: contain;
 }
-.data-table__table { width: 100%; min-width: 100%; table-layout: auto; }
+.data-table__table { width: max-content; min-width: 100%; table-layout: auto; }
 .data-table__th--sortable { white-space: nowrap; }
 .data-table__th--sorted { color: var(--teal-light, #26a69a); }
 .data-table__th--right,
@@ -3347,7 +3351,7 @@ html.theme-brand-light .contact__form label {
   grid-template-columns: 1fr;
 }
 .admin-table--compact td, .admin-table--compact th { padding: 0.6rem 0.75rem; }
-.admin-table th, .admin-table td { padding: 0.75rem; text-align: left; border-bottom: 1px solid var(--surface-border); }
+.admin-table th, .admin-table td { padding: 0.75rem; text-align: left; border-bottom: 1px solid var(--surface-border); white-space: nowrap; }
 .admin-table th { color: var(--text-muted); font-weight: 600; }
 .admin-inline-input {
   width: 100%;
@@ -3416,6 +3420,10 @@ html.theme-brand-light .contact__form label {
 .admin-kitchen-panel__head p { margin: 0; color: var(--text-muted); font-size: 0.85rem; }
 .admin-kitchen-panel__tabs {
   display: flex; flex-wrap: wrap; gap: 0.4rem; margin-bottom: 1rem;
+  max-width: 100%;
+}
+.admin-kitchen-panel__tabs-btns {
+  display: flex; flex-wrap: wrap; gap: 0.4rem; width: 100%;
 }
 .admin-kitchen-panel__tabs button {
   border: 1px solid var(--surface-border);
@@ -4625,6 +4633,76 @@ html.theme-brand-light .social-btn {
 }
 .customer-dash__bar--good i { background: #2f9e44; }
 .customer-dash__bar--warn i { background: #e67700; }
+.dish-health {
+  margin: 0.85rem 0 0;
+  padding: 0.9rem 1rem;
+  border-radius: 14px;
+  border: 1px solid var(--surface-border, rgba(13, 115, 119, 0.18));
+  background: color-mix(in srgb, var(--brand-teal, #0d7377) 7%, #fffaf3);
+}
+.dish-health--good {
+  border-color: color-mix(in srgb, #2f9e44 42%, var(--surface-border, #ddd));
+}
+.dish-health--ok {
+  border-color: color-mix(in srgb, #e67700 40%, var(--surface-border, #ddd));
+}
+.dish-health--rich {
+  border-color: color-mix(in srgb, #c45c26 45%, var(--surface-border, #ddd));
+}
+.dish-health--none {
+  background: color-mix(in srgb, var(--surface-border, #ddd) 20%, transparent);
+}
+.dish-health__score {
+  margin: 0 0 0.55rem;
+  display: flex;
+  gap: 0.45rem;
+  align-items: baseline;
+  flex-wrap: wrap;
+}
+.dish-health__score strong {
+  font-size: 1.65rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--brand-teal, #0d7377);
+}
+.dish-health__list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 0.7rem;
+}
+.dish-health__list li {
+  display: grid;
+  gap: 0.12rem;
+}
+.dish-health__pro {
+  color: #2f6b3a;
+  font-size: 0.86rem;
+}
+.dish-health__con {
+  color: var(--text-muted);
+  font-size: 0.86rem;
+}
+.dish-health__disclaimer {
+  margin: 0.8rem 0 0;
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}
+.dish-health--compact {
+  margin: 0;
+  padding: 0.2rem 0;
+  border: 0;
+  background: none;
+}
+.customer-confirm__health {
+  margin-top: 1rem;
+  padding-top: 0.85rem;
+  border-top: 1px solid var(--surface-border, rgba(0, 0, 0, 0.08));
+}
+.customer-confirm__health h2 {
+  margin: 0 0 0.35rem;
+  font-size: 1.05rem;
+}
 .customer-dash__split {
   display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1rem;
 }

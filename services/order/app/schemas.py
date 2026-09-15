@@ -300,8 +300,16 @@ class OrderResponse(BaseModel):
     master_order_id: uuid.UUID | None = Field(
         default=None, description="Parent master order UUID if this order is a sub-order of a multi-kitchen checkout, else `null`."
     )
-    bill_id: str = Field(..., description="Per-kitchen daily sequential bill number.", examples=["BILL-20260712-0042"])
-    order_code: str = Field(..., description="Human-facing order code: `{kitchen_code}-{bill_id}`.", examples=["CKPNQ001-BILL-20260712-0042"])
+    bill_id: str = Field(
+        ...,
+        description="Kitchen-unique daily bill number (`{kitchen_code}-BILL-YYYYMMDD-SEQ`). Same value as `order_code`.",
+        examples=["CKPNQ001-BILL-20260712-0042"],
+    )
+    order_code: str = Field(
+        ...,
+        description="Human-facing order code — same as `bill_id`.",
+        examples=["CKPNQ001-BILL-20260712-0042"],
+    )
     status: str = Field(
         ...,
         description="Current lifecycle status.",
@@ -616,8 +624,9 @@ async def _next_bill_id(session: AsyncSession, kitchen_id: uuid.UUID) -> tuple[s
     code — not just the current kitchen row.
     """
     today = datetime.now(UTC).strftime("%Y%m%d")
-    prefix = f"BILL-{today}-"
     kitchen_code = await _get_kitchen_code(session, kitchen_id)
+    prefix = f"{kitchen_code}-BILL-{today}-"
+    legacy_prefix = f"BILL-{today}-"
     await session.execute(
         text("SELECT pg_advisory_xact_lock(hashtext(:lock_key))"),
         {"lock_key": f"bill_seq:{kitchen_code}:{today}"},
@@ -626,9 +635,15 @@ async def _next_bill_id(session: AsyncSession, kitchen_id: uuid.UUID) -> tuple[s
         select(Order.bill_id, Order.order_code).where(
             or_(
                 Order.kitchen_id == kitchen_id,
-                Order.order_code.like(f"{kitchen_code}-{prefix}%"),
+                Order.order_code.like(f"{prefix}%"),
+                Order.order_code.like(f"{kitchen_code}-{legacy_prefix}%"),
             ),
-            Order.bill_id.like(f"{prefix}%"),
+            or_(
+                Order.bill_id.like(f"{prefix}%"),
+                Order.bill_id.like(f"{legacy_prefix}%"),
+                Order.order_code.like(f"{prefix}%"),
+                Order.order_code.like(f"{kitchen_code}-{legacy_prefix}%"),
+            ),
         )
     )
     max_seq = 0
@@ -636,8 +651,7 @@ async def _next_bill_id(session: AsyncSession, kitchen_id: uuid.UUID) -> tuple[s
         max_seq = max(max_seq, _bill_seq_suffix(bill_id), _bill_seq_suffix(order_code))
     seq = max_seq + 1
     bill_id = f"{prefix}{seq:04d}"
-    order_code = f"{kitchen_code}-{bill_id}"
-    return bill_id, order_code
+    return bill_id, bill_id
 
 
 async def _next_master_order_code(session: AsyncSession) -> str:

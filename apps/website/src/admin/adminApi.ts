@@ -589,6 +589,9 @@ export type AdminPantryIngredient = {
   packs_on_hand?: number | null;
   photo_url?: string | null;
   is_low: boolean;
+  health_score?: number | null;
+  health_benefits?: string | null;
+  health_disadvantages?: string | null;
 };
 
 export type AdminKitchenPantry = {

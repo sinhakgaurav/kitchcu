@@ -1933,6 +1933,12 @@
   align-items: stretch;
   gap: var(--kc-label-control-gap, 0.5rem);
 }
+.owner-recipe-card__health {
+  margin: 0.55rem 0 0;
+  font-size: 0.8rem;
+  line-height: 1.4;
+  color: var(--text-muted);
+}
 @media (max-width: 720px) {
   .owner-recipe-card__row { grid-template-columns: 1fr; }
 }

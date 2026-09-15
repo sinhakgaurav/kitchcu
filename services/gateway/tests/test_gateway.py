@@ -71,6 +71,7 @@ def test_resolve_service_url_catalog():
     assert resolve_service_url("/api/v1/kitchens/abc/dishes") == settings.catalog_service_url
     assert resolve_service_url("/api/v1/kitchens/abc/prep-batches") == settings.catalog_service_url
     assert resolve_service_url("/api/v1/kitchens/abc/stock-settings") == settings.catalog_service_url
+    assert resolve_service_url("/api/v1/dishes/health") == settings.catalog_service_url
     assert resolve_service_url("/api/v1/kitchens/me") == settings.identity_service_url
     assert resolve_service_url("/api/v1/kitchens/abc/profile") == settings.identity_service_url
     assert resolve_service_url("/api/v1/admin/kitchens/abc/profile") == settings.identity_service_url

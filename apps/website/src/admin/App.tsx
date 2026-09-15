@@ -133,6 +133,39 @@ const TABS: { id: Tab; label: string }[] = [
   { id: "audit", label: "Audit" },
 ];
 
+type KitchenPanelTab =
+  | "profile"
+  | "brand"
+  | "whatsapp"
+  | "payments"
+  | "package"
+  | "marketing"
+  | "modules"
+  | "streaming"
+  | "delivery"
+  | "tiffin"
+  | "gst"
+  | "orders"
+  | "pantry"
+  | "kyc";
+
+const KITCHEN_PANEL_TABS: { id: KitchenPanelTab; label: string }[] = [
+  { id: "profile", label: "Profile" },
+  { id: "brand", label: "Brand" },
+  { id: "whatsapp", label: "WhatsApp" },
+  { id: "payments", label: "Payments" },
+  { id: "package", label: "Package" },
+  { id: "marketing", label: "Marketing" },
+  { id: "modules", label: "Modules" },
+  { id: "orders", label: "Orders" },
+  { id: "pantry", label: "Pantry" },
+  { id: "kyc", label: "KYC" },
+  { id: "streaming", label: "Streaming" },
+  { id: "delivery", label: "Delivery" },
+  { id: "tiffin", label: "Tiffin" },
+  { id: "gst", label: "GST" },
+];
+
 function chartDayLabel(isoDate: string): string {
   const d = new Date(isoDate);
   if (Number.isNaN(d.getTime())) return "";
@@ -324,6 +357,21 @@ export default function AdminApp() {
           <p className="admin-shell__tagline">Super admin · platform control center</p>
         </div>
 
+        <label className="admin-mobile-nav-select-wrap">
+          <span className="sr-only">Admin section</span>
+          <select
+            className="admin-mobile-nav-select"
+            value={tab}
+            aria-label="Admin section"
+            onChange={(e) => setTab(e.target.value as Tab)}
+          >
+            {visibleTabs.map((t) => (
+              <option key={t.id} value={t.id}>
+                {t.id === "tickets" && openTickets > 0 ? `${t.label} (${openTickets})` : t.label}
+              </option>
+            ))}
+          </select>
+        </label>
         <nav className="admin-shell__nav" aria-label="Admin navigation">
           {visibleTabs.map((t) => (
             <button
@@ -979,22 +1027,7 @@ function AdminKitchens({
   const [kitchenPkg, setKitchenPkg] = useState<AdminKitchenPackage | null>(null);
   const [allPackages, setAllPackages] = useState<AdminPackage[]>([]);
   const [templates, setTemplates] = useState<{ id: string; channel: string; name: string; is_active: boolean; body: string }[]>([]);
-  const [panelTab, setPanelTab] = useState<
-    | "profile"
-    | "brand"
-    | "whatsapp"
-    | "payments"
-    | "package"
-    | "marketing"
-    | "modules"
-    | "streaming"
-    | "delivery"
-    | "tiffin"
-    | "gst"
-    | "orders"
-    | "pantry"
-    | "kyc"
-  >("profile");
+  const [panelTab, setPanelTab] = useState<KitchenPanelTab>("profile");
   const [porterAutoBook, setPorterAutoBook] = useState(true);
   const [porterDelayMin, setPorterDelayMin] = useState(15);
   const [tiffinSummary, setTiffinSummary] = useState<AdminTiffinSummary | null>(null);
@@ -1033,6 +1066,40 @@ function AdminKitchens({
 
   const reloadList = async () => {
     setRows(await fetchAdminKitchens());
+  };
+
+  const openKitchenPanel = (t: KitchenPanelTab) => {
+    setPanelTab(t);
+    if (!selectedId) return;
+    if (t === "orders") {
+      void fetchAdminOrders(50, { kitchen_id: selectedId })
+        .then(setKitchenOrders)
+        .catch(() => setKitchenOrders([]));
+      void fetchAdminKitchenParseStats(selectedId)
+        .then(setKitchenParseStats)
+        .catch(() => setKitchenParseStats(null));
+    }
+    if (t === "gst") {
+      void (async () => {
+        setError("");
+        try {
+          const [prof, rep] = await Promise.all([
+            fetchAdminKitchenGstProfile(selectedId).catch(() => null),
+            fetchAdminKitchenGstMonthly(selectedId, gstYear, gstMonth).catch(() => null),
+          ]);
+          setGstProfile(prof);
+          setGstReport(rep);
+        } catch (e) {
+          setError(e instanceof Error ? e.message : "GST load failed");
+        }
+      })();
+    }
+    if (t === "pantry") {
+      setError("");
+      void fetchAdminKitchenPantry(selectedId)
+        .then(setPantry)
+        .catch((e) => setError(e instanceof Error ? e.message : "Pantry load failed"));
+    }
   };
 
   const openKitchen = async (id: string) => {
@@ -1465,74 +1532,33 @@ function AdminKitchens({
             </header>
 
             <div className="admin-kitchen-panel__tabs">
-              {(
-                [
-                  "profile",
-                  "brand",
-                  "whatsapp",
-                  "payments",
-                  "package",
-                  "marketing",
-                  "modules",
-                  "orders",
-                  "pantry",
-                  "kyc",
-                  "streaming",
-                  "delivery",
-                  "tiffin",
-                  "gst",
-                ] as const
-              ).map((t) => (
-                <button
-                  key={t}
-                  type="button"
-                  className={panelTab === t ? "active" : ""}
-                  onClick={() => {
-                    setPanelTab(t);
-                    if (t === "orders" && selectedId) {
-                      void fetchAdminOrders(50, { kitchen_id: selectedId })
-                        .then(setKitchenOrders)
-                        .catch(() => setKitchenOrders([]));
-                      void fetchAdminKitchenParseStats(selectedId)
-                        .then(setKitchenParseStats)
-                        .catch(() => setKitchenParseStats(null));
-                    }
-                    if (t === "gst" && selectedId) {
-                      void (async () => {
-                        setError("");
-                        try {
-                          const [prof, rep] = await Promise.all([
-                            fetchAdminKitchenGstProfile(selectedId).catch(() => null),
-                            fetchAdminKitchenGstMonthly(selectedId, gstYear, gstMonth).catch(
-                              () => null,
-                            ),
-                          ]);
-                          setGstProfile(prof);
-                          setGstReport(rep);
-                        } catch (e) {
-                          setError(e instanceof Error ? e.message : "GST load failed");
-                        }
-                      })();
-                    }
-                    if (t === "pantry" && selectedId) {
-                      setError("");
-                      void fetchAdminKitchenPantry(selectedId)
-                        .then(setPantry)
-                        .catch((e) => setError(e instanceof Error ? e.message : "Pantry load failed"));
-                    }
-                  }}
+              <label className="admin-mobile-nav-select-wrap">
+                <span className="sr-only">Kitchen workspace section</span>
+                <select
+                  className="admin-mobile-nav-select"
+                  value={panelTab}
+                  aria-label="Kitchen workspace section"
+                  onChange={(e) => openKitchenPanel(e.target.value as KitchenPanelTab)}
                 >
-                  {t === "whatsapp"
-                    ? "WhatsApp"
-                    : t === "payments"
-                      ? "Payments"
-                      : t === "gst"
-                        ? "GST"
-                        : t === "kyc"
-                          ? "KYC"
-                          : t[0].toUpperCase() + t.slice(1)}
-                </button>
-              ))}
+                  {KITCHEN_PANEL_TABS.map((t) => (
+                    <option key={t.id} value={t.id}>
+                      {t.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <div className="admin-kitchen-panel__tabs-btns">
+                {KITCHEN_PANEL_TABS.map((t) => (
+                  <button
+                    key={t.id}
+                    type="button"
+                    className={panelTab === t.id ? "active" : ""}
+                    onClick={() => openKitchenPanel(t.id)}
+                  >
+                    {t.label}
+                  </button>
+                ))}
+              </div>
             </div>
 
             {panelTab === "orders" && (
@@ -1607,7 +1633,9 @@ function AdminKitchens({
               <div className="admin-kitchen-panel__body">
                 <p className="report-hint">
                   F19 pantry is kitchen-scoped. Recipes deduct from these SKUs when an order is marked
-                  ready. Support can see brand, pack weight, photo, and which dishes still lack a mapping.
+                  ready. Health score is a platform library match on the SKU name (benefits and
+                  cautions for typical home-kitchen use — not medical advice). Support can see brand,
+                  pack weight, photo, and which dishes still lack a mapping.
                 </p>
                 {!pantry ? (
                   <p className="admin-panel__empty">Loading pantry…</p>
@@ -1645,6 +1673,7 @@ function AdminKitchens({
                               <th>Brand</th>
                               <th>Pack</th>
                               <th>Stock</th>
+                              <th>Health</th>
                               <th>Status</th>
                             </tr>
                           </thead>
@@ -1666,6 +1695,21 @@ function AdminKitchens({
                                 <td>
                                   {ing.current_stock} {ing.unit}
                                   {ing.packs_on_hand != null ? ` · ${ing.packs_on_hand} packs` : ""}
+                                </td>
+                                <td className="owner-table__health">
+                                  {ing.health_score != null ? (
+                                    <>
+                                      <strong>{ing.health_score}</strong>
+                                      {ing.health_benefits ? <small>{ing.health_benefits}</small> : null}
+                                      {ing.health_disadvantages ? (
+                                        <small className="owner-table__health-con">
+                                          {ing.health_disadvantages}
+                                        </small>
+                                      ) : null}
+                                    </>
+                                  ) : (
+                                    "—"
+                                  )}
                                 </td>
                                 <td>{ing.is_low ? "Low" : "OK"}</td>
                               </tr>

@@ -10,6 +10,7 @@ from pydantic import BaseModel, Field, field_validator
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.ingredient_health import lookup_health_profile
 from app.models import Dish, DishIngredient, DishPrepStep, Ingredient
 from ckac_common.auth import stream_key
 from ckac_common.event_bus import EventPublisher
@@ -146,6 +147,9 @@ class IngredientResponse(BaseModel):
     )
     photo_url: str | None = Field(default=None, description="Pack/reference photo URL.")
     is_low: bool = Field(..., description="True if current_stock <= low_stock_threshold.")
+    health_score: int | None = Field(default=None, description="Library score 0–100 when the name matches.")
+    health_benefits: str | None = Field(default=None, description="Typical home-kitchen benefits.")
+    health_disadvantages: str | None = Field(default=None, description="Typical cautions for this ingredient.")
 
     model_config = {"from_attributes": True}
 
@@ -272,6 +276,7 @@ def _ingredient_response(row: Ingredient) -> IngredientResponse:
     stock = float(row.current_stock)
     threshold = float(row.low_stock_threshold)
     pack_size = _float_or_none(row.pack_size)
+    profile = lookup_health_profile(row.name)
     return IngredientResponse(
         id=row.id,
         kitchen_id=row.kitchen_id,
@@ -285,6 +290,9 @@ def _ingredient_response(row: Ingredient) -> IngredientResponse:
         packs_on_hand=_packs_on_hand(stock, pack_size),
         photo_url=row.photo_url,
         is_low=stock <= threshold,
+        health_score=profile.score if profile else None,
+        health_benefits=profile.benefits if profile else None,
+        health_disadvantages=profile.disadvantages if profile else None,
     )
 
 

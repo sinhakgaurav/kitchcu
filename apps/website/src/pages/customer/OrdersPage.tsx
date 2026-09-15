@@ -1,11 +1,12 @@
 import { Link, Navigate, useNavigate } from "react-router-dom";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import type { Order } from "../../shared/api";
+import type { DishHealthSnapshot, Order } from "../../shared/api";
 import { getCustomerToken } from "../../shared/customerApi";
 import { useCustomerAuth } from "../../shared/customerAuth";
 import { addItemsToCart, kitchenFromOrderCode } from "../../shared/customerCart";
 import { fetchMyOrders } from "../../shared/customerCheckoutApi";
+import { fetchDishesHealth } from "../../shared/publicApi";
 import { customerStatusTone, humanStatus } from "../../shared/customerUi";
 
 function formatWhen(iso: string, locale: string): string {
@@ -26,6 +27,7 @@ export function OrdersPage() {
   const token = getCustomerToken();
   const navigate = useNavigate();
   const [orders, setOrders] = useState<Order[]>([]);
+  const [dishHealth, setDishHealth] = useState<Record<string, DishHealthSnapshot>>({});
   const [fetching, setFetching] = useState(true);
   const [error, setError] = useState("");
   const [repeatingId, setRepeatingId] = useState<string | null>(null);
@@ -47,6 +49,30 @@ export function OrdersPage() {
   useEffect(() => {
     if (token) load();
   }, [token, load]);
+
+  useEffect(() => {
+    const ids = orders.flatMap((order) => order.items.map((item) => item.dish_id));
+    if (!ids.length) {
+      setDishHealth({});
+      return;
+    }
+    let cancelled = false;
+    void fetchDishesHealth(ids)
+      .then((res) => {
+        if (cancelled) return;
+        const map: Record<string, DishHealthSnapshot> = {};
+        for (const snap of res.dishes) {
+          if (snap.dish_id) map[String(snap.dish_id)] = snap;
+        }
+        setDishHealth(map);
+      })
+      .catch(() => {
+        if (!cancelled) setDishHealth({});
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [orders]);
 
   if (!loading && !token) {
     return <Navigate to="/login?next=/orders" replace />;
@@ -166,6 +192,9 @@ export function OrdersPage() {
                         {order.items.slice(0, 4).map((item) => (
                           <li key={item.id}>
                             {item.quantity}× {item.dish_name}
+                            {dishHealth[item.dish_id]?.score != null
+                              ? ` · health ${dishHealth[item.dish_id].score}`
+                              : ""}
                           </li>
                         ))}
                         {order.items.length > 4 && (

@@ -37,10 +37,12 @@ def _delete_order(order_id: str) -> None:
 async def test_bill_ids_increment_within_the_day(
     client: AsyncClient, order_ctx, manual_order_payload
 ):
-    _, kitchen_id, _, _, token = order_ctx
+    _, kitchen_id, _, kitchen_code, token = order_ctx
     first = await _place(client, kitchen_id, token, manual_order_payload)
     second = await _place(client, kitchen_id, token, manual_order_payload)
 
+    assert first["bill_id"] == first["order_code"]
+    assert first["bill_id"].startswith(f"{kitchen_code}-BILL-")
     assert first["bill_id"].endswith("-0001")
     assert second["bill_id"].endswith("-0002")
     assert first["order_code"] != second["order_code"]

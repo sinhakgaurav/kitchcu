@@ -1,6 +1,7 @@
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import { useEffect, useMemo, useState } from "react";
 import { ListingToolbar } from "../../components/ListingToolbar";
+import { DishHealthBlock } from "../../components/DishHealthBlock";
 import { useBrandedStorefront } from "../../customer/BrandedStorefront";
 import { RichHtml } from "../../components/RichTextEditor";
 import type { CuisineMenuGroup, Dish, KitchenMealPlan, Menu } from "../../shared/api";
@@ -387,7 +388,7 @@ function DishCard({
   const hero = dish.media.find((m) => m.is_hero) ?? dish.media[0];
   const badges = dishHighlightBadges(dish);
   const readyMin = dish.projected_ready_min ?? dish.max_time_min ?? dish.prep_time_min;
-  const hasDetails = Boolean(dish.description || dish.ingredients_description);
+  const hasDetails = Boolean(dish.description || dish.ingredients_description || dish.health?.ingredients?.length);
   return (
     <article className="customer-dish">
       {hero?.url ? (
@@ -408,6 +409,7 @@ function DishCard({
             ? ` · ★ ${summary.overall_rating.toFixed(1)}`
             : ""}
           {hero?.is_live_capture ? " · Live capture" : ""}
+          {dish.health?.score != null ? ` · Health ${dish.health.score}` : ""}
         </p>
         {badges.length > 0 && (
           <div className="dish-badges">
@@ -425,6 +427,7 @@ function DishCard({
             {dish.ingredients_description ? (
               <RichHtml html={dish.ingredients_description} className="customer-dish__ingredients" />
             ) : null}
+            {dish.health ? <DishHealthBlock health={dish.health} /> : null}
           </details>
         )}
         <button type="button" className="btn btn--primary btn--sm customer-dish__add" onClick={onAdd}>

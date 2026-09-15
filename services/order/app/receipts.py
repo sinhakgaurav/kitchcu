@@ -191,8 +191,9 @@ def render_order_bill_pdf(receipt: OrderReceipt) -> bytes:
     pdf.set_font("Helvetica", "B", 18)
     pdf.cell(0, 10, _ascii_safe("kitchCU Bill / Receipt"), ln=True)
     pdf.set_font("Helvetica", "", 10)
-    pdf.cell(0, 6, _ascii_safe(f"Bill ID: {receipt.bill_id}"), ln=True)
-    pdf.cell(0, 6, _ascii_safe(f"Order: {receipt.order_code}"), ln=True)
+    pdf.cell(0, 6, _ascii_safe(f"Order / bill: {receipt.order_code}"), ln=True)
+    if receipt.bill_id and receipt.bill_id != receipt.order_code:
+        pdf.cell(0, 6, _ascii_safe(f"Bill ID: {receipt.bill_id}"), ln=True)
     if receipt.master_order_code:
         pdf.cell(0, 6, _ascii_safe(f"Master order: {receipt.master_order_code}"), ln=True)
     pdf.ln(4)

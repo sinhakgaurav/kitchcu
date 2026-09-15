@@ -9,7 +9,7 @@ from datetime import UTC, datetime
 from typing import Any
 
 from pydantic import BaseModel, Field, field_validator
-from sqlalchemy import func, select, text
+from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import GstMonthlyAudit, GstTaxInvoice, KitchenGstProfile
@@ -46,7 +46,7 @@ class GstProfileUpsertRequest(BaseModel):
     invoice_prefix: str | None = Field(
         default=None,
         max_length=20,
-        description="Prefix for generated invoice numbers (defaults to the kitchen code).",
+        description="Optional GST profile label. Invoice numbers always use `{kitchen_code}-GST-YYYYMM-SEQ`.",
     )
 
     @field_validator("gstin")
@@ -70,7 +70,10 @@ class GstProfileResponse(BaseModel):
     registered_address: str = Field(..., description="Registered business address.")
     default_tax_rate: float = Field(..., description="Default GST rate (%) applied to invoices.")
     is_active: bool = Field(..., description="Whether GST invoicing/sync is active.")
-    invoice_prefix: str | None = Field(default=None, description="Invoice number prefix.")
+    invoice_prefix: str | None = Field(
+        default=None,
+        description="Optional GST profile label. Numbers always use the kitchen code, not this prefix.",
+    )
     created_at: datetime = Field(..., description="Profile creation timestamp.")
     updated_at: datetime | None = Field(default=None, description="Last update timestamp.")
 
@@ -83,7 +86,11 @@ class GstTaxInvoiceResponse(BaseModel):
     id: uuid.UUID = Field(..., description="Invoice ID.")
     kitchen_id: uuid.UUID = Field(..., description="Owning kitchen (tenant scope).")
     order_id: uuid.UUID = Field(..., description="Delivered order this invoice covers.")
-    invoice_number: str = Field(..., description="Sequential invoice number.", examples=["CKPNQ001-GST-202607-0001"])
+    invoice_number: str = Field(
+        ...,
+        description="Kitchen-unique sequential invoice number (`{kitchen_code}-GST-YYYYMM-SEQ`).",
+        examples=["CKPNQ001-GST-202607-0001"],
+    )
     invoice_date: datetime = Field(..., description="Invoice date (order delivery timestamp).")
     order_code: str = Field(..., description="Human-readable order code.")
     customer_name: str | None = Field(default=None, description="Customer name on the invoice.")
@@ -320,24 +327,37 @@ async def upsert_gst_profile(
     return profile
 
 
+def _invoice_seq_suffix(value: str | None) -> int:
+    """Last `-NNNN` segment of an invoice number, or 0 if unreadable."""
+    if not value:
+        return 0
+    suffix = value.rsplit("-", 1)[-1]
+    return int(suffix) if suffix.isdigit() else 0
+
+
 async def _next_invoice_number(
     session: AsyncSession,
     kitchen_id: uuid.UUID,
-    prefix: str,
+    kitchen_code: str,
     invoice_date: datetime,
 ) -> str:
+    """Allocate `{kitchen_code}-GST-YYYYMM-SEQ`. Never reuse a gap; never share a number across kitchens."""
     period = invoice_date.strftime("%Y%m")
-    pattern = f"{prefix}-GST-{period}-%"
+    stem = f"{kitchen_code}-GST-{period}-"
+    await session.execute(
+        text("SELECT pg_advisory_xact_lock(hashtext(:lock_key))"),
+        {"lock_key": f"gst_inv:{kitchen_id}:{period}"},
+    )
     result = await session.execute(
-        select(func.count())
-        .select_from(GstTaxInvoice)
-        .where(
+        select(GstTaxInvoice.invoice_number).where(
             GstTaxInvoice.kitchen_id == kitchen_id,
-            GstTaxInvoice.invoice_number.like(pattern),
+            GstTaxInvoice.invoice_number.like(f"%GST-{period}-%"),
         )
     )
-    seq = int(result.scalar_one()) + 1
-    return f"{prefix}-GST-{period}-{seq:04d}"
+    max_seq = 0
+    for (number,) in result.all():
+        max_seq = max(max_seq, _invoice_seq_suffix(number))
+    return f"{stem}{max_seq + 1:04d}"
 
 
 async def sync_gst_invoices(
@@ -380,14 +400,14 @@ async def sync_gst_invoices(
     )
     rows = result.mappings().all()
     created: list[GstTaxInvoice] = []
-    prefix = profile.invoice_prefix or await _load_kitchen_code(session, kitchen_id)
+    kitchen_code = await _load_kitchen_code(session, kitchen_id)
     rate = float(profile.default_tax_rate)
 
     for row in rows:
         gross = float(row["subtotal"]) + float(row["delivery_fee"] or 0)
         tax_parts = split_tax_inclusive(gross, rate, intra_state=True)
         invoice_date = row["updated_at"] or datetime.now(UTC)
-        invoice_number = await _next_invoice_number(session, kitchen_id, prefix, invoice_date)
+        invoice_number = await _next_invoice_number(session, kitchen_id, kitchen_code, invoice_date)
         invoice = GstTaxInvoice(
             kitchen_id=kitchen_id,
             order_id=row["id"],

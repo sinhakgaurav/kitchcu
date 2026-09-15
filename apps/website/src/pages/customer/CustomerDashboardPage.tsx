@@ -36,6 +36,9 @@ import {
   type CustomerTicket,
   type DashboardOrder,
 } from "../../shared/customerDashboardApi";
+import { fetchDishesHealth } from "../../shared/publicApi";
+import { aggregateOrderedHealth, DishHealthBlock } from "../../components/DishHealthBlock";
+import type { DishHealthSnapshot } from "../../shared/api";
 import { CITIES_PRESENCE, cityCenterByName, liveCities } from "../../data/citiesPresence";
 import { openStreetMapEmbedUrl } from "../../lib/locationMaps";
 import { useCustomerDelivery } from "../../shared/customerDelivery";
@@ -153,6 +156,9 @@ export function CustomerDashboardPage() {
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [plateHealth, setPlateHealth] = useState<DishHealthSnapshot | null>(null);
+  const [dishHealth, setDishHealth] = useState<Record<string, DishHealthSnapshot>>({});
+  const [healthLoading, setHealthLoading] = useState(false);
 
   const loadDash = useCallback(async () => {
     const data = await fetchCustomerDashboard({
@@ -211,6 +217,46 @@ export function CustomerDashboardPage() {
     if (window.location.hash !== "#notifications") return;
     document.getElementById("notifications")?.scrollIntoView({ behavior: "smooth", block: "start" });
   }, [tab, loading]);
+
+  useEffect(() => {
+    if (!dash?.orders.length) {
+      setPlateHealth(null);
+      setDishHealth({});
+      setHealthLoading(false);
+      return;
+    }
+    const qty: Record<string, number> = {};
+    const ids: string[] = [];
+    for (const row of dash.orders) {
+      for (const item of row.items) {
+        qty[item.dish_id] = (qty[item.dish_id] ?? 0) + item.quantity;
+        ids.push(item.dish_id);
+      }
+    }
+    let cancelled = false;
+    setHealthLoading(true);
+    void fetchDishesHealth(ids)
+      .then((res) => {
+        if (cancelled) return;
+        const map: Record<string, DishHealthSnapshot> = {};
+        for (const snap of res.dishes) {
+          if (snap.dish_id) map[String(snap.dish_id)] = snap;
+        }
+        setDishHealth(map);
+        setPlateHealth(aggregateOrderedHealth(res.dishes, qty));
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setDishHealth({});
+        setPlateHealth(null);
+      })
+      .finally(() => {
+        if (!cancelled) setHealthLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [dash]);
 
   const selectTab = (next: Tab) => {
     setTab(next);
@@ -321,7 +367,13 @@ export function CustomerDashboardPage() {
       {loading && <p className="app-loading">Loading dashboard…</p>}
 
       {!loading && dash && tab === "overview" && (
-        <OverviewPanel dash={dash} refunds={refunds} tickets={tickets} onGo={selectTab} />
+        <OverviewPanel
+          dash={dash}
+          refunds={refunds}
+          tickets={tickets}
+          plateHealth={plateHealth}
+          onGo={selectTab}
+        />
       )}
       {!loading && dash && tab === "orders" && (
         <OrdersPanel
@@ -329,6 +381,7 @@ export function CustomerDashboardPage() {
           diet={diet}
           cuisine={cuisine}
           liveOnly={liveOnly}
+          dishHealth={dishHealth}
           setDiet={setDiet}
           setCuisine={setCuisine}
           setLiveOnly={setLiveOnly}
@@ -354,7 +407,9 @@ export function CustomerDashboardPage() {
       {!loading && tab === "referrals" && (
         <ReferralsPanel setError={setError} busy={busy} setBusy={setBusy} />
       )}
-      {!loading && dash && tab === "health" && <HealthPanel dash={dash} />}
+      {!loading && dash && tab === "health" && (
+        <HealthPanel dash={dash} plateHealth={plateHealth} healthLoading={healthLoading} />
+      )}
       {!loading && tab === "refunds" && <RefundsPanel refunds={refunds} />}
       {!loading && tab === "complaints" && (
         <ComplaintsPanel
@@ -399,11 +454,13 @@ function OverviewPanel({
   dash,
   refunds,
   tickets,
+  plateHealth,
   onGo,
 }: {
   dash: CustomerDashboard;
   refunds: CustomerRefund[];
   tickets: CustomerTicket[];
+  plateHealth: DishHealthSnapshot | null;
   onGo: (t: Tab) => void;
 }) {
   const { t } = useTranslation();
@@ -479,7 +536,7 @@ function OverviewPanel({
       </button>
       <button type="button" className="glass customer-dash__stat" onClick={() => onGo("health")}>
         <span className="customer-dash__stat-kicker">{t("customer.dashboard.statFresh")}</span>
-        <strong>{dash.health.home_freshness_score}</strong>
+        <strong>{plateHealth?.score ?? dash.health.home_freshness_score}</strong>
         <span>{t("customer.dashboard.statFreshHint")}</span>
       </button>
       <button type="button" className="glass customer-dash__stat" onClick={() => onGo("refunds")}>
@@ -521,6 +578,7 @@ function OrdersPanel({
   diet,
   cuisine,
   liveOnly,
+  dishHealth,
   setDiet,
   setCuisine,
   setLiveOnly,
@@ -530,6 +588,7 @@ function OrdersPanel({
   diet: string;
   cuisine: string;
   liveOnly: boolean;
+  dishHealth: Record<string, DishHealthSnapshot>;
   setDiet: (v: string) => void;
   setCuisine: (v: string) => void;
   setLiveOnly: (v: boolean) => void;
@@ -577,7 +636,7 @@ function OrdersPanel({
       ) : (
         <ul className="customer-dash__orders">
           {dash.orders.map((row) => (
-            <OrderCard key={row.order.id} row={row} onRaiseIssue={onRaiseIssue} />
+            <OrderCard key={row.order.id} row={row} dishHealth={dishHealth} onRaiseIssue={onRaiseIssue} />
           ))}
         </ul>
       )}
@@ -587,9 +646,11 @@ function OrdersPanel({
 
 function OrderCard({
   row,
+  dishHealth,
   onRaiseIssue,
 }: {
   row: DashboardOrder;
+  dishHealth: Record<string, DishHealthSnapshot>;
   onRaiseIssue: (orderCode: string) => void;
 }) {
   const navigate = useNavigate();
@@ -668,6 +729,9 @@ function OrderCard({
         {row.items.map((item) => (
           <li key={item.id}>
             {item.quantity}× {item.dish_name} · {inr(item.line_total)}
+            {dishHealth[item.dish_id]?.score != null ? (
+              <em> · health {dishHealth[item.dish_id].score}</em>
+            ) : null}
             {item.saved_vs_restaurant > 0 && (
               <em> saved ~{inr(item.saved_vs_restaurant)} vs restaurant</em>
             )}
@@ -1050,10 +1114,28 @@ function SavingsPanel({ dash }: { dash: CustomerDashboard }) {
   );
 }
 
-function HealthPanel({ dash }: { dash: CustomerDashboard }) {
+function HealthPanel({
+  dash,
+  plateHealth,
+  healthLoading,
+}: {
+  dash: CustomerDashboard;
+  plateHealth: DishHealthSnapshot | null;
+  healthLoading: boolean;
+}) {
+  const { t } = useTranslation();
   return (
     <section className="glass customer-dash__card">
-      <h2>Health chart — home kitchen vs restaurant style</h2>
+      <h2>{t("customer.dashboard.healthTitle")}</h2>
+      <p>{t("customer.dashboard.healthIntro")}</p>
+      {healthLoading ? (
+        <p className="customer-dash__empty-hint">{t("customer.dashboard.healthLoading")}</p>
+      ) : plateHealth ? (
+        <DishHealthBlock health={plateHealth} />
+      ) : (
+        <p className="customer-dash__empty-hint">{t("customer.dashboard.healthEmpty")}</p>
+      )}
+      <h3>{t("customer.dashboard.dietMix")}</h3>
       <p>{dash.health.note}</p>
       <div className="customer-dash__bars">
         <div>
@@ -1074,20 +1156,8 @@ function HealthPanel({ dash }: { dash: CustomerDashboard }) {
             <i style={{ width: `${dash.health.vegan_share_pct}%` }} />
           </div>
         </div>
-        <div>
-          <span>Home freshness {dash.health.home_freshness_score}</span>
-          <div className="customer-dash__bar customer-dash__bar--good">
-            <i style={{ width: `${dash.health.home_freshness_score}%` }} />
-          </div>
-        </div>
-        <div>
-          <span>Restaurant processed {dash.health.restaurant_processed_score}</span>
-          <div className="customer-dash__bar customer-dash__bar--warn">
-            <i style={{ width: `${dash.health.restaurant_processed_score}%` }} />
-          </div>
-        </div>
       </div>
-      <h3>Suggestions after meals</h3>
+      <h3>{t("customer.dashboard.tipsTitle")}</h3>
       <ul className="customer-dash__tips">
         {dash.tips.map((tip, i) => (
           <li key={i}>

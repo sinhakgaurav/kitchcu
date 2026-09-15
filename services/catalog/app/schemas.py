@@ -6,6 +6,7 @@ from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.ingredient_health import DishHealthSnapshot, health_enabled, snapshots_for_dishes
 from app.ingredients import sanitize_html
 from app.models import DEFAULT_CATEGORY_SLUGS, DEFAULT_CUISINES, Category, Cuisine, Dish, DishMedia
 from ckac_common.auth import stream_key
@@ -221,6 +222,10 @@ class DishResponse(BaseModel):
     is_unique_recipe: bool = Field(default=False, description="Unique recipe merchandising flag.")
     created_at: datetime | None = Field(default=None, description="Dish creation timestamp.")
     media: list[DishMediaResponse] = Field(default_factory=list, description="Hero + gallery photos.")
+    health: DishHealthSnapshot | None = Field(
+        default=None,
+        description="Ingredient health score from the F19 recipe map (typical home-kitchen use).",
+    )
 
     model_config = {"from_attributes": True}
 
@@ -584,6 +589,7 @@ async def list_owner_dishes(
         stmt = stmt.where(Dish.is_active.is_(is_active))
     rows = list((await session.execute(stmt)).scalars().all())
     dishes = [await dish_with_media(session, row) for row in rows]
+    dishes = await attach_dish_health(session, dishes)
     return DishListResponse(dishes=dishes, total=len(dishes))
 
 
@@ -626,6 +632,19 @@ async def dish_with_media(session: AsyncSession, dish: Dish) -> DishResponse:
         created_at=dish.created_at,
         media=[DishMediaResponse.model_validate(m) for m in media],
     )
+
+
+async def attach_dish_health(session: AsyncSession, dishes: list[DishResponse]) -> list[DishResponse]:
+    """Attach recipe-based health snapshots (batch). No-op list when the flag is off."""
+    if not dishes:
+        return dishes
+    if not await health_enabled(session):
+        return [d.model_copy(update={"health": None}) for d in dishes]
+    models = list(
+        (await session.execute(select(Dish).where(Dish.id.in_([d.id for d in dishes])))).scalars().all()
+    )
+    snaps = await snapshots_for_dishes(session, models)
+    return [d.model_copy(update={"health": snaps.get(d.id)}) for d in dishes]
 
 
 def build_menu_grouped(

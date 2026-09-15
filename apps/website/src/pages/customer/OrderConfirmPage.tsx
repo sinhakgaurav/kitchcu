@@ -1,6 +1,7 @@
 import { Link, useLocation, useParams } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { useBrandedStorefront } from "../../customer/BrandedStorefront";
+import { aggregateOrderedHealth, DishHealthBlock } from "../../components/DishHealthBlock";
 import {
   captureCustomerPayment,
   downloadCustomerOrderBillPdf,
@@ -8,7 +9,8 @@ import {
 } from "../../shared/customerCheckoutApi";
 import { getCustomerToken } from "../../shared/customerApi";
 import { useCustomerAuth } from "../../shared/customerAuth";
-import { STATUS_LABELS, type Order, type Payment, type UpiIntent } from "../../shared/api";
+import { STATUS_LABELS, type DishHealthSnapshot, type Order, type Payment, type UpiIntent } from "../../shared/api";
+import { fetchDishesHealth } from "../../shared/publicApi";
 import { readCheckoutSignature } from "../../shared/razorpayCheckout";
 
 type ConfirmState = {
@@ -53,6 +55,7 @@ export function OrderConfirmPage() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [capturing, setCapturing] = useState(false);
+  const [plateHealth, setPlateHealth] = useState<DishHealthSnapshot | null>(null);
 
   const menuHref = branded ? `${branded.basePath}/menu` : "/";
   const ordersHref = "/orders";
@@ -85,6 +88,29 @@ export function OrderConfirmPage() {
       cancelled = true;
     };
   }, [orderId, order]);
+
+  useEffect(() => {
+    if (!order?.items.length) {
+      setPlateHealth(null);
+      return;
+    }
+    const qty: Record<string, number> = {};
+    const ids = order.items.map((item) => {
+      qty[item.dish_id] = (qty[item.dish_id] ?? 0) + item.quantity;
+      return item.dish_id;
+    });
+    let cancelled = false;
+    void fetchDishesHealth(ids)
+      .then((res) => {
+        if (!cancelled) setPlateHealth(aggregateOrderedHealth(res.dishes, qty));
+      })
+      .catch(() => {
+        if (!cancelled) setPlateHealth(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [order]);
 
   const onDownload = async () => {
     if (!order) return;
@@ -204,6 +230,12 @@ export function OrderConfirmPage() {
             Coupon {order.coupon_code} saved you ₹{Math.round(order.discount_amount || 0)}.
           </p>
         )}
+        {plateHealth ? (
+          <div className="customer-confirm__health">
+            <h2>Ingredient health</h2>
+            <DishHealthBlock health={plateHealth} />
+          </div>
+        ) : null}
       </section>
 
       <section className="customer-confirm__card customer-confirm__next">

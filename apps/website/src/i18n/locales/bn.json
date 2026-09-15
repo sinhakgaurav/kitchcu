@@ -450,7 +450,12 @@
       "statSaved": "Saved",
       "statSavedHint": "Vs typical restaurant pricing",
       "tipsEmpty": "Order a few home meals — light walk and water tips will show up here.",
-      "tipsTitle": "Tips after your meals"
+      "tipsTitle": "Tips after your meals",
+      "dietMix": "Diet mix",
+      "healthEmpty": "Order a mapped home meal to see a plate score. Unmapped recipes show after the kitchen links ingredients.",
+      "healthIntro": "Score comes from each kitchen’s recipe map (quantity-weighted). Benefits and cautions are typical home-kitchen use — not medical advice.",
+      "healthLoading": "Reading recipes for your orders…",
+      "healthTitle": "Ingredient health of food you ordered"
     },
     "account": {
       "title": "অ্যাকাউন্ট",

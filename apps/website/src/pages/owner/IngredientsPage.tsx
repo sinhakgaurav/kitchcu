@@ -281,7 +281,7 @@ export function IngredientsPage() {
     <OwnerPageShell
       eyebrow="Operations"
       title="Ingredient mapper"
-      description="Pantry SKUs (brand, pack weight, photo) map onto dish recipes. Stock deducts when an order is marked ready."
+      description="Pantry SKUs (brand, pack weight, photo) map onto dish recipes. Stock deducts when an order is marked ready. Health scores are a platform library match on the SKU name — typical home-kitchen use, not medical advice."
     >
       {error && <p className="form-error">{error}</p>}
       {savedMsg && <div className="auth-card__success">{savedMsg}</div>}
@@ -376,6 +376,7 @@ export function IngredientsPage() {
                     <th>Brand</th>
                     <th>Pack</th>
                     <th>Stock</th>
+                    <th>Health</th>
                     <th>Low at</th>
                     <th>Status</th>
                     <th>Adjust</th>
@@ -405,6 +406,19 @@ export function IngredientsPage() {
                         {ing.packs_on_hand != null ? (
                           <small> · {ing.packs_on_hand} packs</small>
                         ) : null}
+                      </td>
+                      <td className="owner-table__health">
+                        {ing.health_score != null ? (
+                          <>
+                            <strong>{ing.health_score}</strong>
+                            {ing.health_benefits ? <small>{ing.health_benefits}</small> : null}
+                            {ing.health_disadvantages ? (
+                              <small className="owner-table__health-con">{ing.health_disadvantages}</small>
+                            ) : null}
+                          </>
+                        ) : (
+                          "—"
+                        )}
                       </td>
                       <td>
                         {ing.low_stock_threshold} {ing.unit}
@@ -547,6 +561,19 @@ export function IngredientsPage() {
                           </select>
                         </label>
                       </div>
+                      {(() => {
+                        const picked = ingredients.find((i) => i.id === line.ingredient_id);
+                        if (!picked || picked.health_score == null) return null;
+                        return (
+                          <p className="owner-recipe-card__health">
+                            Health {picked.health_score}
+                            {picked.health_benefits ? ` · ${picked.health_benefits}` : ""}
+                            {picked.health_disadvantages
+                              ? ` · Watch: ${picked.health_disadvantages}`
+                              : ""}
+                          </p>
+                        );
+                      })()}
                       <LiveCapturePhotoField
                         kitchenId={kitchen.id}
                         context="ingredient"

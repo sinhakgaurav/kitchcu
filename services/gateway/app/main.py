@@ -154,6 +154,8 @@ def resolve_service_url(path: str) -> str | None:
         return settings.notification_service_url
     if path.startswith("/api/v1/orders"):
         return settings.order_service_url
+    if path.startswith("/api/v1/dishes"):
+        return settings.catalog_service_url
     if path.startswith("/api/v1/kitchens"):
         # Branded-page settings/upload live on identity — must win before `/media` catalog marker.
         if "/branded-page" in path:

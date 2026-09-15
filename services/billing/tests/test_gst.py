@@ -1,9 +1,11 @@
+import uuid
 from datetime import UTC, datetime
 
+import psycopg2
 import pytest
 from httpx import AsyncClient
 
-from tests.conftest import VALID_GSTIN, _mark_order_delivered, _seed_owner_with_order
+from tests.conftest import SYNC_DB_URL, VALID_GSTIN, _mark_order_delivered, _seed_owner_with_order
 
 # Invoices are synced from orders created "now", so reports must target the current
 # period — a hardcoded month silently reports zero invoices once the calendar moves on.
@@ -56,16 +58,16 @@ async def test_upsert_gst_profile_rejects_invalid_gstin(client: AsyncClient, bil
 
 @pytest.mark.asyncio
 async def test_two_kitchens_same_invoice_prefix_can_both_sync(client: AsyncClient):
-    """Invoice numbers are unique per kitchen (GSTIN), not globally — bulk seed
-    previously 500'd when every kitchen reused prefix SHK."""
-    _, kitchen_a, order_a, _, token_a = _seed_owner_with_order()
-    _, kitchen_b, order_b, _, token_b = _seed_owner_with_order()
+    """Invoice numbers always use the kitchen code, even when profiles share a prefix."""
+    _, kitchen_a, order_a, code_a, token_a = _seed_owner_with_order()
+    _, kitchen_b, order_b, code_b, token_b = _seed_owner_with_order()
     _mark_order_delivered(order_a)
     _mark_order_delivered(order_b)
 
-    for kitchen_id, token, gstin in (
-        (kitchen_a, token_a, "27AAAAA0001C1Z5"),
-        (kitchen_b, token_b, "27AAAAA0002C1Z5"),
+    numbers: list[str] = []
+    for kitchen_id, token, gstin, code in (
+        (kitchen_a, token_a, "27AAAAA0001C1Z5", code_a),
+        (kitchen_b, token_b, "27AAAAA0002C1Z5", code_b),
     ):
         headers = {"Authorization": f"Bearer {token}"}
         profile = await client.put(
@@ -80,7 +82,57 @@ async def test_two_kitchens_same_invoice_prefix_can_both_sync(client: AsyncClien
         )
         assert sync.status_code == 200, sync.text
         assert sync.json()["synced_count"] == 1
-        assert sync.json()["invoices"][0]["invoice_number"].startswith("SHK-GST-")
+        number = sync.json()["invoices"][0]["invoice_number"]
+        assert number.startswith(f"{code}-GST-")
+        assert not number.startswith("SHK-GST-")
+        numbers.append(number)
+    assert numbers[0] != numbers[1]
+
+
+@pytest.mark.asyncio
+async def test_invoice_numbers_increment_within_the_period(client: AsyncClient):
+    _, kitchen_id, order_a, kitchen_code, token = _seed_owner_with_order()
+    order_b = uuid.uuid4()
+    conn = psycopg2.connect(SYNC_DB_URL)
+    conn.autocommit = True
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            INSERT INTO ckac_orders.orders
+            (id, kitchen_id, bill_id, order_code, status, source, delivery_type,
+             payment_method, subtotal, delivery_fee, total, updated_at)
+            VALUES (
+                %s::uuid, %s::uuid, %s, %s, 'delivered', 'manual',
+                'pickup', 'cod', 199, 0, 199, NOW() + interval '1 second'
+            )
+            """,
+            (
+                str(order_b),
+                str(kitchen_id),
+                f"{kitchen_code}-BILL-20260712-0002",
+                f"{kitchen_code}-BILL-20260712-0002",
+            ),
+        )
+    conn.close()
+    _mark_order_delivered(order_a)
+
+    headers = {"Authorization": f"Bearer {token}"}
+    profile = await client.put(
+        f"/api/v1/kitchens/{kitchen_id}/gst/profile",
+        json=_profile_payload(),
+        headers=headers,
+    )
+    assert profile.status_code == 200, profile.text
+    sync = await client.post(
+        f"/api/v1/kitchens/{kitchen_id}/gst/sync",
+        headers=headers,
+    )
+    assert sync.status_code == 200, sync.text
+    body = sync.json()
+    assert body["synced_count"] == 2
+    numbers = [inv["invoice_number"] for inv in body["invoices"]]
+    assert all(n.startswith(f"{kitchen_code}-GST-") for n in numbers)
+    assert sorted(n.rsplit("-", 1)[-1] for n in numbers) == ["0001", "0002"]
 
 
 @pytest.mark.asyncio

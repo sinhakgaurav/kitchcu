@@ -482,6 +482,10 @@ def apply_planned_order_times(
 ) -> tuple[bool, str]:
     """Shift each order (and linked payment/rating/GST rows) to ``stamps``.
 
+    Also rewrites ``bill_id`` / ``order_code`` to ``{kitchen_code}-BILL-YYYYMMDD-SEQ``
+    and GST invoice numbers to ``{kitchen_code}-GST-YYYYMM-SEQ`` so backdated
+    history does not keep today's sequence.
+
     Used by the 6-month bulk seeder and the Saturday weekly fill. Returns
     ``(ok, error)`` so callers can log without raising.
     """
@@ -542,6 +546,40 @@ BEGIN
     );
   END LOOP;
 END $$;
+
+UPDATE ckac_orders.orders o
+SET bill_id = left(replace(o.id::text, '-', ''), 32),
+    order_code = 'tmp-' || o.id::text
+WHERE o.kitchen_id = '{kitchen_id}'::uuid
+  AND EXISTS (SELECT 1 FROM shifted s WHERE s.order_id = o.id);
+
+UPDATE ckac_orders.orders o
+SET bill_id = left(n.fresh, 32),
+    order_code = n.fresh
+FROM (
+  SELECT
+    o2.id,
+    k.code || '-BILL-' || to_char(o2.created_at AT TIME ZONE 'UTC', 'YYYYMMDD')
+      || '-' || lpad(
+        row_number() OVER (
+          PARTITION BY o2.kitchen_id, to_char(o2.created_at AT TIME ZONE 'UTC', 'YYYYMMDD')
+          ORDER BY o2.created_at, o2.id
+        )::text,
+        4, '0'
+      ) AS fresh
+  FROM ckac_orders.orders o2
+  JOIN ckac_identity.kitchens k ON k.id = o2.kitchen_id
+  WHERE o2.kitchen_id = '{kitchen_id}'::uuid
+    AND EXISTS (SELECT 1 FROM shifted s WHERE s.order_id = o2.id)
+) n
+WHERE o.id = n.id;
+
+UPDATE ckac_billing.gst_tax_invoices g
+SET order_code = o.order_code
+FROM ckac_orders.orders o
+WHERE g.order_id = o.id
+  AND g.kitchen_id = '{kitchen_id}'::uuid
+  AND EXISTS (SELECT 1 FROM shifted s WHERE s.order_id = g.order_id);
 
 UPDATE ckac_billing.gst_tax_invoices g
 SET invoice_number = left(g.invoice_number, 40) || '-t' || left(g.id::text, 8)

@@ -248,7 +248,9 @@ export function OrderDetailPage() {
           <p className="od-board__eyebrow">Order detail</p>
           <h1>{order.order_code}</h1>
           <p className="od-board__meta">
-            <span className="od-board__code">{order.bill_id}</span>
+            {order.bill_id && order.bill_id !== order.order_code ? (
+              <span className="od-board__code">{order.bill_id}</span>
+            ) : null}
             <span>{new Date(order.created_at).toLocaleString("en-IN")}</span>
             <span>{order.source} · {order.delivery_type}</span>
           </p>

@@ -85,6 +85,8 @@
 | **Growth golden day** | `services/growth/` | **P20** — ML comment sentiment + golden performance day pins |
 | **Branded storefront** | `services/identity/`, `apps/website/` | **P19** — kitchen `branded_page` + customer `/k/:code` |
 | **Owner KYC** | `services/identity/`, `apps/website/` | **P49** — owner profile + live photo, masked Aadhaar/PAN; Admin kitchen KYC tab |
+| **Dish ingredient health** | `services/catalog/`, `apps/website/` | **P50** — recipe-weighted plate score + benefits/disadvantages on customer menu/Health/orders; pantry Health column; `dish_health` flag |
+| **Unique bill / GST numbers** | `services/order/`, `services/billing/`, `apps/website/` | **P51** — `{kitchen_code}-BILL-YYYYMMDD-SEQ` and `{kitchen_code}-GST-YYYYMM-SEQ`; Super Admin phone nav + table scroll |
 | **Kitchen integrations admin** | identity + billing admin APIs, admin PWA | **P21** — WhatsApp / Razorpay per kitchen (platform keys stay Admin API Keys) |
 | **Package mapper + employees RBAC** | billing packages · identity employees · admin PWA | **P25–P28** — Admin Packages/Employees; kitchen Package/Marketing/Streaming tabs; Cursor super-admin gate |
 | **Dual referrals + GST export + admin ops** | identity referrals · billing GST export · admin PWA | **P37–P39** — customer↔kitchen referrals; GST Excel/PDF; kitchen Orders/Care, ticket triage, settlements |
@@ -467,4 +469,4 @@ Delivered order only → home_taste (1–5) + quality (1–5) → optional anony
 
 ---
 
-*Last updated: Phase 1 S1–S18 + P19–P49 · owner KYC (photos + Aadhaar/PAN). Tracker: `docs/ADVANCEMENT-TRACKER.md`. Portals/QA: `docs/PRODUCTION-PORTALS-CREDENTIALS-QA.md`. Guide: `docs/CKAC-COMPLETE-GUIDE.md` v3.2.6. Prod: `*.kitchcu.com`. Next: kitchen staff build · live Razorpay · E1–E2.*
+*Last updated: Phase 1 S1–S18 + P19–P51 · unique bill/invoice numbers + admin phone layout. Tracker: `docs/ADVANCEMENT-TRACKER.md`. Portals/QA: `docs/PRODUCTION-PORTALS-CREDENTIALS-QA.md`. Guide: `docs/CKAC-COMPLETE-GUIDE.md` v3.2.6. Prod: `*.kitchcu.com`. Next: kitchen staff build · live Razorpay · E1–E2.*

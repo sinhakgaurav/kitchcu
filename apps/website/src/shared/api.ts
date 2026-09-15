@@ -136,6 +136,27 @@ export type DishMedia = {
   captured_at: string | null;
 };
 
+export type DishHealthIngredient = {
+  name: string;
+  score: number;
+  benefits: string;
+  disadvantages: string;
+  quantity?: number | null;
+  unit?: string | null;
+};
+
+export type DishHealthSnapshot = {
+  dish_id?: string | null;
+  dish_name?: string | null;
+  kitchen_id?: string | null;
+  score: number | null;
+  label: string;
+  mapped: number;
+  total: number;
+  ingredients: DishHealthIngredient[];
+  disclaimer: string;
+};
+
 export type Dish = {
   id: string;
   kitchen_id: string;
@@ -161,6 +182,7 @@ export type Dish = {
   is_unique_recipe?: boolean;
   created_at?: string | null;
   media: DishMedia[];
+  health?: DishHealthSnapshot | null;
 };
 
 export type MenuHighlightSections = {
@@ -1800,6 +1822,9 @@ export type Ingredient = {
   packs_on_hand?: number | null;
   photo_url?: string | null;
   is_low: boolean;
+  health_score?: number | null;
+  health_benefits?: string | null;
+  health_disadvantages?: string | null;
 };
 
 export type RecipeLine = {

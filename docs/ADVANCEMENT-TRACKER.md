@@ -113,6 +113,8 @@ For **manual QA / release sign-off** (short Must/Should) see [QA-INSTRUCTION-PAC
 | P47 | **Swagger tester + auth QA** | Aggregated OpenAPI: public ops `security: []` (no leftover token on Try it out); `POST /api/v1/auth/token` OAuth2 password form (admin email+password or owner/customer phone+OTP); owner JWT `type=owner`; `scripts/audit-api-auth.py`; community public recipes skip orphan kitchens; customer refunds list returns `[]` not 500 | ✅ | Gateway `openapi_aggregate.py`; identity `auth_token.py`; community `list_shared_recipes`; billing refunds SQL |
 | P48 | **Customer profile + live photo** | Gallery avatar + camera-only live photo; Admin Customers view; `customer_profile_photos` flag; `customer.updated` | ✅ | Identity `025`; design `CUSTOMER-PROFILE-PHOTOS-DESIGN.md`. Owner CRM display deferred |
 | P49 | **Owner KYC (photos + Aadhaar/PAN)** | Owner profile + live photo; masked Aadhaar/PAN; Admin kitchen **KYC** tab; `owner_kyc` flag; `owner.updated` | ✅ | Identity `026`; design `OWNER-KYC-DESIGN.md`. No UIDAI/NSDL e-KYC |
+| P50 | **Dish ingredient health (customer)** | 0–100 recipe-weighted score + per-ingredient benefits/disadvantages on menu, Health tab, order confirm; owner/admin pantry Health column; `dish_health` flag | ✅ | Catalog library + `GET /dishes/health`; identity `027`; design `DISH-INGREDIENT-HEALTH-DESIGN.md`. Not medical advice |
+| P51 | **Unique bill/invoice numbers + admin phone** | Order/bill = `{kitchen_code}-BILL-YYYYMMDD-SEQ`; GST = `{kitchen_code}-GST-YYYYMM-SEQ` (max+lock, seed rewrite after dating); Super Admin phone section `<select>` + table horizontal scroll | ✅ | Order `_next_bill_id`; billing `_next_invoice_number`; admin nav/table CSS |
 
 ---
 
@@ -228,6 +230,8 @@ The distribution lives in `scripts/order_history.py` and is asserted without a d
   averaged four units, which billed a home-food order at over ₹1,000.
 - **GST invoice numbers follow the dated month** — numbers minted as `CKCODE-GST-YYYYMM-SEQ`
   at create time are rewritten after dating so March filings are not a September series.
+- **Order / bill codes follow the dated day** — `{kitchen_code}-BILL-YYYYMMDD-SEQ` is rewritten
+  after dating so historical orders are not all `…-BILL-{today}-0001`.
 - **Owner Reports** expose a 6-month range; 90/180-day charts roll up to weeks/months instead
   of 180 unreadable daily bars. Period-over-period deltas hide when the prior window is empty.
 

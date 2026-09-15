@@ -1,6 +1,6 @@
 /** Unauthenticated customer-facing API (no owner JWT). */
 
-import type { KitchenNearbyList, Menu } from "./api";
+import type { DishHealthSnapshot, KitchenNearbyList, Menu } from "./api";
 import { getCustomerToken } from "./customerApi";
 
 export type PublicActivePromotion = {
@@ -84,6 +84,15 @@ export async function fetchPublicMenu(
   if (opts?.sort) q.set("sort", opts.sort);
   const qs = q.toString();
   return publicFetch(`/api/v1/kitchens/${kitchenId}/menu${qs ? `?${qs}` : ""}`);
+}
+
+export async function fetchDishesHealth(dishIds: string[]): Promise<{
+  dishes: DishHealthSnapshot[];
+  total: number;
+}> {
+  const unique = [...new Set(dishIds.filter(Boolean))].slice(0, 40);
+  if (unique.length === 0) return { dishes: [], total: 0 };
+  return publicFetch(`/api/v1/dishes/health?ids=${unique.join(",")}`);
 }
 
 export async function fetchKitchenByCode(code: string): Promise<import("./api").KitchenPublic> {
