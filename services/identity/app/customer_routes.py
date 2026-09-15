@@ -5,13 +5,18 @@ from __future__ import annotations
 import uuid
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jose import JWTError, jwt
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ckac_common.storage import get_media_storage
+from app.customer_media import (
+    PHOTO_FEATURE,
+    parse_captured_at,
+    publish_customer_photo_updated,
+    upload_customer_image,
+)
 
 from app.customer_schemas import (
     CustomerAuthResponse,
@@ -382,6 +387,83 @@ async def customer_profile_update(
     return customer_to_response(customer)
 
 
+@router.post(
+    "/customers/me/avatar",
+    response_model=CustomerResponse,
+    summary="Upload a display profile photo",
+    description=(
+        "Customer-only — gallery or camera file. This is the avatar shown in the diner app. "
+        "A separate live-capture photo is uploaded at `/customers/me/live-photo`."
+    ),
+    responses={401: RESP_401, 400: RESP_400},
+    tags=["Customer Dashboard"],
+)
+async def customer_avatar_upload(
+    customer: Annotated[Customer, Depends(get_current_customer)],
+    session: Annotated[AsyncSession, Depends(get_db)],
+    publisher: Annotated[EventPublisher, Depends(get_publisher)],
+    file: Annotated[UploadFile, File()],
+) -> CustomerResponse:
+    from ckac_common.platform_config import feature_http_status, require_feature
+
+    try:
+        await require_feature(session, PHOTO_FEATURE)
+    except ValueError as exc:
+        code = feature_http_status(exc) or status.HTTP_400_BAD_REQUEST
+        raise HTTPException(status_code=code, detail=str(exc)) from exc
+
+    data = await file.read()
+    customer.avatar_url = upload_customer_image(
+        customer_id=customer.id, context="avatar", data=data
+    )
+    await session.flush()
+    await publish_customer_photo_updated(publisher, session, customer, photo_kind="avatar")
+    return customer_to_response(customer)
+
+
+@router.post(
+    "/customers/me/live-photo",
+    response_model=CustomerResponse,
+    summary="Upload a live-capture photo",
+    description=(
+        "Customer-only — camera capture required. The client must send `is_live_capture=true` "
+        "(same trust rule as dish heroes). Gallery files are rejected."
+    ),
+    responses={401: RESP_401, 400: RESP_400},
+    tags=["Customer Dashboard"],
+)
+async def customer_live_photo_upload(
+    customer: Annotated[Customer, Depends(get_current_customer)],
+    session: Annotated[AsyncSession, Depends(get_db)],
+    publisher: Annotated[EventPublisher, Depends(get_publisher)],
+    file: Annotated[UploadFile, File()],
+    is_live_capture: Annotated[bool, Form()] = False,
+    captured_at: Annotated[str | None, Form()] = None,
+) -> CustomerResponse:
+    from ckac_common.platform_config import feature_http_status, require_feature
+
+    try:
+        await require_feature(session, PHOTO_FEATURE)
+    except ValueError as exc:
+        code = feature_http_status(exc) or status.HTTP_400_BAD_REQUEST
+        raise HTTPException(status_code=code, detail=str(exc)) from exc
+
+    if not is_live_capture:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Live photo must be captured with the camera (is_live_capture=true).",
+        )
+
+    data = await file.read()
+    customer.live_photo_url = upload_customer_image(
+        customer_id=customer.id, context="live_photo", data=data
+    )
+    customer.live_photo_captured_at = parse_captured_at(captured_at)
+    await session.flush()
+    await publish_customer_photo_updated(publisher, session, customer, photo_kind="live_photo")
+    return customer_to_response(customer)
+
+
 @router.patch(
     "/customers/me/notifications",
     response_model=CustomerResponse,
@@ -573,26 +655,8 @@ async def customer_payout_qr_upload(
         raise HTTPException(status_code=code, detail=str(exc)) from exc
 
     data = await file.read()
-    if not data:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Empty file")
-    if len(data) > 10 * 1024 * 1024:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="File exceeds 10MB")
-
-    if data.startswith(b"\xff\xd8\xff"):
-        content_type, ext = "image/jpeg", "jpg"
-    elif data.startswith(b"\x89PNG\r\n\x1a\n"):
-        content_type, ext = "image/png", "png"
-    elif len(data) >= 12 and data[:4] == b"RIFF" and data[8:12] == b"WEBP":
-        content_type, ext = "image/webp", "webp"
-    else:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Use JPEG, PNG, or WebP")
-
-    customer.upi_qr_url = get_media_storage().upload(
-        kitchen_id=f"customer-{customer.id}",
-        context="payout_qr",
-        data=data,
-        content_type=content_type,
-        extension=ext,
+    customer.upi_qr_url = upload_customer_image(
+        customer_id=customer.id, context="payout_qr", data=data
     )
     await session.flush()
     return customer_to_response(customer)

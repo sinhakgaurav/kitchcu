@@ -7,6 +7,7 @@ import { CUSTOMER_HOST } from "../shared/brand";
 import { customerAccountLabel, isCustomerSignedIn, useCustomerAuth } from "../shared/customerAuth";
 import { kitchenUrl } from "../shared/urls";
 import { SuperAdminLink } from "./SuperAdminAccess";
+import { CustomerAvatar } from "./CustomerAvatar";
 import { DeliveryAddressPicker } from "./DeliveryAddressPicker";
 
 export function CustomerNavbar() {
@@ -57,6 +58,12 @@ export function CustomerNavbar() {
                   className="btn btn--primary btn--sm nav__auth-btn"
                   onClick={() => setOpen(false)}
                 >
+                  <CustomerAvatar
+                    name={session?.name}
+                    src={session?.avatarUrl}
+                    size="sm"
+                    live={Boolean(session?.livePhotoUrl)}
+                  />
                   {accountLabel}
                 </Link>
                 <div className="nav__account-menu" role="menu" aria-label={t("customer.nav.account")}>

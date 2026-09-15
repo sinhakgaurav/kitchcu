@@ -4,6 +4,7 @@ import redis.asyncio as redis
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.admin_routes import router as admin_router
 from app.internal_routes import router as internal_router
 from app.routes import router
 from ckac_common.config import get_settings
@@ -54,6 +55,7 @@ app.add_middleware(CorrelationMiddleware)
 
 app.include_router(router, prefix="/api/v1")
 app.include_router(internal_router, prefix="/api/v1")
+app.include_router(admin_router, prefix="/api/v1")
 
 
 @app.get("/health/live")

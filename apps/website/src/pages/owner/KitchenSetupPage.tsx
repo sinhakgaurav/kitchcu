@@ -1,6 +1,7 @@
 import { FormEvent, useEffect, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { KitchenLocationMap } from "../../components/owner/KitchenLocationMap";
+import { OwnerIdentityPanel } from "../../components/owner/OwnerIdentityPanel";
 import { OwnerPageShell, OwnerPanel } from "../../components/owner/OwnerPageShell";
 import { useGeolocation } from "../../hooks/useGeolocation";
 import { createKitchen, updateKitchenDeliverySettings, updateKitchenProfile } from "../../lib/api";
@@ -12,6 +13,7 @@ const PUNE_DEFAULT = { latitude: 18.5362, longitude: 73.8958 };
 
 export function KitchenSetupPage() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { reloadKitchens, kitchen } = useKitchen();
   const { coords, status: geoStatus, error: geoError, refresh: refreshGeo } = useGeolocation(PUNE_DEFAULT);
   const [error, setError] = useState("");
@@ -46,6 +48,11 @@ export function KitchenSetupPage() {
     setDraftLng(coords.longitude.toFixed(6));
     setLocateRequested(false);
   }, [kitchen, locateRequested, geoStatus, coords.latitude, coords.longitude]);
+
+  useEffect(() => {
+    if (location.hash !== "#identity") return;
+    document.getElementById("identity")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [location.hash]);
 
   const draftLatitude = Number(draftLat);
   const draftLongitude = Number(draftLng);
@@ -173,10 +180,11 @@ export function KitchenSetupPage() {
       title={kitchen ? "Kitchen settings" : "Create your kitchen"}
       description={
         kitchen
-          ? "Profile, delivery radius, and who pays when customers are beyond range"
-          : "Set up your cloud kitchen to start taking orders"
+          ? "Your identity, kitchen profile, delivery radius, and who pays when customers are beyond range"
+          : "Identify yourself, then set up your cloud kitchen to start taking orders"
       }
     >
+      <OwnerIdentityPanel />
       {kitchen ? (
         <>
           <OwnerPanel

@@ -25,6 +25,7 @@ Deferral allowed only with: tracker note in `docs/ADVANCEMENT-TRACKER.md` + perm
 | Tab | Owns |
 |-----|------|
 | Profile | Status, address, branded summary |
+| KYC | Owner identity — photos + masked Aadhaar/PAN |
 | WhatsApp | Kitchen `phone_number_id` (not Meta app secret) |
 | Payments | Kitchen Razorpay / Route (not SaaS Razorpay) |
 | Modules | Per-kitchen module flags |

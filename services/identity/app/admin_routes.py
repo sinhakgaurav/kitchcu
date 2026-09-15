@@ -15,6 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.admin_order_ops import admin_kitchen_parse_stats, export_admin_kitchen_orders_csv, kitchen_exists
 from app.brand_media import upload_brand_media
+from app.owner_kyc import mask_aadhaar, mask_pan, owner_kyc_complete
 from app.models import (
     Customer,
     CustomerAddress,
@@ -182,6 +183,8 @@ class AdminCustomerRow(BaseModel):
     status: str
     has_password: bool
     has_payout: bool
+    has_avatar: bool = False
+    has_live_photo: bool = False
     address_count: int
     created_at: datetime
 
@@ -193,6 +196,11 @@ class AdminCustomerDetail(BaseModel):
     email: str | None
     status: str
     has_password: bool
+    has_avatar: bool = False
+    has_live_photo: bool = False
+    avatar_url: str | None = None
+    live_photo_url: str | None = None
+    live_photo_captured_at: datetime | None = None
     upi_vpa: str | None
     upi_qr_url: str | None
     bank_account_number_masked: str | None
@@ -280,6 +288,8 @@ class AdminOwnerRow(BaseModel):
     subscription_tier: str = Field(..., description="Subscription plan tier.", examples=["trial"])
     subscription_status: str = Field(..., description="Subscription lifecycle status.", examples=["trial", "active"])
     kitchen_count: int = Field(..., description="Number of kitchens owned by this owner.", examples=[1])
+    has_kyc: bool = Field(default=False, description="True when owner photos + Aadhaar + PAN are on file.")
+    has_live_photo: bool = Field(default=False, description="True when the owner has a live-capture photo.")
 
 
 class AdminKitchenRow(BaseModel):
@@ -316,6 +326,10 @@ class AdminKitchenRow(BaseModel):
         default=0,
         description="Refunds in requested/processing for orders of this kitchen.",
     )
+    owner_kyc_complete: bool = Field(
+        default=False,
+        description="True when the owning owner has avatar, live photo, Aadhaar, and PAN.",
+    )
 
 
 class AdminKitchenDetail(AdminKitchenRow):
@@ -347,6 +361,11 @@ class AdminKitchenDetail(AdminKitchenRow):
             "Kitchen WhatsApp phone ID and kitchen Razorpay keys travel with this kitchen."
         ),
     )
+    owner_avatar_url: str | None = Field(default=None, description="Owner display photo.")
+    owner_live_photo_url: str | None = Field(default=None, description="Owner live-capture photo.")
+    owner_live_photo_captured_at: datetime | None = Field(default=None)
+    owner_aadhaar_masked: str | None = Field(default=None, description="Masked Aadhaar (last 4).")
+    owner_pan_masked: str | None = Field(default=None, description="Masked PAN.")
 
 
 def _admin_kitchen_row(
@@ -375,6 +394,7 @@ def _admin_kitchen_row(
         last_order_at=last_order_at,
         open_ticket_count=open_ticket_count,
         open_refund_count=open_refund_count,
+        owner_kyc_complete=owner_kyc_complete(owner),
     )
 
 
@@ -485,6 +505,11 @@ def _admin_kitchen_detail(
         porter_auto_book_delay_min=int(getattr(kitchen, "porter_auto_book_delay_min", 15) or 15),
         latitude=latitude,
         longitude=longitude,
+        owner_avatar_url=owner.avatar_url,
+        owner_live_photo_url=owner.live_photo_url,
+        owner_live_photo_captured_at=owner.live_photo_captured_at,
+        owner_aadhaar_masked=mask_aadhaar(owner.aadhaar_number),
+        owner_pan_masked=mask_pan(owner.pan_number),
     )
 
 
@@ -806,6 +831,8 @@ async def admin_owners(
                 subscription_tier=o.subscription_tier,
                 subscription_status=o.subscription_status,
                 kitchen_count=kc,
+                has_kyc=owner_kyc_complete(o),
+                has_live_photo=bool(o.live_photo_url),
             )
         )
     return rows
@@ -1464,6 +1491,8 @@ async def admin_customers(
                 status=c.status,
                 has_password=bool(c.password_hash),
                 has_payout=bool(c.upi_vpa or c.bank_account_number),
+                has_avatar=bool(c.avatar_url),
+                has_live_photo=bool(c.live_photo_url),
                 address_count=addr_count,
                 created_at=c.created_at,
             )
@@ -1498,6 +1527,11 @@ async def admin_customer_detail(
         email=customer.email,
         status=customer.status,
         has_password=bool(customer.password_hash),
+        has_avatar=bool(customer.avatar_url),
+        has_live_photo=bool(customer.live_photo_url),
+        avatar_url=customer.avatar_url,
+        live_photo_url=customer.live_photo_url,
+        live_photo_captured_at=customer.live_photo_captured_at,
         upi_vpa=customer.upi_vpa,
         upi_qr_url=customer.upi_qr_url,
         bank_account_number_masked=_mask_account(customer.bank_account_number),
@@ -1568,6 +1602,8 @@ async def admin_customer_status(
         status=customer.status,
         has_password=bool(customer.password_hash),
         has_payout=bool(customer.upi_vpa or customer.bank_account_number),
+        has_avatar=bool(customer.avatar_url),
+        has_live_photo=bool(customer.live_photo_url),
         address_count=addr_count,
         created_at=customer.created_at,
     )
@@ -1661,6 +1697,8 @@ async def admin_owner_subscription(
         subscription_tier=owner.subscription_tier,
         subscription_status=owner.subscription_status,
         kitchen_count=kc,
+        has_kyc=owner_kyc_complete(owner),
+        has_live_photo=bool(owner.live_photo_url),
     )
 
 

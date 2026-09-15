@@ -7,7 +7,7 @@
 | Baseline | Phase 1 **S1–S18** complete (gateway + 13 domain services + 4 PWAs + GST) |
 | Production | `*.kitchcu.com` (GCP VM + Caddy) |
 | Local demo | `*.kitchcu.in` / `admin@kitchcu.dev` |
-| Last updated | 2026-09-12 |
+| Last updated | 2026-09-15 |
 | Portals / QA pack | [PRODUCTION-PORTALS-CREDENTIALS-QA.md](./PRODUCTION-PORTALS-CREDENTIALS-QA.md) (+ PDF) |
 | Tester book | [TESTER-INSTRUCTION-PACK.md](./TESTER-INSTRUCTION-PACK.md) (+ [PDF](./TESTER-INSTRUCTION-PACK.pdf)) — numbered UI + API steps |
 | Architecture flows | [PLATFORM-ARCHITECTURE-FLOWS.md](./PLATFORM-ARCHITECTURE-FLOWS.md) |
@@ -111,6 +111,8 @@ For **manual QA / release sign-off** (short Must/Should) see [QA-INSTRUCTION-PAC
 | P45 | **Gated admin login-hint** | `GET /admin/auth/login-hint` returns `ADMIN_PASSWORD` only in `development`/`test` **or** when `ADMIN_LOGIN_REVEAL_PASSWORD=1`; Sign in + portal/kitchen/customer strips print it when revealed; GCP/startup still write reveal=1 | ✅ | Identity `_should_reveal_admin_password`; `test_admin_password_sync.py` |
 | P46 | **QA tracker close-out (13 issues, 3 sheets)** | Discovery `q` + KNN `nearest` fallback; honest demo-OTP response; dish photo truth table; nearby reveal CSS; social buttons; nav overlay; scroll listener; refund actions; orders empty state | ✅ | See table below. Guardrail `scripts/tests/test_dish_media_truth.py` |
 | P47 | **Swagger tester + auth QA** | Aggregated OpenAPI: public ops `security: []` (no leftover token on Try it out); `POST /api/v1/auth/token` OAuth2 password form (admin email+password or owner/customer phone+OTP); owner JWT `type=owner`; `scripts/audit-api-auth.py`; community public recipes skip orphan kitchens; customer refunds list returns `[]` not 500 | ✅ | Gateway `openapi_aggregate.py`; identity `auth_token.py`; community `list_shared_recipes`; billing refunds SQL |
+| P48 | **Customer profile + live photo** | Gallery avatar + camera-only live photo; Admin Customers view; `customer_profile_photos` flag; `customer.updated` | ✅ | Identity `025`; design `CUSTOMER-PROFILE-PHOTOS-DESIGN.md`. Owner CRM display deferred |
+| P49 | **Owner KYC (photos + Aadhaar/PAN)** | Owner profile + live photo; masked Aadhaar/PAN; Admin kitchen **KYC** tab; `owner_kyc` flag; `owner.updated` | ✅ | Identity `026`; design `OWNER-KYC-DESIGN.md`. No UIDAI/NSDL e-KYC |
 
 ---
 

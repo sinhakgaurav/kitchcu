@@ -35,6 +35,13 @@ export type OwnerProfile = {
   email: string | null;
   subscription_tier: string;
   subscription_status: string;
+  avatar_url?: string | null;
+  live_photo_url?: string | null;
+  live_photo_captured_at?: string | null;
+  has_live_photo?: boolean;
+  aadhaar_masked?: string | null;
+  pan_masked?: string | null;
+  kyc_complete?: boolean;
 };
 
 export type BrandAlign = "left" | "center" | "right";
@@ -488,6 +495,47 @@ export async function verifyOtp(phone: string, otp: string): Promise<TokenRespon
 
 export async function fetchOwnerProfile(): Promise<OwnerProfile> {
   return apiFetch("/api/v1/owners/me");
+}
+
+export async function updateOwnerKyc(data: {
+  aadhaar_number?: string;
+  pan_number?: string;
+}): Promise<OwnerProfile> {
+  return apiFetch("/api/v1/owners/me", {
+    method: "PATCH",
+    body: JSON.stringify(data),
+  });
+}
+
+async function uploadOwnerImage(
+  path: string,
+  file: Blob,
+  extra?: Record<string, string>,
+): Promise<OwnerProfile> {
+  const token = getToken();
+  const form = new FormData();
+  form.append("file", file, file instanceof File ? file.name : "photo.jpg");
+  if (extra) {
+    for (const [key, value] of Object.entries(extra)) form.append(key, value);
+  }
+  const headers = correlationHeaders(token ? { Authorization: `Bearer ${token}` } : undefined);
+  const res = await fetch(path, { method: "POST", headers, body: form });
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(typeof body.detail === "string" ? body.detail : "Upload failed");
+  }
+  return body as OwnerProfile;
+}
+
+export async function uploadOwnerAvatar(file: Blob): Promise<OwnerProfile> {
+  return uploadOwnerImage("/api/v1/owners/me/avatar", file);
+}
+
+export async function uploadOwnerLivePhoto(file: Blob): Promise<OwnerProfile> {
+  return uploadOwnerImage("/api/v1/owners/me/live-photo", file, {
+    is_live_capture: "true",
+    captured_at: new Date().toISOString(),
+  });
 }
 
 export async function fetchKitchens(): Promise<Kitchen[]> {
@@ -1746,6 +1794,10 @@ export type Ingredient = {
   unit: string;
   current_stock: number;
   low_stock_threshold: number;
+  brand?: string | null;
+  pack_size?: number | null;
+  pack_label?: string | null;
+  packs_on_hand?: number | null;
   photo_url?: string | null;
   is_low: boolean;
 };
@@ -1753,6 +1805,10 @@ export type Ingredient = {
 export type RecipeLine = {
   ingredient_id: string;
   ingredient_name: string;
+  ingredient_brand?: string | null;
+  ingredient_photo_url?: string | null;
+  pack_size?: number | null;
+  pack_label?: string | null;
   quantity: number;
   unit: string;
   photo_url?: string | null;
@@ -1852,11 +1908,32 @@ export async function createIngredient(
     unit: string;
     current_stock?: number;
     low_stock_threshold?: number;
+    brand?: string;
+    pack_size?: number;
+    pack_label?: string;
     photo_url?: string;
   },
 ): Promise<Ingredient> {
   return apiFetch(`/api/v1/kitchens/${kitchenId}/ingredients`, {
     method: "POST",
+    body: JSON.stringify(data),
+  });
+}
+
+export async function updateIngredient(
+  kitchenId: string,
+  ingredientId: string,
+  data: {
+    name?: string;
+    low_stock_threshold?: number;
+    brand?: string;
+    pack_size?: number;
+    pack_label?: string;
+    photo_url?: string;
+  },
+): Promise<Ingredient> {
+  return apiFetch(`/api/v1/kitchens/${kitchenId}/ingredients/${ingredientId}`, {
+    method: "PATCH",
     body: JSON.stringify(data),
   });
 }

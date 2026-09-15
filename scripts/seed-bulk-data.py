@@ -88,6 +88,7 @@ from seed_common import (  # noqa: E402
     ensure_ingredients,
     login_customer,
     login_owner,
+    owner_dishes,
     request,
     resolve_postgres_container,
     wait_for_gateway,
@@ -209,14 +210,11 @@ def ensure_dishes(
     *,
     limit: int | None = None,
 ) -> dict[str, str]:
-    existing_names = menu_dish_names(kitchen_id)
     cats = category_map(token, kitchen_id)
     cuisines = cuisine_map(token, kitchen_id)
-    dish_ids: dict[str, str] = {}
-    menu = request("GET", f"/api/v1/kitchens/{kitchen_id}/menu")
-    for d in menu.get("dishes", []):
-        if d.get("is_active", True):
-            dish_ids[d["name"]] = d["id"]
+    owned_rows = owner_dishes(token, kitchen_id)
+    existing_names = {d["name"] for d in owned_rows}
+    dish_ids: dict[str, str] = {d["name"]: d["id"] for d in owned_rows}
 
     added = 0
     target = dishes[:limit] if limit else dishes
@@ -227,7 +225,7 @@ def ensure_dishes(
     intended_media = {d["name"]: d.get("media_url") for d in target}
     resynced = 0
     retired = 0
-    for d in menu.get("dishes", []):
+    for d in owned_rows:
         if d["name"] not in intended_media:
             continue
         want = intended_media[d["name"]]
@@ -235,7 +233,7 @@ def ensure_dishes(
         if not want:
             # The dish lost its hero because no asset honestly showed it. Pull it off
             # the public menu instead of leaving the borrowed photo in place.
-            if hero:
+            if hero or d.get("is_active"):
                 request(
                     "PATCH",
                     f"/api/v1/kitchens/{kitchen_id}/dishes/{d['id']}",
@@ -243,7 +241,6 @@ def ensure_dishes(
                     token=token,
                 )
                 retired += 1
-            dish_ids.pop(d["name"], None)
             continue
         if hero and hero.get("url") == want:
             continue
@@ -265,7 +262,7 @@ def ensure_dishes(
         log(f"  Resynced {resynced} dish heroes to the correct image.")
     if retired:
         log(f"  Unpublished {retired} dishes whose hero did not show the dish.")
-    for i, dish in enumerate(target):
+    for dish in target:
         if dish["name"] in existing_names:
             continue
         payload = dish_create_payload(
@@ -275,8 +272,7 @@ def ensure_dishes(
             captured_at=captured_at(),
         )
         resp = request("POST", f"/api/v1/kitchens/{kitchen_id}/dishes", payload, token=token)
-        if payload.get("is_active", True) and payload.get("media"):
-            dish_ids[dish["name"]] = resp["id"]
+        dish_ids[dish["name"]] = resp["id"]
         existing_names.add(dish["name"])
         added += 1
         if added % 10 == 0:
@@ -339,6 +335,12 @@ def ensure_orders(
         log("  ! No dishes — skipping orders")
         return []
 
+    orderable_names = menu_dish_names(kitchen_id)
+    orderable_ids = {name: did for name, did in dish_ids.items() if name in orderable_names}
+    if not orderable_ids:
+        log("  ! No live dishes — skipping orders")
+        return []
+
     KITCHEN_TOKENS[kitchen_id] = token
     orders_resp = request("GET", f"/api/v1/kitchens/{kitchen_id}/orders", token=token)
     current = orders_resp.get("total", 0)
@@ -378,7 +380,7 @@ def ensure_orders(
         else:
             cust_name, cust_phone = rng.choices(customer_pool, weights=pool_weights, k=1)[0]
         payload = {
-            "items": pick_order_items(dish_ids, rng),
+            "items": pick_order_items(orderable_ids, rng),
             "delivery_type": delivery,
             "payment_method": payment,
             "delivery_fee": delivery_fee,
@@ -518,10 +520,10 @@ def ensure_kitchen_complete(
     kid = kitchen["id"]
     log(f"  [{kitchen['code']}] {kitchen['name']} ({kitchen.get('city', '')})")
     dish_ids = ensure_dishes(token, kid, dishes)
-    log(f"    menu: {len(dish_ids)} dishes")
+    log(f"    menu: {len(dish_ids)} dishes (live + drafts)")
     ingredient_ids = ensure_ingredients(token, kid, DEMO_PANTRY)
-    ensure_dish_recipes(token, kid, dish_ids, DISH_RECIPES, ingredient_ids, DISH_PREP_STEPS)
-    log(f"    pantry: {len(ingredient_ids)} ingredients, recipes on {len(DISH_RECIPES)} dishes")
+    recipes_set = ensure_dish_recipes(token, kid, dish_ids, DISH_RECIPES, ingredient_ids, DISH_PREP_STEPS)
+    log(f"    pantry: {len(ingredient_ids)} ingredients, recipes on {recipes_set} dishes")
     ensure_orders(token, kid, dish_ids, orders_target, city_customers=city_customers)
     ensure_drafts(token, kid, drafts_target)
     if with_modules:
@@ -768,9 +770,14 @@ def main() -> None:
             rotated = all_dishes[offset : offset + BULK_DISHES_PER_KITCHEN]
             if len(rotated) < BULK_DISHES_PER_KITCHEN:
                 rotated = (rotated + all_dishes)[:BULK_DISHES_PER_KITCHEN]
-            dish_ids_by_kitchen[k["id"]] = ensure_dishes(
+            dish_ids = ensure_dishes(
                 demo_token, k["id"], rotated, limit=BULK_DISHES_PER_KITCHEN
             )
+            ing_ids = ensure_ingredients(demo_token, k["id"], DEMO_PANTRY)
+            ensure_dish_recipes(
+                demo_token, k["id"], dish_ids, DISH_RECIPES, ing_ids, DISH_PREP_STEPS
+            )
+            dish_ids_by_kitchen[k["id"]] = dish_ids
             secondary += 1
         log(f"Seeded mini menus on {secondary} secondary kitchens")
         for k in demo_kitchens:
@@ -830,6 +837,10 @@ def main() -> None:
                 if not chunk:
                     chunk = subset
                 dish_ids = ensure_dishes(token, k["id"], chunk, limit=BULK_DISHES_PER_KITCHEN)
+                ing_ids = ensure_ingredients(token, k["id"], DEMO_PANTRY)
+                ensure_dish_recipes(
+                    token, k["id"], dish_ids, DISH_RECIPES, ing_ids, DISH_PREP_STEPS
+                )
                 dish_ids_by_kitchen[k["id"]] = dish_ids
                 kitchen_ctxs.append(kitchen_volume_ctx(token, k, dish_ids))
                 if j == 0:

@@ -45,6 +45,7 @@ export function CustomerAuthProvider({ children }: { children: ReactNode }) {
       phone: result.customer.phone ?? "",
       email: result.customer.email,
       avatarUrl: result.customer.avatar_url,
+      livePhotoUrl: result.customer.live_photo_url,
       authProvider: session?.authProvider ?? "oauth",
       savedKitchens: session?.savedKitchens ?? [],
     };
@@ -91,6 +92,7 @@ export function CustomerAuthProvider({ children }: { children: ReactNode }) {
           phone: profile.phone ?? "",
           email: profile.email,
           avatarUrl: profile.avatar_url,
+          livePhotoUrl: profile.live_photo_url,
           savedKitchens: session?.savedKitchens ?? getCustomerSession()?.savedKitchens ?? [],
         };
         setCustomerSession(next);

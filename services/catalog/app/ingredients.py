@@ -18,6 +18,27 @@ ALLOWED_UNITS = frozenset({"g", "ml", "pcs"})
 ALLOWED_HTML_TAGS = frozenset({"p", "strong", "em", "b", "i", "ul", "ol", "li", "br", "h3", "a"})
 
 
+def _optional_text(value: str | None, *, max_len: int) -> str | None:
+    if value is None:
+        return None
+    cleaned = value.strip()
+    if not cleaned:
+        return None
+    return cleaned[:max_len]
+
+
+def _packs_on_hand(stock: float, pack_size: float | None) -> float | None:
+    if pack_size is None or pack_size <= 0:
+        return None
+    return round(stock / pack_size, 3)
+
+
+def _float_or_none(value) -> float | None:
+    if value is None:
+        return None
+    return float(value)
+
+
 def sanitize_html(value: str) -> str:
     """Strip dangerous markup; allow basic formatting for prep steps / dish copy."""
     if not value or not value.strip():
@@ -62,7 +83,16 @@ class IngredientCreateRequest(BaseModel):
     low_stock_threshold: float = Field(
         default=0, ge=0, description="Stock level at or below which a low-stock warning is raised."
     )
-    photo_url: str | None = Field(default=None, description="Optional reference photo URL.")
+    brand: str | None = Field(default=None, max_length=120, description="Retail brand on the pantry SKU.")
+    pack_size: float | None = Field(
+        default=None,
+        gt=0,
+        description="Retail pack weight/volume in the same `unit` as stock (e.g. 200 for a 200 g pouch).",
+    )
+    pack_label: str | None = Field(
+        default=None, max_length=80, description="Human pack label, e.g. '200 g pouch' or '12 pcs tray'."
+    )
+    photo_url: str | None = Field(default=None, description="Optional pack/reference photo URL.")
 
     @field_validator("unit")
     @classmethod
@@ -80,6 +110,11 @@ class IngredientUpdateRequest(BaseModel):
     low_stock_threshold: float | None = Field(
         default=None, ge=0, description="New low-stock warning threshold."
     )
+    brand: str | None = Field(default=None, max_length=120, description="Retail brand on the pantry SKU.")
+    pack_size: float | None = Field(
+        default=None, gt=0, description="Retail pack size in the same `unit` as stock."
+    )
+    pack_label: str | None = Field(default=None, max_length=80, description="Human pack label.")
     photo_url: str | None = Field(default=None, description="New reference photo URL.")
 
 
@@ -103,7 +138,13 @@ class IngredientResponse(BaseModel):
     unit: str = Field(..., description="Unit of measure.")
     current_stock: float = Field(..., description="Current stock quantity, in `unit`.")
     low_stock_threshold: float = Field(..., description="Low-stock warning threshold.")
-    photo_url: str | None = Field(default=None, description="Reference photo URL.")
+    brand: str | None = Field(default=None, description="Retail brand on the pantry SKU.")
+    pack_size: float | None = Field(default=None, description="Retail pack size in `unit`.")
+    pack_label: str | None = Field(default=None, description="Human pack label.")
+    packs_on_hand: float | None = Field(
+        default=None, description="current_stock / pack_size when a pack size is set."
+    )
+    photo_url: str | None = Field(default=None, description="Pack/reference photo URL.")
     is_low: bool = Field(..., description="True if current_stock <= low_stock_threshold.")
 
     model_config = {"from_attributes": True}
@@ -137,6 +178,10 @@ class RecipeLineInput(BaseModel):
 class RecipeLineResponse(BaseModel):
     ingredient_id: uuid.UUID = Field(..., description="Ingredient ID.")
     ingredient_name: str = Field(..., description="Resolved ingredient name.")
+    ingredient_brand: str | None = Field(default=None, description="Brand on the pantry SKU.")
+    ingredient_photo_url: str | None = Field(default=None, description="Pack photo on the pantry SKU.")
+    pack_size: float | None = Field(default=None, description="Retail pack size on the pantry SKU.")
+    pack_label: str | None = Field(default=None, description="Retail pack label on the pantry SKU.")
     quantity: float = Field(..., description="Quantity required per dish unit.")
     unit: str = Field(..., description="Unit of measure.")
     photo_url: str | None = Field(default=None, description="Optional reference photo.")
@@ -226,6 +271,7 @@ class StockDeductResponse(BaseModel):
 def _ingredient_response(row: Ingredient) -> IngredientResponse:
     stock = float(row.current_stock)
     threshold = float(row.low_stock_threshold)
+    pack_size = _float_or_none(row.pack_size)
     return IngredientResponse(
         id=row.id,
         kitchen_id=row.kitchen_id,
@@ -233,8 +279,29 @@ def _ingredient_response(row: Ingredient) -> IngredientResponse:
         unit=row.unit,
         current_stock=stock,
         low_stock_threshold=threshold,
+        brand=row.brand,
+        pack_size=pack_size,
+        pack_label=row.pack_label,
+        packs_on_hand=_packs_on_hand(stock, pack_size),
         photo_url=row.photo_url,
         is_low=stock <= threshold,
+    )
+
+
+def _recipe_line_response(line: DishIngredient, ingredient: Ingredient) -> RecipeLineResponse:
+    pack_size = _float_or_none(ingredient.pack_size)
+    photo = line.photo_url or ingredient.photo_url
+    return RecipeLineResponse(
+        ingredient_id=ingredient.id,
+        ingredient_name=ingredient.name,
+        ingredient_brand=ingredient.brand,
+        ingredient_photo_url=ingredient.photo_url,
+        pack_size=pack_size,
+        pack_label=ingredient.pack_label,
+        quantity=float(line.quantity),
+        unit=line.unit,
+        photo_url=photo,
+        sort_order=int(line.sort_order or 0),
     )
 
 
@@ -293,6 +360,9 @@ async def create_ingredient(
         unit=data.unit,
         current_stock=data.current_stock,
         low_stock_threshold=data.low_stock_threshold,
+        brand=_optional_text(data.brand, max_len=120),
+        pack_size=data.pack_size,
+        pack_label=_optional_text(data.pack_label, max_len=80),
         photo_url=data.photo_url,
     )
     session.add(row)
@@ -304,7 +374,7 @@ async def create_ingredient(
         event_type="ingredient.created",
         ingredient_id=row.id,
         kitchen_id=kitchen_id,
-        payload={"name": row.name, "unit": row.unit},
+        payload={"name": row.name, "unit": row.unit, "brand": row.brand},
     )
     return _ingredient_response(row)
 
@@ -331,6 +401,12 @@ async def update_ingredient(
         row.name = data.name.strip()
     if data.low_stock_threshold is not None:
         row.low_stock_threshold = data.low_stock_threshold
+    if data.brand is not None:
+        row.brand = _optional_text(data.brand, max_len=120)
+    if data.pack_size is not None:
+        row.pack_size = data.pack_size
+    if data.pack_label is not None:
+        row.pack_label = _optional_text(data.pack_label, max_len=80)
     if data.photo_url is not None:
         row.photo_url = data.photo_url
     await session.flush()
@@ -418,17 +494,7 @@ async def get_dish_recipe(
         )
     ).all()
 
-    lines = [
-        RecipeLineResponse(
-            ingredient_id=ingredient.id,
-            ingredient_name=ingredient.name,
-            quantity=float(line.quantity),
-            unit=line.unit,
-            photo_url=line.photo_url,
-            sort_order=int(line.sort_order or 0),
-        )
-        for line, ingredient in rows
-    ]
+    lines = [_recipe_line_response(line, ingredient) for line, ingredient in rows]
 
     step_rows = (
         await session.execute(
@@ -474,29 +540,32 @@ async def set_dish_recipe(
         raise ValueError("Dish not found")
 
     ingredient_ids = {line.ingredient_id for line in data.lines}
+    pantry_rows: dict[uuid.UUID, Ingredient] = {}
     if ingredient_ids:
-        valid = (
+        found = (
             await session.execute(
-                select(Ingredient.id).where(
+                select(Ingredient).where(
                     Ingredient.kitchen_id == kitchen_id,
                     Ingredient.id.in_(ingredient_ids),
                 )
             )
         ).scalars().all()
-        if len(valid) != len(ingredient_ids):
+        pantry_rows = {row.id: row for row in found}
+        if len(pantry_rows) != len(ingredient_ids):
             raise ValueError("One or more ingredients not found for this kitchen")
 
     await session.execute(delete(DishIngredient).where(DishIngredient.dish_id == dish_id))
     await session.execute(delete(DishPrepStep).where(DishPrepStep.dish_id == dish_id))
 
     for index, line in enumerate(data.lines):
+        pantry = pantry_rows[line.ingredient_id]
         session.add(
             DishIngredient(
                 dish_id=dish_id,
                 ingredient_id=line.ingredient_id,
                 quantity=line.quantity,
                 unit=line.unit,
-                photo_url=line.photo_url,
+                photo_url=line.photo_url or pantry.photo_url,
                 sort_order=line.sort_order if line.sort_order else index,
             )
         )
@@ -683,3 +752,61 @@ async def deduct_stock_for_order(
 
     await session.flush()
     return StockDeductResponse(deducted=deducted, low_stock_alerts=low_alerts)
+
+
+class AdminDishRecipeGap(BaseModel):
+    id: uuid.UUID
+    name: str
+    is_active: bool
+
+
+class AdminRecipeCoverage(BaseModel):
+    dishes_total: int
+    dishes_mapped: int
+    dishes_unmapped: list[AdminDishRecipeGap]
+
+
+class AdminKitchenPantryResponse(BaseModel):
+    kitchen_id: uuid.UUID
+    ingredients: list[IngredientResponse]
+    total: int
+    coverage: AdminRecipeCoverage
+
+
+async def admin_kitchen_pantry(
+    session: AsyncSession,
+    kitchen_id: uuid.UUID,
+) -> AdminKitchenPantryResponse:
+    pantry = await list_ingredients(session, kitchen_id)
+    dishes = list(
+        (
+            await session.execute(
+                select(Dish).where(Dish.kitchen_id == kitchen_id).order_by(Dish.name)
+            )
+        ).scalars().all()
+    )
+    mapped_ids = set(
+        (
+            await session.execute(
+                select(DishIngredient.dish_id)
+                .join(Dish, Dish.id == DishIngredient.dish_id)
+                .where(Dish.kitchen_id == kitchen_id)
+                .distinct()
+            )
+        ).scalars().all()
+    )
+    unmapped = [
+        AdminDishRecipeGap(id=dish.id, name=dish.name, is_active=bool(dish.is_active))
+        for dish in dishes
+        if dish.id not in mapped_ids
+    ]
+    return AdminKitchenPantryResponse(
+        kitchen_id=kitchen_id,
+        ingredients=pantry.ingredients,
+        total=pantry.total,
+        coverage=AdminRecipeCoverage(
+            dishes_total=len(dishes),
+            dishes_mapped=len(dishes) - len(unmapped),
+            dishes_unmapped=unmapped,
+        ),
+    )

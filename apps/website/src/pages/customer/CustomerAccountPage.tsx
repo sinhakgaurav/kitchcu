@@ -2,6 +2,7 @@ import { FormEvent, useEffect, useState } from "react";
 import { Link, Navigate, useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { CustomerAvatar } from "../../components/CustomerAvatar";
+import { CustomerProfilePhotos } from "../../components/CustomerProfilePhotos";
 import {
   fetchCustomerProfile,
   getCustomerToken,
@@ -89,7 +90,12 @@ export function CustomerAccountPage() {
     <div className="container customer-dash customer-account">
       <header className="customer-space__hero">
         <div className="customer-space__identity">
-          <CustomerAvatar name={profile?.name} src={profile?.avatar_url} size="lg" />
+          <CustomerAvatar
+            name={profile?.name}
+            src={profile?.avatar_url}
+            size="lg"
+            live={Boolean(profile?.has_live_photo)}
+          />
           <div>
             <p className="customer-dash__eyebrow">{t("customer.account.title")}</p>
             <h1>{t("customer.account.pageTitle")}</h1>
@@ -112,6 +118,8 @@ export function CustomerAccountPage() {
 
       {error && <div className="auth-card__error">{error}</div>}
       {ok && <p className="customer-dash__ok" role="status">{ok}</p>}
+
+      {profile ? <CustomerProfilePhotos profile={profile} onUpdated={setProfile} /> : null}
 
       {payoutReady ? (
         <p className="customer-dash__ok" role="status">

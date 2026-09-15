@@ -11,7 +11,7 @@ import {
   fetchGoldenRecipes,
   fetchGrowthSuggestions,
   fetchIngredients,
-  fetchMenu,
+  fetchOwnerDishes,
   saveDishRecipe,
   type DishRecipe,
   type GoldenRecipePin,
@@ -44,7 +44,7 @@ export function IngredientsPage() {
   const [searchParams] = useSearchParams();
   const dishFromUrl = searchParams.get("dish") ?? "";
   const [ingredients, setIngredients] = useState<Ingredient[]>([]);
-  const [dishes, setDishes] = useState<{ id: string; name: string }[]>([]);
+  const [dishes, setDishes] = useState<{ id: string; name: string; is_active: boolean }[]>([]);
   const [selectedDishId, setSelectedDishId] = useState("");
   const [recipe, setRecipe] = useState<DishRecipe | null>(null);
   const [loading, setLoading] = useState(true);
@@ -61,23 +61,30 @@ export function IngredientsPage() {
   const [newStock, setNewStock] = useState("500");
   const [newThreshold, setNewThreshold] = useState("50");
   const [newPhoto, setNewPhoto] = useState("");
+  const [newBrand, setNewBrand] = useState("");
+  const [newPackSize, setNewPackSize] = useState("");
+  const [newPackLabel, setNewPackLabel] = useState("");
 
   const load = async () => {
     if (!kitchen) return;
     setLoading(true);
     setError("");
     try {
-      const [ingRes, menu] = await Promise.all([
+      const [ingRes, ownerMenu] = await Promise.all([
         fetchIngredients(kitchen.id),
-        fetchMenu(kitchen.id),
+        fetchOwnerDishes(kitchen.id),
       ]);
       setIngredients(ingRes.ingredients);
-      const active = menu.dishes.filter((d) => d.is_active).map((d) => ({ id: d.id, name: d.name }));
-      setDishes(active);
-      if (dishFromUrl && active.some((d) => d.id === dishFromUrl)) {
+      const allDishes = ownerMenu.dishes.map((d) => ({
+        id: d.id,
+        name: d.name,
+        is_active: d.is_active,
+      }));
+      setDishes(allDishes);
+      if (dishFromUrl && allDishes.some((d) => d.id === dishFromUrl)) {
         setSelectedDishId(dishFromUrl);
-      } else if (!selectedDishId && active[0]) {
-        setSelectedDishId(active[0].id);
+      } else if (!selectedDishId && allDishes[0]) {
+        setSelectedDishId(allDishes[0].id);
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load ingredients");
@@ -131,16 +138,23 @@ export function IngredientsPage() {
     setBusy(true);
     setError("");
     try {
+      const packSize = Number(newPackSize);
       const row = await createIngredient(kitchen.id, {
         name: newName.trim(),
         unit: newUnit,
         current_stock: Number(newStock) || 0,
         low_stock_threshold: Number(newThreshold) || 0,
+        brand: newBrand.trim() || undefined,
+        pack_size: packSize > 0 ? packSize : undefined,
+        pack_label: newPackLabel.trim() || undefined,
         photo_url: newPhoto.trim() || undefined,
       });
       setIngredients((prev) => [...prev, row].sort((a, b) => a.name.localeCompare(b.name)));
       setNewName("");
       setNewPhoto("");
+      setNewBrand("");
+      setNewPackSize("");
+      setNewPackLabel("");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not add ingredient");
     } finally {
@@ -243,7 +257,13 @@ export function IngredientsPage() {
     let list = [...ingredients];
     if (pantrySearch.trim()) {
       const n = pantrySearch.trim().toLowerCase();
-      list = list.filter((i) => i.name.toLowerCase().includes(n) || i.unit.toLowerCase().includes(n));
+      list = list.filter(
+        (i) =>
+          i.name.toLowerCase().includes(n) ||
+          i.unit.toLowerCase().includes(n) ||
+          (i.brand ?? "").toLowerCase().includes(n) ||
+          (i.pack_label ?? "").toLowerCase().includes(n),
+      );
     }
     if (pantryFilter === "low") list = list.filter((i) => i.is_low);
     list.sort((a, b) => {
@@ -261,7 +281,7 @@ export function IngredientsPage() {
     <OwnerPageShell
       eyebrow="Operations"
       title="Ingredient mapper"
-      description="Recipe standards, prep steps with photos, and stock tracking (F19)"
+      description="Pantry SKUs (brand, pack weight, photo) map onto dish recipes. Stock deducts when an order is marked ready."
     >
       {error && <p className="form-error">{error}</p>}
       {savedMsg && <div className="auth-card__success">{savedMsg}</div>}
@@ -269,11 +289,15 @@ export function IngredientsPage() {
         <div className="app-loading">Loading pantry…</div>
       ) : (
         <>
-          <OwnerPanel title="Pantry stock" description="Track ingredients and low-stock alerts">
+          <OwnerPanel title="Pantry stock" description="Brand, pack size, photo, and on-hand quantity in the same unit">
             <form className="owner-form owner-form--grid" onSubmit={onAddIngredient}>
               <label>
                 Name
                 <input value={newName} onChange={(e) => setNewName(e.target.value)} required placeholder="Garam masala" />
+              </label>
+              <label>
+                Brand
+                <input value={newBrand} onChange={(e) => setNewBrand(e.target.value)} placeholder="Everest" />
               </label>
               <label>
                 Unit
@@ -282,6 +306,25 @@ export function IngredientsPage() {
                   <option value="ml">ml</option>
                   <option value="pcs">pcs</option>
                 </select>
+              </label>
+              <label>
+                Pack size
+                <input
+                  type="number"
+                  min={0}
+                  step={0.1}
+                  value={newPackSize}
+                  onChange={(e) => setNewPackSize(e.target.value)}
+                  placeholder="100"
+                />
+              </label>
+              <label>
+                Pack label
+                <input
+                  value={newPackLabel}
+                  onChange={(e) => setNewPackLabel(e.target.value)}
+                  placeholder="100 g carton"
+                />
               </label>
               <label>
                 Stock
@@ -330,6 +373,8 @@ export function IngredientsPage() {
                   <tr>
                     <th>Photo</th>
                     <th>Name</th>
+                    <th>Brand</th>
+                    <th>Pack</th>
                     <th>Stock</th>
                     <th>Low at</th>
                     <th>Status</th>
@@ -351,15 +396,38 @@ export function IngredientsPage() {
                       <td>
                         {ing.name} <small>({ing.unit})</small>
                       </td>
-                      <td>{ing.current_stock}</td>
-                      <td>{ing.low_stock_threshold}</td>
+                      <td>{ing.brand || "—"}</td>
+                      <td>
+                        {ing.pack_label || (ing.pack_size ? `${ing.pack_size} ${ing.unit}` : "—")}
+                      </td>
+                      <td>
+                        {ing.current_stock} {ing.unit}
+                        {ing.packs_on_hand != null ? (
+                          <small> · {ing.packs_on_hand} packs</small>
+                        ) : null}
+                      </td>
+                      <td>
+                        {ing.low_stock_threshold} {ing.unit}
+                      </td>
                       <td>{ing.is_low ? "Low" : "OK"}</td>
                       <td>
-                        <button type="button" className="btn btn--ghost btn--sm" disabled={busy} onClick={() => onAdjust(ing.id, 100)}>
-                          +100
+                        <button
+                          type="button"
+                          className="btn btn--ghost btn--sm"
+                          disabled={busy}
+                          onClick={() => onAdjust(ing.id, ing.pack_size && ing.pack_size > 0 ? ing.pack_size : 100)}
+                        >
+                          {ing.pack_size && ing.pack_size > 0 ? "+1 pack" : "+100"}
                         </button>
-                        <button type="button" className="btn btn--ghost btn--sm" disabled={busy} onClick={() => onAdjust(ing.id, -10)}>
-                          −10
+                        <button
+                          type="button"
+                          className="btn btn--ghost btn--sm"
+                          disabled={busy}
+                          onClick={() =>
+                            onAdjust(ing.id, ing.pack_size && ing.pack_size > 0 ? -ing.pack_size : -10)
+                          }
+                        >
+                          {ing.pack_size && ing.pack_size > 0 ? "−1 pack" : "−10"}
                         </button>
                       </td>
                     </tr>
@@ -369,7 +437,7 @@ export function IngredientsPage() {
             </div>
           </OwnerPanel>
 
-          <OwnerPanel title="Dish recipe & prep" description="Standard portions and preparation steps">
+          <OwnerPanel title="Dish recipe & prep" description="Every dish — live or draft — maps to pantry SKUs. Stock deducts from those packs.">
             <div className="owner-form">
             <label>
               Dish
@@ -377,6 +445,7 @@ export function IngredientsPage() {
                 {dishes.map((d) => (
                   <option key={d.id} value={d.id}>
                     {d.name}
+                    {d.is_active ? "" : " (draft)"}
                   </option>
                 ))}
               </select>
@@ -420,6 +489,10 @@ export function IngredientsPage() {
                                   ...lines[idx],
                                   ingredient_id: e.target.value,
                                   ingredient_name: ing?.name ?? "",
+                                  ingredient_brand: ing?.brand ?? "",
+                                  ingredient_photo_url: ing?.photo_url ?? "",
+                                  pack_size: ing?.pack_size ?? null,
+                                  pack_label: ing?.pack_label ?? "",
                                   unit: ing?.unit ?? lines[idx].unit,
                                   photo_url: lines[idx].photo_url || ing?.photo_url || "",
                                 };
@@ -431,6 +504,8 @@ export function IngredientsPage() {
                             {ingredients.map((ing) => (
                               <option key={ing.id} value={ing.id}>
                                 {ing.name}
+                                {ing.brand ? ` · ${ing.brand}` : ""}
+                                {ing.pack_label ? ` (${ing.pack_label})` : ""}
                               </option>
                             ))}
                           </select>

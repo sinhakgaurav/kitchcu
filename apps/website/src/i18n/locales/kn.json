@@ -185,7 +185,8 @@
       "gst": "ಜಿಎಸ್‌ಟಿ ಮತ್ತು ಹಣಕಾಸು",
       "setup": "ಕಿಚನ್ ಸೆಟಪ್",
       "bulkPrep": "Prep batches",
-      "ratings": "Ratings"
+      "ratings": "Ratings",
+      "identity": "Identity"
     },
     "shell": {
       "activeKitchen": "ಸಕ್ರಿಯ ಅಡುಗೆಮನೆ",
@@ -333,6 +334,24 @@
       "newOrder": "ಹೊಸ ಆದೇಶ",
       "addDish": "ಭಕ್ಷ್ಯವನ್ನು ಸೇರಿಸಿ",
       "ratings": "Ratings"
+    },
+    "identity": {
+      "aadhaar": "Aadhaar number",
+      "complete": "Identity on file — photos, Aadhaar, and PAN are saved.",
+      "hint": "A profile photo plus a live camera photo, Aadhaar, and PAN — so support can match you when money or kitchen status is in question.",
+      "idsHint": "Numbers are stored for support matching. You will only see a masked value after save.",
+      "idsRequired": "Enter Aadhaar or PAN to update.",
+      "idsSaved": "Identity numbers saved.",
+      "incomplete": "Add a profile photo, a live photo, Aadhaar, and PAN to complete identity.",
+      "livePhoto": "Live photo",
+      "livePhotoHint": "Open the camera and capture now. Gallery uploads are not accepted.",
+      "liveRequired": "Live photo must be captured with the camera.",
+      "pan": "PAN",
+      "profilePhoto": "Profile photo",
+      "profilePhotoHint": "Gallery or camera. This is your display photo.",
+      "saveIds": "Save Aadhaar and PAN",
+      "saving": "Saving…",
+      "title": "Your identity"
     }
   },
   "customer": {
@@ -460,7 +479,16 @@
       "payoutStatusReady": "Refunds can reach this UPI or bank account.",
       "profileHint": "This name shows on orders and kitchen receipts.",
       "qrChange": "Replace QR image",
-      "savedMasked": "Saved: {{masked}}"
+      "savedMasked": "Saved: {{masked}}",
+      "livePhoto": "Live photo",
+      "livePhotoHint": "Open the camera and capture now. Gallery uploads are not accepted.",
+      "livePhotoRequired": "Live photo must be captured with the camera.",
+      "livePhotoSaved": "Live photo saved.",
+      "photosHint": "A profile photo is what kitchens see first. A live photo must be taken with the camera — same honesty rule as dish photos.",
+      "photosTitle": "Your photos",
+      "profilePhoto": "Profile photo",
+      "profilePhotoHint": "Upload from your gallery or take a new picture. This is your display avatar.",
+      "profilePhotoSaved": "Profile photo saved."
     },
     "delivery": {
       "addAddress": "Add an address",

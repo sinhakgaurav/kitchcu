@@ -125,11 +125,16 @@ export type AdminCustomer = {
   status: string;
   has_password: boolean;
   has_payout: boolean;
+  has_avatar?: boolean;
+  has_live_photo?: boolean;
   address_count: number;
   created_at: string;
 };
 
 export type AdminCustomerDetail = AdminCustomer & {
+  avatar_url?: string | null;
+  live_photo_url?: string | null;
+  live_photo_captured_at?: string | null;
   upi_vpa: string | null;
   upi_qr_url: string | null;
   bank_account_number_masked: string | null;
@@ -356,6 +361,7 @@ export type AdminKitchen = {
   last_order_at?: string | null;
   open_ticket_count?: number;
   open_refund_count?: number;
+  owner_kyc_complete?: boolean;
 };
 
 export type AdminKitchenDetail = AdminKitchen & {
@@ -371,6 +377,11 @@ export type AdminKitchenDetail = AdminKitchen & {
   porter_auto_book_enabled?: boolean;
   porter_auto_book_delay_min?: number;
   platform_secrets_note: string;
+  owner_avatar_url?: string | null;
+  owner_live_photo_url?: string | null;
+  owner_live_photo_captured_at?: string | null;
+  owner_aadhaar_masked?: string | null;
+  owner_pan_masked?: string | null;
 };
 
 export type AdminKitchenWhatsApp = {
@@ -565,6 +576,36 @@ export async function fetchAdminKitchenStreamSummary(kitchenId: string) {
   );
 }
 
+export type AdminPantryIngredient = {
+  id: string;
+  kitchen_id: string;
+  name: string;
+  unit: string;
+  current_stock: number;
+  low_stock_threshold: number;
+  brand?: string | null;
+  pack_size?: number | null;
+  pack_label?: string | null;
+  packs_on_hand?: number | null;
+  photo_url?: string | null;
+  is_low: boolean;
+};
+
+export type AdminKitchenPantry = {
+  kitchen_id: string;
+  ingredients: AdminPantryIngredient[];
+  total: number;
+  coverage: {
+    dishes_total: number;
+    dishes_mapped: number;
+    dishes_unmapped: { id: string; name: string; is_active: boolean }[];
+  };
+};
+
+export async function fetchAdminKitchenPantry(kitchenId: string) {
+  return adminFetch<AdminKitchenPantry>(`/api/v1/admin/kitchens/${kitchenId}/ingredients`);
+}
+
 export async function updateAdminKitchenDeliverySettings(
   kitchenId: string,
   data: {
@@ -654,6 +695,8 @@ export async function fetchAdminOwners() {
       subscription_tier: string;
       subscription_status: string;
       kitchen_count: number;
+      has_kyc?: boolean;
+      has_live_photo?: boolean;
     }[]
   >("/api/v1/admin/owners");
 }

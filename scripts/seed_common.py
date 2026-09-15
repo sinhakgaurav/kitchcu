@@ -274,25 +274,59 @@ def cuisine_map(token: str, kitchen_id: str) -> dict[str, str]:
     return {c["slug"]: c["id"] for c in cuisines}
 
 
+def owner_dishes(token: str, kitchen_id: str) -> list[dict]:
+    listing = request("GET", f"/api/v1/kitchens/{kitchen_id}/dishes", token=token)
+    if isinstance(listing, list):
+        return listing
+    return listing.get("dishes", [])
+
+
 def ensure_ingredients(token: str, kitchen_id: str, pantry: list[dict]) -> dict[str, str]:
-    """Create pantry items; return name -> ingredient id."""
+    """Create or refresh pantry SKUs (brand/pack/photo); return name -> ingredient id."""
     existing = request("GET", f"/api/v1/kitchens/{kitchen_id}/ingredients", token=token)
-    by_name = {i["name"]: i["id"] for i in existing.get("ingredients", [])}
+    by_name = {i["name"]: i for i in existing.get("ingredients", [])}
+    ids = {name: row["id"] for name, row in by_name.items()}
     created = 0
+    updated = 0
+    patch_keys = ("brand", "pack_size", "pack_label", "photo_url", "low_stock_threshold")
     for item in pantry:
-        if item["name"] in by_name:
+        row = by_name.get(item["name"])
+        if not row:
+            resp = request(
+                "POST",
+                f"/api/v1/kitchens/{kitchen_id}/ingredients",
+                item,
+                token=token,
+            )
+            ids[item["name"]] = resp["id"]
+            created += 1
             continue
-        resp = request(
-            "POST",
-            f"/api/v1/kitchens/{kitchen_id}/ingredients",
-            item,
-            token=token,
+        ids[item["name"]] = row["id"]
+        patch: dict = {}
+        for key in patch_keys:
+            incoming = item.get(key)
+            if incoming is None:
+                continue
+            current = row.get(key)
+            if key in ("pack_size", "low_stock_threshold"):
+                if current is not None and abs(float(current) - float(incoming)) < 0.001:
+                    continue
+            elif current == incoming:
+                continue
+            patch[key] = incoming
+        if patch:
+            request(
+                "PATCH",
+                f"/api/v1/kitchens/{kitchen_id}/ingredients/{row['id']}",
+                patch,
+                token=token,
+            )
+            updated += 1
+    if created or updated:
+        print(
+            f"  Pantry kitchen {kitchen_id[:8]}...: +{created} new, refreshed {updated} SKUs."
         )
-        by_name[item["name"]] = resp["id"]
-        created += 1
-    if created:
-        print(f"  Added {created} ingredients to kitchen {kitchen_id[:8]}...")
-    return by_name
+    return ids
 
 
 def ensure_dish_recipes(
@@ -303,12 +337,22 @@ def ensure_dish_recipes(
     ingredient_ids: dict[str, str],
     prep_steps: dict[str, list[dict]] | None = None,
 ) -> int:
-    """Set recipe lines + optional prep steps for dishes that have mappings."""
+    """Set recipe lines + optional prep steps for every dish row (including duplicates)."""
+    from collections import defaultdict
+
+    from ingredient_demo_data import infer_recipe
+
+    by_name: dict[str, list[str]] = defaultdict(list)
+    for row in owner_dishes(token, kitchen_id):
+        by_name[str(row["name"])].append(str(row["id"]))
+    for dish_name, dish_id in dish_ids.items():
+        if dish_id not in by_name[dish_name]:
+            by_name[dish_name].append(dish_id)
+
+    pantry_names = set(ingredient_ids)
     set_count = 0
-    for dish_name, lines in recipes.items():
-        dish_id = dish_ids.get(dish_name)
-        if not dish_id:
-            continue
+    for dish_name, ids in by_name.items():
+        lines = recipes.get(dish_name) or infer_recipe(dish_name, pantry_names)
         payload_lines = []
         for index, entry in enumerate(lines):
             if len(entry) == 4:
@@ -333,13 +377,14 @@ def ensure_dish_recipes(
         body: dict = {"lines": payload_lines}
         if prep_steps and dish_name in prep_steps:
             body["prep_steps"] = prep_steps[dish_name]
-        request(
-            "PUT",
-            f"/api/v1/kitchens/{kitchen_id}/dishes/{dish_id}/recipe",
-            body,
-            token=token,
-        )
-        set_count += 1
+        for dish_id in ids:
+            request(
+                "PUT",
+                f"/api/v1/kitchens/{kitchen_id}/dishes/{dish_id}/recipe",
+                body,
+                token=token,
+            )
+            set_count += 1
     if set_count:
         print(f"  Set recipes on {set_count} dishes.")
     return set_count

@@ -102,6 +102,16 @@ class OwnerResponse(BaseModel):
     subscription_status: str = Field(
         ..., description="Current subscription lifecycle status.", examples=["trial", "active", "past_due"]
     )
+    avatar_url: str | None = Field(default=None, description="Owner display photo URL.")
+    live_photo_url: str | None = Field(default=None, description="Camera live-capture photo URL.")
+    live_photo_captured_at: datetime | None = Field(default=None, description="When the live photo was captured.")
+    has_live_photo: bool = Field(default=False, description="True when a live-capture photo is on file.")
+    aadhaar_masked: str | None = Field(default=None, description="Masked Aadhaar (last 4 only).")
+    pan_masked: str | None = Field(default=None, description="Masked PAN (last 5 characters).")
+    kyc_complete: bool = Field(
+        default=False,
+        description="True when avatar, live photo, Aadhaar, and PAN are all on file.",
+    )
 
     model_config = {"from_attributes": True}
 

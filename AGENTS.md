@@ -84,6 +84,7 @@
 | **Streaming service** | `services/streaming/`, `apps/website/` | **S18** — F46 LiveKit sessions, F47 owner opt-in go-live, F48 customer live filter; **P22** per-dish showcase phases |
 | **Growth golden day** | `services/growth/` | **P20** — ML comment sentiment + golden performance day pins |
 | **Branded storefront** | `services/identity/`, `apps/website/` | **P19** — kitchen `branded_page` + customer `/k/:code` |
+| **Owner KYC** | `services/identity/`, `apps/website/` | **P49** — owner profile + live photo, masked Aadhaar/PAN; Admin kitchen KYC tab |
 | **Kitchen integrations admin** | identity + billing admin APIs, admin PWA | **P21** — WhatsApp / Razorpay per kitchen (platform keys stay Admin API Keys) |
 | **Package mapper + employees RBAC** | billing packages · identity employees · admin PWA | **P25–P28** — Admin Packages/Employees; kitchen Package/Marketing/Streaming tabs; Cursor super-admin gate |
 | **Dual referrals + GST export + admin ops** | identity referrals · billing GST export · admin PWA | **P37–P39** — customer↔kitchen referrals; GST Excel/PDF; kitchen Orders/Care, ticket triage, settlements |
@@ -91,7 +92,7 @@
 | **Cities presence** | `apps/website/src/data/citiesPresence.ts` | Marketing + discovery strip; multi-city seed kitchens |
 | **Owner analytics** | `services/order/app/analytics.py` | F07–F08 revenue, top dishes, peak hours, customer segments |
 | Shared lib | `packages/ckac-common/` | Config, DB, auth, `EventPublisher`, cache, health, internal auth |
-| Event bus | Redis Streams | `ckac:catalog:dish`, `ckac:catalog:ingredient`, `ckac:orders:order`, `ckac:orders:draft`, `ckac:orders:master_order`, `ckac:billing:payment`, `ckac:billing:settlement`, `ckac:billing:subscription`, `ckac:billing:wallet`, `ckac:billing:gst`, `ckac:billing:refund`, `ckac:billing:package`, `ckac:identity:kitchen`, `ckac:identity:referral`, `ckac:marketing:coupon`, `ckac:marketing:promotion`, `ckac:marketing:crm`, `ckac:marketing:template`, `ckac:marketing:subscription`, `ckac:ratings:rating`, `ckac:ratings:dish`, `ckac:growth:suggestion`, `ckac:growth:daily_menu`, `ckac:delivery:quote`, `ckac:delivery:tracking`, `ckac:learning:trial`, `ckac:community:recipe`, `ckac:community:reward`, `ckac:community:ranking`, `ckac:streaming:session`, `ckac:notify:whatsapp`, `ckac:notify:dispatch`, `ckac:notify:tracking` |
+| Event bus | Redis Streams | `ckac:catalog:dish`, `ckac:catalog:ingredient`, `ckac:orders:order`, `ckac:orders:draft`, `ckac:orders:master_order`, `ckac:billing:payment`, `ckac:billing:settlement`, `ckac:billing:subscription`, `ckac:billing:wallet`, `ckac:billing:gst`, `ckac:billing:refund`, `ckac:billing:package`, `ckac:identity:kitchen`, `ckac:identity:owner`, `ckac:identity:customer`, `ckac:identity:referral`, `ckac:marketing:coupon`, `ckac:marketing:promotion`, `ckac:marketing:crm`, `ckac:marketing:template`, `ckac:marketing:subscription`, `ckac:ratings:rating`, `ckac:ratings:dish`, `ckac:growth:suggestion`, `ckac:growth:daily_menu`, `ckac:delivery:quote`, `ckac:delivery:tracking`, `ckac:learning:trial`, `ckac:community:recipe`, `ckac:community:reward`, `ckac:community:ranking`, `ckac:streaming:session`, `ckac:notify:whatsapp`, `ckac:notify:dispatch`, `ckac:notify:tracking` |
 | PostgreSQL + PostGIS | `infra/postgres/init/` | Schema-per-domain |
 | Docker stack | `docker-compose.yml` | postgres, redis, minio, gateway, identity, catalog, order, billing, marketing, ratings, growth, delivery, learning, community, streaming, notification |
 | Tests | `services/*/tests/` | TDD — run `scripts/run-tests.ps1` |
@@ -466,4 +467,4 @@ Delivered order only → home_taste (1–5) + quality (1–5) → optional anony
 
 ---
 
-*Last updated: Phase 1 S1–S18 + P19–P47 · Swagger tester (`POST /api/v1/auth/token`) · owner JWT type-check · gated login-hint · 6-month bulk history seed. Tracker: `docs/ADVANCEMENT-TRACKER.md`. Portals/QA: `docs/PRODUCTION-PORTALS-CREDENTIALS-QA.md`. Guide: `docs/CKAC-COMPLETE-GUIDE.md` v3.2.6. Prod: `*.kitchcu.com`. Next: kitchen staff build · live Razorpay · E1–E2.*
+*Last updated: Phase 1 S1–S18 + P19–P49 · owner KYC (photos + Aadhaar/PAN). Tracker: `docs/ADVANCEMENT-TRACKER.md`. Portals/QA: `docs/PRODUCTION-PORTALS-CREDENTIALS-QA.md`. Guide: `docs/CKAC-COMPLETE-GUIDE.md` v3.2.6. Prod: `*.kitchcu.com`. Next: kitchen staff build · live Razorpay · E1–E2.*

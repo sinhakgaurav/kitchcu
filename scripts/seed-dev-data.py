@@ -43,6 +43,7 @@ from seed_common import (  # noqa: E402
     ensure_ingredients,
     login_customer,
     login_owner,
+    owner_dishes,
     request,
     wait_for_gateway,
 )
@@ -102,11 +103,10 @@ def ensure_extra_owners() -> list[tuple[dict, dict]]:
                 token=token,
             )
             print(f"  Created {kitchen['code']} - {kitchen['name']}")
-            # Light menu so customer browse has something
-            try:
-                ensure_dishes(token, kitchen["id"])
-            except Exception as exc:  # noqa: BLE001
-                print(f"  (menu seed skipped: {exc})")
+        try:
+            seed_kitchen_menu(token, kitchen["id"])
+        except Exception as exc:  # noqa: BLE001
+            print(f"  (menu seed skipped: {exc})")
         created.append((owner, kitchen))
     return created
 
@@ -126,10 +126,6 @@ def ensure_kitchens(token: str) -> dict:
             print(f"Created kitchen {k['code']} - {k['name']} ({extra['city']})")
             kitchens.append(k)
             existing_names.add(extra["name"])
-            try:
-                ensure_dishes(token, k["id"])
-            except Exception as exc:  # noqa: BLE001
-                print(f"  (menu seed skipped: {exc})")
 
     primary = next((k for k in kitchens if k.get("code") == DEMO_KITCHEN_CODE), kitchens[0])
     print(f"Primary demo kitchen: {primary['code']} - {primary['name']} ({len(kitchens)} total)")
@@ -141,9 +137,15 @@ def category_map(token: str, kitchen_id: str) -> dict[str, str]:
     return {c["slug"]: c["id"] for c in categories}
 
 
+def seed_kitchen_menu(token: str, kitchen_id: str) -> dict[str, str]:
+    dish_ids = ensure_dishes(token, kitchen_id)
+    ingredient_ids = ensure_ingredients(token, kitchen_id, DEMO_PANTRY)
+    ensure_dish_recipes(token, kitchen_id, dish_ids, DISH_RECIPES, ingredient_ids, DISH_PREP_STEPS)
+    return dish_ids
+
+
 def ensure_dishes(token: str, kitchen_id: str) -> dict[str, str]:
-    menu = request("GET", f"/api/v1/kitchens/{kitchen_id}/menu")
-    existing = {d["name"]: d["id"] for d in menu.get("dishes", [])}
+    existing = {d["name"]: d["id"] for d in owner_dishes(token, kitchen_id)}
     cats = category_map(token, kitchen_id)
     cuisines = cuisine_map(token, kitchen_id)
     created = 0
@@ -234,9 +236,18 @@ def main() -> None:
     token = login_owner(DEMO_OWNER["phone_e164"], DEMO_OTP)
     print("Authenticated demo owner.")
     kitchen = ensure_kitchens(token)
-    dish_ids = ensure_dishes(token, kitchen["id"])
-    ingredient_ids = ensure_ingredients(token, kitchen["id"], DEMO_PANTRY)
-    ensure_dish_recipes(token, kitchen["id"], dish_ids, DISH_RECIPES, ingredient_ids, DISH_PREP_STEPS)
+    kitchens = request("GET", "/api/v1/kitchens/me", token=token)
+    dish_ids: dict[str, str] = {}
+    for k in kitchens:
+        try:
+            mapped = seed_kitchen_menu(token, k["id"])
+            print(f"  pantry+recipes: {k.get('code')} ({len(mapped)} dishes)")
+            if k["id"] == kitchen["id"]:
+                dish_ids = mapped
+        except Exception as exc:  # noqa: BLE001
+            print(f"  ! pantry seed skipped for {k.get('code')}: {exc}")
+    if not dish_ids:
+        dish_ids = seed_kitchen_menu(token, kitchen["id"])
     ensure_orders(token, kitchen["id"], dish_ids)
 
     print()

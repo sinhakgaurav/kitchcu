@@ -2,13 +2,18 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { uploadKitchenMedia, type MediaUploadContext } from "../lib/api";
 
 type Props = {
-  kitchenId: string;
-  context: MediaUploadContext;
+  kitchenId?: string;
+  context?: MediaUploadContext;
+  /** When set, used instead of kitchen media upload (customer photos). */
+  upload?: (blob: Blob, isLive: boolean) => Promise<string>;
   value?: string;
   onChange: (url: string) => void;
   label?: string;
-  /** When true, only camera capture is allowed (dish hero). */
+  /** When true, only camera capture is allowed (dish hero / customer live photo). */
   requireLiveCapture?: boolean;
+  facingMode?: "user" | "environment";
+  hint?: string;
+  allowClear?: boolean;
 };
 
 type Phase = "idle" | "camera" | "preview" | "uploading";
@@ -16,10 +21,14 @@ type Phase = "idle" | "camera" | "preview" | "uploading";
 export function LiveCapturePhotoField({
   kitchenId,
   context,
+  upload,
   value,
   onChange,
   label = "Photo",
   requireLiveCapture = false,
+  facingMode = "environment",
+  hint,
+  allowClear = true,
 }: Props) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -60,7 +69,7 @@ export function LiveCapturePhotoField({
         throw new Error("Camera API not available");
       }
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: { ideal: "environment" }, width: { ideal: 1280 } },
+        video: { facingMode: { ideal: facingMode }, width: { ideal: 1280 } },
         audio: false,
       });
       streamRef.current = stream;
@@ -69,7 +78,7 @@ export function LiveCapturePhotoField({
     } catch {
       setError(
         requireLiveCapture
-          ? "Camera access denied or unavailable. Dish photos require a live camera capture."
+          ? "Camera access denied or unavailable. This photo requires a live camera capture."
           : "Camera access denied or unavailable. Use upload instead.",
       );
       setPhase("idle");
@@ -121,13 +130,20 @@ export function LiveCapturePhotoField({
     setError("");
     setPhase("uploading");
     try {
-      const result = await uploadKitchenMedia(kitchenId, blob, {
-        context,
-        is_live_capture: isLive,
-        captured_at: isLive ? new Date().toISOString() : undefined,
-        filename: isLive ? "live-capture.jpg" : "upload.jpg",
-      });
-      onChange(result.url);
+      if (upload) {
+        const url = await upload(blob, isLive);
+        onChange(url);
+      } else if (kitchenId && context) {
+        const result = await uploadKitchenMedia(kitchenId, blob, {
+          context,
+          is_live_capture: isLive,
+          captured_at: isLive ? new Date().toISOString() : undefined,
+          filename: isLive ? "live-capture.jpg" : "upload.jpg",
+        });
+        onChange(result.url);
+      } else {
+        throw new Error("Upload is not configured");
+      }
       resetPending();
       setPhase("idle");
     } catch (err) {
@@ -167,9 +183,11 @@ export function LiveCapturePhotoField({
       {value && phase === "idle" && (
         <div className="live-capture-field__current">
           <img src={value} alt="" className="owner-recipe-preview" />
-          <button type="button" className="btn btn--ghost btn--sm" onClick={() => onChange("")}>
-            Remove
-          </button>
+          {allowClear ? (
+            <button type="button" className="btn btn--ghost btn--sm" onClick={() => onChange("")}>
+              Remove
+            </button>
+          ) : null}
         </div>
       )}
 
@@ -240,9 +258,9 @@ export function LiveCapturePhotoField({
         </div>
       )}
 
-      {requireLiveCapture && (
-        <p className="auth-card__hint">Truth in media — dish hero must be a live camera capture.</p>
-      )}
+      {hint ? <p className="auth-card__hint">{hint}</p> : requireLiveCapture ? (
+        <p className="auth-card__hint">Truth in media — this photo must be a live camera capture.</p>
+      ) : null}
     </div>
   );
 }

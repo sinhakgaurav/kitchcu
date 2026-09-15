@@ -411,7 +411,7 @@ async def ingredient_create(
     response_model=IngredientResponse,
     tags=[TAG_INGREDIENTS],
     summary="Update an ingredient",
-    description="Owner-only — update an ingredient's name, low-stock threshold, or photo.",
+    description="Owner-only — update name, brand, pack size/label, low-stock threshold, or photo.",
     responses={**auth_errors(include_403=True, include_404=True), 400: RESP_400},
 )
 async def ingredient_update(

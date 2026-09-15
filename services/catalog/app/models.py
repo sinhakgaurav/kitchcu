@@ -108,6 +108,9 @@ class Ingredient(Base):
     unit: Mapped[str] = mapped_column(String(20), nullable=False)
     current_stock: Mapped[float] = mapped_column(Numeric(12, 3), default=0)
     low_stock_threshold: Mapped[float] = mapped_column(Numeric(12, 3), default=0)
+    brand: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    pack_size: Mapped[float | None] = mapped_column(Numeric(12, 3), nullable=True)
+    pack_label: Mapped[str | None] = mapped_column(String(80), nullable=True)
     photo_url: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(UTC)

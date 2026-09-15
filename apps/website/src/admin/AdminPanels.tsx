@@ -286,6 +286,13 @@ export function AdminCustomers({ canWrite = false }: { canWrite?: boolean } = {}
         cell: (c) => (c.has_payout ? "Yes" : "No"),
       },
       {
+        id: "live",
+        header: "Live photo",
+        sortable: true,
+        sortValue: (c) => (c.has_live_photo ? 1 : 0),
+        cell: (c) => (c.has_live_photo ? "Yes" : "No"),
+      },
+      {
         id: "addresses",
         header: "Addresses",
         sortable: true,
@@ -371,6 +378,27 @@ export function AdminCustomers({ canWrite = false }: { canWrite?: boolean } = {}
               Status: <strong>{selected.status}</strong>
               {selected.has_password ? " · password set" : " · OTP/social only"}
             </p>
+            <h4>Photos</h4>
+            <div className="admin-customer-photos">
+              <figure>
+                {selected.avatar_url ? (
+                  <img src={selected.avatar_url} alt="" />
+                ) : (
+                  <span className="admin-panel__empty">No profile photo</span>
+                )}
+                <figcaption>Profile</figcaption>
+              </figure>
+              <figure>
+                {selected.live_photo_url ? (
+                  <img src={selected.live_photo_url} alt="" />
+                ) : (
+                  <span className="admin-panel__empty">No live photo</span>
+                )}
+                <figcaption>
+                  Live capture{selected.live_photo_captured_at ? ` · ${selected.live_photo_captured_at.slice(0, 16)}` : ""}
+                </figcaption>
+              </figure>
+            </div>
             <h4>Payout</h4>
             <p>UPI: {selected.upi_vpa || "—"}</p>
             <p>

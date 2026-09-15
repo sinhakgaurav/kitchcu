@@ -22,6 +22,7 @@ import {
   downloadAdminKitchenOrdersCsv,
   fetchAdminKitchenParseStats,
   fetchAdminKitchenStreamSummary,
+  fetchAdminKitchenPantry,
   fetchAdminKitchenWhatsApp,
   updateAdminKitchenDeliverySettings,
   updateAdminKitchenProfile,
@@ -62,6 +63,7 @@ import {
   type AdminKitchenPackage,
   type AdminKitchenPaymentGateway,
   type AdminKitchenStreamSummary,
+  type AdminKitchenPantry,
   type AdminKitchenWhatsApp,
   type AdminPackage,
   type AdminMe,
@@ -144,12 +146,12 @@ const TAB_META: Record<Tab, { title: string; desc: string }> = {
   },
   kitchens: {
     title: "Kitchens",
-    desc: "Kitchen workspace — brand, WhatsApp, payments, GST, package, marketing, modules, streaming",
+    desc: "Kitchen workspace — brand, WhatsApp, payments, GST, pantry, KYC, package, marketing, modules, streaming",
   },
   owners: { title: "Owners", desc: "Subscription tiers and kitchen counts — force plan changes" },
   customers: {
     title: "Customers",
-    desc: "Full customer control — status, payout profile, addresses, password reset",
+    desc: "Full customer control — status, photos, payout profile, addresses, password reset",
   },
   orders: { title: "Orders", desc: "Cross-kitchen order feed" },
   refunds: {
@@ -990,12 +992,15 @@ function AdminKitchens({
     | "tiffin"
     | "gst"
     | "orders"
+    | "pantry"
+    | "kyc"
   >("profile");
   const [porterAutoBook, setPorterAutoBook] = useState(true);
   const [porterDelayMin, setPorterDelayMin] = useState(15);
   const [tiffinSummary, setTiffinSummary] = useState<AdminTiffinSummary | null>(null);
   const [tiffinSubs, setTiffinSubs] = useState<AdminTiffinSubscription[]>([]);
   const [streamSummary, setStreamSummary] = useState<AdminKitchenStreamSummary | null>(null);
+  const [pantry, setPantry] = useState<AdminKitchenPantry | null>(null);
   const [gstProfile, setGstProfile] = useState<AdminGstProfile | null>(null);
   const [gstReport, setGstReport] = useState<AdminGstMonthlyReport | null>(null);
   const gstNow = useMemo(() => new Date(), []);
@@ -1066,6 +1071,7 @@ function AdminKitchens({
       setTiffinSummary(tf);
       setTiffinSubs(subs.subscriptions);
       setStreamSummary(stream);
+      setPantry(null);
       setGstProfile(null);
       setGstReport(null);
       setKitchenOrders([]);
@@ -1159,6 +1165,13 @@ function AdminKitchens({
         sortable: true,
         sortValue: (k) => (k.branded_page_enabled ? 1 : 0),
         cell: (k) => (k.branded_page_enabled ? "●" : "○"),
+      },
+      {
+        id: "kyc",
+        header: "KYC",
+        sortable: true,
+        sortValue: (k) => (k.owner_kyc_complete ? 1 : 0),
+        cell: (k) => (k.owner_kyc_complete ? "●" : "○"),
       },
       {
         id: "health",
@@ -1462,6 +1475,8 @@ function AdminKitchens({
                   "marketing",
                   "modules",
                   "orders",
+                  "pantry",
+                  "kyc",
                   "streaming",
                   "delivery",
                   "tiffin",
@@ -1499,6 +1514,12 @@ function AdminKitchens({
                         }
                       })();
                     }
+                    if (t === "pantry" && selectedId) {
+                      setError("");
+                      void fetchAdminKitchenPantry(selectedId)
+                        .then(setPantry)
+                        .catch((e) => setError(e instanceof Error ? e.message : "Pantry load failed"));
+                    }
                   }}
                 >
                   {t === "whatsapp"
@@ -1507,7 +1528,9 @@ function AdminKitchens({
                       ? "Payments"
                       : t === "gst"
                         ? "GST"
-                        : t[0].toUpperCase() + t.slice(1)}
+                        : t === "kyc"
+                          ? "KYC"
+                          : t[0].toUpperCase() + t.slice(1)}
                 </button>
               ))}
             </div>
@@ -1580,11 +1603,137 @@ function AdminKitchens({
               </div>
             )}
 
+            {panelTab === "pantry" && (
+              <div className="admin-kitchen-panel__body">
+                <p className="report-hint">
+                  F19 pantry is kitchen-scoped. Recipes deduct from these SKUs when an order is marked
+                  ready. Support can see brand, pack weight, photo, and which dishes still lack a mapping.
+                </p>
+                {!pantry ? (
+                  <p className="admin-panel__empty">Loading pantry…</p>
+                ) : (
+                  <>
+                    <dl className="admin-kv">
+                      <div>
+                        <dt>SKUs</dt>
+                        <dd>{pantry.total}</dd>
+                      </div>
+                      <div>
+                        <dt>Dishes mapped</dt>
+                        <dd>
+                          {pantry.coverage.dishes_mapped} of {pantry.coverage.dishes_total}
+                        </dd>
+                      </div>
+                    </dl>
+                    {pantry.coverage.dishes_unmapped.length > 0 && (
+                      <p className="report-hint">
+                        Unmapped:{" "}
+                        {pantry.coverage.dishes_unmapped
+                          .map((d) => `${d.name}${d.is_active ? "" : " (draft)"}`)
+                          .join(", ")}
+                      </p>
+                    )}
+                    {pantry.ingredients.length === 0 ? (
+                      <p className="admin-panel__empty">No pantry SKUs yet.</p>
+                    ) : (
+                      <div className="owner-table-wrap">
+                        <table className="owner-table">
+                          <thead>
+                            <tr>
+                              <th>Photo</th>
+                              <th>Name</th>
+                              <th>Brand</th>
+                              <th>Pack</th>
+                              <th>Stock</th>
+                              <th>Status</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {pantry.ingredients.map((ing) => (
+                              <tr key={ing.id} className={ing.is_low ? "owner-row--warn" : undefined}>
+                                <td>
+                                  {ing.photo_url ? (
+                                    <img src={ing.photo_url} alt="" className="owner-thumb" />
+                                  ) : (
+                                    "—"
+                                  )}
+                                </td>
+                                <td>
+                                  {ing.name} <small>({ing.unit})</small>
+                                </td>
+                                <td>{ing.brand || "—"}</td>
+                                <td>{ing.pack_label || (ing.pack_size ? `${ing.pack_size} ${ing.unit}` : "—")}</td>
+                                <td>
+                                  {ing.current_stock} {ing.unit}
+                                  {ing.packs_on_hand != null ? ` · ${ing.packs_on_hand} packs` : ""}
+                                </td>
+                                <td>{ing.is_low ? "Low" : "OK"}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+            )}
+
+            {panelTab === "kyc" && (
+              <div className="admin-kitchen-panel__body">
+                <p className="report-hint">
+                  Owner identity for this kitchen — profile photo, live camera photo, and masked
+                  Aadhaar/PAN. Full numbers are never shown. There is no UIDAI or NSDL lookup.
+                </p>
+                <dl className="admin-kv">
+                  <div>
+                    <dt>KYC</dt>
+                    <dd>{detail.owner_kyc_complete ? "Complete" : "Incomplete"}</dd>
+                  </div>
+                  <div>
+                    <dt>Aadhaar</dt>
+                    <dd>{detail.owner_aadhaar_masked || "—"}</dd>
+                  </div>
+                  <div>
+                    <dt>PAN</dt>
+                    <dd>{detail.owner_pan_masked || "—"}</dd>
+                  </div>
+                </dl>
+                <div className="admin-customer-photos">
+                  <figure>
+                    {detail.owner_avatar_url ? (
+                      <img src={detail.owner_avatar_url} alt="" />
+                    ) : (
+                      <span className="admin-panel__empty">No profile photo</span>
+                    )}
+                    <figcaption>Profile</figcaption>
+                  </figure>
+                  <figure>
+                    {detail.owner_live_photo_url ? (
+                      <img src={detail.owner_live_photo_url} alt="" />
+                    ) : (
+                      <span className="admin-panel__empty">No live photo</span>
+                    )}
+                    <figcaption>
+                      Live capture
+                      {detail.owner_live_photo_captured_at
+                        ? ` · ${detail.owner_live_photo_captured_at.slice(0, 16)}`
+                        : ""}
+                    </figcaption>
+                  </figure>
+                </div>
+              </div>
+            )}
+
             {panelTab === "profile" && (
               <div className="admin-kitchen-panel__body owner-forms">
                 <p className="report-hint">{detail.platform_secrets_note}</p>
                 <dl className="admin-kv">
                   <div><dt>Owner phone</dt><dd>{detail.owner_phone}</dd></div>
+                  <div>
+                    <dt>Owner KYC</dt>
+                    <dd>{detail.owner_kyc_complete ? "Complete" : "Incomplete — open KYC tab"}</dd>
+                  </div>
                   <div><dt>Kitchen code</dt><dd><code>{detail.code}</code> (permanent)</dd></div>
                   <div><dt>WhatsApp</dt><dd>{detail.whatsapp_connected ? "Linked" : "Not linked"}</dd></div>
                   <div><dt>Payment gateway</dt><dd>{detail.payment_gateway_configured ? "Configured" : "Not set"}</dd></div>
@@ -2540,6 +2689,20 @@ function AdminOwners() {
         sortValue: (o) => o.kitchen_count,
         align: "right",
         cell: (o) => o.kitchen_count,
+      },
+      {
+        id: "kyc",
+        header: "KYC",
+        sortable: true,
+        sortValue: (o) => (o.has_kyc ? 1 : 0),
+        cell: (o) => (o.has_kyc ? "Yes" : "No"),
+      },
+      {
+        id: "live",
+        header: "Live photo",
+        sortable: true,
+        sortValue: (o) => (o.has_live_photo ? 1 : 0),
+        cell: (o) => (o.has_live_photo ? "Yes" : "No"),
       },
       {
         id: "control",

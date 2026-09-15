@@ -69,6 +69,7 @@ const NAV_SECTIONS: { labelKey: string; items: NavItem[] }[] = [
       { to: "/dashboard/payment-gateway", labelKey: "owner.nav.paymentGateway", module: "razorpay" },
       { to: "/dashboard/gst", labelKey: "owner.nav.gst" },
       { to: "/dashboard/setup", labelKey: "owner.nav.setup" },
+      { to: "/dashboard/setup#identity", labelKey: "owner.nav.identity" },
     ],
   },
 ];

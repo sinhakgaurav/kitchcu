@@ -193,7 +193,26 @@
       "whatsapp": "WhatsApp",
       "paymentGateway": "Payments",
       "gst": "GST & invoices",
-      "setup": "Kitchen setup"
+      "setup": "Kitchen setup",
+      "identity": "Identity"
+    },
+    "identity": {
+      "title": "Your identity",
+      "hint": "A profile photo plus a live camera photo, Aadhaar, and PAN — so support can match you when money or kitchen status is in question.",
+      "complete": "Identity on file — photos, Aadhaar, and PAN are saved.",
+      "incomplete": "Add a profile photo, a live photo, Aadhaar, and PAN to complete identity.",
+      "profilePhoto": "Profile photo",
+      "profilePhotoHint": "Gallery or camera. This is your display photo.",
+      "livePhoto": "Live photo",
+      "livePhotoHint": "Open the camera and capture now. Gallery uploads are not accepted.",
+      "liveRequired": "Live photo must be captured with the camera.",
+      "aadhaar": "Aadhaar number",
+      "pan": "PAN",
+      "idsHint": "Numbers are stored for support matching. You will only see a masked value after save.",
+      "idsRequired": "Enter Aadhaar or PAN to update.",
+      "idsSaved": "Identity numbers saved.",
+      "saveIds": "Save Aadhaar and PAN",
+      "saving": "Saving…"
     },
     "shell": {
       "activeKitchen": "Active kitchen",
@@ -481,7 +500,16 @@
       "payoutStatusMissing": "Add UPI or bank so kitchens can refund you quickly.",
       "savedMasked": "Saved: {{masked}}",
       "enterAccount": "Enter account number",
-      "profileHint": "This name shows on orders and kitchen receipts."
+      "profileHint": "This name shows on orders and kitchen receipts.",
+      "photosTitle": "Your photos",
+      "photosHint": "A profile photo is what kitchens see first. A live photo must be taken with the camera — same honesty rule as dish photos.",
+      "profilePhoto": "Profile photo",
+      "profilePhotoHint": "Upload from your gallery or take a new picture. This is your display avatar.",
+      "livePhoto": "Live photo",
+      "livePhotoHint": "Open the camera and capture now. Gallery uploads are not accepted.",
+      "livePhotoRequired": "Live photo must be captured with the camera.",
+      "profilePhotoSaved": "Profile photo saved.",
+      "livePhotoSaved": "Live photo saved."
     }
   }
 }

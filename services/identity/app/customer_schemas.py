@@ -29,7 +29,22 @@ class CustomerResponse(BaseModel):
     name: str = Field(..., description="Customer display name.", examples=["Anjali Rao"])
     email: str | None = Field(default=None, description="Customer email (set via OAuth or optionally later).")
     phone: str | None = Field(default=None, description="Customer phone in E.164, if logged in via WhatsApp OTP.", examples=["+919123456789"])
-    avatar_url: str | None = Field(default=None, description="Profile picture URL from the OAuth provider, if any.")
+    avatar_url: str | None = Field(
+        default=None,
+        description="Display photo URL (OAuth picture or customer upload). Gallery allowed.",
+    )
+    live_photo_url: str | None = Field(
+        default=None,
+        description="Camera live-capture photo URL. Set only via POST /customers/me/live-photo.",
+    )
+    live_photo_captured_at: datetime | None = Field(
+        default=None,
+        description="When the live photo was captured (ISO-8601).",
+    )
+    has_live_photo: bool = Field(
+        default=False,
+        description="True when a live-capture photo is on file.",
+    )
     upi_vpa: str | None = Field(default=None, description="Customer UPI VPA for refunds.", examples=["priya@okaxis"])
     upi_qr_url: str | None = Field(default=None, description="Uploaded UPI QR / scanner image URL.")
     bank_account_number_masked: str | None = Field(
@@ -200,6 +215,9 @@ def customer_to_response(customer: Customer) -> CustomerResponse:
         email=customer.email,
         phone=customer.phone,
         avatar_url=customer.avatar_url,
+        live_photo_url=customer.live_photo_url,
+        live_photo_captured_at=customer.live_photo_captured_at,
+        has_live_photo=bool(customer.live_photo_url),
         upi_vpa=customer.upi_vpa,
         upi_qr_url=customer.upi_qr_url,
         bank_account_number_masked=_mask_account(customer.bank_account_number),

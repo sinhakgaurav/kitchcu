@@ -52,6 +52,7 @@ import type { CustomerKitchenSubscription } from "../../shared/api";
 import { useCustomerAuth } from "../../shared/customerAuth";
 import { addItemsToCart, kitchenFromOrderCode } from "../../shared/customerCart";
 import { CustomerAvatar } from "../../components/CustomerAvatar";
+import { CustomerProfilePhotos } from "../../components/CustomerProfilePhotos";
 import { PhoneField } from "../../components/PhoneField";
 import {
   customerStatusTone,
@@ -252,7 +253,12 @@ export function CustomerDashboardPage() {
     <div className="container customer-dash">
       <header className="customer-space__hero">
         <div className="customer-space__identity">
-          <CustomerAvatar name={profile?.name} src={profile?.avatar_url} size="lg" />
+          <CustomerAvatar
+            name={profile?.name}
+            src={profile?.avatar_url}
+            size="lg"
+            live={Boolean(profile?.has_live_photo)}
+          />
           <div>
             <p className="customer-dash__eyebrow">{t("customer.dashboard.spaceEyebrow")}</p>
             <h1>
@@ -1918,7 +1924,12 @@ function AccountPanel({
   return (
     <div className="customer-dash__account">
       <section className="glass customer-profile-id">
-        <CustomerAvatar name={profile.name} src={profile.avatar_url} size="lg" />
+        <CustomerAvatar
+          name={profile.name}
+          src={profile.avatar_url}
+          size="lg"
+          live={Boolean(profile.has_live_photo)}
+        />
         <div className="customer-profile-id__copy">
           <h2>{profile.name || "Your profile"}</h2>
           <p>
@@ -1940,6 +1951,8 @@ function AccountPanel({
           </Link>
         </div>
       </section>
+
+      <CustomerProfilePhotos profile={profile} onUpdated={setProfile} />
 
       <div className="customer-dash__split">
       <form className="glass customer-dash__card" onSubmit={saveProfile}>

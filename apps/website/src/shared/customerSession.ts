@@ -18,6 +18,7 @@ export type CustomerSession = {
   phone: string;
   email?: string | null;
   avatarUrl?: string | null;
+  livePhotoUrl?: string | null;
   authProvider?: string;
   savedKitchens: SavedKitchen[];
 };

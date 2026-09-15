@@ -11,6 +11,9 @@ export type CustomerProfile = {
   email: string | null;
   phone: string | null;
   avatar_url: string | null;
+  live_photo_url?: string | null;
+  live_photo_captured_at?: string | null;
+  has_live_photo?: boolean;
   upi_vpa: string | null;
   upi_qr_url: string | null;
   bank_account_number_masked: string | null;
@@ -131,11 +134,18 @@ export async function updateCustomerPayout(data: {
   });
 }
 
-export async function uploadCustomerPayoutQr(file: File): Promise<CustomerProfile> {
+async function uploadCustomerImage(
+  path: string,
+  file: Blob,
+  extra?: Record<string, string>,
+): Promise<CustomerProfile> {
   const token = getCustomerToken();
   const form = new FormData();
-  form.append("file", file);
-  const res = await fetch("/api/v1/customers/me/payout/qr", {
+  form.append("file", file, file instanceof File ? file.name : "photo.jpg");
+  if (extra) {
+    for (const [key, value] of Object.entries(extra)) form.append(key, value);
+  }
+  const res = await fetch(path, {
     method: "POST",
     headers: token ? { Authorization: `Bearer ${token}` } : {},
     body: form,
@@ -145,6 +155,24 @@ export async function uploadCustomerPayoutQr(file: File): Promise<CustomerProfil
     throw new Error(typeof body.detail === "string" ? body.detail : "Upload failed");
   }
   return body as CustomerProfile;
+}
+
+export async function uploadCustomerPayoutQr(file: File): Promise<CustomerProfile> {
+  return uploadCustomerImage("/api/v1/customers/me/payout/qr", file);
+}
+
+export async function uploadCustomerAvatar(file: Blob): Promise<CustomerProfile> {
+  return uploadCustomerImage("/api/v1/customers/me/avatar", file);
+}
+
+export async function uploadCustomerLivePhoto(
+  file: Blob,
+  options?: { captured_at?: string },
+): Promise<CustomerProfile> {
+  return uploadCustomerImage("/api/v1/customers/me/live-photo", file, {
+    is_live_capture: "true",
+    captured_at: options?.captured_at ?? new Date().toISOString(),
+  });
 }
 
 export async function loginWithCustomerOAuthProvider(

@@ -208,3 +208,97 @@ async def test_recipe_prep_steps_and_photos(client: AsyncClient, kitchen_ctx):
     assert len(body["prep_steps"]) == 2
     assert "yogurt" in body["prep_steps"][0]["body_html"]
     assert body["prep_steps"][0]["duration_min"] == 20
+
+
+@pytest.mark.asyncio
+async def test_create_ingredient_with_brand_pack_and_photo(client: AsyncClient, kitchen_ctx):
+    _, kitchen_id, token = kitchen_ctx
+    headers = {"Authorization": f"Bearer {token}"}
+    response = await client.post(
+        f"/api/v1/kitchens/{kitchen_id}/ingredients",
+        json={
+            "name": "Amul Paneer",
+            "unit": "g",
+            "current_stock": 800,
+            "low_stock_threshold": 200,
+            "brand": "Amul",
+            "pack_size": 200,
+            "pack_label": "200 g pouch",
+            "photo_url": "https://example.com/amul-paneer.jpg",
+        },
+        headers=headers,
+    )
+    assert response.status_code == 201, response.text
+    data = response.json()
+    assert data["brand"] == "Amul"
+    assert data["pack_size"] == 200
+    assert data["pack_label"] == "200 g pouch"
+    assert data["photo_url"] == "https://example.com/amul-paneer.jpg"
+    assert data["packs_on_hand"] == 4
+    assert data["current_stock"] == 800
+
+    patched = await client.patch(
+        f"/api/v1/kitchens/{kitchen_id}/ingredients/{data['id']}",
+        json={"brand": "Amul Fresh", "pack_size": 400, "pack_label": "400 g block"},
+        headers=headers,
+    )
+    assert patched.status_code == 200, patched.text
+    body = patched.json()
+    assert body["brand"] == "Amul Fresh"
+    assert body["pack_size"] == 400
+    assert body["packs_on_hand"] == 2
+
+
+@pytest.mark.asyncio
+async def test_recipe_line_inherits_pantry_photo_and_brand(client: AsyncClient, kitchen_ctx):
+    _, kitchen_id, token = kitchen_ctx
+    headers = {"Authorization": f"Bearer {token}"}
+    ing = await client.post(
+        f"/api/v1/kitchens/{kitchen_id}/ingredients",
+        json={
+            "name": "Everest Garam Masala",
+            "unit": "g",
+            "current_stock": 500,
+            "brand": "Everest",
+            "pack_size": 100,
+            "pack_label": "100 g carton",
+            "photo_url": "https://example.com/everest-garam.jpg",
+        },
+        headers=headers,
+    )
+    ingredient_id = ing.json()["id"]
+    dish_payload = await build_dish_payload(client, kitchen_id, token)
+    dish_id = (
+        await client.post(
+            f"/api/v1/kitchens/{kitchen_id}/dishes",
+            json=dish_payload,
+            headers=headers,
+        )
+    ).json()["id"]
+
+    recipe = await client.put(
+        f"/api/v1/kitchens/{kitchen_id}/dishes/{dish_id}/recipe",
+        json={"lines": [{"ingredient_id": ingredient_id, "quantity": 8, "unit": "g"}]},
+        headers=headers,
+    )
+    assert recipe.status_code == 200, recipe.text
+    line = recipe.json()["lines"][0]
+    assert line["photo_url"] == "https://example.com/everest-garam.jpg"
+    assert line["ingredient_brand"] == "Everest"
+    assert line["ingredient_photo_url"] == "https://example.com/everest-garam.jpg"
+    assert line["pack_size"] == 100
+    assert line["pack_label"] == "100 g carton"
+
+    deduct = await client.post(
+        f"/api/v1/internal/kitchens/{kitchen_id}/stock/deduct-order",
+        json={
+            "order_id": str(uuid.uuid4()),
+            "items": [{"dish_id": dish_id, "quantity": 2}],
+        },
+        headers={"X-Internal-Key": INTERNAL_KEY},
+    )
+    assert deduct.status_code == 200
+    listing = await client.get(f"/api/v1/kitchens/{kitchen_id}/ingredients", headers=headers)
+    stock = next(i for i in listing.json()["ingredients"] if i["id"] == ingredient_id)
+    assert stock["current_stock"] == 484
+    assert stock["packs_on_hand"] == 4.84

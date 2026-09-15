@@ -174,6 +174,16 @@ def test_resolve_service_url_marketing():
     )
 
 
+def test_resolve_service_url_catalog_admin_pantry():
+    from ckac_common.config import get_settings
+
+    settings = get_settings()
+    assert (
+        resolve_service_url("/api/v1/admin/kitchens/abc/ingredients")
+        == settings.catalog_service_url
+    )
+
+
 def test_resolve_service_url_streaming_admin():
     from ckac_common.config import get_settings
 

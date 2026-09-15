@@ -8,6 +8,15 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.brand_media import upload_brand_media
 from app.models import Kitchen, Owner
+from app.owner_kyc import (
+    KYC_FEATURE,
+    OwnerKycUpdateRequest,
+    apply_owner_kyc,
+    owner_to_response,
+    parse_live_captured_at,
+    publish_owner_updated,
+    upload_owner_image,
+)
 from app.discovery import DiscoveryHomeResponse, build_discovery_home
 from app.otp_delivery import demo_otp_response
 from app.schemas import (
@@ -180,7 +189,7 @@ async def verify_otp(
 async def owner_register(
     body: OwnerRegisterRequest,
     session: Annotated[AsyncSession, Depends(get_db)],
-) -> Owner:
+) -> OwnerResponse:
     try:
         await require_feature(session, "owner_registrations")
         owner = await register_owner(session, body)
@@ -189,7 +198,7 @@ async def owner_register(
         if detail.startswith("Feature '") and detail.endswith("' is disabled"):
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=detail) from exc
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=detail) from exc
-    return owner
+    return owner_to_response(owner)
 
 
 @router.get(
@@ -204,8 +213,102 @@ async def owner_register(
     responses=auth_errors(),
     tags=["Owners"],
 )
-async def owner_me(owner: Annotated[Owner, Depends(get_current_owner)]) -> Owner:
-    return owner
+async def owner_me(owner: Annotated[Owner, Depends(get_current_owner)]) -> OwnerResponse:
+    return owner_to_response(owner)
+
+
+@router.patch(
+    "/owners/me",
+    response_model=OwnerResponse,
+    summary="Update owner identity documents",
+    description=(
+        "Owner-only — save Aadhaar and PAN. Numbers are stored for support matching; "
+        "reads return masked values only. Photos use `/owners/me/avatar` and `/live-photo`."
+    ),
+    responses={**auth_errors(), 400: RESP_400},
+    tags=["Owners"],
+)
+async def owner_kyc_update(
+    body: OwnerKycUpdateRequest,
+    owner: Annotated[Owner, Depends(get_current_owner)],
+    session: Annotated[AsyncSession, Depends(get_db)],
+    publisher: Annotated[EventPublisher, Depends(get_publisher)],
+) -> OwnerResponse:
+    from ckac_common.platform_config import feature_http_status
+
+    try:
+        await require_feature(session, KYC_FEATURE)
+        apply_owner_kyc(owner, body)
+    except ValueError as exc:
+        code = feature_http_status(exc) or status.HTTP_400_BAD_REQUEST
+        raise HTTPException(status_code=code, detail=str(exc)) from exc
+    await session.flush()
+    await publish_owner_updated(publisher, session, owner, kind="kyc_ids")
+    return owner_to_response(owner)
+
+
+@router.post(
+    "/owners/me/avatar",
+    response_model=OwnerResponse,
+    summary="Upload owner display photo",
+    description="Owner-only — gallery or camera. Separate from the required live-capture photo.",
+    responses={**auth_errors(), 400: RESP_400},
+    tags=["Owners"],
+)
+async def owner_avatar_upload(
+    owner: Annotated[Owner, Depends(get_current_owner)],
+    session: Annotated[AsyncSession, Depends(get_db)],
+    publisher: Annotated[EventPublisher, Depends(get_publisher)],
+    file: Annotated[UploadFile, File()],
+) -> OwnerResponse:
+    from ckac_common.platform_config import feature_http_status
+
+    try:
+        await require_feature(session, KYC_FEATURE)
+    except ValueError as exc:
+        code = feature_http_status(exc) or status.HTTP_400_BAD_REQUEST
+        raise HTTPException(status_code=code, detail=str(exc)) from exc
+    data = await file.read()
+    owner.avatar_url = upload_owner_image(owner_id=owner.id, context="avatar", data=data)
+    await session.flush()
+    await publish_owner_updated(publisher, session, owner, kind="avatar")
+    return owner_to_response(owner)
+
+
+@router.post(
+    "/owners/me/live-photo",
+    response_model=OwnerResponse,
+    summary="Upload owner live-capture photo",
+    description="Owner-only — camera capture required (`is_live_capture=true`).",
+    responses={**auth_errors(), 400: RESP_400},
+    tags=["Owners"],
+)
+async def owner_live_photo_upload(
+    owner: Annotated[Owner, Depends(get_current_owner)],
+    session: Annotated[AsyncSession, Depends(get_db)],
+    publisher: Annotated[EventPublisher, Depends(get_publisher)],
+    file: Annotated[UploadFile, File()],
+    is_live_capture: Annotated[bool, Form()] = False,
+    captured_at: Annotated[str | None, Form()] = None,
+) -> OwnerResponse:
+    from ckac_common.platform_config import feature_http_status
+
+    try:
+        await require_feature(session, KYC_FEATURE)
+    except ValueError as exc:
+        code = feature_http_status(exc) or status.HTTP_400_BAD_REQUEST
+        raise HTTPException(status_code=code, detail=str(exc)) from exc
+    if not is_live_capture:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Live photo must be captured with the camera (is_live_capture=true).",
+        )
+    data = await file.read()
+    owner.live_photo_url = upload_owner_image(owner_id=owner.id, context="live_photo", data=data)
+    owner.live_photo_captured_at = parse_live_captured_at(captured_at)
+    await session.flush()
+    await publish_owner_updated(publisher, session, owner, kind="live_photo")
+    return owner_to_response(owner)
 
 
 @router.post(
