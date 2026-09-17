@@ -210,10 +210,12 @@ async def menu_get(
 ) -> MenuResponse:
     from app.deps import require_kitchen_exists
     from app.main import redis_client
+    from ckac_common.platform_config import healthy_food_cache_variant
 
     await require_kitchen_exists(kitchen_id, session)
 
-    cached = await get_cached_menu(redis_client, kitchen_id)
+    variant = await healthy_food_cache_variant(session)
+    cached = await get_cached_menu(redis_client, kitchen_id, variant=variant)
     if cached:
         base = MenuResponse(**cached)
     else:
@@ -231,7 +233,9 @@ async def menu_get(
             diet_categories=[CategoryResponse.model_validate(c) for c in categories],
             highlight_sections=build_highlight_sections(enriched),
         )
-        await set_cached_menu(redis_client, kitchen_id, base.model_dump(mode="json"))
+        await set_cached_menu(
+            redis_client, kitchen_id, base.model_dump(mode="json"), variant=variant
+        )
 
     has_options = any([highlight, diet, q, sort])
     if not has_options:

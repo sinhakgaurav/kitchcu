@@ -3,12 +3,12 @@
 | Field | Value |
 |-------|-------|
 | Document | `QA-INSTRUCTION-PACK.md` |
-| Version | 1.2 |
-| Date | September 2026 |
+| Version | 1.3 |
+| Date | September 2026 (2026-09-17) |
 | Audience | QA Lead, engineers, founders doing release verification |
 | Companion PDF | `docs/QA-INSTRUCTION-PACK.pdf` — generate via `python scripts/generate_qa_instruction_pdf.py` |
 | Full tester steps | [`TESTER-INSTRUCTION-PACK.md`](./TESTER-INSTRUCTION-PACK.md) · [`TESTER-INSTRUCTION-PACK.pdf`](./TESTER-INSTRUCTION-PACK.pdf) — numbered UI + Swagger/API for every persona |
-| Scope | Local Docker demo + GCP production smoke; owner kitchen lists/UI polish; F19/F19b stock + bulk prep |
+| Scope | Local Docker demo + GCP production smoke; owner kitchen lists/UI polish; F19/F19b stock + bulk prep; **P55** store apps + sales onboard + in-dashboard tours |
 
 ---
 
@@ -43,6 +43,7 @@
 | Customer | http://localhost:13001 | 13001 |
 | Kitchen (owner) | http://localhost:13002 | 13002 |
 | Admin | http://localhost:13003 | 13003 |
+| Store shells | Three apps wrap the PWAs | `in.kitchcu.customer` · `.kitchen` · `.admin` |
 | Gateway | http://localhost:18000 | 18000 |
 
 After frontend rebuilds: hard-refresh or unregister the PWA service worker if UI looks stale.
@@ -54,6 +55,7 @@ After frontend rebuilds: hard-refresh or unregister the PWA service worker if UI
 | Owner | Phone `9876543210`, OTP `123456` | Primary kitchen `CKPNQ001` (Sharma Home Kitchen) |
 | Customer | WhatsApp OTP phone `9123456789`, OTP `123456` | Other demo phones in `AGENTS.md` |
 | Admin | `admin@kitchcu.dev` / `admin123456` | Platform JWT only |
+| Sales | `sales@kitchcu.dev` / `sales123456` | Role `sales` — Sales + Kitchens only (extras seed) |
 
 ### 1.3 GCP smoke (optional)
 
@@ -73,6 +75,8 @@ Follow `docs/DEPLOYMENT-GCP.md`. Confirm `*.kitchcu.com` health and same persona
 | S4 | Admin login → overview | Dashboard KPIs/panels load; Sign in card shows **username + password**; API docs links (Swagger / ReDoc / portal explorer) work | |
 | S5 | Portal home | Brand-first hero; no console crash | |
 | S6 | OpenAPI via gateway `/docs` or portal `/openapi` | Schema loads; public routes have no padlock; **Authorize → OAuth2Password** (`POST /api/v1/auth/token`) accepts admin email+password or owner/customer phone+OTP; HTTPBearer still accepts a pasted JWT | |
+| S7 | Sales login `sales@kitchcu.dev` | Nav = Sales + Kitchens; onboard creates a kitchen code; `/admin/stats` 403 | |
+| S8 | First-run tips on C / Kitchen / Admin | Skip / Next / Show tips; does not block the page | |
 
 **Fail any of S1–S4 → stop deep QA; fix infra first.**
 
@@ -127,6 +131,9 @@ For each page below: toolbar visible, search filters rows, sort changes order, f
 | I2 | Adjust stock +100 / −10 | Stock number updates; no 404 |
 | I3 | Select dish → edit recipe lines + prep steps → Save | Success toast/message; reload persists |
 | I4 | Low-stock filter | Only low items when chip on |
+| I5 | Pantry kcal / 100 | Owner can set kcal on add and inline in the table; recipe panel shows running plate kcal |
+| I6 | Healthy tag | Automatic when recipe kcal map is complete, total ≤ Control max kcal (default 500), health score ≥ Control floor (default 65) — owner cannot pin it. Super Admin **Control → Dish calories & Healthy** sets the cap and ON/OFF |
+| I7 | Calories note | Optional dish note on Add dish / Menu edit / Ingredients recipe panel; shown next to kcal, not instead of it |
 
 ### 4.2 Stock deduct mode + bulk prep
 
@@ -161,6 +168,9 @@ For each page below: toolbar visible, search filters rows, sort changes order, f
 | R3 | Ratings | Delivered order can rate home_taste |
 | R4 | Admin tickets / refunds | Admin can open tickets; refund list loads |
 | R5 | Tenant isolation | Owner A never sees kitchen B’s CRM / ingredients / prep batches |
+| R6 | Sales onboard | Sales login sees only Sales + Kitchens; onboard creates kitchen in their book; other sales 403; Super Admin Employees can hire role `sales` |
+| R7 | In-app tips | Customer home, Kitchen home, Admin: first-run tour Skip / Next / Show tips |
+| R8 | Store apps | Three listings: **kitchCU - customers** / **kitchCU - kitchen owner** / **kitchCU - admin**; ids `in.kitchcu.customer` / `.kitchen` / `.admin` |
 
 ---
 
@@ -197,7 +207,7 @@ cd ../gateway; python -m pytest tests/test_gateway.py::test_resolve_service_url_
 ```text
 Title:
 Environment: local | GCP
-Surface: portal | customer | kitchen | admin | API
+Surface: portal | customer | kitchen | admin | store app | API
 Severity: S1 blocker | S2 major | S3 minor | S4 polish
 Steps:
 1.
@@ -218,7 +228,7 @@ Workaround:
 | CTO / eng | | | | |
 | CPO | | | | |
 
-**Go criteria:** §2 Smoke Pass; §3 list/UI Must Pass; §4 F19b Must Pass; §6 security Must Pass; automated tests green for touched services. GCP: weekly timer enabled; bulk seed log exists when `run-seed=1`.
+**Go criteria:** §2 Smoke Pass (incl. S7–S8); §3 list/UI Must Pass; §4 F19b Must Pass; §6 security Must Pass; automated tests green for touched services. GCP: weekly timer enabled; bulk seed log exists when `run-seed=1`. P55: R6–R8 Pass or waived with device/emulator note.
 
 ---
 
@@ -242,3 +252,4 @@ Workaround:
 | Initial QA pack (lists/UI polish + F19b stock/bulk prep) | 2026-07-20 |
 | P41: kitchen profile edit, ratings, settlements, GCP bulk + weekly seed | 2026-09-07 |
 | Pointer to Tester Instruction Pack (numbered UI + API) | 2026-09-12 |
+| P55: sales creds, store app names, first-run tips, S7–S8 smoke | 2026-09-17 |

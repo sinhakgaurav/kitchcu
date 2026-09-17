@@ -10,7 +10,8 @@ from pydantic import BaseModel, Field, field_validator
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.ingredient_health import lookup_health_profile
+from app.dish_calories import KCAL_PER_100_MAX, is_healthy_tag, line_kcal, sum_recipe_kcal
+from app.ingredient_health import lookup_health_profile, score_ingredient_lines
 from app.models import Dish, DishIngredient, DishPrepStep, Ingredient
 from ckac_common.auth import stream_key
 from ckac_common.event_bus import EventPublisher
@@ -94,6 +95,12 @@ class IngredientCreateRequest(BaseModel):
         default=None, max_length=80, description="Human pack label, e.g. '200 g pouch' or '12 pcs tray'."
     )
     photo_url: str | None = Field(default=None, description="Optional pack/reference photo URL.")
+    kcal_per_100: float | None = Field(
+        default=None,
+        ge=0,
+        le=KCAL_PER_100_MAX,
+        description="kcal per 100 g or 100 ml; when unit is pcs, kcal per piece.",
+    )
 
     @field_validator("unit")
     @classmethod
@@ -117,6 +124,12 @@ class IngredientUpdateRequest(BaseModel):
     )
     pack_label: str | None = Field(default=None, max_length=80, description="Human pack label.")
     photo_url: str | None = Field(default=None, description="New reference photo URL.")
+    kcal_per_100: float | None = Field(
+        default=None,
+        ge=0,
+        le=KCAL_PER_100_MAX,
+        description="kcal per 100 g/ml, or per piece when unit is pcs. Send null to clear.",
+    )
 
 
 class IngredientAdjustStockRequest(BaseModel):
@@ -150,6 +163,10 @@ class IngredientResponse(BaseModel):
     health_score: int | None = Field(default=None, description="Library score 0–100 when the name matches.")
     health_benefits: str | None = Field(default=None, description="Typical home-kitchen benefits.")
     health_disadvantages: str | None = Field(default=None, description="Typical cautions for this ingredient.")
+    kcal_per_100: float | None = Field(
+        default=None,
+        description="kcal per 100 g/ml, or per piece when unit is pcs.",
+    )
 
     model_config = {"from_attributes": True}
 
@@ -190,6 +207,12 @@ class RecipeLineResponse(BaseModel):
     unit: str = Field(..., description="Unit of measure.")
     photo_url: str | None = Field(default=None, description="Optional reference photo.")
     sort_order: int = Field(default=0, description="Display order within the recipe.")
+    kcal_per_100: float | None = Field(
+        default=None, description="Pantry kcal per 100 g/ml (or per piece when unit is pcs)."
+    )
+    line_kcal: float | None = Field(
+        default=None, description="kcal this recipe line contributes to one serving."
+    )
 
 
 class PrepStepInput(BaseModel):
@@ -227,6 +250,23 @@ class DishRecipeResponse(BaseModel):
     dish_name: str = Field(..., description="Resolved dish name.")
     lines: list[RecipeLineResponse] = Field(..., description="Ingredient lines, in sort order.")
     prep_steps: list[PrepStepResponse] = Field(default_factory=list, description="Preparation steps, in order.")
+    calories_kcal: int | None = Field(default=None, description="Sum of mapped ingredient kcal for one serving.")
+    calories_incomplete: bool = Field(
+        default=False, description="True when at least one recipe line is missing pantry kcal."
+    )
+    healthy_tag: bool = Field(
+        default=False,
+        description="Automatic Healthy mark: complete kcal map, kcal at/under Control cap, health score at/over floor.",
+    )
+    calories_description: str | None = Field(default=None, description="Owner note shown next to the kcal total.")
+    healthy_max_kcal: int = Field(
+        default=500,
+        description="Control kcal cap currently used to award Healthy.",
+    )
+    healthy_min_score: int = Field(
+        default=65,
+        description="Control health-score floor currently used to award Healthy.",
+    )
 
 
 class OrderItemStockInput(BaseModel):
@@ -293,12 +333,14 @@ def _ingredient_response(row: Ingredient) -> IngredientResponse:
         health_score=profile.score if profile else None,
         health_benefits=profile.benefits if profile else None,
         health_disadvantages=profile.disadvantages if profile else None,
+        kcal_per_100=_float_or_none(row.kcal_per_100),
     )
 
 
 def _recipe_line_response(line: DishIngredient, ingredient: Ingredient) -> RecipeLineResponse:
     pack_size = _float_or_none(ingredient.pack_size)
     photo = line.photo_url or ingredient.photo_url
+    kcal_per_100 = _float_or_none(ingredient.kcal_per_100)
     return RecipeLineResponse(
         ingredient_id=ingredient.id,
         ingredient_name=ingredient.name,
@@ -310,6 +352,13 @@ def _recipe_line_response(line: DishIngredient, ingredient: Ingredient) -> Recip
         unit=line.unit,
         photo_url=photo,
         sort_order=int(line.sort_order or 0),
+        kcal_per_100=kcal_per_100,
+        line_kcal=line_kcal(
+            kcal_per_100=kcal_per_100,
+            quantity=float(line.quantity),
+            recipe_unit=line.unit,
+            ingredient_unit=ingredient.unit,
+        ),
     )
 
 
@@ -372,6 +421,7 @@ async def create_ingredient(
         pack_size=data.pack_size,
         pack_label=_optional_text(data.pack_label, max_len=80),
         photo_url=data.photo_url,
+        kcal_per_100=data.kcal_per_100,
     )
     session.add(row)
     await session.flush()
@@ -382,7 +432,7 @@ async def create_ingredient(
         event_type="ingredient.created",
         ingredient_id=row.id,
         kitchen_id=kitchen_id,
-        payload={"name": row.name, "unit": row.unit, "brand": row.brand},
+        payload={"name": row.name, "unit": row.unit, "brand": row.brand, "kcal_per_100": _float_or_none(row.kcal_per_100)},
     )
     return _ingredient_response(row)
 
@@ -417,6 +467,8 @@ async def update_ingredient(
         row.pack_label = _optional_text(data.pack_label, max_len=80)
     if data.photo_url is not None:
         row.photo_url = data.photo_url
+    if "kcal_per_100" in data.model_fields_set:
+        row.kcal_per_100 = data.kcal_per_100
     await session.flush()
 
     await _publish_ingredient_event(
@@ -425,7 +477,7 @@ async def update_ingredient(
         event_type="ingredient.updated",
         ingredient_id=row.id,
         kitchen_id=kitchen_id,
-        payload={"name": row.name},
+        payload={"name": row.name, "kcal_per_100": _float_or_none(row.kcal_per_100)},
     )
     return _ingredient_response(row)
 
@@ -524,11 +576,42 @@ async def get_dish_recipe(
         for step in step_rows
     ]
 
+    kcal_total, _mapped, n, complete = sum_recipe_kcal(
+        [
+            (
+                _float_or_none(ingredient.kcal_per_100),
+                float(line.quantity),
+                line.unit,
+                ingredient.unit,
+            )
+            for line, ingredient in rows
+        ]
+    )
+
+    from ckac_common.platform_config import get_healthy_food_params
+
+    max_kcal, min_score = await get_healthy_food_params(session)
+
     return DishRecipeResponse(
         dish_id=dish.id,
         dish_name=dish.name,
         lines=lines,
         prep_steps=prep_steps,
+        calories_kcal=kcal_total,
+        calories_incomplete=(n > 0 and not complete),
+        healthy_tag=is_healthy_tag(
+            calories_kcal=kcal_total,
+            complete=complete,
+            health_score=score_ingredient_lines(
+                [(line.ingredient_name, line.quantity, line.unit) for line in lines]
+            ).score,
+            recipe_lines=n,
+            max_kcal=max_kcal,
+            min_score=min_score,
+        ),
+        calories_description=dish.calories_description,
+        healthy_max_kcal=max_kcal,
+        healthy_min_score=min_score,
     )
 
 
@@ -594,6 +677,7 @@ async def set_dish_recipe(
         )
     await session.flush()
 
+    recipe = await get_dish_recipe(session, kitchen_id, dish_id)
     await _publish_ingredient_event(
         publisher,
         session,
@@ -604,9 +688,11 @@ async def set_dish_recipe(
             "dish_id": str(dish_id),
             "line_count": len(data.lines),
             "prep_step_count": len(data.prep_steps),
+            "calories_kcal": recipe.calories_kcal,
+            "healthy_tag": recipe.healthy_tag,
         },
     )
-    return await get_dish_recipe(session, kitchen_id, dish_id)
+    return recipe
 
 
 async def _aggregate_requirements(

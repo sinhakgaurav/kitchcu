@@ -13,6 +13,7 @@ import {
   fetchAdminEmployees,
   fetchAdminFeatureFlags,
   fetchAdminFeatures,
+  fetchAdminHealthyFood,
   fetchAdminJourneys,
   fetchAdminMoneyStats,
   fetchAdminOrders,
@@ -28,14 +29,18 @@ import {
   updateAdminCustomerStatus,
   updateAdminEmployee,
   updateAdminFeatureFlag,
+  updateAdminHealthyFood,
   updateAdminOwnerSubscription,
   updateAdminRateLimits,
   upsertAdminPackage,
+  salesOnboardKitchen,
+  patchKitchenTraining,
   type AdminAuditEvent,
   type AdminCustomer,
   type AdminCustomerDetail,
   type AdminEmployee,
   type AdminFeature,
+  type AdminHealthyFoodSettings,
   type AdminOrder,
   type AdminPackage,
   type AdminRateLimitRule,
@@ -44,8 +49,11 @@ import {
   type AdminSettlement,
   type AdminTicket,
   type FeatureFlag,
+  type KitchenTraining,
   type PlatformApiKey,
 } from "./adminApi";
+import { PhoneField } from "../components/PhoneField";
+import { toE164, validateNationalPhone } from "../shared/validation";
 
 const inr = (n: number) => `₹${Math.round(n).toLocaleString("en-IN")}`;
 
@@ -293,6 +301,13 @@ export function AdminCustomers({ canWrite = false }: { canWrite?: boolean } = {}
         cell: (c) => (c.has_live_photo ? "Yes" : "No"),
       },
       {
+        id: "checkup",
+        header: "Checkup",
+        sortable: true,
+        sortValue: (c) => (c.has_checkup_report ? 1 : 0),
+        cell: (c) => (c.has_checkup_report ? (c.diet_filter_enabled ? "On" : "Yes") : "No"),
+      },
+      {
         id: "addresses",
         header: "Addresses",
         sortable: true,
@@ -399,6 +414,21 @@ export function AdminCustomers({ canWrite = false }: { canWrite?: boolean } = {}
                 </figcaption>
               </figure>
             </div>
+            <h4>Checkup diet filter</h4>
+            <p>
+              Report on file: {selected.has_checkup_report ? "Yes" : "No"}
+              {selected.diet_filter_enabled ? " · filter ON" : " · filter off"}
+            </p>
+            {selected.diet_conditions && selected.diet_conditions.length > 0 ? (
+              <p>Flags: {selected.diet_conditions.join(", ")}</p>
+            ) : (
+              <p className="admin-panel__empty">No parsed diet flags.</p>
+            )}
+            {selected.diet_summary ? <p>{selected.diet_summary}</p> : null}
+            {selected.diet_avoid_categories && selected.diet_avoid_categories.length > 0 ? (
+              <p>Avoid categories: {selected.diet_avoid_categories.join(", ")}</p>
+            ) : null}
+            <p className="admin-panel__empty">File is not shown here — structured flags only.</p>
             <h4>Payout</h4>
             <p>UPI: {selected.upi_vpa || "—"}</p>
             <p>
@@ -907,6 +937,135 @@ function AdminRateLimitsPanel() {
   );
 }
 
+function AdminHealthyFoodPanel() {
+  const [settings, setSettings] = useState<AdminHealthyFoodSettings | null>(null);
+  const [maxKcal, setMaxKcal] = useState(500);
+  const [minScore, setMinScore] = useState(65);
+  const [error, setError] = useState("");
+  const [ok, setOk] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [busyKey, setBusyKey] = useState<string | null>(null);
+
+  const load = async () => {
+    const data = await fetchAdminHealthyFood();
+    setSettings(data);
+    setMaxKcal(data.healthy_max_kcal);
+    setMinScore(data.healthy_min_score);
+  };
+
+  useEffect(() => {
+    void load().catch((e) => {
+      setError(e instanceof Error ? e.message : "Failed to load Healthy settings");
+    });
+  }, []);
+
+  const saveNumbers = async () => {
+    setBusy(true);
+    setOk("");
+    setError("");
+    try {
+      const next = await updateAdminHealthyFood({
+        healthy_max_kcal: Number(maxKcal),
+        healthy_min_score: Number(minScore),
+      });
+      setSettings(next);
+      setMaxKcal(next.healthy_max_kcal);
+      setMinScore(next.healthy_min_score);
+      setOk("Healthy kcal cap saved — menus pick it up on the next load.");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Save failed");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const toggleFlag = async (key: "dish_calories_enabled" | "dish_healthy_tag_enabled", value: boolean) => {
+    setBusyKey(key);
+    setOk("");
+    setError("");
+    try {
+      const next = await updateAdminHealthyFood({ [key]: value });
+      setSettings(next);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Flag update failed");
+    } finally {
+      setBusyKey(null);
+    }
+  };
+
+  return (
+    <section className="glass admin-detail" style={{ marginBottom: "1rem" }}>
+      <h3>Dish calories &amp; Healthy</h3>
+      <p>
+        Public menu kcal and the automatic <strong>Healthy</strong> badge. Healthy is awarded only when
+        the recipe kcal map is complete, the plate is at or below this kcal cap, and the health score
+        meets the floor. Owners cannot pin Healthy. Kitchen pantry kcal is still stored when public
+        switches are off.
+      </p>
+      {error ? <p className="auth-card__error">{error}</p> : null}
+      {ok ? <p className="auth-card__hint">{ok}</p> : null}
+      <div style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem", marginBottom: "0.75rem" }}>
+        <button
+          type="button"
+          className={`btn btn--sm ${settings?.dish_calories_enabled ? "btn--primary" : "btn--ghost"}`}
+          disabled={!settings || busyKey === "dish_calories_enabled"}
+          onClick={() =>
+            void toggleFlag("dish_calories_enabled", !(settings?.dish_calories_enabled ?? true))
+          }
+        >
+          Calories {settings?.dish_calories_enabled ? "ON" : "OFF"}
+        </button>
+        <button
+          type="button"
+          className={`btn btn--sm ${settings?.dish_healthy_tag_enabled ? "btn--primary" : "btn--ghost"}`}
+          disabled={!settings || busyKey === "dish_healthy_tag_enabled"}
+          onClick={() =>
+            void toggleFlag("dish_healthy_tag_enabled", !(settings?.dish_healthy_tag_enabled ?? true))
+          }
+        >
+          Healthy tag {settings?.dish_healthy_tag_enabled ? "ON" : "OFF"}
+        </button>
+      </div>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: "1rem", alignItems: "flex-end" }}>
+        <label>
+          Max kcal for Healthy
+          <input
+            type="number"
+            min={50}
+            max={5000}
+            step={10}
+            value={maxKcal}
+            disabled={busy}
+            onChange={(e) => setMaxKcal(Number(e.target.value))}
+            style={{ display: "block", width: "8rem", marginTop: "0.25rem" }}
+          />
+        </label>
+        <label>
+          Min health score
+          <input
+            type="number"
+            min={0}
+            max={100}
+            step={1}
+            value={minScore}
+            disabled={busy}
+            onChange={(e) => setMinScore(Number(e.target.value))}
+            style={{ display: "block", width: "8rem", marginTop: "0.25rem" }}
+          />
+        </label>
+        <button type="button" className="btn btn--primary btn--sm" disabled={busy} onClick={() => void saveNumbers()}>
+          {busy ? "Saving…" : "Save Healthy rule"}
+        </button>
+      </div>
+      {settings?.updated_at ? (
+        <p className="auth-card__hint" style={{ marginTop: "0.5rem" }}>
+          Last updated: {new Date(settings.updated_at).toLocaleString()}
+        </p>
+      ) : null}
+    </section>
+  );
+}
+
 export function AdminControlPlane() {
   const [flags, setFlags] = useState<FeatureFlag[]>([]);
   const [journeys, setJourneys] = useState<
@@ -944,6 +1103,8 @@ export function AdminControlPlane() {
       {error && <p className="auth-card__error">{error}</p>}
 
       <AdminRateLimitsPanel />
+
+      <AdminHealthyFoodPanel />
 
       <section className="glass admin-detail" style={{ marginBottom: "1rem" }}>
         <h3>Platform API keys</h3>
@@ -1219,7 +1380,8 @@ export function AdminEmployeesPanel() {
           <div>
             <h3>Add employee</h3>
             <p style={{ margin: "0.35rem 0 0", color: "var(--text-muted)" }}>
-              RBAC roles: superadmin, ops, support, finance — permissions enforced on admin APIs.
+              RBAC roles: superadmin, ops, support, finance, sales — permissions enforced on admin APIs.
+              Hire sales so they can onboard kitchens and train owners (Sales tab only).
             </p>
           </div>
         </header>
@@ -1496,6 +1658,192 @@ export function AdminAuditPanel() {
             </li>
           ))}
         </ul>
+      )}
+    </div>
+  );
+}
+
+const PUNE_PIN = { latitude: 18.5204, longitude: 73.8567 };
+
+export function AdminSalesPanel() {
+  const [ownerName, setOwnerName] = useState("");
+  const [ownerPhone, setOwnerPhone] = useState("");
+  const [phoneError, setPhoneError] = useState<string>();
+  const [ownerEmail, setOwnerEmail] = useState("");
+  const [kitchenName, setKitchenName] = useState("");
+  const [address, setAddress] = useState("");
+  const [city, setCity] = useState("Pune");
+  const [stateName, setStateName] = useState("Maharashtra");
+  const [pincode, setPincode] = useState("");
+  const [lat, setLat] = useState(String(PUNE_PIN.latitude));
+  const [lng, setLng] = useState(String(PUNE_PIN.longitude));
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const [ok, setOk] = useState("");
+  const [createdId, setCreatedId] = useState<string | null>(null);
+  const [createdCode, setCreatedCode] = useState<string | null>(null);
+  const [training, setTraining] = useState<KitchenTraining | null>(null);
+
+  const onSubmit = async (e: FormEvent) => {
+    e.preventDefault();
+    const phoneCheck = validateNationalPhone(ownerPhone);
+    if (phoneCheck) {
+      setPhoneError(phoneCheck);
+      return;
+    }
+    setBusy(true);
+    setError("");
+    setOk("");
+    try {
+      const res = await salesOnboardKitchen({
+        owner_name: ownerName.trim(),
+        owner_phone: toE164(ownerPhone),
+        owner_email: ownerEmail.trim() || null,
+        kitchen_name: kitchenName.trim(),
+        address_line: address.trim(),
+        city: city.trim(),
+        state: stateName.trim(),
+        pincode: pincode.trim() || null,
+        latitude: Number(lat),
+        longitude: Number(lng),
+      });
+      setCreatedId(res.kitchen.id);
+      setCreatedCode(res.kitchen.code);
+      setTraining(res.training);
+      setOk(
+        `${res.kitchen.code} is live for the owner. ${res.owner_created ? "New owner created." : "Attached to the existing owner phone."} ${res.owner_login_hint}`,
+      );
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Onboard failed");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const toggleStep = async (key: string, completed: boolean) => {
+    if (!createdId) return;
+    setBusy(true);
+    try {
+      setTraining(await patchKitchenTraining(createdId, { step_key: key, completed }));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not update training");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="admin-panel">
+      {error && <p className="auth-card__error">{error}</p>}
+      {ok && <p className="auth-card__success">{ok}</p>}
+      <section className="glass admin-detail" style={{ marginBottom: "1.25rem" }}>
+        <header className="admin-panel__head">
+          <div>
+            <h3>Onboard a kitchen</h3>
+            <p style={{ margin: "0.35rem 0 0", color: "var(--text-muted)" }}>
+              One form: owner phone + kitchen pin. The owner signs in on the Kitchen app with that
+              phone and OTP. You never paste Meta or Razorpay SaaS secrets here.
+            </p>
+          </div>
+        </header>
+        <form className="owner-forms" onSubmit={onSubmit}>
+          <label>
+            Owner name
+            <input value={ownerName} onChange={(e) => setOwnerName(e.target.value)} required minLength={2} />
+          </label>
+          <PhoneField
+            label="Owner phone"
+            value={ownerPhone}
+            onChange={(v) => {
+              setOwnerPhone(v);
+              setPhoneError(undefined);
+            }}
+            error={phoneError}
+            required
+          />
+          <label>
+            Owner email (optional)
+            <input type="email" value={ownerEmail} onChange={(e) => setOwnerEmail(e.target.value)} />
+          </label>
+          <label>
+            Kitchen name
+            <input value={kitchenName} onChange={(e) => setKitchenName(e.target.value)} required minLength={2} />
+          </label>
+          <label>
+            Street address
+            <input value={address} onChange={(e) => setAddress(e.target.value)} required minLength={3} />
+          </label>
+          <div className="kc-form-row">
+            <label>
+              City
+              <input value={city} onChange={(e) => setCity(e.target.value)} required />
+            </label>
+            <label>
+              State
+              <input value={stateName} onChange={(e) => setStateName(e.target.value)} required />
+            </label>
+            <label>
+              PIN
+              <input value={pincode} onChange={(e) => setPincode(e.target.value)} />
+            </label>
+          </div>
+          <div className="kc-form-row">
+            <label>
+              Latitude
+              <input value={lat} onChange={(e) => setLat(e.target.value)} inputMode="decimal" required />
+            </label>
+            <label>
+              Longitude
+              <input value={lng} onChange={(e) => setLng(e.target.value)} inputMode="decimal" required />
+            </label>
+          </div>
+          <p className="report-hint">
+            Pin must match the stall. Demo Pune pin is prefilled for local QA.
+          </p>
+          <button type="submit" className="btn btn--primary" disabled={busy}>
+            {busy ? "Creating…" : "Create kitchen"}
+          </button>
+        </form>
+      </section>
+
+      {createdId && training && (
+        <section className="glass admin-detail">
+          <header className="admin-panel__head">
+            <div>
+              <h3>
+                Train the owner · {createdCode} ({training.completed}/{training.total})
+              </h3>
+              <p style={{ margin: "0.35rem 0 0", color: "var(--text-muted)" }}>
+                Walk these steps with them on the Kitchen app. Training does not block going live.
+              </p>
+            </div>
+            <button
+              type="button"
+              className="btn btn--ghost btn--sm"
+              onClick={() => adminNavigate({ tab: "kitchens", kitchenId: createdId })}
+            >
+              Open kitchen workspace
+            </button>
+          </header>
+          <ul className="kc-train-list">
+            {training.steps.map((step) => (
+              <li key={step.key} className={step.completed ? "kc-train-list__done" : undefined}>
+                <label>
+                  <input
+                    type="checkbox"
+                    checked={step.completed}
+                    disabled={busy}
+                    onChange={(e) => void toggleStep(step.key, e.target.checked)}
+                  />
+                  <span>
+                    <strong>{step.title}</strong>
+                    <span className="report-hint">{step.coach}</span>
+                  </span>
+                </label>
+              </li>
+            ))}
+          </ul>
+        </section>
       )}
     </div>
   );

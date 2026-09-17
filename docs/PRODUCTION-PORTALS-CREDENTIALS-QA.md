@@ -1,7 +1,7 @@
 # KitchCu — Production Portals, Credentials & Feature QA
 
 **Audience:** CEO · CPO · CTO · QA · Ops · Support  
-**Last updated:** 2026-09-12  
+**Last updated:** 2026-09-17  
 **Related:** [DEPLOYMENT-GCP.md](./DEPLOYMENT-GCP.md) · [TESTER-INSTRUCTION-PACK.md](./TESTER-INSTRUCTION-PACK.md) (numbered UI + API) · [QA-INSTRUCTION-PACK.md](./QA-INSTRUCTION-PACK.md) · [ADVANCEMENT-TRACKER.md](./ADVANCEMENT-TRACKER.md)
 
 This pack is the single place for **production portal URLs**, **who logs in where**, **demo vs production credentials policy**, and a **feature → responsibility → test steps** matrix.
@@ -16,7 +16,10 @@ This pack is the single place for **production portal URLs**, **who logs in wher
 | **WWW alias** | https://www.kitchcu.com | Same as portal | Canonical redirect / same app |
 | **Customer PWA** | https://customer.kitchcu.com | Diners | Discovery by city/GPS, kitchen code, cart, checkout, track, rate, My space |
 | **Kitchen (owner) PWA** | https://kitchen.kitchcu.com | Kitchen owners / chefs | Day ops: orders, menu (incl. drafts), setup/profile, ratings, brand page, CRM, reports, WhatsApp, payments |
-| **Admin console** | https://admin.kitchcu.com | Platform employees | Super Admin / RBAC ops, kitchens, tickets, rate limits, API keys |
+| **Admin console** | https://admin.kitchcu.com | Platform employees + field sales | Super Admin / RBAC ops, kitchens, tickets, rate limits, API keys, **Sales** onboard + Train |
+| **kitchCU - customers** (store) | Same PWA as customer.kitchcu.com | Diners | Play/App listing `in.kitchcu.customer` |
+| **kitchCU - kitchen owner** (store) | Same PWA as kitchen.kitchcu.com | Kitchen owners | Play/App listing `in.kitchcu.kitchen` |
+| **kitchCU - admin** (store) | Same PWA as admin.kitchcu.com | Super Admin + sales | Play/App listing `in.kitchcu.admin` |
 | **API gateway** | https://api.kitchcu.com | All clients (via PWAs) | `/api/v1/*`, OpenAPI `/docs`, health |
 | **Media** | https://media.kitchcu.com | Signed/public media | Dish heroes, QR uploads (when configured) |
 
@@ -33,6 +36,7 @@ Local equivalents (dev): portal `:13000` · customer `:13001` · kitchen `:13002
 | **Owner** | Phone `9876543210` | OTP `123456` | Printed on kitchen Sign in (open demo list). Extra owners `9876543211`–`9876543213` |
 | **Customer** | Phone `9123456789` | OTP `123456` | Printed on customer Sign in (open demo list). Also `9123456780`, `9988776655`, `9123456781`, `9123456782` |
 | **Super Admin** | `admin@kitchcu.dev` | `admin123456` | Dev only — never use on production |
+| **Sales (field)** | `sales@kitchcu.dev` | `sales123456` | Seeded by extras; role `sales` — Sales + Kitchens only |
 
 Seed: `.\scripts\seed-all.ps1` (includes multi-city kitchens: Delhi, Gurugram, Noida, Dehradun, Prayagraj, Varanasi, Kanpur, Lucknow, Jhansi, Mumbai).
 
@@ -70,7 +74,15 @@ Override volumes with `--owners`, `--customers`, `--orders-per-kitchen`, `--week
 
 ### 2.1c Bulk demo seed (first boot + on demand)
 
-First boot with metadata `run-seed=1` runs `infra/gcp-vm/bulk-seed.sh` → `scripts/seed-all.sh` (dev baseline + 30-kitchen **6-month** bulk + feature volume + current weekly cohort). Dishes without a live-capture hero stay inactive; orders use active dishes only. Re-run on the VM:
+First boot with metadata `run-seed=1` runs `infra/gcp-vm/bulk-seed.sh` → `scripts/seed-all.sh` (dev baseline + 30-kitchen **6-month** bulk + feature volume + current weekly cohort). Dishes without a live-capture hero stay inactive; orders use active dishes only.
+
+Pull main + rebuild + seed in **one** command (see [DEPLOYMENT-GCP.md](./DEPLOYMENT-GCP.md) §11.8):
+
+```bash
+gcloud compute ssh ckac-vm --zone=asia-south1-a --command="sudo bash -lc 'cd /opt/ckac && git fetch origin main && git reset --hard origin/main && bash infra/gcp-vm/update-setup-seed.sh'"
+```
+
+Seed only (stack already up):
 
 ```bash
 gcloud compute ssh ckac-vm --zone=asia-south1-a --command="sudo systemctl start kitchcu-bulk-seed.service"
@@ -193,6 +205,10 @@ Legend: **O** = Owner · **C** = Customer · **A** = Admin · **P** = Platform/s
 | ID | Feature | Responsible for | Test steps |
 |----|---------|-----------------|------------|
 | F32 | Discovery | Near you / featured / code | C home search; city kitchens; `#cities` section |
+| P52 | Checkup diet filter | Only food the diner can have | C home **As per my report** (or Health → upload text PDF → Yes) → nearby hides kitchens without matching food/variety; Admin Customers shows flags not the file |
+| P53 | Dish calories + Healthy | Honest plate kcal from recipe | O Ingredients: pantry kcal + recipe running total; C menu shows kcal / Healthy; Admin Kitchens → Pantry kcal column. Not a lab label |
+| P54 | Calories / Healthy Control | Super Admin enable/disable + kcal cap | Admin Control → Dish calories & Healthy: Calories ON/OFF, Healthy tag ON/OFF, Save max kcal; C menu follows |
+| P55 | Store apps + sales onboard | Field kitchen acquisition | Sales login `sales@kitchcu.dev`; **Sales** tab onboard; kitchen **Train** checklist; first-run tips on C/O/A; Android/iOS shells wrap the PWAs |
 | F33 | History + reorder | One-tap repeat | Orders → Reorder → cart filled |
 | F34–F35 | Tiffin / meal plans | Monthly subscriptions | C plans tab; O tiffin plans CRUD |
 | F36–F38 | Coupons / CRM / promos | Owner-owned offers | Create coupon → apply at checkout; CRM list |
@@ -238,6 +254,7 @@ Legend: **O** = Owner · **C** = Customer · **A** = Admin · **P** = Platform/s
 5. Customer discovery shows cities section; search works  
 6. Place one paid/test order end-to-end in a non-prod kitchen if available  
 7. Confirm `APP_ENV=production` rejects OTP `123456`
+8. Store apps (when listed): three Play/App listings named **kitchCU - customers**, **kitchCU - kitchen owner**, **kitchCU - admin** — not one combined APK
 
 ---
 

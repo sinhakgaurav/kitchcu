@@ -2,7 +2,7 @@
 
 | Field | Value |
 |-------|-------|
-| Version | 1.1 |
+| Version | 1.2 |
 | Base URL | Gateway `http://localhost:18000` (or same-origin `/api` via PWAs) |
 | Prefix | `/api/v1` |
 | Live explorer | Portal [`/openapi`](http://localhost:13000/openapi) · Gateway [`/docs`](http://localhost:18000/docs) · [`/redoc`](http://localhost:18000/redoc) |
@@ -96,6 +96,20 @@ Last run against the local stack — **302 operations, 0 FAIL** (298 PASS, 4 INF
 | Webhook | 4 | Signature-verified; reported, not asserted |
 
 Webhooks fail closed in production: the WhatsApp receiver verifies `X-Hub-Signature-256` when `whatsapp_app_secret` is set and returns `503` if it is missing outside development, so an unsigned call is only accepted on a dev stack.
+
+### 1.4 Sales (P55)
+
+Field sales use the **same** admin login (`POST /api/v1/admin/auth/login`) with a `sales` employee account. JWT `type` is still `admin`; RBAC role is `sales`.
+
+| Method | Path | Permission | Notes |
+|--------|------|------------|-------|
+| `POST` | `/api/v1/admin/sales/onboard` | `sales:write` | Owner + kitchen; `onboarded_by_admin_id`; 201 |
+| `GET` | `/api/v1/admin/kitchens` | `kitchens:read` | Sales list is filtered to their book |
+| `GET` | `/api/v1/admin/kitchens/{id}/training` | trainable kitchen | 8-step playbook |
+| `PATCH` | `/api/v1/admin/kitchens/{id}/training` | trainable kitchen | `{ "key": "profile", "completed": true }` |
+| `GET` | `/api/v1/admin/stats` | not granted to sales | **403** for role `sales` |
+
+Kill-switch: feature flag `sales_onboarding`. Local demo: `sales@kitchcu.dev` / `sales123456`.
 
 ---
 
@@ -254,7 +268,7 @@ Gateway aggregation prefixes service name (e.g. `Identity: Auth`, `Order: Custom
 
 | Service | Example tags | Owns |
 |---------|--------------|------|
-| Identity | Auth, Owners, Kitchens, Discovery, Customer Auth, Admin, Employees, Referrals | OTP/JWT, kitchens, nearby, admin RBAC, dual referrals |
+| Identity | Auth, Owners, Kitchens, Discovery, Customer Auth, Admin, Employees, Sales, Referrals | OTP/JWT, kitchens, nearby, admin RBAC, sales onboard, dual referrals |
 | Catalog | Menu, Dishes, Ingredients, Media | Live-capture menu, stock recipes (HTML sanitized on write) |
 | Order | Owner Orders, Customer Checkout, Master Orders, Analytics, Bills | Lifecycle, PDFs |
 | Billing | Payments, Settlements, Subscriptions, GST, Refunds, Packages | Money + tax + package mapper + GST Excel/PDF export |

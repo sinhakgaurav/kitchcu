@@ -29,6 +29,8 @@ class DiscoveryKitchenCard(BaseModel):
     min_dish_price: float | None = None
     tagline: str | None = None
     logo_url: str | None = None
+    compatible_dish_count: int | None = None
+    better_for_report: bool = False
 
 
 class DiscoveryDishCard(BaseModel):
@@ -53,6 +55,7 @@ class DiscoveryHomeResponse(BaseModel):
     most_liked: list[DiscoveryKitchenCard]
     live_now: list[DiscoveryKitchenCard]
     cheapest_dishes: list[DiscoveryDishCard]
+    diet_filter_applied: bool = False
 
 
 def _card_from_row(row) -> DiscoveryKitchenCard:
@@ -153,6 +156,7 @@ async def build_discovery_home(
     max_km: float = 25.0,
     section_limit: int = 12,
     q: str | None = None,
+    customer: object | None = None,
 ) -> DiscoveryHomeResponse:
     max_m = max_km * 1000.0
     section_limit = min(max(section_limit, 1), 30)
@@ -313,7 +317,7 @@ async def build_discovery_home(
         for r in dish_rows
     ]
 
-    return DiscoveryHomeResponse(
+    home = DiscoveryHomeResponse(
         customer_latitude=latitude,
         customer_longitude=longitude,
         max_km=max_km,
@@ -324,3 +328,47 @@ async def build_discovery_home(
         live_now=live_now,
         cheapest_dishes=cheapest,
     )
+    return await apply_diet_to_discovery(session, home, customer)
+
+
+async def apply_diet_to_discovery(
+    session: AsyncSession,
+    home: DiscoveryHomeResponse,
+    customer: object | None,
+) -> DiscoveryHomeResponse:
+    from app.diet_report import (
+        active_diet_profile,
+        compatible_counts,
+        dish_is_compatible,
+        load_kitchen_dishes,
+        rank_kitchens_for_diet,
+    )
+
+    profile = await active_diet_profile(session, customer)
+    if not profile:
+        home.diet_filter_applied = False
+        return home
+
+    cards = home.near_you + home.featured + home.most_liked + home.live_now
+    kitchen_ids = list({c.id for c in cards} | {d.kitchen_id for d in home.cheapest_dishes})
+    rows = await load_kitchen_dishes(session, kitchen_ids)
+    counts = compatible_counts(rows, profile)
+    home.near_you = rank_kitchens_for_diet(home.near_you, counts, limit=max(len(home.near_you), 1))
+    home.featured = rank_kitchens_for_diet(home.featured, counts, limit=max(len(home.featured), 1))
+    home.most_liked = rank_kitchens_for_diet(home.most_liked, counts, limit=max(len(home.most_liked), 1))
+    home.live_now = rank_kitchens_for_diet(home.live_now, counts, limit=max(len(home.live_now), 1))
+    ok_dishes = {
+        row.dish_id
+        for row in rows
+        if dish_is_compatible(
+            name=row.name,
+            category_slug=row.category_slug,
+            ingredient_blob=row.ingredient_blob,
+            profile=profile,
+        )
+    }
+    home.cheapest_dishes = [d for d in home.cheapest_dishes if d.dish_id in ok_dishes]
+    remaining = {c.id for c in home.near_you + home.featured + home.most_liked + home.live_now}
+    home.total_kitchens = len(remaining)
+    home.diet_filter_applied = True
+    return home

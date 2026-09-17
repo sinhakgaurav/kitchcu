@@ -7,7 +7,7 @@
 | Baseline | Phase 1 **S1–S18** complete (gateway + 13 domain services + 4 PWAs + GST) |
 | Production | `*.kitchcu.com` (GCP VM + Caddy) |
 | Local demo | `*.kitchcu.in` / `admin@kitchcu.dev` |
-| Last updated | 2026-09-15 |
+| Last updated | 2026-09-17 |
 | Portals / QA pack | [PRODUCTION-PORTALS-CREDENTIALS-QA.md](./PRODUCTION-PORTALS-CREDENTIALS-QA.md) (+ PDF) |
 | Tester book | [TESTER-INSTRUCTION-PACK.md](./TESTER-INSTRUCTION-PACK.md) (+ [PDF](./TESTER-INSTRUCTION-PACK.pdf)) — numbered UI + API steps |
 | Architecture flows | [PLATFORM-ARCHITECTURE-FLOWS.md](./PLATFORM-ARCHITECTURE-FLOWS.md) |
@@ -115,6 +115,10 @@ For **manual QA / release sign-off** (short Must/Should) see [QA-INSTRUCTION-PAC
 | P49 | **Owner KYC (photos + Aadhaar/PAN)** | Owner profile + live photo; masked Aadhaar/PAN; Admin kitchen **KYC** tab; `owner_kyc` flag; `owner.updated` | ✅ | Identity `026`; design `OWNER-KYC-DESIGN.md`. No UIDAI/NSDL e-KYC |
 | P50 | **Dish ingredient health (customer)** | 0–100 recipe-weighted score + per-ingredient benefits/disadvantages on menu, Health tab, order confirm; owner/admin pantry Health column; `dish_health` flag | ✅ | Catalog library + `GET /dishes/health`; identity `027`; design `DISH-INGREDIENT-HEALTH-DESIGN.md`. Not medical advice |
 | P51 | **Unique bill/invoice numbers + admin phone** | Order/bill = `{kitchen_code}-BILL-YYYYMMDD-SEQ`; GST = `{kitchen_code}-GST-YYYYMM-SEQ` (max+lock, seed rewrite after dating); Super Admin phone section `<select>` + table horizontal scroll | ✅ | Order `_next_bill_id`; billing `_next_invoice_number`; admin nav/table CSS |
+| P52 | **Customer checkup diet filter** | Upload latest checkup (text PDF or photo+notes); in-process ML + lab rules; ask to show only food they can have; nearby/discovery/menu **As per my report** select (matching food + preferred variety); only kitchens with that food stay listed; “better match” rank | ✅ | Identity `028`; design `CUSTOMER-CHECKUP-DIET-FILTER-DESIGN.md`; flag `customer_diet_report`. Not medical advice; admin sees flags not the file |
+| P53 | **Dish calories + healthy tag** | Owner pantry `kcal_per_100` + dish calories note; recipe qty × SKU kcal auto-sums the plate; **Healthy** automatic (complete map, kcal ≤ Control cap, P50 score ≥ floor); customer menu/Health; Admin Pantry kcal column | ✅ | Catalog `011`; design `DISH-INGREDIENT-CALORIES-DESIGN.md`. Kitchen estimate — not a lab/FSSAI/medical claim |
+| P54 | **Super-admin calories / Healthy controls** | Control enable/disable `dish_calories` + `dish_healthy_tag`; configurable `healthy_max_kcal` (default 500, 50–5000) + score floor; catalog menus honor live cap | ✅ | Identity `029`; `GET/PATCH /admin/healthy-food`; design `DISH-CALORIES-ADMIN-SETTINGS-DESIGN.md` |
+| P55 | **Store apps + sales onboarding** | Android TWA + iOS WKWebView shells for Customer / Kitchen / Admin PWAs; in-dashboard skippable tours; employee role `sales` onboards kitchens + 8-step owner training; Sales tab + kitchen Train; flag `sales_onboarding` | ✅ | Identity `030`; `POST /admin/sales/onboard`; design `SALES-ONBOARDING-ANDROID-APPS-DESIGN.md`. Not a native rewrite |
 
 ---
 
@@ -295,18 +299,17 @@ operations, 0 mismatches**. Details and the per-class table are in
 ### GCP update (single-VM — production path today)
 
 ```bash
-# 1) After push to origin/main — pull + rebuild (keeps DB)
-gcloud compute ssh ckac-vm --zone=asia-south1-a --command="sudo google_metadata_script_runner startup"
+# After push to origin/main — pull + rebuild + seed (keeps DB)
+gcloud compute ssh ckac-vm --zone=asia-south1-a --command="sudo bash -lc 'cd /opt/ckac && git fetch origin main && git reset --hard origin/main && bash infra/gcp-vm/update-setup-seed.sh'"
 
-# 2) Watch build
-gcloud compute ssh ckac-vm --zone=asia-south1-a --command="sudo tail -f /var/log/ckac-startup.log"
+# Watch seed
+gcloud compute ssh ckac-vm --zone=asia-south1-a --command="sudo tail -f /var/log/ckac-bulk-seed.log"
 
-# 3) Smoke
+# Smoke
 curl -sS https://api.kitchcu.com/health/ready
-# Login admin.kitchcu.com → Packages + Employees; open a kitchen → Package / Marketing / Streaming
 
-# Fresh wipe (DB reset + re-seed) — only when intentionally destroying demo data:
-# gcloud compute ssh ckac-vm --zone=asia-south1-a --command="cd /opt/ckac && sudo git fetch origin main && sudo git reset --hard origin/main && sudo bash infra/gcp-vm/reset-fresh.sh"
+# Wipe DB + rebuild + seed:
+# gcloud compute ssh ckac-vm --zone=asia-south1-a --command="sudo bash -lc 'cd /opt/ckac && git fetch origin main && git reset --hard origin/main && bash infra/gcp-vm/update-setup-seed.sh --fresh'"
 ```
 
 Full runbook: [DEPLOYMENT-GCP.md](./DEPLOYMENT-GCP.md) §11.

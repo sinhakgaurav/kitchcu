@@ -23,6 +23,7 @@ import {
   type StreamSettings,
 } from "../../lib/api";
 import { customerUrl } from "../../shared/urls";
+import { ProductTour, TourReplayButton } from "../../components/ProductTour";
 
 const inr = (n: number) => `₹${Math.round(n).toLocaleString("en-IN")}`;
 const pct = (n: number) => `${(n * 100).toFixed(0)}%`;
@@ -197,6 +198,20 @@ export function OwnerHomePage() {
 
   return (
     <div className="owner-page od-board">
+      <ProductTour
+        id="kitchen"
+        skipLabel={t("owner.tour.skip")}
+        nextLabel={t("owner.tour.next")}
+        backLabel={t("owner.tour.back")}
+        doneLabel={t("owner.tour.done")}
+        stepLabel={(current, total) => t("owner.tour.step", { current, total })}
+        steps={[
+          { title: t("owner.tour.s1Title"), body: t("owner.tour.s1Body") },
+          { title: t("owner.tour.s2Title"), body: t("owner.tour.s2Body") },
+          { title: t("owner.tour.s3Title"), body: t("owner.tour.s3Body") },
+          { title: t("owner.tour.s4Title"), body: t("owner.tour.s4Body") },
+        ]}
+      />
       <section className="od-board__hero dash-card">
         <div className="od-board__hero-text">
           <p className="od-board__eyebrow">{greeting()}, {owner?.name?.split(" ")[0] ?? "chef"}</p>
@@ -226,6 +241,7 @@ export function OwnerHomePage() {
           </div>
         </div>
         <div className="od-board__hero-actions">
+          <TourReplayButton id="kitchen" label={t("owner.tour.replay")} />
           {activeOrders.length > 0 ? (
             <>
               <Link to="/dashboard/orders" className="btn btn--primary">

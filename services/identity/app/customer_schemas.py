@@ -67,6 +67,37 @@ class CustomerResponse(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class CustomerDietProfileResponse(BaseModel):
+    """Parsed checkup flags for kitchen discovery — never includes the report file."""
+
+    has_checkup_report: bool = Field(..., description="True when a checkup file was stored.")
+    parsed_at: datetime | None = Field(default=None, description="When the latest report was parsed.")
+    diet_filter_enabled: bool = Field(
+        default=False,
+        description="When true, nearby/discovery/menu hide plates the report flags as a poor fit.",
+    )
+    conditions: list[str] = Field(default_factory=list, description="ML + lab condition keys.")
+    avoid_ingredients: list[str] = Field(default_factory=list)
+    avoid_categories: list[str] = Field(default_factory=list)
+    avoid_name_tokens: list[str] = Field(default_factory=list)
+    prefer_categories: list[str] = Field(default_factory=list)
+    confidence: float = Field(default=0.0, ge=0, le=1)
+    summary: str = Field(default="")
+    disclaimer: str = Field(default="")
+
+
+class DietFilterUpdateRequest(BaseModel):
+    enabled: bool = Field(..., description="Show only food the checkup profile allows.")
+
+
+class DietCompatibleDishesResponse(BaseModel):
+    kitchen_id: uuid.UUID
+    dish_ids: list[uuid.UUID] = Field(default_factory=list)
+    compatible_count: int = 0
+    total_active: int = 0
+    filter_applied: bool = False
+
+
 # WhatsApp is the only channel the platform actually delivers on today; adding "sms"
 # here before an SMS provider exists would promise a message that never arrives.
 NOTIFY_CHANNELS = ("whatsapp", "none")
@@ -206,6 +237,25 @@ def _mask_account(account: str | None) -> str | None:
     if len(digits) <= 4:
         return "****"
     return f"{'*' * (len(digits) - 4)}{digits[-4:]}"
+
+
+def customer_diet_to_response(customer: Customer) -> CustomerDietProfileResponse:
+    from app.diet_report import DISCLAIMER, profile_from_dict
+
+    profile = profile_from_dict(customer.diet_profile)
+    return CustomerDietProfileResponse(
+        has_checkup_report=bool(customer.checkup_report_url or customer.diet_profile),
+        parsed_at=customer.checkup_parsed_at,
+        diet_filter_enabled=bool(customer.diet_filter_enabled),
+        conditions=list(profile.conditions) if profile else [],
+        avoid_ingredients=list(profile.avoid_ingredients) if profile else [],
+        avoid_categories=list(profile.avoid_categories) if profile else [],
+        avoid_name_tokens=list(profile.avoid_name_tokens) if profile else [],
+        prefer_categories=list(profile.prefer_categories) if profile else [],
+        confidence=profile.confidence if profile else 0.0,
+        summary=profile.summary if profile else "",
+        disclaimer=profile.disclaimer if profile else DISCLAIMER,
+    )
 
 
 def customer_to_response(customer: Customer) -> CustomerResponse:

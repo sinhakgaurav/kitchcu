@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useMemo, useState, type CSSProperties, type RefObject } from "react";
 import { useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { ListingToolbar } from "./ListingToolbar";
 import { DeliveryAddressPicker } from "./DeliveryAddressPicker";
+import { ReportFoodFilter } from "./ReportFoodFilter";
 import { kitchenCardImage } from "../data/content";
 import type { KitchenNearby, LiveKitchenSummary } from "../shared/api";
 import { fetchLiveKitchens } from "../shared/api";
@@ -10,6 +12,10 @@ import { useCustomerAuth } from "../shared/customerAuth";
 import { useCustomerDelivery } from "../shared/customerDelivery";
 import { saveKitchenToSession } from "../shared/customerSession";
 import { useInView } from "../hooks/useParallax";
+import {
+  DIET_FILTER_CHANGED,
+  type ReportFoodChangeDetail,
+} from "../hooks/useReportFoodFilter";
 import {
   discoveryMapEmbedUrl,
   googleMapsNearbyStaticUrl,
@@ -22,6 +28,7 @@ type DietFilter = "" | "veg" | "non_veg" | "vegan";
 type ListSort = "distance_asc" | "distance_desc" | "name_asc" | "name_desc";
 
 export function NearbyKitchensList() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const { updateSession } = useCustomerAuth();
   const { ref, visible } = useInView(0.06);
@@ -39,6 +46,7 @@ export function NearbyKitchensList() {
   const [diet, setDiet] = useState<DietFilter>("");
   const [liveCaptureOnly, setLiveCaptureOnly] = useState(false);
   const [liveOnly, setLiveOnly] = useState(false);
+  const [dietFilterApplied, setDietFilterApplied] = useState(false);
 
   const mapsEnabled = hasGoogleMapsApiKey();
 
@@ -81,6 +89,7 @@ export function NearbyKitchensList() {
       ]);
       setKitchens(data.kitchens);
       setNearest(data.nearest ?? []);
+      setDietFilterApplied(Boolean(data.diet_filter_applied));
       const map: Record<string, LiveKitchenSummary> = {};
       for (const live of liveRes.kitchens) {
         map[live.kitchen_id] = live;
@@ -99,6 +108,19 @@ export function NearbyKitchensList() {
     if (deliveryLoading) return;
     void load();
   }, [load, deliveryLoading]);
+
+  useEffect(() => {
+    const onChange = (event: Event) => {
+      const nextDiet = (event as CustomEvent<ReportFoodChangeDetail>).detail?.diet;
+      if (nextDiet !== undefined && nextDiet !== diet) {
+        setDiet(nextDiet as DietFilter);
+        return;
+      }
+      void load();
+    };
+    window.addEventListener(DIET_FILTER_CHANGED, onChange);
+    return () => window.removeEventListener(DIET_FILTER_CHANGED, onChange);
+  }, [diet, load]);
 
   // Search hits the API so dish and cuisine names match, not just kitchen names.
   useEffect(() => {
@@ -125,12 +147,15 @@ export function NearbyKitchensList() {
 
   const displayed = useMemo(() => {
     const list = [...kitchens];
+    if (dietFilterApplied && (listSort === "distance_asc" || listSort === "distance_desc")) {
+      return listSort === "distance_desc" ? [...list].reverse() : list;
+    }
     if (listSort === "name_asc") list.sort((a, b) => a.name.localeCompare(b.name));
     else if (listSort === "name_desc") list.sort((a, b) => b.name.localeCompare(a.name));
     else if (listSort === "distance_desc") list.sort((a, b) => b.distance_km - a.distance_km);
     else list.sort((a, b) => a.distance_km - b.distance_km);
     return list;
-  }, [kitchens, listSort]);
+  }, [kitchens, listSort, dietFilterApplied]);
 
   const onListSortChange = (v: string) => {
     const next = v as ListSort;
@@ -155,9 +180,12 @@ export function NearbyKitchensList() {
             <h2>{placeLabel ? `Cloud kitchens near ${placeLabel}` : "Cloud kitchens nearby"}</h2>
             <p>
               {mapsEnabled ? "Google Map" : "Map"} + list sorted by distance. Filter by diet,
-              live-capture menu photos, or kitchens streaming now.
+              checkup report food, live-capture menu photos, or kitchens streaming now.
               {geoError && <span className="nearby-kitchens__geo-hint"> {geoError}</span>}
             </p>
+            {dietFilterApplied ? (
+              <p className="nearby-kitchens__geo-hint">{t("customer.discovery.dietFilterOn")}</p>
+            ) : null}
           </div>
           <div className="nearby-kitchens__controls">
             <DeliveryAddressPicker variant="bar" />
@@ -185,6 +213,7 @@ export function NearbyKitchensList() {
                 <option value="vegan">Vegan</option>
               </select>
             </label>
+            <ReportFoodFilter diet={diet} onDietChange={(next) => setDiet(next as DietFilter)} />
             <label className="nearby-kitchens__checkbox">
               <input
                 type="checkbox"
@@ -260,7 +289,9 @@ export function NearbyKitchensList() {
         ) : nothingAnywhere ? (
           <div className="glass nearby-kitchens__empty">
             <p>
-              {activeSearch
+              {dietFilterApplied
+                ? t("customer.discovery.dietFilterEmpty")
+                : activeSearch
                 ? `No kitchen on kitchCU matches “${activeSearch}” yet.`
                 : "No active kitchens with these filters."}
             </p>
@@ -329,6 +360,11 @@ export function NearbyKitchensList() {
                         : ""}
                     </span>
                     <span className="nearby-kitchens__badges">
+                      {k.better_for_report && (
+                        <span className="nearby-kitchens__badge nearby-kitchens__badge--better">
+                          {t("customer.discovery.betterForReport")}
+                        </span>
+                      )}
                       {k.has_veg && <span className="nearby-kitchens__badge">Veg</span>}
                       {k.has_non_veg && <span className="nearby-kitchens__badge">Non-veg</span>}
                       {k.has_live_capture && <span className="nearby-kitchens__badge">Live photo</span>}

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""Generate Kitchcu Complete Executive Guide PDF v3.2.6 — deep encyclopedia (CEO + CPO + CTO).
+"""Generate Kitchcu Complete Executive Guide PDF v3.2.7 — deep encyclopedia (CEO + CPO + CTO).
 
-Source of truth: docs/CKAC-COMPLETE-GUIDE.md v3.2.6 (September 2026).
+Source of truth: docs/CKAC-COMPLETE-GUIDE.md v3.2.7 (September 2026).
 Shared layout: scripts/pdf_guide.py (GuidePDF) — header clearance, caption-above figures.
 """
 
@@ -9,7 +9,7 @@ from pathlib import Path
 
 from pdf_guide import GuidePDF
 
-GUIDE_VERSION = "3.2.6"
+GUIDE_VERSION = "3.2.7"
 GUIDE_DATE = "September 2026"
 OUTPUT = Path(__file__).resolve().parent.parent / "docs" / "CKAC-COMPLETE-GUIDE.pdf"
 UI = Path(__file__).resolve().parent.parent / "docs" / "assets" / "ui"
@@ -28,12 +28,12 @@ def build() -> GuidePDF:
         audience="Audience: CEO, CPO, CTO, Product, Engineering, DBA, QA, Investors, AI agents",
         lenses=[
             "CEO — positioning, subscription economics, GTM, risks, India 1st / world 3rd claim",
-            "CPO — personas, P1-P12 / C1-C6, modules M01-M18 (Definition/How/Why), journeys, KPIs",
+            "CPO — personas, P1-P12 / C1-C6, modules M01-M19 (Definition/How/Why), journeys, KPIs",
             "CTO — architecture WHY, 100k sessions, TDD+EDD, diagrams, ER, security, build matrix",
         ],
         bullets=[
             "Part 0 definitions + glossary (tenant, outbox, EventEnvelope, live-capture, master order)",
-            "Parts I-III: CEO / CPO / CTO lenses through S18 + GST; E1/E2 design-ready",
+            "Parts I-III: CEO / CPO / CTO lenses through P55 store apps + sales onboard; E1/E2 design-ready",
             "Aggregated OpenAPI portal (/openapi.json, /docs, /redoc, portal /openapi) + docs/API.md",
             "Parts IV-V: product flows (+ delivery payer, super-admin) + UI Catalog (8 JPEGs)",
             "Addons: dish ready-within, Maps tracking, login highlights, Control plane, refunds",
@@ -59,7 +59,7 @@ def build() -> GuidePDF:
         ("PART II — CPO Lens", [
             "4. Vision, Personas & Principles",
             "5. Challenges to Module Solutions (P1-P12 / C1-C6)",
-            "6. Module Catalog M01-M18",
+            "6. Module Catalog M01-M19",
             "7. Product Journeys & Capability Ladder",
             "8. Product KPIs",
         ]),
@@ -78,6 +78,7 @@ def build() -> GuidePDF:
             "17.1-17.8 Owner onboard, OTP, intake, checkout, settlement, GST, ratings",
             "17.9 Delivery payer modes + Maps tracking",
             "17.10 Super admin Control plane",
+            "17.11 Sales onboard, training & store apps (P55)",
             "Full journey pack: docs/CKAC-USERFLOWS.md / .pdf",
         ]),
         ("PART V — UI Catalog", [
@@ -448,10 +449,18 @@ def build() -> GuidePDF:
             "Four installable React surfaces from one Vite monorepo.",
             "portal/customer/kitchen/admin bundles share brand.ts; Workbox offline on "
             "customer+kitchen; OwnerPageShell for kitchen command center.",
-            "Distribution without app-store gatekeeping. Continuous.",
+            "Distribution without rewriting native checkout. Store shells wrap the same PWAs. Continuous.",
         ),
         (
-            "M18 — Kitchen Quality Loop (E1+E2) — Design Only",
+            "M18 — Store apps + sales onboarding (P55)",
+            "Three Play/App listings wrap the PWAs; field sales onboard kitchens.",
+            "TWA + WKWebView: kitchCU - customers / kitchen owner / admin "
+            "(in.kitchcu.customer / .kitchen / .admin). Role sales: POST /admin/sales/onboard; "
+            "8-step Train; flag sales_onboarding. Tours on C/O/A dashboards.",
+            "Solves store-download expectation + field acquisition without platform secrets.",
+        ),
+        (
+            "M19 — Kitchen Quality Loop (E1+E2) — Design Only",
             "Purchases restock -> recipes consume -> ratings signal -> lock standard.",
             "E1: purchase ledger + stock_movements. E2: rules-based chef brief "
             "(0.45*vol+0.35*taste+tip+0.20*risk); owner Lock snapshots recipe_standard_versions. "
@@ -827,6 +836,8 @@ def build() -> GuidePDF:
             ["P41 profile edit / ratings / seed", "P41", "Done"],
             ["P45 gated admin login-hint", "P45", "Done"],
             ["P47 Swagger token + owner JWT type", "P47", "Done"],
+            ["P50-P54 health / calories / diet Control", "P50-P54", "Done"],
+            ["P55 store apps + sales onboard + tours", "P55", "Done"],
             ["E1/E2 purchases + chef lock", "S19 proposed", "Design only"],
         ],
         [80, 40, 50],
@@ -944,10 +955,21 @@ def build() -> GuidePDF:
     pdf.chapter("Super Admin Control Plane")
     pdf.bullets([
         "Login highlights: customers/refunds, flags & journeys, suspend, money, SaaS oversight",
-        "Nav: Overview, Kitchens, Owners, Customers, Orders, Refunds, Tickets, Control",
-        "Control: application data journeys + feature_flags kill-switches + subscription overrides",
+        "Nav: Overview, Kitchens, Owners, Customers, Orders, Refunds, Tickets, Packages, Employees, Sales, Control",
+        "Control: journeys + feature_flags (sales_onboarding, dish_calories, dish_healthy_tag) + kcal cap",
         "Billing admin (refunds/payments/settlements/money-stats) proxied before identity catch-all",
         "Admin JWT never mutates owner menu/order routes",
+        "Sales role: Sales + Kitchens only; GET /admin/stats -> 403",
+    ])
+
+    pdf.chapter("Sales onboard, owner training & store apps")
+    pdf.bullets([
+        "sales@kitchcu.dev / sales123456 (extras seed). POST /admin/sales/onboard -> kitchen code",
+        "Kitchen Train: 8 steps (profile, live hero, recipe, radius, KYC, test order, WhatsApp, handoff)",
+        "Events: owner.created / kitchen.created / kitchen.training.updated",
+        "Store listings wrap PWAs: kitchCU - customers / kitchen owner / admin",
+        "Ids in.kitchcu.customer / .kitchen / .admin — three Play/App downloads",
+        "First-run ProductTour on customer, kitchen, admin (Skip / Next / Show tips)",
     ])
 
     # ═════════════════════════════════════════════════════════════════════
@@ -1109,6 +1131,7 @@ def build() -> GuidePDF:
             ["Customer", "9123456780", "OTP 123456", "Repeat/VIP segment"],
             ["Customer", "9988776655", "OTP 123456", "Guest path"],
             ["Admin", "admin@kitchcu.dev", "admin123456", "Platform scope only"],
+            ["Sales", "sales@kitchcu.dev", "sales123456", "Role sales; Sales + Kitchens"],
         ],
         [32, 42, 38, 58],
         size=6,
@@ -1225,7 +1248,7 @@ def build() -> GuidePDF:
     pdf.table(
         ["Document", "Role"],
         [
-            ["CKAC-COMPLETE-GUIDE.md/.pdf v3.2.6", "This CEO/CPO/CTO encyclopedia"],
+            ["CKAC-COMPLETE-GUIDE.md/.pdf v3.2.7", "This CEO/CPO/CTO encyclopedia"],
             ["CKAC-USERFLOWS.md/.pdf", "Full step-by-step user journey pack"],
             ["API.md", "Public API reference + OpenAPI URLs"],
             ["E1-E2-*-DESIGN.md", "S19 quality-loop design pack"],
@@ -1245,13 +1268,12 @@ def build() -> GuidePDF:
 
     pdf.chapter("Document control")
     pdf.body(
-        "v3.2.6 September 2026 — P47 Swagger/OpenAPI tester (POST /api/v1/auth/token, "
-        "public security: []), owner JWT type=owner, gated login-hint, 6-month demo "
-        "history seed. Builds on P41 profile PATCH, live-capture-safe GCP bulk seed, "
-        "P37-P40 referrals, GST export, admin ops, i18n."
+        "v3.2.7 September 2026 — P55 three store apps (kitchCU - customers / kitchen owner / "
+        "admin), sales onboard + Train, in-dashboard tours; P50-P54 calories/Healthy/diet. "
+        "Builds on P47 Swagger tester, 6-month seed, P41 profile PATCH."
     )
     pdf.quote(
-        "KitchCu Complete Executive & Engineering Guide v3.2.6 — Confidential — September 2026. "
+        "KitchCu Complete Executive & Engineering Guide v3.2.7 — Confidential — September 2026. "
         "India's first — and the world's third — platform with this feature stack."
     )
 

@@ -145,6 +145,59 @@ async def is_feature_enabled(
     return bool(val)
 
 
+# P53/P54 — public calories + automatic Healthy (catalog reads these live).
+DISH_CALORIES_FLAG = "dish_calories"
+DISH_HEALTHY_TAG_FLAG = "dish_healthy_tag"
+HEALTHY_MAX_KCAL_DEFAULT = 500
+HEALTHY_MIN_SCORE_DEFAULT = 65
+HEALTHY_MAX_KCAL_MIN = 50
+HEALTHY_MAX_KCAL_MAX = 5000
+
+
+def _clamp_int(value: object, lo: int, hi: int, default: int) -> int:
+    try:
+        n = int(value)  # type: ignore[arg-type]
+    except (TypeError, ValueError):
+        return default
+    return max(lo, min(hi, n))
+
+
+async def get_healthy_food_params(session: AsyncSession) -> tuple[int, int]:
+    """Return (healthy_max_kcal, healthy_min_score) from Control, else defaults."""
+    result = await session.execute(
+        text(
+            """
+            SELECT healthy_max_kcal, healthy_min_score
+            FROM ckac_identity.healthy_food_settings
+            WHERE id = 1
+            LIMIT 1
+            """
+        )
+    )
+    row = result.first()
+    if row is None:
+        return HEALTHY_MAX_KCAL_DEFAULT, HEALTHY_MIN_SCORE_DEFAULT
+    return (
+        _clamp_int(
+            row[0],
+            HEALTHY_MAX_KCAL_MIN,
+            HEALTHY_MAX_KCAL_MAX,
+            HEALTHY_MAX_KCAL_DEFAULT,
+        ),
+        _clamp_int(row[1], 0, 100, HEALTHY_MIN_SCORE_DEFAULT),
+    )
+
+
+async def healthy_food_cache_variant(session: AsyncSession) -> str:
+    """Menu cache suffix so Control kcal/flag changes do not serve a stale plate."""
+    calories_on = await is_feature_enabled(session, DISH_CALORIES_FLAG, default=True)
+    healthy_on = await is_feature_enabled(session, DISH_HEALTHY_TAG_FLAG, default=True)
+    max_kcal, min_score = await get_healthy_food_params(session)
+    return (
+        f"hf{int(calories_on)}{int(healthy_on)}k{max_kcal}s{min_score}"
+    )
+
+
 # Master kill-switch for outbound Meta / Porter / OpenAI / OAuth IdP calls.
 # Super-admin toggles ``ckac_identity.feature_flags.third_party_integrations``.
 # Env ``THIRD_PARTY_INTEGRATIONS=0|1`` overrides DB (ops / local dry-run).

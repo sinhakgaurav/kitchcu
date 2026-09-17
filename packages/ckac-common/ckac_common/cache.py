@@ -6,33 +6,49 @@ from uuid import UUID
 MENU_CACHE_TTL_SECONDS = 300
 
 
-def menu_cache_key(kitchen_id: UUID | str) -> str:
-    return f"menu:{kitchen_id}"
+def menu_cache_key(kitchen_id: UUID | str, variant: str = "") -> str:
+    base = f"menu:{kitchen_id}"
+    return f"{base}:{variant}" if variant else base
 
 
-async def get_cached_menu(redis_client, kitchen_id: UUID | str) -> dict | None:
+async def get_cached_menu(
+    redis_client, kitchen_id: UUID | str, *, variant: str = ""
+) -> dict | None:
     if not redis_client:
         return None
-    raw = await redis_client.get(menu_cache_key(kitchen_id))
+    raw = await redis_client.get(menu_cache_key(kitchen_id, variant))
     if not raw:
         return None
     return json.loads(raw)
 
 
-async def set_cached_menu(redis_client, kitchen_id: UUID | str, menu: dict) -> None:
+async def set_cached_menu(
+    redis_client, kitchen_id: UUID | str, menu: dict, *, variant: str = ""
+) -> None:
     if not redis_client:
         return
     await redis_client.setex(
-        menu_cache_key(kitchen_id),
+        menu_cache_key(kitchen_id, variant),
         MENU_CACHE_TTL_SECONDS,
         json.dumps(menu, default=str),
     )
 
 
+def _as_str(key: object) -> str:
+    if isinstance(key, bytes):
+        return key.decode()
+    return str(key)
+
+
 async def invalidate_menu_cache(redis_client, kitchen_id: UUID | str) -> None:
     if not redis_client:
         return
-    await redis_client.delete(menu_cache_key(kitchen_id))
+    prefix = f"menu:{kitchen_id}"
+    keys = {prefix}
+    async for key in redis_client.scan_iter(match=f"{prefix}*"):
+        keys.add(_as_str(key))
+    if keys:
+        await redis_client.delete(*keys)
 
 
 # Analytics aggregates change slowly relative to how often a dashboard is

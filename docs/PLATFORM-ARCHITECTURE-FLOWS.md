@@ -1,12 +1,12 @@
 # KitchCu — Platform Architecture & Flow Report
 
-**Living executive report.** Current-state architecture, persona flows, events, and gaps after Phase 1 S1–S18 + post-S18 **P19–P32.1**.
+**Living executive report.** Current-state architecture, persona flows, events, and gaps after Phase 1 S1–S18 + post-S18 **P19–P55**.
 
 | Field | Value |
 |-------|-------|
-| Version | **1.0** |
-| Date | 2026-07-19 |
-| Baseline | S1–S18 + P19–P32.1 (`caf9c73`) |
+| Version | **1.1** |
+| Date | 2026-09-17 |
+| Baseline | S1–S18 + P19–P55 |
 | Production | `*.kitchcu.com` (GCP VM + Caddy) |
 | Companions | [ADVANCEMENT-TRACKER](./ADVANCEMENT-TRACKER.md) · [PERSONA DEEP DIVE](./PLATFORM-PERSONA-DEEP-DIVE.md) · [SOLUTION BLUEPRINT](./PLATFORM-SOLUTION-BLUEPRINT.md) · [DELIVERY PAYER](./DELIVERY-PAYER-MODE-DESIGN.md) · [ARCHITECTURE CTO](./CKAC-ARCHITECTURE-CTO.md) |
 
@@ -24,8 +24,9 @@
 
 ```
 ┌──────────────────────────────────────────────────────────────────┐
-│  PWAs (apps/website/)                                            │
+│  PWAs (apps/website/) + store shells (P55)                       │
 │  portal:13000 · customer:13001 · kitchen:13002 · admin:13003     │
+│  kitchCU - customers / kitchen owner / admin (TWA + WKWebView)   │
 └────────────────────────────┬─────────────────────────────────────┘
                              │ HTTPS / JWT  (public clients → gateway only)
 ┌────────────────────────────▼─────────────────────────────────────┐
@@ -257,7 +258,7 @@ P19 branded storefront · P20 golden day · P21 WA/PG workspace · P22 dish show
 | **This file** | Architecture + flow snapshot (current state) |
 | [PLATFORM-PERSONA-DEEP-DIVE.md](./PLATFORM-PERSONA-DEEP-DIVE.md) | Lived voice + friction |
 | [PLATFORM-SOLUTION-BLUEPRINT.md](./PLATFORM-SOLUTION-BLUEPRINT.md) | Expectations → solution → gaps per journey |
-| [ADVANCEMENT-TRACKER.md](./ADVANCEMENT-TRACKER.md) | Ship board P19–P32.1 |
+| [ADVANCEMENT-TRACKER.md](./ADVANCEMENT-TRACKER.md) | Ship board P19–P55 |
 | [CKAC-ARCHITECTURE-CTO.md](./CKAC-ARCHITECTURE-CTO.md) | Layered arch + registry |
 | [CKAC-USERFLOWS.md](./CKAC-USERFLOWS.md) | Step APIs |
 
@@ -267,6 +268,7 @@ P19 branded storefront · P20 golden day · P21 WA/PG workspace · P22 dish show
 
 | Version | Date | Changes |
 |---------|------|---------|
+| **1.1** | 2026-09-17 | P55 store shells + sales onboard; baseline P19–P55 |
 | **1.0** | 2026-07-19 | Full platform architecture & flow report post P32.1 |
 
 *Update this file when a persona-blocking gap closes or a service boundary changes.*

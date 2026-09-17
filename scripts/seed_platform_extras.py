@@ -8,7 +8,7 @@ import os
 import subprocess
 from datetime import datetime, timedelta, timezone
 
-from demo_data import DEMO_ADMIN, DEMO_CUSTOMERS, DEMO_OTP, DEMO_REFERRAL, media_for_dish
+from demo_data import DEMO_ADMIN, DEMO_CUSTOMERS, DEMO_OTP, DEMO_REFERRAL, DEMO_SALES, media_for_dish
 from seed_common import (
     ApiError,
     login_admin,
@@ -131,6 +131,30 @@ def ensure_admin_session() -> str:
     token = login_admin(email, password)
     log(f"  Admin login OK ({email})")
     return token
+
+
+def ensure_demo_sales_rep(admin_token: str) -> None:
+    """Local QA field login — Super Admin still hires live sales on Employees."""
+    try:
+        emps = request("GET", "/api/v1/admin/employees", token=admin_token)
+        rows = emps if isinstance(emps, list) else []
+        if any(str(e.get("email", "")).lower() == DEMO_SALES["email"] for e in rows):
+            log(f"  Sales login ready ({DEMO_SALES['email']})")
+            return
+        request(
+            "POST",
+            "/api/v1/admin/employees",
+            token=admin_token,
+            body={
+                "email": DEMO_SALES["email"],
+                "name": DEMO_SALES["name"],
+                "password": DEMO_SALES["password"],
+                "role": DEMO_SALES["role"],
+            },
+        )
+        log(f"  Created sales employee {DEMO_SALES['email']} / {DEMO_SALES['password']}")
+    except ApiError as exc:
+        log(f"  ! sales employee: {exc}")
 
 
 def ensure_customer_sessions() -> list[dict]:
@@ -1133,6 +1157,7 @@ def seed_platform_extras(
     log("Platform extras (all user types + all modules)")
     log("-" * 50)
     admin_token = ensure_admin_session()
+    ensure_demo_sales_rep(admin_token)
     customers = ensure_customer_sessions()
     if dish_ids:
         ensure_customer_orders(customers, kitchen_id, dish_ids, owner_token)

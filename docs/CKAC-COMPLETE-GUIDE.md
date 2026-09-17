@@ -4,11 +4,11 @@
 
 | Field | Value |
 |-------|-------|
-| Version | **3.2.6** |
-| Status | Phase 1 **S1–S18** + post-S18 **P19–P47**; prod `*.kitchcu.com`; multi-city presence; i18n parity; Swagger/OpenAPI tester (padlock only on JWT routes; `POST /api/v1/auth/token`); owner JWT `type=owner`; login-hint gated; 6-month demo history seed; portals/QA pack [`PRODUCTION-PORTALS-CREDENTIALS-QA.md`](./PRODUCTION-PORTALS-CREDENTIALS-QA.md); tracker [`ADVANCEMENT-TRACKER.md`](./ADVANCEMENT-TRACKER.md); **E1/E2** design pack only |
+| Version | **3.2.7** |
+| Status | Phase 1 **S1–S18** + post-S18 **P19–P55**; store apps (**kitchCU - customers / kitchen owner / admin**); sales onboard + Train; in-dashboard tours; dish calories/Healthy Control; checkup diet filter; prod `*.kitchcu.com`; Swagger `POST /api/v1/auth/token`; 6-month demo history; portals/QA [`PRODUCTION-PORTALS-CREDENTIALS-QA.md`](./PRODUCTION-PORTALS-CREDENTIALS-QA.md); tester book [`TESTER-INSTRUCTION-PACK.md`](./TESTER-INSTRUCTION-PACK.md); tracker [`ADVANCEMENT-TRACKER.md`](./ADVANCEMENT-TRACKER.md); **E1/E2** design pack only |
 | Audience | CEO, CPO, CTO, Product, Engineering, DBA, QA, Investors, AI coding agents |
-| Last updated | 2026-09-12 |
-| Supersedes | `CKAC-COMPLETE-GUIDE.md` v3.2.5 (2026-09-07) |
+| Last updated | 2026-09-17 |
+| Supersedes | `CKAC-COMPLETE-GUIDE.md` v3.2.6 (2026-09-12) |
 | Operating charter | [`.cursor/rules/kitchcu-executive-operating-charter.mdc`](../.cursor/rules/kitchcu-executive-operating-charter.mdc) — always-on, non-negotiable |
 | Engineering constitution | [`KITCHCU-ENGINEERING-STANDARDS.md`](./KITCHCU-ENGINEERING-STANDARDS.md) |
 | Agent quick spec | [`AGENTS.md`](../AGENTS.md) |
@@ -66,6 +66,7 @@
 17.8 [Ratings After Delivery](#178-ratings-after-delivery)
 17.9 [Delivery Payer Modes & Maps Tracking](#179-delivery-payer-modes--maps-tracking)
 17.10 [Super Admin Control Plane](#1710-super-admin-control-plane)
+17.11 [Sales onboard, owner training & store apps](#1711-sales-onboard-owner-training--store-apps)
 
 **Part V — UI Catalog**
 18. [UI Catalog — Reference Surfaces (Login, Ops, Control)](#18-ui-catalog--reference-surfaces-login-ops-control)
@@ -150,7 +151,7 @@ KitchCu (repo/schema identifiers use the legacy short name **`ckac`** — CloudK
 |-------------|-----------|-----------------|
 | Owner / chef | WhatsApp chaos, aggregator tax, no quality OS | Unified order hub · flat subscription SaaS · ratings + recipe standards |
 | Customer | Fake dish photos, opaque delivery fees, one-kitchen-only carts | Live-capture media · transparent PostGIS-based fee quotes · multi-kitchen master order |
-| Platform | Needs a capital-efficient path to scale | PWA-first distribution (no app-store gatekeeping) · event-driven microservices · zero food commission |
+| Platform | Needs a capital-efficient path to scale | PWA-first product + three store shells (TWA / WKWebView) · event-driven microservices · zero food commission |
 
 ### CEO guiding principle
 
@@ -484,14 +485,27 @@ Each module is a **bounded product + engineering context**: one row per module w
 |--|--|
 | **Definition** | Installable React surfaces for every persona — including super-admin control. |
 | **Problem solved** | Distribution without app-store gatekeeping or review delays; deep-linkable from WhatsApp; platform ops in one Admin shell. |
-| **Logic / how it works** | One Vite monorepo (`apps/website/`) builds four independent bundles (`portal`, `customer`, `kitchen`, `admin`) sharing components, brand tokens (`shared/brand.ts`), and API helpers, but each with its own `main.tsx` entry, manifest, and service worker where offline matters (customer, kitchen). **`OwnerPageShell`** unifies the kitchen dashboard (incl. Growth → **Templates** for WA/email). **`AuthLoginHighlights`** lists subdomain-specific value props. Owner Home includes **`CommissionAdvantagePanel`**. Customer **Dashboard** covers savings, health tips, refunds, and addresses. Admin tabs: Overview · Kitchens · Owners · Customers · Orders · Refunds · Tickets · **Packages** · **Employees** · **Control**. Kitchen workspace: Profile / WhatsApp / Payments / Package / Marketing / Modules / Streaming. |
+| **Logic / how it works** | One Vite monorepo (`apps/website/`) builds four independent bundles (`portal`, `customer`, `kitchen`, `admin`) sharing components, brand tokens (`shared/brand.ts`), and API helpers, but each with its own `main.tsx` entry, manifest, and service worker where offline matters (customer, kitchen). **`OwnerPageShell`** unifies the kitchen dashboard (incl. Growth → **Templates** for WA/email). **`AuthLoginHighlights`** lists subdomain-specific value props. Owner Home includes **`CommissionAdvantagePanel`**. Customer **Dashboard** covers savings, health tips, refunds, and addresses. Admin tabs: Overview · Kitchens · Owners · Customers · Orders · Refunds · Tickets · **Packages** · **Employees** · **Sales** · **Control**. Kitchen workspace: Profile / **Train** / WhatsApp / Payments / Package / Marketing / Modules / Streaming. First-run **ProductTour** (`kitchcu_tour_{persona}_v1`) on customer, kitchen, and admin. |
 | **Data / events** | Client-only; identity RBAC + feature flags / journeys + billing packages/refunds power Admin. |
-| **Surfaces** | All four apps — see §18/§21. |
-| **Status** | ✅ Continuous polish; Packages · Employees · Templates · super-admin kitchen workspace ✅ (P25–P28). |
+| **Surfaces** | All four apps — see §18/§21. Store listings wrap the same PWAs (M18). |
+| **Status** | ✅ Continuous polish; Packages · Employees · Sales · Templates · super-admin kitchen workspace ✅ (P25–P28, P55). |
 
 ---
 
-### M18 — Kitchen Quality Loop (E1 + E2) — Design Only
+### M18 — Store apps + sales onboarding (P55)
+
+| | |
+|--|--|
+| **Definition** | Three store listings wrap the live PWAs; field sales onboard kitchens and train owners in the same Admin console. |
+| **Problem solved** | Diners / owners / staff expect an App Store / Play download; field reps need a scoped tool that cannot see platform secrets or other reps’ kitchens. |
+| **Logic / how it works** | **Not a native rewrite.** Android Trusted Web Activity + iOS WKWebView load `customer.kitchcu.com` / `kitchen.kitchcu.com` / `admin.kitchcu.com`. Display names: **kitchCU - customers** (`in.kitchcu.customer`), **kitchCU - kitchen owner** (`in.kitchcu.kitchen`), **kitchCU - admin** (`in.kitchcu.admin`). Employee role `sales` grants `sales:write` + `kitchens:read`; `tabs_for_permissions` returns Sales + Kitchens only. `POST /admin/sales/onboard` creates owner+kitchen with `onboarded_by_admin_id`. Kitchen **Train** is an 8-step playbook (`kitchen_training_progress`); events `kitchen.created` / `owner.created` / `kitchen.training.updated`. Kill-switch `sales_onboarding`. |
+| **Data / events** | Identity Alembic `030`; streams `ckac:identity:kitchen` / `ckac:identity:owner`. |
+| **Surfaces** | Admin **Sales** + kitchen **Train**; first-run tours; `apps/android/` · `apps/ios/`. Play steps: [`apps/android/README.md`](../apps/android/README.md). |
+| **Status** | ✅ P55. |
+
+---
+
+### M19 — Kitchen Quality Loop (E1 + E2) — Design Only
 
 | | |
 |--|--|
@@ -1077,6 +1091,12 @@ curl "http://localhost:18000/openapi.json?refresh=true"   # force refresh after 
 | Kitchen profile edit + owner ratings/inbox + admin RBAC/stream summary + live-capture-safe GCP seed | P41 | ✅ |
 | Admin login-hint gated (`development`/`test` or `ADMIN_LOGIN_REVEAL_PASSWORD=1`) | P45 | ✅ |
 | Swagger tester: `POST /api/v1/auth/token`, public `security: []`, owner JWT type-check, community/refunds 500s closed | P47 | ✅ |
+| Dish ingredient health (recipe-weighted plate) | P50 | ✅ |
+| Unique bill / GST numbers | P51 | ✅ |
+| Customer checkup diet filter | P52 | ✅ |
+| Dish calories + automatic Healthy tag | P53 | ✅ |
+| Calories / Healthy Super Admin Control | P54 | ✅ |
+| Store apps + sales onboard + in-dashboard tours | P55 | ✅ |
 | **Purchases ledger + chef-standard lock (E1/E2)** | **S19 proposed** | **📋 Design only — not started** |
 
 ---
@@ -1267,16 +1287,31 @@ See [`DELIVERY-PAYER-MODE-DESIGN.md`](./DELIVERY-PAYER-MODE-DESIGN.md) for the c
 |------|-----------------|-----|
 | Health | Overview | Stat tiles, charts, quick actions (tickets, refunds, suspended kitchens, trials) |
 | People | Customers, Owners, Kitchens | Suspend, activate, subscription overrides; customer **order + ticket history** + server search (P39) |
-| Staff | **Employees** | CRUD/deactivate platform admins; roles `superadmin` / `ops` / `support` / `finance`; permissions `resource:action` |
+| Staff | **Employees** · **Sales** | CRUD/deactivate platform admins; roles `superadmin` / `ops` / `support` / `finance` / **`sales`**; permissions `resource:action`. Sales sees Sales + Kitchens only (P55) |
 | Monetization | **Packages** · **Referrals** | Map features→packages→plans; dual referral rewards + lead queue (P37) |
 | Money | Refunds + settlements + billing admin | Gateway vs direct refunds, payments, settlements list, money-stats; GST kitchen exports (P38) |
-| Governance | **Control** | Feature flags, journeys, subscription overrides, API Keys (`value_masked` never full secret — P40) |
+| Governance | **Control** | Feature flags (incl. `sales_onboarding`, `dish_calories`, `dish_healthy_tag`), journeys, subscription overrides, API Keys (`value_masked` never full secret — P40); Dish calories & Healthy cap (P54) |
 | Support | Tickets | Escalated queues; **assignee / priority / resolution note**; deep-link to kitchen + refunds (P39) |
-| Kitchen workspace | Profile / Brand / WhatsApp / Payments / Package / Marketing / Modules / **Orders** / Streaming / Delivery / Tiffin / **GST** | Care strip (open tickets/refunds, last order); per-kitchen credentials + GST (P38–P39) |
+| Kitchen workspace | Profile / **Train** / Brand / WhatsApp / Payments / Package / Marketing / Modules / **Orders** / Streaming / Delivery / Tiffin / **GST** | Care strip (open tickets/refunds, last order); 8-step owner playbook (P55); per-kitchen credentials + GST (P38–P39) |
 
 Gateway note: admin **billing** paths (packages, refunds, payment-gateway, GST) are registered **before** the identity admin catch-all so they proxy correctly.
 
 **Security (P40 / P45 / P47):** Dish HTML is sanitized server- and client-side. API Keys stay masked after save. `GET /admin/auth/login-hint` returns plaintext `ADMIN_PASSWORD` only when `APP_ENV` is `development`/`test` **or** `ADMIN_LOGIN_REVEAL_PASSWORD=1` (GCP/startup still write `1`). Swagger publishes `security: []` on public ops and `POST /api/v1/auth/token` for Authorize. Owner JWT must be `type=owner`.
+
+## 17.11 Sales onboard, owner training & store apps
+
+**Context.** Field sales create kitchens without seeing platform secrets. Store listings are three shells over the same PWAs — not a sixth native product.
+
+| Step | Actor | Action | Result |
+|------|-------|--------|--------|
+| 1 | Sales | Sign in `sales@kitchcu.dev` on Admin (or **kitchCU - admin** app) | JWT `type=admin`, role `sales`; tabs Sales + Kitchens |
+| 2 | Sales | **Sales** form: owner name/phone + kitchen address/pin | `POST /admin/sales/onboard` → 201, kitchen code, `onboarded_by_admin_id` |
+| 3 | Identity | Persist owner + kitchen | Events `owner.created` (if new) and `kitchen.created` on `ckac:identity:*` |
+| 4 | Sales | Kitchen **Train** — 8 playbook steps | `GET/PATCH /admin/kitchens/{id}/training`; event `kitchen.training.updated` |
+| 5 | Owner | Kitchen PWA / **kitchCU - kitchen owner** OTP login | Same product as web; first-run tour |
+| 6 | Diner | **kitchCU - customers** or customer.kitchcu.com | Same discovery/checkout PWA; first-run tour |
+
+Sales `GET /admin/stats` → 403. Another sales JWT cannot PATCH training for a kitchen they did not onboard.
 
 ---
 
@@ -1465,6 +1500,7 @@ The `.kc-field` flex-column pattern (`display: flex; flex-direction: column; gap
 | Customer (repeat buyer) | `9123456780` (Rahul Menon) | OTP `123456` | Weighted into repeat/VIP demo segments |
 | Customer (guest) | `9988776655` (Ananya Guest) | OTP `123456` | Guest checkout path |
 | Platform admin (local) | `admin@kitchcu.dev` | `admin123456` | Platform-scope only — no owner JWT accepted |
+| Field sales (local) | `sales@kitchcu.dev` | `sales123456` | Role `sales` — Sales + Kitchens; extras seed |
 | Platform admin (prod) | `admin@kitchcu.com` | `ADMIN_PASSWORD` from GCE metadata | Same JWT type=admin; password re-synced from env on login |
 
 All OTPs are the fixed dev value `123456` (`ckac_common` dev OTP provider) — production OTP delivery via WhatsApp/SMS is a named target, not yet wired. Seed data is generated by `scripts/seed-dev-data.py` and `scripts/seed-bulk-data.py`, kept in sync with `apps/website/src/shared/demo.ts` (the single frontend source of truth for these values — never hardcode a demo phone number elsewhere).
@@ -1478,9 +1514,9 @@ All OTPs are the fixed dev value `123456` (`ckac_common` dev OTP provider) — p
 | Surface / Service | Port | Kind |
 |--------------------|------|------|
 | Portal (`kitchcu.in`) | 13000 | PWA |
-| Customer (`customer.kitchcu.in`) | 13001 | PWA |
-| Kitchen (`kitchen.kitchcu.in`) | 13002 | PWA |
-| Admin (`admin.kitchcu.in`) | 13003 | PWA |
+| Customer (`customer.kitchcu.in`) | 13001 | PWA · also **kitchCU - customers** store shell |
+| Kitchen (`kitchen.kitchcu.in`) | 13002 | PWA · also **kitchCU - kitchen owner** store shell |
+| Admin (`admin.kitchcu.in`) | 13003 | PWA · also **kitchCU - admin** store shell |
 | Gateway | 18000 | API edge |
 | Identity | 18001 | Service |
 | Catalog | 18002 | Service |
@@ -1584,7 +1620,7 @@ Full acceptance criteria for every feature: [`CKAC-COMPLETE-PLANNING-BENCHMARK.m
 
 | Doc | Role |
 |-----|------|
-| **This guide (v3.2.6)** | CEO/CPO/CTO master encyclopedia |
+| **This guide (v3.2.7)** | CEO/CPO/CTO master encyclopedia |
 | [`PLATFORM-SOLUTION-BLUEPRINT.md`](./PLATFORM-SOLUTION-BLUEPRINT.md) | Expectations → CEO/CPO solution → CTO impl → arch/DB/UX per journey & admin controls |
 | [`PLATFORM-PERSONA-DEEP-DIVE.md`](./PLATFORM-PERSONA-DEEP-DIVE.md) | Persona lived experience + scorecards |
 | [`PLATFORM-STRATEGIC-ANALYSIS.md`](./PLATFORM-STRATEGIC-ANALYSIS.md) | Competitive honesty + Waves A–D |
@@ -1612,6 +1648,7 @@ Full acceptance criteria for every feature: [`CKAC-COMPLETE-PLANNING-BENCHMARK.m
 
 | Version | Date | Changes |
 |---------|------|---------|
+| **3.2.7** | 2026-09-17 | **P55** three store apps (**kitchCU - customers / kitchen owner / admin**); sales role + Sales/Train; in-dashboard tours; **P50–P54** health/calories/diet Control; tester/QA/portals packs + PDFs refresh. |
 | **3.2.6** | 2026-09-12 | **P47** Swagger/OpenAPI: padlock only on JWT routes; `POST /api/v1/auth/token`; owner JWT `type=owner`; login-hint gated (`ADMIN_LOGIN_REVEAL_PASSWORD`); 6-month bulk history seed; community orphan-recipe + customer-refunds 500s closed; docs/PDFs refresh. |
 | **3.2.5** | 2026-09-07 | P41: owner/admin kitchen profile PATCH (code immutable); owner dish list includes drafts; Ratings page; order filters/draft remap; settlements + payment-mix; admin RBAC UI + stream summary; Super Admin links; live-capture-safe bulk seed; weekly cron path `/opt/ckac`; docs/PDFs refresh. |
 | **3.2.4** | 2026-08-02 | Portals/QA pack, multi-city presence, i18n parity, weekly QA cohort seed. |
@@ -1627,4 +1664,4 @@ Full acceptance criteria for every feature: [`CKAC-COMPLETE-PLANNING-BENCHMARK.m
 
 ---
 
-*KitchCu Complete Executive & Engineering Guide v3.2.6 — Confidential — September 2026*
+*KitchCu Complete Executive & Engineering Guide v3.2.7 — Confidential — September 2026*

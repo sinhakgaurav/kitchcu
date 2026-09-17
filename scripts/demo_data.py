@@ -53,6 +53,13 @@ DEMO_ADMIN = {
     "password": "admin123456",
 }
 
+DEMO_SALES = {
+    "email": "sales@kitchcu.dev",
+    "password": "sales123456",
+    "name": "Field Sales",
+    "role": "sales",
+}
+
 # Customer WhatsApp OTP demos (dev OTP always DEMO_OTP)
 # Extra saved pins for the primary diner so discovery can switch cities.
 DEMO_CUSTOMER_ADDRESSES = [

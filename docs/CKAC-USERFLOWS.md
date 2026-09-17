@@ -4,10 +4,10 @@
 
 | Field | Value |
 |-------|-------|
-| Version | **1.5** |
-| Date | 2026-09-12 |
+| Version | **1.6** |
+| Date | 2026-09-17 |
 | Audience | CPO, Product, Engineering, QA, Investors |
-| Status | Traces to code shipped through **S1–S18 + P19–P47** (Swagger `POST /api/v1/auth/token`, owner JWT `type=owner`, gated login-hint, 6-month demo history) |
+| Status | Traces to code shipped through **S1–S18 + P19–P55** (store apps, sales onboard, in-dashboard tours, Swagger `POST /api/v1/auth/token`, owner JWT `type=owner`, gated login-hint, 6-month demo history) |
 | Companion PDF | [`docs/CKAC-USERFLOWS.pdf`](./CKAC-USERFLOWS.pdf) (generate with `scripts/generate_userflows_pdf.py`) |
 
 ---
@@ -39,9 +39,10 @@ This document is the **single source of truth for "how does a user actually get 
 | Persona | Surface (PWA) | Host : Port (dev) | Auth JWT `type` | Primary jobs |
 |---------|----------------|--------------------|------------------|---------------|
 | Guest / prospect | Portal | `kitchcu.in` : **13000** | none | Brand story, pricing, live `/openapi` explorer, demo |
-| Owner / chef | Kitchen | `kitchen.kitchcu.in` : **13002** | `owner` | Menu, orders, GST, CRM, growth, ratings, stream |
-| Customer / diner | Customer | `customer.kitchcu.in` : **13001** | `customer` | Discover, order, pay, track, rate |
-| Platform admin | Admin | `admin.kitchcu.in` : **13003** | `admin` | Oversight, kitchen moderation, support tickets |
+| Owner / chef | Kitchen PWA · **kitchCU - kitchen owner** | `kitchen.kitchcu.in` : **13002** | `owner` | Menu, orders, GST, CRM, growth, ratings, stream |
+| Customer / diner | Customer PWA · **kitchCU - customers** | `customer.kitchcu.in` : **13001** | `customer` | Discover, order, pay, track, rate |
+| Platform admin | Admin PWA · **kitchCU - admin** | `admin.kitchcu.in` : **13003** | `admin` | Oversight, kitchen moderation, support tickets |
+| Field sales | Admin **Sales** (same **kitchCU - admin** app) | `admin.kitchcu.in` : **13003** | `admin` (role `sales`) | Onboard kitchens, 8-step Train; no platform secrets |
 
 | Edge | Port | Role |
 |------|------|------|
@@ -73,6 +74,7 @@ This document is the **single source of truth for "how does a user actually get 
 | Customer | `9123456780` | OTP `123456` | Rahul Menon — repeat/VIP segment |
 | Customer | `9988776655` | OTP `123456` | Ananya Guest — guest checkout |
 | Admin (local) | `admin@kitchcu.dev` | `admin123456` | Platform scope only |
+| Sales (local) | `sales@kitchcu.dev` | `sales123456` | Role `sales` — Sales + Kitchens; extras seed |
 | Admin (prod `admin.kitchcu.com`) | `admin@kitchcu.com` | GCE `admin-password` → `ADMIN_PASSWORD` | Synced to DB on login — do not use `.dev` email in prod |
 
 ---
@@ -481,8 +483,8 @@ flowchart LR
 
 ## 9. Flow 6 — Admin Login -> Overview -> Customers / Refunds / Control / Tickets
 
-**Goal:** Full super-admin control plane — platform health, customer/refund oversight, packages & employees RBAC, referrals, feature flags & journeys, per-kitchen workspace (incl. Orders/GST) — never owner-scope menu/order mutation.
-**Persona:** Platform admin (roles: superadmin / ops / support / finance)
+**Goal:** Full super-admin control plane — platform health, customer/refund oversight, packages & employees RBAC, **sales onboard + Train**, referrals, feature flags & journeys, per-kitchen workspace (incl. Orders/GST) — never owner-scope menu/order mutation.
+**Persona:** Platform admin (roles: superadmin / ops / support / finance / **sales**)
 **Entry URL:** `admin.kitchcu.in` (13003) · prod `admin.kitchcu.com`
 **Screenshots:** [`07-admin-login.png`](./assets/ui/07-admin-login.png) · [`05-admin-overview.png`](./assets/ui/05-admin-overview.png) · [`08-admin-control.png`](./assets/ui/08-admin-control.png)
 
@@ -499,10 +501,11 @@ flowchart LR
 4. **Refunds** — escalate gateway vs direct refunds; **settlements** table; deep-link search from tickets.
 5. **Packages** — list platform features; create/edit packages; assign from kitchen workspace.
 6. **Referrals** — reward ₹ config; lead queue by direction/status.
-7. **Employees** — create/update/deactivate platform staff; assign roles.
-8. **Control** — journeys; feature flags; subscription overrides; **API Keys** (masked only after save).
-9. **Tickets** — triage: status, priority, assignee, resolution note; **Open kitchen** / **Open refunds**.
-10. **Kitchens** — Care column (open tickets/refunds) + last order; workspace tabs including **Orders**, **GST**, Brand, WhatsApp, Payments, Package, Marketing, Modules, Streaming, Delivery, Tiffin.
+7. **Employees** — create/update/deactivate platform staff; assign roles including **sales**.
+8. **Sales** — field onboard: owner name/phone + kitchen pin → kitchen code; open kitchen **Train** (8 steps).
+9. **Control** — journeys; feature flags (`sales_onboarding`, `dish_calories`, `dish_healthy_tag`); subscription overrides; **API Keys** (masked only after save).
+10. **Tickets** — triage: status, priority, assignee, resolution note; **Open kitchen** / **Open refunds**.
+11. **Kitchens** — Care column (open tickets/refunds) + last order; workspace tabs including **Train**, **Orders**, **GST**, Brand, WhatsApp, Payments, Package, Marketing, Modules, Streaming, Delivery, Tiffin.
 
 ### API calls
 
@@ -517,14 +520,16 @@ flowchart LR
 | 4 | `GET /api/v1/admin/refunds` / `settlements` / `money-stats` | admin | Billing admin |
 | 5 | `GET /api/v1/admin/features` · packages · plan-packages | admin | Package mapper |
 | 6 | `GET/PATCH /api/v1/admin/referrals/settings` · `GET .../leads` | admin | Dual referral program |
-| 7 | `GET/POST /api/v1/admin/employees` · deactivate · roles | admin | `employees:read/write` |
-| 8 | Feature flags · journeys · API keys | admin | Secrets never returned in full |
+| 7 | `GET/POST /api/v1/admin/employees` · deactivate · roles | admin | `employees:read/write`; role includes `sales` |
+| 7b | `POST /api/v1/admin/sales/onboard` | admin `sales:write` | Owner+kitchen; `onboarded_by_admin_id` |
+| 7c | `GET/PATCH /api/v1/admin/kitchens/{id}/training` | admin; sales scoped | 8-step playbook; other sales 403 |
+| 8 | Feature flags · journeys · API keys | admin | Secrets never returned in full; `sales_onboarding` kill-switch |
 | 9 | `GET/PATCH /api/v1/admin/tickets/{id}` · reply | admin | Assignee / priority / resolution |
 | 10 | `GET /api/v1/admin/orders?kitchen_id=` · kitchen GST export paths | admin | Ops + finance |
 
 ### Domain events published
 
-`support.ticket.created` (customer/owner-initiated, `ckac:notify:support`) -> `support.ticket.updated` -> `support.ticket.replied` (admin actions on `ckac:notify:support`).
+`support.ticket.created` (customer/owner-initiated, `ckac:notify:support`) -> `support.ticket.updated` -> `support.ticket.replied` (admin actions on `ckac:notify:support`). Sales onboard: `owner.created` / `kitchen.created` / `kitchen.training.updated` on `ckac:identity:owner` and `ckac:identity:kitchen`.
 
 ### Success screen / failure paths
 
@@ -558,6 +563,58 @@ sequenceDiagram
     NOT--)NOT: support.ticket.replied
     NOT-->>A: TicketResponse
 ```
+
+---
+
+## 9b. Flow 6b — Sales onboard kitchen + Train + store shells (P55)
+
+**Goal:** Field sales create a kitchen, walk the owner through an 8-step playbook, then the owner and diner use named store apps that wrap the same PWAs.
+**Persona:** Field sales (`role=sales`) then Owner then Customer
+**Entry URL:** `admin.kitchcu.in` (13003) · store **kitchCU - admin** / **kitchCU - kitchen owner** / **kitchCU - customers**
+
+### Preconditions
+
+- Feature flag `sales_onboarding` on. Demo: `sales@kitchcu.dev` / `sales123456` (extras seed).
+- Sales JWT must not call `/admin/stats` (403). Digital Asset Links / AASA deployed for TWA / Universal Links.
+
+### Step-by-step UI actions
+
+1. Sales signs in on Admin (or **kitchCU - admin**). First-run tour Skip / Next / Show tips.
+2. Nav is **Sales** + **Kitchens** only.
+3. **Sales** → fill owner name, unique phone, kitchen name, address, city, map pin → **Onboard**.
+4. Kitchen code (`CK…`) appears. Open kitchen **Train**. Tick steps as the owner completes them on **kitchCU - kitchen owner** (or kitchen PWA).
+5. Owner OTP-logs in (demo `123456`). First-run kitchen tour. Completes profile / live hero / recipe as coached.
+6. Diner installs **kitchCU - customers** (or opens customer PWA) — same discovery/checkout as web.
+
+### API calls
+
+| Step | Method + Path | Auth | Notes |
+|------|----------------|------|-------|
+| 1 | `POST /api/v1/admin/auth/login` | none | Email `sales@…`; JWT `type=admin` |
+| 2 | `GET /api/v1/admin/me` | sales | `allowed_tabs` = sales, kitchens |
+| 3 | `POST /api/v1/admin/sales/onboard` | `sales:write` | 201 kitchen card + training 0/8 |
+| 4 | `GET/PATCH /api/v1/admin/kitchens/{id}/training` | sales scoped | Keys: profile, live_hero, recipe, radius, kyc, test_order, whatsapp, handoff |
+| 5 | Owner OTP `/auth/otp/*` | owner | Same as Flow 1 — not a second product |
+
+### Domain events
+
+`owner.created` (if new phone) · `kitchen.created` · `kitchen.training.updated` on `ckac:identity:owner` / `ckac:identity:kitchen`.
+
+### Failure paths
+
+- Duplicate owner phone reuses the owner and still creates a kitchen for this sales book.
+- Other sales PATCH → 403. Superadmin can read any kitchen Train.
+- Flag off → onboard 403/disabled.
+
+### Store ids (three downloads)
+
+| Listing | applicationId / bundle | Host |
+|---------|------------------------|------|
+| kitchCU - customers | `in.kitchcu.customer` | customer.kitchcu.com |
+| kitchCU - kitchen owner | `in.kitchcu.kitchen` | kitchen.kitchcu.com |
+| kitchCU - admin | `in.kitchcu.admin` | admin.kitchcu.com |
+
+Play Console steps: [`apps/android/README.md`](../apps/android/README.md). iOS: [`apps/ios/README.md`](../apps/ios/README.md).
 
 ---
 
@@ -879,11 +936,11 @@ Gateway-owned (not forwarded): `GET /`, `GET /health/live`, `GET /health/ready`,
 | Field | Value |
 |-------|-------|
 | Document | `CKAC-USERFLOWS.md` |
-| Version | 1.5 |
+| Version | 1.6 |
 | Date | September 2026 |
 | Author | KitchCu engineering (AI-assisted, human-reviewed) |
-| Traceability | Every route/event cited here was read directly from `services/*/app/routes.py`, `schemas.py`, and `main.py` in this repository as of July 2026 — not inferred from memory |
+| Traceability | Every route/event cited here was read directly from `services/*/app/routes.py`, `schemas.py`, and `main.py` in this repository as of September 2026 — not inferred from memory |
 | Companion | `docs/CKAC-USERFLOWS.pdf` — generate/refresh via `python scripts/generate_userflows_pdf.py` |
-| QA checklist | `docs/QA-INSTRUCTION-PACK.md` (+ PDF) — smoke, lists/UI, F19b; `python scripts/generate_qa_instruction_pdf.py` |
+| QA checklist | `docs/QA-INSTRUCTION-PACK.md` (+ PDF) — smoke, lists/UI, F19b, P55; `python scripts/generate_qa_instruction_pdf.py` |
 | Change policy | Update this file whenever a route, event name, or status transition changes; regenerate the PDF in the same change |
-| Supersedes | v1.4; aligned with Complete Guide v3.2.6 (P47 Swagger tester, owner JWT type-check, gated login-hint, 6-month seed) |
+| Supersedes | v1.5; aligned with Complete Guide v3.2.7 (P55 store apps + sales onboard) |

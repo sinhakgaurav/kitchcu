@@ -1,9 +1,12 @@
-"""P50 — ingredient health scores from F19 recipes."""
+"""P50 — ingredient health scores from F19 recipes. P53 — recipe kcal + healthy tag."""
 
 from __future__ import annotations
 
+import json
+import os
 import uuid
 
+import psycopg2
 import pytest
 from httpx import AsyncClient
 
@@ -149,3 +152,305 @@ async def test_ingredient_list_includes_health_profile(client: AsyncClient, kitc
     listing = await client.get(f"/api/v1/kitchens/{kitchen_id}/ingredients", headers=headers)
     row = listing.json()["ingredients"][0]
     assert row["health_disadvantages"]
+
+
+@pytest.mark.asyncio
+async def test_recipe_sums_ingredient_kcal_and_sets_healthy_tag(client: AsyncClient, kitchen_ctx):
+    _, kitchen_id, token = kitchen_ctx
+    headers = {"Authorization": f"Bearer {token}"}
+    spinach = await client.post(
+        f"/api/v1/kitchens/{kitchen_id}/ingredients",
+        json={
+            "name": "Spinach",
+            "unit": "g",
+            "current_stock": 500,
+            "low_stock_threshold": 50,
+            "kcal_per_100": 23,
+        },
+        headers=headers,
+    )
+    dal = await client.post(
+        f"/api/v1/kitchens/{kitchen_id}/ingredients",
+        json={
+            "name": "Lentils",
+            "unit": "g",
+            "current_stock": 500,
+            "low_stock_threshold": 50,
+            "kcal_per_100": 116,
+        },
+        headers=headers,
+    )
+    assert spinach.status_code == 201, spinach.text
+    assert spinach.json()["kcal_per_100"] == 23
+    dish_payload = await build_dish_payload(client, kitchen_id, token)
+    dish = await client.post(
+        f"/api/v1/kitchens/{kitchen_id}/dishes",
+        json={
+            **dish_payload,
+            "name": "Palak Dal Bowl",
+            "calories_description": "Light lunch bowl — dal + greens.",
+        },
+        headers=headers,
+    )
+    assert dish.status_code == 201, dish.text
+    assert dish.json()["calories_description"] == "Light lunch bowl — dal + greens."
+    dish_id = dish.json()["id"]
+
+    from app.main import redis_client
+
+    if redis_client:
+        await redis_client.delete("ckac:catalog:ingredient")
+
+    recipe = await client.put(
+        f"/api/v1/kitchens/{kitchen_id}/dishes/{dish_id}/recipe",
+        json={
+            "lines": [
+                {"ingredient_id": spinach.json()["id"], "quantity": 150, "unit": "g"},
+                {"ingredient_id": dal.json()["id"], "quantity": 80, "unit": "g"},
+            ]
+        },
+        headers=headers,
+    )
+    assert recipe.status_code == 200, recipe.text
+    body = recipe.json()
+    assert body["calories_kcal"] == 127  # 34.5 + 92.8
+    assert body["calories_incomplete"] is False
+    assert body["healthy_tag"] is True
+    assert body["lines"][0]["line_kcal"] is not None
+
+    messages = await redis_client.xread({"ckac:catalog:ingredient": "0-0"}, count=40)
+    events = [json.loads(entry[1]["data"]) for _, entries in messages for entry in entries]
+    recipe_events = [e for e in events if e["event_type"] == "ingredient.recipe.updated"]
+    assert recipe_events
+    assert recipe_events[-1]["payload"]["calories_kcal"] == 127
+    assert recipe_events[-1]["payload"]["healthy_tag"] is True
+
+    menu = await client.get(f"/api/v1/kitchens/{kitchen_id}/menu")
+    row = next(d for d in menu.json()["dishes"] if d["id"] == dish_id)
+    assert row["calories_description"].startswith("Light lunch")
+    assert row["health"]["calories_kcal"] == 127
+    assert row["health"]["healthy_tag"] is True
+    assert row["health"]["calories_incomplete"] is False
+    spinach_line = next(i for i in row["health"]["ingredients"] if i["name"] == "Spinach")
+    assert spinach_line["kcal"] == 34.5
+
+
+@pytest.mark.asyncio
+async def test_incomplete_kcal_map_is_not_healthy(client: AsyncClient, kitchen_ctx):
+    _, kitchen_id, token = kitchen_ctx
+    headers = {"Authorization": f"Bearer {token}"}
+    spinach = await client.post(
+        f"/api/v1/kitchens/{kitchen_id}/ingredients",
+        json={"name": "Spinach", "unit": "g", "current_stock": 200, "kcal_per_100": 23},
+        headers=headers,
+    )
+    mystery = await client.post(
+        f"/api/v1/kitchens/{kitchen_id}/ingredients",
+        json={"name": "House Mix", "unit": "g", "current_stock": 200},
+        headers=headers,
+    )
+    dish_payload = await build_dish_payload(client, kitchen_id, token)
+    dish = await client.post(
+        f"/api/v1/kitchens/{kitchen_id}/dishes",
+        json={**dish_payload, "name": "Partial Kcal Plate"},
+        headers=headers,
+    )
+    dish_id = dish.json()["id"]
+    await client.put(
+        f"/api/v1/kitchens/{kitchen_id}/dishes/{dish_id}/recipe",
+        json={
+            "lines": [
+                {"ingredient_id": spinach.json()["id"], "quantity": 100, "unit": "g"},
+                {"ingredient_id": mystery.json()["id"], "quantity": 40, "unit": "g"},
+            ]
+        },
+        headers=headers,
+    )
+    menu = await client.get(f"/api/v1/kitchens/{kitchen_id}/menu")
+    row = next(d for d in menu.json()["dishes"] if d["id"] == dish_id)
+    assert row["health"]["calories_kcal"] == 23
+    assert row["health"]["calories_incomplete"] is True
+    assert row["health"]["healthy_tag"] is False
+    mystery_line = next(i for i in row["health"]["ingredients"] if i["name"] == "House Mix")
+    assert mystery_line["kcal"] is None
+
+
+@pytest.mark.asyncio
+async def test_patch_ingredient_kcal_publishes_event(client: AsyncClient, kitchen_ctx):
+    from app.main import redis_client
+
+    if redis_client:
+        await redis_client.delete("ckac:catalog:ingredient")
+
+    _, kitchen_id, token = kitchen_ctx
+    headers = {"Authorization": f"Bearer {token}"}
+    created = await client.post(
+        f"/api/v1/kitchens/{kitchen_id}/ingredients",
+        json={"name": "Onion", "unit": "g", "current_stock": 500},
+        headers=headers,
+    )
+    assert created.status_code == 201
+    ingredient_id = created.json()["id"]
+    patched = await client.patch(
+        f"/api/v1/kitchens/{kitchen_id}/ingredients/{ingredient_id}",
+        json={"kcal_per_100": 40},
+        headers=headers,
+    )
+    assert patched.status_code == 200
+    assert patched.json()["kcal_per_100"] == 40
+
+    messages = await redis_client.xread({"ckac:catalog:ingredient": "0-0"}, count=20)
+    events = [json.loads(entry[1]["data"]) for _, entries in messages for entry in entries]
+    updated = [e for e in events if e["event_type"] == "ingredient.updated"]
+    assert updated
+    assert updated[-1]["payload"]["kcal_per_100"] == 40
+
+
+def _set_identity_flag(key: str, enabled: bool) -> None:
+    conn = psycopg2.connect(os.environ["DATABASE_SYNC_URL"])
+    conn.autocommit = True
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            INSERT INTO ckac_identity.feature_flags (key, enabled, scope, description)
+            VALUES (%s, %s, 'kitchen', %s)
+            ON CONFLICT (key) DO UPDATE SET enabled = EXCLUDED.enabled
+            """,
+            (key, enabled, key),
+        )
+    conn.close()
+
+
+def _set_healthy_max_kcal(value: int) -> None:
+    conn = psycopg2.connect(os.environ["DATABASE_SYNC_URL"])
+    conn.autocommit = True
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            INSERT INTO ckac_identity.healthy_food_settings
+              (id, healthy_max_kcal, healthy_min_score)
+            VALUES (1, %s, 65)
+            ON CONFLICT (id) DO UPDATE SET healthy_max_kcal = EXCLUDED.healthy_max_kcal
+            """,
+            (value,),
+        )
+    conn.close()
+
+
+def _restore_calorie_controls() -> None:
+    _set_identity_flag("dish_calories", True)
+    _set_identity_flag("dish_healthy_tag", True)
+    _set_healthy_max_kcal(500)
+
+
+async def _palak_dal_dish(client: AsyncClient, kitchen_id, token: str) -> str:
+    headers = {"Authorization": f"Bearer {token}"}
+    spinach = await client.post(
+        f"/api/v1/kitchens/{kitchen_id}/ingredients",
+        json={
+            "name": "Spinach",
+            "unit": "g",
+            "current_stock": 500,
+            "kcal_per_100": 23,
+        },
+        headers=headers,
+    )
+    dal = await client.post(
+        f"/api/v1/kitchens/{kitchen_id}/ingredients",
+        json={
+            "name": "Lentils",
+            "unit": "g",
+            "current_stock": 500,
+            "kcal_per_100": 116,
+        },
+        headers=headers,
+    )
+    assert spinach.status_code == 201, spinach.text
+    assert dal.status_code == 201, dal.text
+    dish_payload = await build_dish_payload(client, kitchen_id, token)
+    dish = await client.post(
+        f"/api/v1/kitchens/{kitchen_id}/dishes",
+        json={
+            **dish_payload,
+            "name": f"Palak Dal {uuid.uuid4().hex[:6]}",
+            "calories_description": "Light lunch bowl — dal + greens.",
+        },
+        headers=headers,
+    )
+    assert dish.status_code == 201, dish.text
+    dish_id = dish.json()["id"]
+    recipe = await client.put(
+        f"/api/v1/kitchens/{kitchen_id}/dishes/{dish_id}/recipe",
+        json={
+            "lines": [
+                {"ingredient_id": spinach.json()["id"], "quantity": 150, "unit": "g"},
+                {"ingredient_id": dal.json()["id"], "quantity": 80, "unit": "g"},
+            ]
+        },
+        headers=headers,
+    )
+    assert recipe.status_code == 200, recipe.text
+    return dish_id
+
+
+@pytest.mark.asyncio
+async def test_admin_kcal_cap_controls_public_healthy_tag(client: AsyncClient, kitchen_ctx):
+    _, kitchen_id, token = kitchen_ctx
+    try:
+        dish_id = await _palak_dal_dish(client, kitchen_id, token)
+        menu = await client.get(f"/api/v1/kitchens/{kitchen_id}/menu")
+        row = next(d for d in menu.json()["dishes"] if d["id"] == dish_id)
+        assert row["health"]["calories_kcal"] == 127
+        assert row["health"]["healthy_tag"] is True
+
+        _set_healthy_max_kcal(100)
+        menu = await client.get(f"/api/v1/kitchens/{kitchen_id}/menu")
+        row = next(d for d in menu.json()["dishes"] if d["id"] == dish_id)
+        assert row["health"]["calories_kcal"] == 127
+        assert row["health"]["healthy_tag"] is False
+
+        recipe = await client.get(
+            f"/api/v1/kitchens/{kitchen_id}/dishes/{dish_id}/recipe",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert recipe.status_code == 200, recipe.text
+        assert recipe.json()["healthy_max_kcal"] == 100
+        assert recipe.json()["healthy_tag"] is False
+    finally:
+        _restore_calorie_controls()
+
+
+@pytest.mark.asyncio
+async def test_dish_calories_flag_strips_public_kcal(client: AsyncClient, kitchen_ctx):
+    _, kitchen_id, token = kitchen_ctx
+    try:
+        dish_id = await _palak_dal_dish(client, kitchen_id, token)
+        _set_identity_flag("dish_calories", False)
+        menu = await client.get(f"/api/v1/kitchens/{kitchen_id}/menu")
+        row = next(d for d in menu.json()["dishes"] if d["id"] == dish_id)
+        assert row["health"]["calories_kcal"] is None
+        assert row["health"]["healthy_tag"] is False
+        spinach_line = next(i for i in row["health"]["ingredients"] if i["name"] == "Spinach")
+        assert spinach_line["kcal"] is None
+
+        recipe = await client.get(
+            f"/api/v1/kitchens/{kitchen_id}/dishes/{dish_id}/recipe",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert recipe.json()["calories_kcal"] == 127
+    finally:
+        _restore_calorie_controls()
+
+
+@pytest.mark.asyncio
+async def test_healthy_tag_flag_hides_badge_keeps_kcal(client: AsyncClient, kitchen_ctx):
+    _, kitchen_id, token = kitchen_ctx
+    try:
+        dish_id = await _palak_dal_dish(client, kitchen_id, token)
+        _set_identity_flag("dish_healthy_tag", False)
+        menu = await client.get(f"/api/v1/kitchens/{kitchen_id}/menu")
+        row = next(d for d in menu.json()["dishes"] if d["id"] == dish_id)
+        assert row["health"]["calories_kcal"] == 127
+        assert row["health"]["healthy_tag"] is False
+    finally:
+        _restore_calorie_controls()

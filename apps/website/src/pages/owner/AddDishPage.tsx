@@ -25,6 +25,7 @@ export function AddDishPage() {
   const [heroUrl, setHeroUrl] = useState("");
   const [descriptionHtml, setDescriptionHtml] = useState("");
   const [ingredientsHtml, setIngredientsHtml] = useState("");
+  const [caloriesNote, setCaloriesNote] = useState("");
   const [isFeatured, setIsFeatured] = useState(false);
   const [isChefsSpecial, setIsChefsSpecial] = useState(false);
   const [isUniqueRecipe, setIsUniqueRecipe] = useState(false);
@@ -97,6 +98,7 @@ export function AddDishPage() {
         category_id: String(fd.get("category_id")),
         description: descriptionHtml.trim() || undefined,
         ingredients_description: ingredientsHtml.trim() || undefined,
+        calories_description: caloriesNote.trim() || undefined,
         is_featured: isFeatured,
         is_chefs_special: isChefsSpecial,
         is_unique_recipe: isUniqueRecipe,
@@ -351,6 +353,20 @@ export function AddDishPage() {
             minHeight={100}
           />
         </div>
+
+        <label>
+          Calories note (optional)
+          <input
+            value={caloriesNote}
+            maxLength={500}
+            onChange={(e) => setCaloriesNote(e.target.value)}
+            placeholder="Light lunch bowl — dal + greens. The kcal number comes from the recipe map."
+          />
+        </label>
+        <p className="auth-card__hint">
+          Plate calories are calculated from pantry kcal × recipe amounts on Ingredients. This note
+          is shown next to that total — you cannot type the number or pin a Healthy tag.
+        </p>
 
         <LiveCapturePhotoField
           kitchenId={kitchen.id}

@@ -15,16 +15,16 @@ async def test_menu_uses_redis_cache(client: AsyncClient, kitchen_ctx):
     )
 
     from app.main import redis_client
-    from ckac_common.cache import menu_cache_key
 
     assert redis_client is not None
-    cached_before = await redis_client.get(menu_cache_key(kitchen_id))
-    assert cached_before is None
+    match = f"menu:{kitchen_id}*"
+    cached_before = [k async for k in redis_client.scan_iter(match=match)]
+    assert cached_before == []
 
     first = await client.get(f"/api/v1/kitchens/{kitchen_id}/menu")
     assert first.status_code == 200
-    cached_after = await redis_client.get(menu_cache_key(kitchen_id))
-    assert cached_after is not None
+    cached_after = [k async for k in redis_client.scan_iter(match=match)]
+    assert cached_after
 
     second = await client.get(f"/api/v1/kitchens/{kitchen_id}/menu")
     assert second.status_code == 200
@@ -46,9 +46,9 @@ async def test_dish_update_invalidates_menu_cache(client: AsyncClient, kitchen_c
     await client.get(f"/api/v1/kitchens/{kitchen_id}/menu")
 
     from app.main import redis_client
-    from ckac_common.cache import menu_cache_key
 
-    assert await redis_client.get(menu_cache_key(kitchen_id)) is not None
+    match = f"menu:{kitchen_id}*"
+    assert [k async for k in redis_client.scan_iter(match=match)]
 
     patch = await client.patch(
         f"/api/v1/kitchens/{kitchen_id}/dishes/{dish_id}",
@@ -56,7 +56,7 @@ async def test_dish_update_invalidates_menu_cache(client: AsyncClient, kitchen_c
         headers=headers,
     )
     assert patch.status_code == 200
-    assert await redis_client.get(menu_cache_key(kitchen_id)) is None
+    assert [k async for k in redis_client.scan_iter(match=match)] == []
 
     menu = await client.get(f"/api/v1/kitchens/{kitchen_id}/menu")
     assert menu.status_code == 200

@@ -282,13 +282,13 @@ def owner_dishes(token: str, kitchen_id: str) -> list[dict]:
 
 
 def ensure_ingredients(token: str, kitchen_id: str, pantry: list[dict]) -> dict[str, str]:
-    """Create or refresh pantry SKUs (brand/pack/photo); return name -> ingredient id."""
+    """Create or refresh pantry SKUs (brand/pack/photo/kcal); return name -> ingredient id."""
     existing = request("GET", f"/api/v1/kitchens/{kitchen_id}/ingredients", token=token)
     by_name = {i["name"]: i for i in existing.get("ingredients", [])}
     ids = {name: row["id"] for name, row in by_name.items()}
     created = 0
     updated = 0
-    patch_keys = ("brand", "pack_size", "pack_label", "photo_url", "low_stock_threshold")
+    patch_keys = ("brand", "pack_size", "pack_label", "photo_url", "low_stock_threshold", "kcal_per_100")
     for item in pantry:
         row = by_name.get(item["name"])
         if not row:
@@ -308,7 +308,7 @@ def ensure_ingredients(token: str, kitchen_id: str, pantry: list[dict]) -> dict[
             if incoming is None:
                 continue
             current = row.get(key)
-            if key in ("pack_size", "low_stock_threshold"):
+            if key in ("pack_size", "low_stock_threshold", "kcal_per_100"):
                 if current is not None and abs(float(current) - float(incoming)) < 0.001:
                     continue
             elif current == incoming:

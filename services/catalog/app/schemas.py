@@ -20,6 +20,16 @@ def _sanitize_optional_html(value: str | None) -> str | None:
     return cleaned or None
 
 
+def _plain_calories_note(value: str | None) -> str | None:
+    if value is None:
+        return None
+    import re
+
+    cleaned = re.sub(r"<[^>]+>", " ", value)
+    cleaned = " ".join(cleaned.split()).strip()
+    return cleaned[:500] or None
+
+
 def projected_ready_min(
     prep: int,
     delivery: int | None,
@@ -146,6 +156,11 @@ class DishCreateRequest(BaseModel):
         ),
     )
     ingredients_description: str | None = Field(default=None, description="Free-text ingredient list for customers.")
+    calories_description: str | None = Field(
+        default=None,
+        max_length=500,
+        description="Owner note shown next to the recipe calorie total (not the kcal number itself).",
+    )
     quality_measures: str | None = Field(
         default=None, description="Free-text hygiene/quality notes shown to build customer trust."
     )
@@ -165,6 +180,11 @@ class DishCreateRequest(BaseModel):
     @classmethod
     def _sanitize_html_fields(cls, value: str | None) -> str | None:
         return _sanitize_optional_html(value)
+
+    @field_validator("calories_description")
+    @classmethod
+    def _plain_calories(cls, value: str | None) -> str | None:
+        return _plain_calories_note(value)
 
     @model_validator(mode="after")
     def _timing_and_media(self):
@@ -215,6 +235,9 @@ class DishResponse(BaseModel):
     )
     description: str | None = Field(default=None, description="Customer-facing dish description.")
     ingredients_description: str | None = Field(default=None, description="Free-text ingredient list.")
+    calories_description: str | None = Field(
+        default=None, description="Owner note shown next to the recipe calorie total."
+    )
     quality_measures: str | None = Field(default=None, description="Free-text hygiene/quality notes.")
     is_active: bool = Field(..., description="Whether the dish is visible on the live menu.")
     is_featured: bool = Field(default=False, description="Featured merchandising flag.")
@@ -423,6 +446,7 @@ async def create_dish(
         delivery_time_min=data.delivery_time_min,
         max_time_min=data.max_time_min or default_max_time_min(data.prep_time_min, data.delivery_time_min),
         ingredients_description=data.ingredients_description,
+        calories_description=data.calories_description,
         quality_measures=data.quality_measures,
         is_active=data.is_active,
         is_featured=data.is_featured,
@@ -477,6 +501,11 @@ class DishUpdateRequest(BaseModel):
     max_time_min: int | None = Field(default=None, gt=0, description="New max readiness minutes for customers.")
     description: str | None = Field(default=None, description="New customer-facing description.")
     ingredients_description: str | None = Field(default=None, description="New ingredient list for customers.")
+    calories_description: str | None = Field(
+        default=None,
+        max_length=500,
+        description="Owner note shown next to the recipe calorie total.",
+    )
     quality_measures: str | None = Field(default=None, description="New hygiene/quality notes.")
     media: DishMediaInput | None = Field(
         default=None,
@@ -487,6 +516,11 @@ class DishUpdateRequest(BaseModel):
     @classmethod
     def _sanitize_html_fields(cls, value: str | None) -> str | None:
         return _sanitize_optional_html(value)
+
+    @field_validator("calories_description")
+    @classmethod
+    def _plain_calories(cls, value: str | None) -> str | None:
+        return _plain_calories_note(value)
 
     @model_validator(mode="after")
     def _timing_pair(self):
@@ -624,6 +658,7 @@ async def dish_with_media(session: AsyncSession, dish: Dish) -> DishResponse:
         ),
         description=dish.description,
         ingredients_description=dish.ingredients_description,
+        calories_description=dish.calories_description,
         quality_measures=dish.quality_measures,
         is_active=dish.is_active,
         is_featured=bool(dish.is_featured),

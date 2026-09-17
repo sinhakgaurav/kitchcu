@@ -7,7 +7,7 @@
 | Version | **2.0** |
 | Date | 2026-07-19 |
 | Audience | CTO, Engineering Managers, Tech Leads, CPO (product ↔ code traceability) |
-| Status | **S1–S18 + P19–P32.1 shipped** (gateway + 13 domain services + 4 PWAs) |
+| Status | **S1–S18 + P19–P55 shipped** (gateway + 13 domain services + 4 PWAs + 3 store shells) |
 | Companion | [Architecture Flows](./PLATFORM-ARCHITECTURE-FLOWS.md) · [Complete Guide](./CKAC-COMPLETE-GUIDE.md) · [Implementation Guide](./CKAC-IMPLEMENTATION-GUIDE.md) · [Advancement Tracker](./ADVANCEMENT-TRACKER.md) · [AGENTS.md](../AGENTS.md) |
 
 ---
@@ -18,6 +18,7 @@
 ┌─────────────────────────────────────────────────────────────────────────┐
 │  EXPERIENCE LAYER                                                       │
 │  Portal · Customer PWA · Kitchen PWA · Admin PWA · WhatsApp webhook     │
+│  Store shells: kitchCU - customers / kitchen owner / admin (P55)        │
 │  apps/website/  (:13000–13003)                                          │
 └───────────────────────────────────┬─────────────────────────────────────┘
                                     │ HTTPS / JWT

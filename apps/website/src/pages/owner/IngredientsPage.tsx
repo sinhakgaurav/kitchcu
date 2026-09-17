@@ -13,6 +13,8 @@ import {
   fetchIngredients,
   fetchOwnerDishes,
   saveDishRecipe,
+  updateDish,
+  updateIngredient,
   type DishRecipe,
   type GoldenRecipePin,
   type GrowthSuggestion,
@@ -21,6 +23,27 @@ import {
   type RecipeLine,
 } from "../../lib/api";
 import { useKitchen } from "../../lib/kitchen";
+
+const PCS = new Set(["pcs", "pc", "piece", "pieces"]);
+
+function estimateLineKcal(
+  ingredient: Ingredient | undefined,
+  quantity: number,
+  recipeUnit: string,
+): number | null {
+  if (!ingredient || ingredient.kcal_per_100 == null) return null;
+  const kcal = Number(ingredient.kcal_per_100);
+  const qty = Math.max(Number(quantity) || 0, 0);
+  const pantry = (ingredient.unit || "g").trim().toLowerCase();
+  const recipe = (recipeUnit || pantry).trim().toLowerCase();
+  if (PCS.has(pantry)) {
+    if (PCS.has(recipe)) return Math.round(kcal * qty * 10) / 10;
+    const grams = recipe === "g" || recipe === "ml" ? qty : qty * 50;
+    return Math.round(kcal * (grams / 50) * 10) / 10;
+  }
+  const grams = PCS.has(recipe) ? qty * 50 : qty;
+  return Math.round(kcal * (grams / 100) * 10) / 10;
+}
 
 const EMPTY_LINE = (): RecipeLine => ({
   ingredient_id: "",
@@ -64,6 +87,8 @@ export function IngredientsPage() {
   const [newBrand, setNewBrand] = useState("");
   const [newPackSize, setNewPackSize] = useState("");
   const [newPackLabel, setNewPackLabel] = useState("");
+  const [newKcal, setNewKcal] = useState("");
+  const [caloriesNote, setCaloriesNote] = useState("");
 
   const load = async () => {
     if (!kitchen) return;
@@ -106,15 +131,17 @@ export function IngredientsPage() {
           lines: r.lines.length ? r.lines : [],
           prep_steps: r.prep_steps?.length ? r.prep_steps : [],
         });
+        setCaloriesNote(r.calories_description ?? "");
       })
-      .catch(() =>
+      .catch(() => {
+        setCaloriesNote("");
         setRecipe({
           dish_id: selectedDishId,
           dish_name: dishes.find((d) => d.id === selectedDishId)?.name ?? "",
           lines: [],
           prep_steps: [],
-        }),
-      );
+        });
+      });
     Promise.all([
       fetchGoldenRecipes(kitchen.id, selectedDishId).catch(() => ({ pins: [] as GoldenRecipePin[] })),
       fetchGrowthSuggestions(kitchen.id).catch(() => ({ suggestions: [] as GrowthSuggestion[] })),
@@ -148,6 +175,7 @@ export function IngredientsPage() {
         pack_size: packSize > 0 ? packSize : undefined,
         pack_label: newPackLabel.trim() || undefined,
         photo_url: newPhoto.trim() || undefined,
+        kcal_per_100: newKcal.trim() ? Number(newKcal) : undefined,
       });
       setIngredients((prev) => [...prev, row].sort((a, b) => a.name.localeCompare(b.name)));
       setNewName("");
@@ -155,6 +183,7 @@ export function IngredientsPage() {
       setNewBrand("");
       setNewPackSize("");
       setNewPackLabel("");
+      setNewKcal("");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not add ingredient");
     } finally {
@@ -177,6 +206,43 @@ export function IngredientsPage() {
       setBusy(false);
     }
   };
+
+  const onSaveKcal = async (ingredientId: string, kcalPer100: number | null) => {
+    if (!kitchen) return;
+    setBusy(true);
+    setError("");
+    try {
+      const updated = await updateIngredient(kitchen.id, ingredientId, { kcal_per_100: kcalPer100 });
+      setIngredients((prev) => prev.map((i) => (i.id === updated.id ? updated : i)));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not save kcal");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const recipeCalories = useMemo(() => {
+    if (!recipe) return { kcal: null as number | null, incomplete: false, total: 0, mapped: 0 };
+    const lines = recipe.lines.filter((l) => l.ingredient_id);
+    let mapped = 0;
+    let acc = 0;
+    for (const line of lines) {
+      const kcal = estimateLineKcal(
+        ingredients.find((i) => i.id === line.ingredient_id),
+        line.quantity,
+        line.unit,
+      );
+      if (kcal == null) continue;
+      mapped += 1;
+      acc += kcal;
+    }
+    return {
+      kcal: mapped ? Math.round(acc) : null,
+      incomplete: mapped > 0 && mapped < lines.length,
+      mapped,
+      total: lines.length,
+    };
+  }, [recipe, ingredients]);
 
   const onSaveRecipe = async () => {
     if (!kitchen || !selectedDishId || !recipe) return;
@@ -202,8 +268,15 @@ export function IngredientsPage() {
           duration_min: s.duration_min ?? undefined,
         })),
       });
-      setRecipe(saved);
-      setSavedMsg("Recipe and prep steps saved.");
+      const note = caloriesNote.trim() || null;
+      let next = saved;
+      if ((saved.calories_description ?? null) !== note) {
+        const dish = await updateDish(kitchen.id, selectedDishId, { calories_description: note });
+        next = { ...saved, calories_description: dish.calories_description };
+      }
+      setRecipe(next);
+      setCaloriesNote(next.calories_description ?? "");
+      setSavedMsg("Recipe, calories, and prep steps saved.");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not save recipe");
     } finally {
@@ -281,7 +354,7 @@ export function IngredientsPage() {
     <OwnerPageShell
       eyebrow="Operations"
       title="Ingredient mapper"
-      description="Pantry SKUs (brand, pack weight, photo) map onto dish recipes. Stock deducts when an order is marked ready. Health scores are a platform library match on the SKU name — typical home-kitchen use, not medical advice."
+      description="Pantry SKUs (brand, pack weight, photo, kcal) map onto dish recipes. Plate calories sum automatically from quantity × pantry kcal. The Healthy tag is automatic — you cannot pin it. Health scores are a platform library match on the SKU name — typical home-kitchen use, not medical advice."
     >
       {error && <p className="form-error">{error}</p>}
       {savedMsg && <div className="auth-card__success">{savedMsg}</div>}
@@ -289,7 +362,7 @@ export function IngredientsPage() {
         <div className="app-loading">Loading pantry…</div>
       ) : (
         <>
-          <OwnerPanel title="Pantry stock" description="Brand, pack size, photo, and on-hand quantity in the same unit">
+          <OwnerPanel title="Pantry stock" description="Brand, pack size, photo, kcal per 100 g/ml (or per piece), and on-hand quantity in the same unit">
             <form className="owner-form owner-form--grid" onSubmit={onAddIngredient}>
               <label>
                 Name
@@ -324,6 +397,18 @@ export function IngredientsPage() {
                   value={newPackLabel}
                   onChange={(e) => setNewPackLabel(e.target.value)}
                   placeholder="100 g carton"
+                />
+              </label>
+              <label>
+                kcal / 100 {newUnit === "pcs" ? "pc" : newUnit}
+                <input
+                  type="number"
+                  min={0}
+                  max={2000}
+                  step={0.1}
+                  value={newKcal}
+                  onChange={(e) => setNewKcal(e.target.value)}
+                  placeholder={newUnit === "pcs" ? "78" : "116"}
                 />
               </label>
               <label>
@@ -375,6 +460,7 @@ export function IngredientsPage() {
                     <th>Name</th>
                     <th>Brand</th>
                     <th>Pack</th>
+                    <th>kcal / 100</th>
                     <th>Stock</th>
                     <th>Health</th>
                     <th>Low at</th>
@@ -400,6 +486,27 @@ export function IngredientsPage() {
                       <td>{ing.brand || "—"}</td>
                       <td>
                         {ing.pack_label || (ing.pack_size ? `${ing.pack_size} ${ing.unit}` : "—")}
+                      </td>
+                      <td>
+                        <input
+                          type="number"
+                          min={0}
+                          max={2000}
+                          step={0.1}
+                          className="owner-kcal-input"
+                          aria-label={`${ing.name} kcal per 100 ${ing.unit === "pcs" ? "piece" : ing.unit}`}
+                          defaultValue={ing.kcal_per_100 ?? ""}
+                          key={`${ing.id}-${ing.kcal_per_100 ?? "none"}`}
+                          disabled={busy}
+                          onBlur={(e) => {
+                            const raw = e.target.value.trim();
+                            const next = raw === "" ? null : Number(raw);
+                            const current = ing.kcal_per_100 ?? null;
+                            if (next === current || (next == null && current == null)) return;
+                            if (next != null && Number.isNaN(next)) return;
+                            void onSaveKcal(ing.id, next);
+                          }}
+                        />
                       </td>
                       <td>
                         {ing.current_stock} {ing.unit}
@@ -451,7 +558,10 @@ export function IngredientsPage() {
             </div>
           </OwnerPanel>
 
-          <OwnerPanel title="Dish recipe & prep" description="Every dish — live or draft — maps to pantry SKUs. Stock deducts from those packs.">
+          <OwnerPanel
+            title="Dish recipe & prep"
+            description={`Every dish maps to pantry SKUs. Calories are quantity × pantry kcal — the Healthy tag is awarded automatically when the map is complete, the plate is ≤ ${recipe?.healthy_max_kcal ?? 500} kcal, and the health score is ≥ ${recipe?.healthy_min_score ?? 65}. Super Admin Control sets that kcal cap.`}
+          >
             <div className="owner-form">
             <label>
               Dish
@@ -485,6 +595,29 @@ export function IngredientsPage() {
 
             {recipe && (
               <>
+                <div className="owner-recipe-kcal">
+                  {recipeCalories.kcal != null ? (
+                    <p>
+                      <strong>{recipeCalories.kcal} kcal</strong> per plate
+                      {recipeCalories.incomplete ? " · incomplete pantry kcal" : ""}
+                      {recipe.healthy_tag ? " · Healthy" : ""}
+                    </p>
+                  ) : (
+                    <p>Add pantry kcal on every SKU to calculate this plate.</p>
+                  )}
+                  <p className="auth-card__hint">
+                    Kitchen estimate from recipe amounts — not a lab nutrition label. You cannot pin Healthy.
+                  </p>
+                </div>
+                <label>
+                  Calories note (optional)
+                  <input
+                    value={caloriesNote}
+                    maxLength={500}
+                    onChange={(e) => setCaloriesNote(e.target.value)}
+                    placeholder="Light lunch bowl — dal + greens."
+                  />
+                </label>
                 <h3 className="owner-subhead">Ingredients (per portion)</h3>
                 <div className="owner-recipe-cards">
                   {recipe.lines.map((line, idx) => (
@@ -563,10 +696,15 @@ export function IngredientsPage() {
                       </div>
                       {(() => {
                         const picked = ingredients.find((i) => i.id === line.ingredient_id);
-                        if (!picked || picked.health_score == null) return null;
+                        const lineKcal = estimateLineKcal(picked, line.quantity, line.unit);
+                        if (!picked || (picked.health_score == null && lineKcal == null)) return null;
                         return (
                           <p className="owner-recipe-card__health">
-                            Health {picked.health_score}
+                            {picked.health_score != null ? `Health ${picked.health_score}` : "Unmapped health"}
+                            {lineKcal != null ? ` · ${lineKcal} kcal` : " · kcal missing"}
+                            {picked.kcal_per_100 != null
+                              ? ` (${picked.kcal_per_100} / 100 ${picked.unit === "pcs" ? "pc" : picked.unit})`
+                              : ""}
                             {picked.health_benefits ? ` · ${picked.health_benefits}` : ""}
                             {picked.health_disadvantages
                               ? ` · Watch: ${picked.health_disadvantages}`

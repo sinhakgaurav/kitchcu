@@ -503,6 +503,14 @@ class KitchenNearbyResponse(KitchenPublicResponse):
         description="Kitchen-level average of dish overall ratings (0.6 home-taste + 0.4 quality). Null when unrated.",
     )
     rating_count: int = Field(default=0, description="Total verified dish ratings across the kitchen.")
+    compatible_dish_count: int | None = Field(
+        default=None,
+        description="Active dishes that pass the diner's checkup filter. Null when the filter is off.",
+    )
+    better_for_report: bool = Field(
+        default=False,
+        description="True when this kitchen has the most compatible dishes among the returned set.",
+    )
 
 
 class KitchenNearbyListResponse(BaseModel):
@@ -520,6 +528,10 @@ class KitchenNearbyListResponse(BaseModel):
     customer_latitude: float = Field(..., description="Echo of the query latitude used for distance calc.", examples=[18.5204])
     customer_longitude: float = Field(..., description="Echo of the query longitude used for distance calc.", examples=[73.8567])
     sort: str = Field(..., description="Sort order applied.", examples=["asc", "desc"])
+    diet_filter_applied: bool = Field(
+        default=False,
+        description="True when the authenticated diner asked to see only checkup-compatible kitchens.",
+    )
 
 
 class OTPDispatchResponse(BaseModel):
@@ -643,7 +655,11 @@ async def register_owner(session: AsyncSession, data: OwnerRegisterRequest) -> O
 
 
 async def create_kitchen(
-    session: AsyncSession, owner_id: uuid.UUID, data: KitchenCreateRequest
+    session: AsyncSession,
+    owner_id: uuid.UUID,
+    data: KitchenCreateRequest,
+    *,
+    onboarded_by_admin_id: uuid.UUID | None = None,
 ) -> Kitchen:
     code = await generate_kitchen_code(session, data.city)
     kitchen = Kitchen(
@@ -663,6 +679,7 @@ async def create_kitchen(
         min_order_for_free_delivery=data.min_order_for_free_delivery,
         tracking_notify_interval_min=data.tracking_notify_interval_min,
         status="active",
+        onboarded_by_admin_id=onboarded_by_admin_id,
     )
     session.add(kitchen)
     await session.flush()
@@ -952,7 +969,7 @@ async def list_kitchens_nearby(
         diet_filter += kitchen_search_sql("ckac_identity.kitchens")
         params["q"] = term
     if diet in ("veg", "non_veg", "vegan"):
-        diet_filter = """
+        diet_filter += """
               AND EXISTS (
                     SELECT 1 FROM ckac_catalog.dishes d
                     INNER JOIN ckac_catalog.categories c ON c.id = d.category_id

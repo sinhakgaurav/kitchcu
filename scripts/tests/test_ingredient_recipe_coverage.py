@@ -35,6 +35,9 @@ def test_pantry_skus_carry_brand_pack_photo_and_stock() -> None:
         assert item["unit"] in item["pack_label"] or item["unit"] == "pcs"
         packs = item["current_stock"] / pack_size
         assert packs >= 1, f"{name} stock must cover at least one pack"
+        kcal = item.get("kcal_per_100")
+        assert kcal is not None, name
+        assert 0 <= float(kcal) <= 2000, name
 
 
 def test_every_bulk_and_demo_dish_has_a_recipe_on_pantry_stock() -> None:

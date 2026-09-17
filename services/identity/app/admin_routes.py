@@ -15,7 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.admin_order_ops import admin_kitchen_parse_stats, export_admin_kitchen_orders_csv, kitchen_exists
 from app.brand_media import upload_brand_media
-from app.owner_kyc import mask_aadhaar, mask_pan, owner_kyc_complete
+from app.healthy_food_settings import HealthyFoodSettingsUpdate
 from app.models import (
     Customer,
     CustomerAddress,
@@ -25,7 +25,9 @@ from app.models import (
     PlatformAdmin,
     PlatformApiKey,
 )
+from app.owner_kyc import mask_aadhaar, mask_pan, owner_kyc_complete
 from app.routes import get_publisher
+from app.sales import SalesOnboardRequest, TrainingStepUpdate
 from app.schemas import (
     KitchenBrandedPageSettings,
     KitchenBrandedPageUpdate,
@@ -75,6 +77,21 @@ async def _payment_gateway_kitchen_ids(
     ).bindparams(bindparam("ids", expanding=True))
     rows = (await session.execute(stmt, {"ids": list(kitchen_ids)})).scalars().all()
     return {uuid.UUID(str(r)) for r in rows}
+
+
+def _customer_diet_admin(customer) -> dict:
+    from app.diet_report import profile_from_dict
+
+    profile = profile_from_dict(getattr(customer, "diet_profile", None))
+    return {
+        "has_checkup_report": bool(
+            getattr(customer, "checkup_report_url", None) or getattr(customer, "diet_profile", None)
+        ),
+        "diet_filter_enabled": bool(getattr(customer, "diet_filter_enabled", False)),
+        "diet_conditions": list(profile.conditions) if profile else [],
+        "diet_summary": profile.summary if profile else None,
+        "diet_avoid_categories": list(profile.avoid_categories) if profile else [],
+    }
 
 
 def _mask_account(account: str | None) -> str | None:
@@ -185,6 +202,9 @@ class AdminCustomerRow(BaseModel):
     has_payout: bool
     has_avatar: bool = False
     has_live_photo: bool = False
+    has_checkup_report: bool = False
+    diet_filter_enabled: bool = False
+    diet_conditions: list[str] = Field(default_factory=list)
     address_count: int
     created_at: datetime
 
@@ -201,6 +221,11 @@ class AdminCustomerDetail(BaseModel):
     avatar_url: str | None = None
     live_photo_url: str | None = None
     live_photo_captured_at: datetime | None = None
+    has_checkup_report: bool = False
+    diet_filter_enabled: bool = False
+    diet_conditions: list[str] = Field(default_factory=list)
+    diet_summary: str | None = None
+    diet_avoid_categories: list[str] = Field(default_factory=list)
     upi_vpa: str | None
     upi_qr_url: str | None
     bank_account_number_masked: str | None
@@ -702,7 +727,7 @@ async def admin_me(
         name=admin.name,
         role=admin.role,
         permissions=sorted(grants),
-        allowed_tabs=tabs_for_permissions(grants),
+        allowed_tabs=tabs_for_permissions(grants, role=admin.role),
     )
 
 
@@ -753,7 +778,13 @@ async def admin_stats(
     session: Annotated[AsyncSession, Depends(get_db)],
 ) -> PlatformStats:
     from app.rbac import assert_admin_permission
+    from app.sales import is_sales_role
 
+    if is_sales_role(admin):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Sales cannot view platform-wide stats",
+        )
     await assert_admin_permission(session, role=admin.role, permission="kitchens:read")
     _ = admin
     owners = (await session.execute(select(func.count()).select_from(Owner))).scalar_one()
@@ -855,15 +886,14 @@ async def admin_kitchens(
     session: Annotated[AsyncSession, Depends(get_db)],
 ) -> list[AdminKitchenRow]:
     from app.rbac import assert_admin_permission
+    from app.sales import apply_sales_kitchen_filter
 
     await assert_admin_permission(session, role=admin.role, permission="kitchens:read")
-    _ = admin
-    result = await session.execute(
-        select(Kitchen, Owner)
-        .join(Owner, Owner.id == Kitchen.owner_id)
-        .order_by(Kitchen.created_at.desc())
-        .limit(300)
+    query = apply_sales_kitchen_filter(
+        select(Kitchen, Owner).join(Owner, Owner.id == Kitchen.owner_id),
+        admin,
     )
+    result = await session.execute(query.order_by(Kitchen.created_at.desc()).limit(300))
     pairs = list(result.all())
     kids = [k.id for k, _ in pairs]
     gateway_ids = await _payment_gateway_kitchen_ids(session, kids)
@@ -901,9 +931,9 @@ async def admin_kitchen_detail(
     session: Annotated[AsyncSession, Depends(get_db)],
 ) -> AdminKitchenDetail:
     from app.rbac import assert_admin_permission
+    from app.sales import assert_kitchen_visible
 
     await assert_admin_permission(session, role=admin.role, permission="kitchens:read")
-    _ = admin
     result = await session.execute(
         select(Kitchen, Owner)
         .join(Owner, Owner.id == Kitchen.owner_id)
@@ -913,6 +943,7 @@ async def admin_kitchen_detail(
     if not row:
         raise HTTPException(status_code=404, detail="Kitchen not found")
     kitchen, owner = row
+    await assert_kitchen_visible(session, admin, kitchen)
     gateway_ids = await _payment_gateway_kitchen_ids(session, [kitchen.id])
     health = await _kitchen_health_map(session, [kitchen.id])
     h = health.get(kitchen.id, {})
@@ -927,6 +958,85 @@ async def admin_kitchen_detail(
         latitude=lat,
         longitude=lng,
     )
+
+
+@router.post(
+    "/sales/onboard",
+    status_code=status.HTTP_201_CREATED,
+    summary="Sales: create owner + kitchen in the field",
+    description=(
+        "Field sales onboard: reuse owner by phone or register, then create a kitchen "
+        "attributed to this admin. Requires `sales:write` and flag `sales_onboarding`."
+    ),
+    responses=auth_errors(),
+    tags=["Admin"],
+)
+async def admin_sales_onboard(
+    body: SalesOnboardRequest,
+    admin: Annotated[PlatformAdmin, Depends(get_current_admin)],
+    session: Annotated[AsyncSession, Depends(get_db)],
+    publisher: Annotated[EventPublisher, Depends(get_publisher)],
+):
+    from app.admin_audit import record_admin_audit
+    from app.sales import onboard_kitchen
+
+    result = await onboard_kitchen(session, admin, body, publisher)
+    await record_admin_audit(
+        session,
+        actor=admin,
+        action="sales.kitchen.onboarded",
+        resource_type="kitchen",
+        resource_id=str(result.kitchen.id),
+        kitchen_id=result.kitchen.id,
+        summary=f"{result.kitchen.code} onboarded by sales",
+        after={
+            "code": result.kitchen.code,
+            "owner_id": str(result.kitchen.owner_id),
+            "owner_created": result.owner_created,
+        },
+    )
+    return result
+
+
+@router.get(
+    "/kitchens/{kitchen_id}/training",
+    summary="Owner training playbook for a kitchen",
+    responses=auth_errors(include_404=True),
+    tags=["Admin"],
+)
+async def admin_kitchen_training_get(
+    kitchen_id: uuid.UUID,
+    admin: Annotated[PlatformAdmin, Depends(get_current_admin)],
+    session: Annotated[AsyncSession, Depends(get_db)],
+):
+    from app.sales import assert_kitchen_visible, training_response
+
+    kitchen = await session.get(Kitchen, kitchen_id)
+    if kitchen is None:
+        raise HTTPException(status_code=404, detail="Kitchen not found")
+    await assert_kitchen_visible(session, admin, kitchen)
+    return await training_response(session, kitchen_id)
+
+
+@router.patch(
+    "/kitchens/{kitchen_id}/training",
+    summary="Tick or untick a training playbook step",
+    responses=auth_errors(include_404=True),
+    tags=["Admin"],
+)
+async def admin_kitchen_training_patch(
+    kitchen_id: uuid.UUID,
+    body: TrainingStepUpdate,
+    admin: Annotated[PlatformAdmin, Depends(get_current_admin)],
+    session: Annotated[AsyncSession, Depends(get_db)],
+    publisher: Annotated[EventPublisher, Depends(get_publisher)],
+):
+    from app.sales import set_training_step
+
+    kitchen = await session.get(Kitchen, kitchen_id)
+    if kitchen is None:
+        raise HTTPException(status_code=404, detail="Kitchen not found")
+    return await set_training_step(session, admin, kitchen, body, publisher)
 
 
 @router.patch(
@@ -948,11 +1058,10 @@ async def admin_kitchen_profile(
     publisher: Annotated[EventPublisher, Depends(get_publisher)],
 ) -> AdminKitchenDetail:
     from app.admin_audit import record_admin_audit
-    from app.rbac import assert_admin_permission
+    from app.sales import assert_kitchen_trainable
     from ckac_common.auth import stream_key
     from ckac_common.event_bus import EventPublisher as EventBus
 
-    await assert_admin_permission(session, role=admin.role, permission="kitchens:write")
     result = await session.execute(
         select(Kitchen, Owner)
         .join(Owner, Owner.id == Kitchen.owner_id)
@@ -962,6 +1071,7 @@ async def admin_kitchen_profile(
     if not row:
         raise HTTPException(status_code=404, detail="Kitchen not found")
     kitchen, owner = row
+    await assert_kitchen_trainable(session, admin, kitchen)
     kitchen = await update_kitchen_profile(session, kitchen, body)
     event = EventBus.build(
         event_type="kitchen.updated",
@@ -1482,6 +1592,7 @@ async def admin_customers(
                 select(func.count()).select_from(CustomerAddress).where(CustomerAddress.customer_id == c.id)
             )
         ).scalar_one()
+        diet = _customer_diet_admin(c)
         rows.append(
             AdminCustomerRow(
                 id=c.id,
@@ -1493,6 +1604,9 @@ async def admin_customers(
                 has_payout=bool(c.upi_vpa or c.bank_account_number),
                 has_avatar=bool(c.avatar_url),
                 has_live_photo=bool(c.live_photo_url),
+                has_checkup_report=diet["has_checkup_report"],
+                diet_filter_enabled=diet["diet_filter_enabled"],
+                diet_conditions=diet["diet_conditions"],
                 address_count=addr_count,
                 created_at=c.created_at,
             )
@@ -1520,6 +1634,7 @@ async def admin_customer_detail(
             )
         ).scalars().all()
     )
+    diet = _customer_diet_admin(customer)
     return AdminCustomerDetail(
         id=customer.id,
         name=customer.name,
@@ -1532,6 +1647,11 @@ async def admin_customer_detail(
         avatar_url=customer.avatar_url,
         live_photo_url=customer.live_photo_url,
         live_photo_captured_at=customer.live_photo_captured_at,
+        has_checkup_report=diet["has_checkup_report"],
+        diet_filter_enabled=diet["diet_filter_enabled"],
+        diet_conditions=diet["diet_conditions"],
+        diet_summary=diet["diet_summary"],
+        diet_avoid_categories=diet["diet_avoid_categories"],
         upi_vpa=customer.upi_vpa,
         upi_qr_url=customer.upi_qr_url,
         bank_account_number_masked=_mask_account(customer.bank_account_number),
@@ -1594,6 +1714,7 @@ async def admin_customer_status(
             select(func.count()).select_from(CustomerAddress).where(CustomerAddress.customer_id == customer.id)
         )
     ).scalar_one()
+    diet = _customer_diet_admin(customer)
     return AdminCustomerRow(
         id=customer.id,
         name=customer.name,
@@ -1604,6 +1725,9 @@ async def admin_customer_status(
         has_payout=bool(customer.upi_vpa or customer.bank_account_number),
         has_avatar=bool(customer.avatar_url),
         has_live_photo=bool(customer.live_photo_url),
+        has_checkup_report=diet["has_checkup_report"],
+        diet_filter_enabled=diet["diet_filter_enabled"],
+        diet_conditions=diet["diet_conditions"],
         address_count=addr_count,
         created_at=customer.created_at,
     )
@@ -1745,6 +1869,61 @@ async def admin_feature_flag_update(
     )
     await session.flush()
     return FeatureFlagRow.model_validate(flag)
+
+
+@router.get(
+    "/healthy-food",
+    summary="Get dish calories / Healthy Control settings",
+    tags=["Admin Control"],
+    responses=auth_errors(),
+)
+async def admin_healthy_food_get(
+    admin: Annotated[PlatformAdmin, Depends(get_current_admin)],
+    session: Annotated[AsyncSession, Depends(get_db)],
+):
+    from app.healthy_food_settings import get_settings_response
+    from app.rbac import assert_admin_permission
+
+    await assert_admin_permission(session, role=admin.role, permission="flags:read")
+    return await get_settings_response(session)
+
+
+@router.patch(
+    "/healthy-food",
+    summary="Update dish calories / Healthy Control settings",
+    description=(
+        "Enable or disable public dish calories and the automatic Healthy badge, and set the "
+        "kcal cap used to award Healthy. Changes apply on the next catalog menu/health read "
+        "(no redeploy). Kitchen pantry kcal is still stored when public flags are off."
+    ),
+    tags=["Admin Control"],
+    responses=auth_errors(),
+)
+async def admin_healthy_food_patch(
+    body: HealthyFoodSettingsUpdate,
+    admin: Annotated[PlatformAdmin, Depends(get_current_admin)],
+    session: Annotated[AsyncSession, Depends(get_db)],
+):
+    from app.admin_audit import record_admin_audit
+    from app.healthy_food_settings import get_settings_response, update_settings
+    from app.rbac import assert_admin_permission
+
+    await assert_admin_permission(session, role=admin.role, permission="flags:write")
+    before = (await get_settings_response(session)).model_dump(mode="json")
+    after_model = await update_settings(session, body, admin_id=admin.id)
+    after = after_model.model_dump(mode="json")
+    await record_admin_audit(
+        session,
+        actor=admin,
+        action="healthy_food.updated",
+        resource_type="healthy_food_settings",
+        resource_id="1",
+        summary="Updated dish calories / Healthy Control settings",
+        before=before,
+        after=after,
+    )
+    await session.commit()
+    return after
 
 
 class KitchenModuleFlagRow(BaseModel):

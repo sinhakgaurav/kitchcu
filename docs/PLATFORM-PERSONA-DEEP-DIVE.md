@@ -11,9 +11,9 @@
 
 | Field | Value |
 |-------|-------|
-| Version | **1.1** |
-| Date | 2026-07-19 |
-| Baseline | S1–S18 + P19–P32.1 |
+| Version | **1.2** |
+| Date | 2026-09-17 |
+| Baseline | S1–S18 + P19–P55 |
 | Code roots | `apps/website/` · `services/*/` · `packages/ckac-common/` |
 
 **How to read**
@@ -318,6 +318,8 @@ CRM segments → Coupons / promotions
 3. Assign Starter/Growth package; sync modules.  
 4. Toggle streaming/livekit if abuse.  
 5. Force subscription when billing glitches (`owners:write`).
+
+**P55 field sales (role `sales`)** is a narrower cousin of this job: **Sales** tab onboard + kitchen **Train** (8 steps), kitchens they created only, **no** Overview/stats/API Keys/Control. Demo `sales@kitchcu.dev` / `sales123456`. Store app: **kitchCU - admin** (same PWA).
 
 ### 4.2 What’s good
 
@@ -654,6 +656,7 @@ Canonical scorecard also in [`PLATFORM-ARCHITECTURE-FLOWS.md`](./PLATFORM-ARCHIT
 | Version | Date | Changes |
 |---------|------|---------|
 | **1.0** | 2026-07-18 | First full persona/flow/architecture/implementation deep dive |
+| **1.2** | 2026-09-17 | P55: field sales role, Sales/Train, three store shells (kitchCU - customers / kitchen owner / admin) |
 | **1.1** | 2026-07-19 | Refresh post P29–P32.1: RBAC/audit/Watch/templates/Porter; scorecard + §10 |
 
 **Update policy:** When a persona-blocking gap closes, update that persona’s scorecard + §12 item in the same PR as the code. Keep Waves in sync. Architecture snapshot: [`PLATFORM-ARCHITECTURE-FLOWS.md`](./PLATFORM-ARCHITECTURE-FLOWS.md).
@@ -668,4 +671,4 @@ Canonical scorecard also in [`PLATFORM-ARCHITECTURE-FLOWS.md`](./PLATFORM-ARCHIT
 
 ---
 
-*KitchCu Persona Deep Dive v1.1 — Confidential — July 2026*
+*KitchCu Persona Deep Dive v1.2 — Confidential — September 2026*

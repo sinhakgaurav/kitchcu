@@ -352,6 +352,22 @@
       "saveIds": "Save Aadhaar and PAN",
       "saving": "Saving…",
       "title": "Your identity"
+    },
+    "tour": {
+      "back": "Back",
+      "done": "Got it",
+      "next": "Next",
+      "replay": "Show tips",
+      "s1Body": "Home shows orders in progress. Open Orders to accept, cook, and mark ready — never fake a timer.",
+      "s1Title": "Today’s board",
+      "s2Body": "Add Dish uses the camera. Gallery stock photos are not allowed as the hero. Customers trust the plate they see.",
+      "s2Title": "Live-capture a dish",
+      "s3Body": "Ingredients → pantry → dish quantities. This drives stock, health score, and calories.",
+      "s3Title": "Map the recipe",
+      "s4Body": "Kitchen setup: free radius and max km must match how far you actually ride. Then share your kitchen code.",
+      "s4Title": "Delivery radius",
+      "skip": "Skip",
+      "step": "{{current}} of {{total}}"
     }
   },
   "customer": {
@@ -386,7 +402,18 @@
       "searchPlaceholder": "किचन, व्यंजन, डिश खोजें…",
       "useLocation": "मेरा स्थान उपयोग करें",
       "noResults": "आपके फ़िल्टर से कोई किचन मेल नहीं खाता",
-      "helloName": "घर जैसा स्वाद ऑर्डर करें, {{name}}"
+      "helloName": "घर जैसा स्वाद ऑर्डर करें, {{name}}",
+      "betterForReport": "आपकी रिपोर्ट के लिए बेहतर",
+      "dietFilterEmpty": "पास की कोई किचन अभी मेल खाता व्यंजन नहीं दिखाती। सभी किचन देखने के लिए रिपोर्ट फ़िल्टर बंद करें।",
+      "dietFilterOn": "आपकी जाँच नोट्स से मेल खाते भोजन वाली किचन दिख रही हैं। यह चिकित्सकीय सलाह नहीं है।",
+      "reportFood": "मेरी रिपोर्ट के अनुसार",
+      "reportFoodAll": "सभी किचन",
+      "reportFoodMatch": "केवल वह भोजन जो मैं ले सकता/सकती हूँ",
+      "reportFoodNeedUpload": "फ़िल्टर के लिए जाँच रिपोर्ट अपलोड करें",
+      "reportFoodSignIn": "रिपोर्ट से फ़िल्टर करने के लिए साइन इन करें",
+      "reportFoodVariety": "केवल {{variety}} जो मैं ले सकता/सकती हूँ",
+      "reportFood_veg": "शाकाहारी",
+      "reportFood_vegan": "वीगन"
     },
     "checkout": {
       "title": "चेकआउट",
@@ -453,9 +480,30 @@
       "tipsTitle": "भोजन के बाद सुझाव",
       "dietMix": "आहार मिश्रण",
       "healthEmpty": "प्लेट स्कोर देखने के लिए मैप किया हुआ घर का भोजन ऑर्डर करें। बिना मैप रेसिपी किचन सामग्री जोड़ने के बाद दिखेगी।",
-      "healthIntro": "स्कोर किचन की रेसिपी मैप (मात्रा के अनुसार) से आता है। लाभ और सावधानियाँ सामान्य घरेलू उपयोग के लिए हैं — यह चिकित्सकीय सलाह नहीं है।",
+      "healthIntro": "स्कोर और कैलोरी किचन की रेसिपी मैप (मात्रा × पेंट्री kcal) से आते हैं। लाभ, सावधानियाँ और kcal सामान्य घरेलू अनुमान हैं — चिकित्सकीय सलाह या लैब लेबल नहीं।",
       "healthLoading": "आपके ऑर्डर की रेसिपी पढ़ी जा रही हैं…",
-      "healthTitle": "ऑर्डर किए भोजन का सामग्री स्वास्थ्य"
+      "healthTitle": "ऑर्डर किए भोजन का सामग्री स्वास्थ्य",
+      "checkupAsk": "केवल वही भोजन दिखाएँ जो आप ले सकते हैं, उन किचन से जो वह पकाती हैं?",
+      "checkupConditions": "जो संकेत मिले",
+      "checkupDisclaimer": "यह निदान या इलाज नहीं है। अपने चिकित्सक से पुष्टि करें।",
+      "checkupEmpty": "अभी कोई रिपोर्ट नहीं। टेक्स्ट PDF सबसे अच्छा पढ़ा जाता है।",
+      "checkupFailed": "यह रिपोर्ट नहीं पढ़ सकी।",
+      "checkupFile": "जाँच PDF या फ़ोटो",
+      "checkupFindFood": "मेल खाती किचन खोजें",
+      "checkupIntro": "नवीनतम लैब रिपोर्ट का टेक्स्ट PDF अपलोड करें (या फ़ोटो और छोटा सार)। हम ML से घर के व्यंजन सुझाते हैं — यह चिकित्सकीय सलाह नहीं है।",
+      "checkupNeedFile": "पहले PDF या फ़ोटो चुनें।",
+      "checkupNo": "नहीं — हर किचन दिखाएँ",
+      "checkupNotes": "छोटा सार (फ़ोटो के लिए ज़रूरी)",
+      "checkupNotesHint": "उदाहरण: HbA1c 8.2, टाइप 2 डायबिटीज़। PDF में चुनने योग्य टेक्स्ट हो तो वैकल्पिक।",
+      "checkupOff": "आप हर पास की किचन देखेंगे। Health या पास की सूची के रिपोर्ट फ़िल्टर से कभी भी चालू करें।",
+      "checkupOn": "पास की सूचियाँ अब रिपोर्ट से टकराने वाले व्यंजन छुपाती हैं। बेहतर मेल किचन पहले हैं।",
+      "checkupTitle": "आपकी ताज़ा जाँच रिपोर्ट",
+      "checkupUpload": "रिपोर्ट पढ़ें",
+      "checkupUploading": "रिपोर्ट पढ़ी जा रही है…",
+      "checkupYes": "हाँ — केवल मेल खाता भोजन",
+      "healthCalories": "{{kcal}} kcal प्रति प्लेट (किचन अनुमान)",
+      "healthCaloriesPartial": "{{kcal}} kcal — कुछ सामग्रियों पर पेंट्री kcal अभी बाकी है",
+      "healthTag": "हेल्दी"
     },
     "account": {
       "title": "रिफ़ंड कहाँ जाएँगे",
@@ -507,6 +555,22 @@
       "editAddress": "Edit address",
       "editThisAddress": "Edit this address",
       "updateAddress": "Update address"
+    },
+    "tour": {
+      "back": "Back",
+      "done": "Got it",
+      "next": "Next",
+      "replay": "Show tips",
+      "s1Body": "Use your location or pick an address. Nearby kitchens and honest delivery fees start from this pin.",
+      "s1Title": "Set where you are",
+      "s2Body": "Tap a card. Dish photos are live-capture from that kitchen — not stock food ads.",
+      "s2Title": "Open a kitchen",
+      "s3Body": "Filter veg / non-veg, or turn on “as per my report” after you upload a checkup in My space.",
+      "s3Title": "Food that fits you",
+      "s4Body": "Add plates, checkout once. You pay the kitchen — kitchCU does not take a food commission.",
+      "s4Title": "Cart and pay",
+      "skip": "Skip",
+      "step": "{{current}} of {{total}}"
     }
   },
   "cities": {

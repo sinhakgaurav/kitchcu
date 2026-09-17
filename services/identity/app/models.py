@@ -66,6 +66,10 @@ class Customer(Base):
     notify_order_updates: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     notify_offers: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     notify_channel: Mapped[str] = mapped_column(String(16), default="whatsapp", nullable=False)
+    diet_profile: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    diet_filter_enabled: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    checkup_report_url: Mapped[str | None] = mapped_column(Text, nullable=True)
+    checkup_parsed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(UTC)
     )
@@ -176,9 +180,27 @@ class Kitchen(Base):
     status: Mapped[str] = mapped_column(String(20), default="pending_verification")
     whatsapp_phone_id: Mapped[str | None] = mapped_column(String(100), nullable=True, index=True)
     settings: Mapped[dict] = mapped_column(JSONB, default=dict)
+    onboarded_by_admin_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), nullable=True, index=True
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(UTC)
     )
+
+
+class KitchenTrainingProgress(Base):
+    """Sales playbook ticks — one row per completed step (P55)."""
+
+    __tablename__ = "kitchen_training_progress"
+    __table_args__ = {"schema": "ckac_identity"}
+
+    kitchen_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True)
+    step_key: Mapped[str] = mapped_column(String(64), primary_key=True)
+    completed_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(UTC)
+    )
+    completed_by: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
+    note: Mapped[str | None] = mapped_column(Text, nullable=True)
 
 
 class ReferralSettings(Base):
@@ -205,6 +227,21 @@ class GatewayRateLimitSettings(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, default=1)
     enabled: Mapped[bool] = mapped_column(Boolean, default=True)
     rules: Mapped[dict] = mapped_column(JSONB, default=dict)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(UTC)
+    )
+    updated_by: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
+
+
+class HealthyFoodSettings(Base):
+    """Singleton row — catalog reads the kcal cap for the automatic Healthy tag."""
+
+    __tablename__ = "healthy_food_settings"
+    __table_args__ = {"schema": "ckac_identity"}
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, default=1)
+    healthy_max_kcal: Mapped[int] = mapped_column(Integer, default=500)
+    healthy_min_score: Mapped[int] = mapped_column(Integer, default=65)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(UTC)
     )

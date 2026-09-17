@@ -100,6 +100,8 @@ export type KitchenNearby = KitchenPublic & {
   is_live_now: boolean;
   avg_rating?: number | null;
   rating_count?: number;
+  compatible_dish_count?: number | null;
+  better_for_report?: boolean;
 };
 
 export type KitchenNearbyList = {
@@ -110,6 +112,7 @@ export type KitchenNearbyList = {
   customer_latitude: number;
   customer_longitude: number;
   sort: string;
+  diet_filter_applied?: boolean;
 };
 
 export type Category = {
@@ -143,6 +146,7 @@ export type DishHealthIngredient = {
   disadvantages: string;
   quantity?: number | null;
   unit?: string | null;
+  kcal?: number | null;
 };
 
 export type DishHealthSnapshot = {
@@ -154,6 +158,10 @@ export type DishHealthSnapshot = {
   mapped: number;
   total: number;
   ingredients: DishHealthIngredient[];
+  calories_kcal?: number | null;
+  calories_description?: string | null;
+  calories_incomplete?: boolean;
+  healthy_tag?: boolean;
   disclaimer: string;
 };
 
@@ -175,6 +183,7 @@ export type Dish = {
   projected_ready_min: number;
   description: string | null;
   ingredients_description: string | null;
+  calories_description?: string | null;
   quality_measures: string | null;
   is_active: boolean;
   is_featured?: boolean;
@@ -740,6 +749,7 @@ export async function createDish(
     category_id: string;
     description?: string;
     ingredients_description?: string;
+    calories_description?: string;
     is_featured?: boolean;
     is_chefs_special?: boolean;
     is_unique_recipe?: boolean;
@@ -829,6 +839,7 @@ export async function updateDish(
     is_unique_recipe?: boolean;
     description?: string | null;
     ingredients_description?: string | null;
+    calories_description?: string | null;
     quality_measures?: string | null;
     media?: {
       url: string;
@@ -1825,6 +1836,7 @@ export type Ingredient = {
   health_score?: number | null;
   health_benefits?: string | null;
   health_disadvantages?: string | null;
+  kcal_per_100?: number | null;
 };
 
 export type RecipeLine = {
@@ -1838,6 +1850,8 @@ export type RecipeLine = {
   unit: string;
   photo_url?: string | null;
   sort_order?: number;
+  kcal_per_100?: number | null;
+  line_kcal?: number | null;
 };
 
 export type PrepStep = {
@@ -1854,6 +1868,12 @@ export type DishRecipe = {
   dish_name: string;
   lines: RecipeLine[];
   prep_steps: PrepStep[];
+  calories_kcal?: number | null;
+  calories_incomplete?: boolean;
+  healthy_tag?: boolean;
+  calories_description?: string | null;
+  healthy_max_kcal?: number;
+  healthy_min_score?: number;
 };
 
 export type StockWarning = {
@@ -1937,6 +1957,7 @@ export async function createIngredient(
     pack_size?: number;
     pack_label?: string;
     photo_url?: string;
+    kcal_per_100?: number;
   },
 ): Promise<Ingredient> {
   return apiFetch(`/api/v1/kitchens/${kitchenId}/ingredients`, {
@@ -1955,6 +1976,7 @@ export async function updateIngredient(
     pack_size?: number;
     pack_label?: string;
     photo_url?: string;
+    kcal_per_100?: number | null;
   },
 ): Promise<Ingredient> {
   return apiFetch(`/api/v1/kitchens/${kitchenId}/ingredients/${ingredientId}`, {

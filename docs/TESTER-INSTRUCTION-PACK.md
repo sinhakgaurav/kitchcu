@@ -4,11 +4,11 @@
 
 | Field | Value |
 |-------|-------|
-| Version | **1.0** |
-| Date | 2026-09-12 |
+| Version | **1.1** |
+| Date | 2026-09-17 |
 | Audience | QA testers, release sign-off, founders doing a full pass |
 | Companion PDF | [`docs/TESTER-INSTRUCTION-PACK.pdf`](./TESTER-INSTRUCTION-PACK.pdf) — `python scripts/generate_tester_instruction_pdf.py` |
-| Aligned with | Complete Guide **v3.2.6** · Userflows **v1.5** · API.md **v1.1** · QA pack **v1.2** |
+| Aligned with | Complete Guide **v3.2.7** · Userflows **v1.6** · API.md **v1.2** · QA pack **v1.3** |
 
 This pack is the **how to click / how to call** book. The existing [QA Instruction Pack](./QA-INSTRUCTION-PACK.md) is the short Must/Should checklist. Use **this** document when you need every numbered step.
 
@@ -22,7 +22,7 @@ This pack is the **how to click / how to call** book. The existing [QA Instructi
 
 1. Pick **one environment** (local Docker **or** production). Never mix credentials across them.
 2. Confirm the stack is up (**§1**). If smoke fails, **stop** — do not continue deep UI/API.
-3. Work persona by persona: Portal → Customer → Kitchen (owner) → Super Admin → API (Swagger).
+3. Work persona by persona: Portal → Customer → Kitchen (owner) → Super Admin → **Sales** → store shells (if a device is available) → API (Swagger).
 4. For every case write **Pass / Fail / Blocked** plus the exact URL, what you typed, and what you saw.
 5. On Fail, fill the defect template in **§10**. Include screenshot + `X-Correlation-ID` from the Network tab if an API failed.
 
@@ -42,6 +42,9 @@ This pack is the **how to click / how to call** book. The existing [QA Instructi
 | Customer PWA | http://localhost:13001 | Diner |
 | Kitchen (owner) PWA | http://localhost:13002 | Kitchen owner |
 | Super Admin | http://localhost:13003 | Platform staff |
+| **kitchCU - customers** (store) | Same as Customer PWA | Play/App `in.kitchcu.customer` |
+| **kitchCU - kitchen owner** (store) | Same as Kitchen PWA | Play/App `in.kitchcu.kitchen` |
+| **kitchCU - admin** (store) | Same as Super Admin | Play/App `in.kitchcu.admin` |
 | API gateway | http://localhost:18000 | All clients |
 | Swagger | http://localhost:18000/docs | API tester |
 | ReDoc | http://localhost:18000/redoc | Read-only API |
@@ -66,6 +69,7 @@ Production substitutes: `https://kitchcu.com`, `https://customer.kitchcu.com`, `
 | Customer (repeat) | `9123456780` | OTP `123456` | Rahul — richer order history |
 | Customer (guest path) | `9988776655` | OTP `123456` | Ananya |
 | Super Admin | `admin@kitchcu.dev` | `admin123456` | Admin Overview |
+| Sales (field) | `sales@kitchcu.dev` | `sales123456` | Admin **Sales** only (extras seed; role `sales`) |
 
 **Production:** Super Admin is `admin@kitchcu.com` + the live `ADMIN_PASSWORD`. OTP `123456` is **refused** when `APP_ENV=production`. Never use `.dev` on `*.kitchcu.com`.
 
@@ -98,6 +102,8 @@ Do these in order. Fail on S1–S4 → stop the session.
 | S4 | Admin `:13003` → `admin@kitchcu.dev` / `admin123456` | Overview KPIs load. Sign in card shows username + password **when** reveal gate is on (`development`/`test` or `ADMIN_LOGIN_REVEAL_PASSWORD=1`) |
 | S5 | Portal `:13000` | Brand hero; cities strip; no console crash |
 | S6 | Gateway `/docs` | Schema loads. Public ops have **no padlock**. **Authorize → OAuth2Password** accepts the three demo logins in §1.3 |
+| S7 | Admin logout → `sales@kitchcu.dev` / `sales123456` | Nav is **Sales + Kitchens only**. Overview / Employees / API Keys / Control **must not** appear. Overview KPIs must **not** load |
+| S8 | Customer / Kitchen / Admin first-run tour | Overlay **Skip / Next / Done**. **Show tips** in the header restarts it. Completing or skipping does not block the page |
 
 ---
 
@@ -134,6 +140,13 @@ Do these in order. Fail on S1–S4 → stop the session.
 
 **Wrong OTP:** enter `000000` → error, stay on login.  
 **Logout:** use account / nav logout → return to login or guest home; cart must not keep another diner’s items after a new login.
+
+### 4.1b First-run tips (P55) — Must
+
+1. After login, a **tour overlay** appears on discovery home (unless you already completed it in this browser).
+2. Read step 1. Click **Next** through the remaining steps, or **Skip**.
+3. After Done/Skip the overlay is gone. Header **Show tips** brings it back.
+4. Completing the tour must **not** hide kitchens or change search results.
 
 ### 4.2 Discovery home
 
@@ -194,6 +207,7 @@ Login as `9876543210` / `123456` unless a step says otherwise. After login, kitc
 2. Open `/login`. Demo strip lists owner phones. OTP story matches §1.3 (no fake SMS).
 3. Login. Land on `/dashboard` (Overview) or inbox-first Orders — never a black screen.
 4. Hero: kitchen **name + code CKPNQ001** on the left; primary CTAs (New order / Brand) **same row, top-right**.
+5. **First-run tips:** overlay Skip / Next / Done; **Show tips** restarts. Must not block Orders.
 
 ### 5.2 Overview (`/dashboard`)
 
@@ -225,7 +239,7 @@ Login as `9876543210` / `123456` unless a step says otherwise. After login, kitc
 
 1. `/dashboard/ingredients` — pantry form (4-column). Add one ingredient. Adjust stock +100 then −10. Number updates; no 404.
 2. **Low stock** chip hides healthy rows.
-3. Select a dish → edit recipe lines (ingredient / qty / unit **above** controls) → save → reload persists.
+3. Select a dish → edit recipe lines (ingredient / qty / unit **above** controls) → save → reload persists. Pantry **kcal / 100** (or per piece) fills the running plate total. Optional calories note saves with the recipe. **Healthy** appears only when the map is complete, kcal ≤ the Super Admin Control cap (default 500), and health score ≥ the Control floor (default 65).
 4. `/dashboard/prep` — modes **Order Ready** and **Bulk prep only**. No “Not Found”.
 5. Mode **Order Ready**: helper text says orders deduct when marked Ready.
 6. Create a combo batch (≥2 dishes, portions > 0). Table shows expanded ingredient lines.
@@ -300,10 +314,11 @@ For each tab: open it, wait for load, confirm no white-crash, then do the action
 | Refunds | Open list + settlements | Status chips; no 500 |
 | Tickets | Open one ticket | Assignee / priority / reply fields; deep-link to kitchen |
 | Packages | View feature → package → plan map | Read-only OK without `packages:write` |
-| Employees | List staff | Write hidden without `employees:write` |
+| Employees | List staff | Write hidden without `employees:write`; role list includes **sales** |
+| Sales | Onboard owner+kitchen; tick Train | Kitchen code issued; playbook 8 steps; other sales cannot open it |
 | API Keys | Open a key | Value **masked** after save — never full secret |
 | Referrals | Settings + leads | Loads; settings save **Should** if you have write |
-| Control | Flags / journeys | Toggles persist; no raw secrets |
+| Control | Flags / journeys / Dish calories & Healthy | Toggles persist; kcal cap saves; no raw secrets |
 | Audit | Recent admin actions | Sensitive writes appear; no OTP/token in the log text |
 
 ### 6.3 Kitchen workspace (open CKPNQ001)
@@ -313,6 +328,7 @@ Open each workspace tab and confirm it loads:
 | Tab | Check |
 |-----|-------|
 | Profile | Status, address, branded summary; **code cannot be edited** |
+| Train | 8-step owner playbook; sales can tick kitchens they onboarded |
 | WhatsApp | Kitchen phone number id only — not Meta app secret |
 | Payments | Kitchen Razorpay / Route — not platform SaaS Razorpay |
 | Modules | Per-kitchen module flags |
@@ -323,6 +339,48 @@ Open each workspace tab and confirm it loads:
 | GST | Profile / report / export paths load |
 
 Admin must **not** mutate owner menu items or cook-line status from this console.
+
+### 6.4 Sales onboard + Train (P55) — Must
+
+Use a **fresh** browser profile or log out of Super Admin first. Seed extras so `sales@kitchcu.dev` exists (`.\scripts\seed-all.ps1` or `python scripts/seed_platform_extras.py`).
+
+1. Open http://localhost:13003. Sign in `sales@kitchcu.dev` / `sales123456`.
+2. Nav shows **Sales** and **Kitchens** only. **Fail** if Overview, Employees, API Keys, Control, Packages, Refunds, or Audit appear.
+3. Open **Sales**. Form: owner name, phone, kitchen name, address, city, map pin.
+4. Use a **new** 10-digit phone that is not a seeded owner (e.g. `9000012345`). Submit **Onboard**.
+5. Success: a kitchen **code** (`CK…`) is issued. The kitchen appears in **this sales book**.
+6. Open that kitchen → **Train**. Confirm **8 steps**:
+   1. Kitchen profile is true
+   2. Live-capture a dish hero
+   3. Map the first recipe
+   4. Set delivery radius
+   5. Owner KYC photos
+   6. Place a test order
+   7. WhatsApp number check
+   8. Owner can login alone
+7. Tick step 1 (profile). Count becomes **1/8**. Reload persists.
+8. Open **Kitchens** as this sales user: you see **only** kitchens you onboarded (plus none of CKPNQ001 unless you onboarded it).
+9. Log out. Log in as Super Admin. Employees lists role **sales**. Kitchen workspace **Train** still shows the ticks.
+10. **Isolation (Should if a second sales user exists):** another `sales` JWT must get **403** on this kitchen’s training PATCH.
+
+Training ticks **do not** block the kitchen going live.
+
+### 6.5 Store apps (P55) — Must when a device/emulator is available
+
+Three **different downloads**. Product is still the PWA; the shell only opens the matching host.
+
+| Store name | Package / bundle | Host |
+|------------|------------------|------|
+| **kitchCU - customers** | `in.kitchcu.customer` | `customer.kitchcu.com` · local `:13001` |
+| **kitchCU - kitchen owner** | `in.kitchcu.kitchen` | `kitchen.kitchcu.com` · local `:13002` |
+| **kitchCU - admin** | `in.kitchcu.admin` | `admin.kitchcu.com` · local `:13003` |
+
+1. Confirm three **distinct** application ids (installing customers must not replace kitchen owner).
+2. Customer app lands on the diner PWA (discovery / login). Kitchen owner app lands on owner login. Admin app lands on Super Admin / Sales.
+3. If Play TWA: `https://{host}/.well-known/assetlinks.json` lists that package’s SHA-256. If iOS: AASA lists the bundle id (replace `TEAMID` before store submit).
+4. Play hosting steps (engineering, not a tester click-path): `apps/android/README.md` — three Play Console apps, three AABs (`bundleCustomerRelease` / `bundleKitchenRelease` / `bundleAdminRelease`), app-signing SHA-256 into Digital Asset Links.
+
+**Web still counts as the product:** first-run tips, Sales, calories/Healthy, checkup diet filter are on the PWAs. Store shells do not ship a second checkout.
 
 ---
 
@@ -354,6 +412,7 @@ Public clients use the **gateway only**: http://localhost:18000. Do not call `:1
    - Owner: username `9876543210`, password `123456`.
    - Customer: username `9123456789`, password `123456`.
    - Admin: username `admin@kitchcu.dev`, password `admin123456`.
+   - Sales: username `sales@kitchcu.dev`, password `sales123456` (same token endpoint; JWT `type=admin`, role `sales`).
 3. Click Authorize / Close.
 4. Alternative: obtain a JWT from login/OTP verify, then paste **only** the token into **HTTPBearer** (Swagger adds `Bearer`).
 5. Logout of Authorize (or close the token) before switching persona — **do not** call owner routes with a customer token.
@@ -405,6 +464,13 @@ Public clients use the **gateway only**: http://localhost:18000. Do not call `:1
 9. `GET /api/v1/admin/auth/login-hint` → password field present locally when reveal=1; production without the flag hides it.
 10. Repeat **one** admin GET with the **owner** token → **401**.
 11. `GET /api/v1/internal/anything` via gateway → **404** (never proxied).
+12. **Sales (P55):** Authorize as `sales@kitchcu.dev` / `sales123456`.
+    - `GET /api/v1/admin/me` → 200; `allowed_tabs` is **sales** + **kitchens** only.
+    - `GET /api/v1/admin/stats` → **403**.
+    - `POST /api/v1/admin/sales/onboard` with a unique owner phone + kitchen pin → **201**, kitchen code.
+    - `GET /api/v1/admin/kitchens/{id}/training` → 8 steps.
+    - `PATCH /api/v1/admin/kitchens/{id}/training` body `{ "key": "profile", "completed": true }` → completed ≥ 1.
+    - Super-admin token can read any kitchen training; a **different** sales token → **403**.
 
 ### 7.8 Negative / security API (Must)
 
@@ -441,6 +507,8 @@ Do **not** run `.\scripts\run-tests.ps1` or identity/community/billing pytest on
 | X6 | Cities | Portal, customer home, kitchen landing | Same live / coming-soon set |
 | X7 | Media truth | Customer menu vs owner menu | Public heroes match the dish; drafts stay off the diner menu |
 | X8 | Commission | Owner subscription + reports | No “platform commission % of food” line |
+| X9 | Sales scope | Sales JWT vs `/admin/stats` and `/admin/api-keys` | 403 |
+| X10 | Tours | C / O / A first-run overlay | Skip or complete; Show tips restarts |
 
 ---
 
@@ -452,6 +520,7 @@ Do **not** run `.\scripts\run-tests.ps1` or identity/community/billing pytest on
 4. Confirm OTP `123456` is **rejected**.
 5. Do not paste production API secrets into tickets or chat.
 6. Prefer the current **weekly QA cohort** phones (`7{YY}{WW}…` owners, `8{YY}{WW}…` customers) if ops provided them — see [PRODUCTION-PORTALS-CREDENTIALS-QA.md](./PRODUCTION-PORTALS-CREDENTIALS-QA.md).
+7. Store listings (when published): three Play URLs for `in.kitchcu.customer` / `.kitchen` / `.admin`. Do not treat a single “KitchCu” APK as a pass.
 
 ---
 
@@ -460,7 +529,7 @@ Do **not** run `.\scripts\run-tests.ps1` or identity/community/billing pytest on
 ```text
 Title:
 Environment: local | production
-Surface: portal | customer | kitchen | admin | Swagger | other API
+Surface: portal | customer | kitchen | admin | store app | Swagger | other API
 Case ID: (e.g. 5.3 step 7)
 Severity: S1 blocker | S2 major | S3 minor | S4 polish
 Steps:
@@ -487,7 +556,7 @@ Workaround:
 | QA Lead | | | Go / No-Go | |
 | Eng / CTO | | | | |
 
-**Go criteria:** §2 smoke Pass; §4 customer Must Pass; §5 owner Must (orders, stock, isolation, reports seed) Pass; §6 admin tabs + kitchen workspace Pass; §7 API public/owner/customer/admin + negatives Pass; §8 X1–X4 and X8 Pass.
+**Go criteria:** §2 smoke Pass (including S7 sales + S8 tours); §4 customer Must Pass; §5 owner Must (orders, stock, isolation, reports seed) Pass; §6 admin tabs + kitchen workspace + **§6.4 Sales** Pass; §6.5 store ids Pass when a device is in the run; §7 API public/owner/customer/admin/sales + negatives Pass; §8 X1–X4, X8–X10 Pass.
 
 ---
 
@@ -500,7 +569,8 @@ Workaround:
 | Auth / OpenAPI cheat-sheet | [`API.md`](./API.md) §1.1–1.2 |
 | Prod URLs + feature matrix | [`PRODUCTION-PORTALS-CREDENTIALS-QA.md`](./PRODUCTION-PORTALS-CREDENTIALS-QA.md) |
 | Seed + credentials | [`ADVANCEMENT-TRACKER.md`](./ADVANCEMENT-TRACKER.md) |
-| Product encyclopedia | [`CKAC-COMPLETE-GUIDE.md`](./CKAC-COMPLETE-GUIDE.md) v3.2.6 |
+| Product encyclopedia | [`CKAC-COMPLETE-GUIDE.md`](./CKAC-COMPLETE-GUIDE.md) v3.2.7 |
+| Store shells | [`apps/android/README.md`](../apps/android/README.md) · [`apps/ios/README.md`](../apps/ios/README.md) |
 
 ---
 
@@ -508,4 +578,5 @@ Workaround:
 
 | Change | Date |
 |--------|------|
+| P55 — store apps (kitchCU - customers / kitchen owner / admin), sales onboard + Train, first-run tips, sales API | 2026-09-17 |
 | Initial tester pack — numbered UI + Swagger/API steps for all personas | 2026-09-12 |

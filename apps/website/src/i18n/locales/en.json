@@ -360,6 +360,22 @@
       "referrals": "Referrals",
       "newOrder": "New order",
       "addDish": "Add dish"
+    },
+    "tour": {
+      "skip": "Skip",
+      "next": "Next",
+      "back": "Back",
+      "done": "Got it",
+      "replay": "Show tips",
+      "step": "{{current}} of {{total}}",
+      "s1Title": "Today’s board",
+      "s1Body": "Home shows orders in progress. Open Orders to accept, cook, and mark ready — never fake a timer.",
+      "s2Title": "Live-capture a dish",
+      "s2Body": "Add Dish uses the camera. Gallery stock photos are not allowed as the hero. Customers trust the plate they see.",
+      "s3Title": "Map the recipe",
+      "s3Body": "Ingredients → pantry → dish quantities. This drives stock, health score, and calories.",
+      "s4Title": "Delivery radius",
+      "s4Body": "Kitchen setup: free radius and max km must match how far you actually ride. Then share your kitchen code."
     }
   },
   "customer": {
@@ -394,7 +410,18 @@
       "lede": "Real dish photos, honest prep times, and fair delivery — order home taste.",
       "searchPlaceholder": "Search kitchen, dish, or cuisine…",
       "useLocation": "Use my location",
-      "noResults": "No kitchens match your filters"
+      "noResults": "No kitchens match your filters",
+      "dietFilterOn": "Showing kitchens with food that matches your checkup notes. Not medical advice.",
+      "dietFilterEmpty": "No nearby kitchen currently lists a matching plate. Turn the report food filter off to see all kitchens.",
+      "betterForReport": "Better for your report",
+      "reportFood": "As per my report",
+      "reportFoodAll": "All kitchens",
+      "reportFoodMatch": "Only food I can have",
+      "reportFoodVariety": "Only {{variety}} I can have",
+      "reportFood_veg": "veg",
+      "reportFood_vegan": "vegan",
+      "reportFoodNeedUpload": "Upload checkup to filter",
+      "reportFoodSignIn": "Sign in to filter by report"
     },
     "delivery": {
       "deliverTo": "Deliver to",
@@ -473,10 +500,31 @@
       "tipsTitle": "Tips after your meals",
       "tipsEmpty": "Order a few home meals — light walk and water tips will show up here.",
       "healthTitle": "Ingredient health of food you ordered",
-      "healthIntro": "Score comes from each kitchen’s recipe map (quantity-weighted). Benefits and cautions are typical home-kitchen use — not medical advice.",
+      "healthIntro": "Score and calories come from each kitchen’s recipe map (quantity × pantry kcal). Benefits, cautions, and kcal are typical home-kitchen estimates — not medical advice or a lab nutrition label.",
       "healthEmpty": "Order a mapped home meal to see a plate score. Unmapped recipes show after the kitchen links ingredients.",
       "healthLoading": "Reading recipes for your orders…",
-      "dietMix": "Diet mix"
+      "healthTag": "Healthy",
+      "healthCalories": "{{kcal}} kcal per plate (kitchen estimate)",
+      "healthCaloriesPartial": "{{kcal}} kcal — some ingredients still need pantry kcal",
+      "dietMix": "Diet mix",
+      "checkupTitle": "Your latest checkup",
+      "checkupIntro": "Upload a text PDF of your latest lab report (or a photo plus a short summary). We parse it with an on-device-style ML model to suggest home plates — this is not medical advice.",
+      "checkupFile": "Checkup PDF or photo",
+      "checkupNotes": "Short summary (required for photos)",
+      "checkupNotesHint": "Example: HbA1c 8.2, type 2 diabetes. Optional when the PDF has selectable text.",
+      "checkupUpload": "Parse report",
+      "checkupUploading": "Reading report…",
+      "checkupAsk": "Show only food you can have, from kitchens that cook those plates?",
+      "checkupYes": "Yes — only matching food",
+      "checkupNo": "No — show every kitchen",
+      "checkupOn": "Nearby lists now hide plates that clash with this report. Better-matching kitchens are listed first.",
+      "checkupOff": "You will see every nearby kitchen. Turn this on any time from Health or the nearby report-food filter.",
+      "checkupDisclaimer": "Not a diagnosis or treatment plan. Confirm with your clinician.",
+      "checkupEmpty": "No checkup on file yet. A text PDF parses best.",
+      "checkupFindFood": "Find matching kitchens",
+      "checkupConditions": "Flags we read",
+      "checkupNeedFile": "Choose a PDF or photo first.",
+      "checkupFailed": "Could not read that report."
     },
     "account": {
       "title": "Where refunds go",
@@ -515,6 +563,22 @@
       "livePhotoRequired": "Live photo must be captured with the camera.",
       "profilePhotoSaved": "Profile photo saved.",
       "livePhotoSaved": "Live photo saved."
+    },
+    "tour": {
+      "skip": "Skip",
+      "next": "Next",
+      "back": "Back",
+      "done": "Got it",
+      "replay": "Show tips",
+      "step": "{{current}} of {{total}}",
+      "s1Title": "Set where you are",
+      "s1Body": "Use your location or pick an address. Nearby kitchens and honest delivery fees start from this pin.",
+      "s2Title": "Open a kitchen",
+      "s2Body": "Tap a card. Dish photos are live-capture from that kitchen — not stock food ads.",
+      "s3Title": "Food that fits you",
+      "s3Body": "Filter veg / non-veg, or turn on “as per my report” after you upload a checkup in My space.",
+      "s4Title": "Cart and pay",
+      "s4Body": "Add plates, checkout once. You pay the kitchen — kitchCU does not take a food commission."
     }
   }
 }

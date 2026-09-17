@@ -2,6 +2,8 @@
 # Fresh wipe + rebuild on the EXISTING GCE VM. Does NOT change the static IP.
 # Usage (on VM as root or via sudo):
 #   cd /opt/ckac && sudo bash infra/gcp-vm/reset-fresh.sh
+# Keep DB and still pull + rebuild + seed:
+#   sudo bash infra/gcp-vm/update-setup-seed.sh
 set -euo pipefail
 
 REPO_DIR="$(cd "$(dirname "$0")/../.." && pwd)"

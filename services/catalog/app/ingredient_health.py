@@ -308,6 +308,7 @@ class IngredientHealthLine(BaseModel):
     disadvantages: str
     quantity: float | None = None
     unit: str | None = None
+    kcal: float | None = None
 
 
 class DishHealthSnapshot(BaseModel):
@@ -319,6 +320,10 @@ class DishHealthSnapshot(BaseModel):
     mapped: int = 0
     total: int = 0
     ingredients: list[IngredientHealthLine] = Field(default_factory=list)
+    calories_kcal: int | None = None
+    calories_description: str | None = None
+    calories_incomplete: bool = False
+    healthy_tag: bool = False
     disclaimer: str = (
         "Typical home-kitchen use from the recipe map — not medical advice or a lab nutrition label."
     )
@@ -406,33 +411,136 @@ def aggregate_order_health(
 async def load_recipe_lines(
     session: AsyncSession,
     dish_ids: list[uuid.UUID],
-) -> dict[uuid.UUID, list[tuple[str, float, str]]]:
+) -> dict[uuid.UUID, list[tuple[str, float, str, float | None, str]]]:
+    """name, recipe qty, recipe unit, pantry kcal_per_100, pantry unit."""
     if not dish_ids:
         return {}
     rows = (
         await session.execute(
-            select(DishIngredient.dish_id, Ingredient.name, DishIngredient.quantity, DishIngredient.unit)
+            select(
+                DishIngredient.dish_id,
+                Ingredient.name,
+                DishIngredient.quantity,
+                DishIngredient.unit,
+                Ingredient.kcal_per_100,
+                Ingredient.unit,
+            )
             .join(Ingredient, Ingredient.id == DishIngredient.ingredient_id)
             .where(DishIngredient.dish_id.in_(dish_ids))
             .order_by(DishIngredient.sort_order, Ingredient.name)
         )
     ).all()
-    out: dict[uuid.UUID, list[tuple[str, float, str]]] = {did: [] for did in dish_ids}
-    for dish_id, name, qty, unit in rows:
-        out.setdefault(dish_id, []).append((name, float(qty), unit))
+    out: dict[uuid.UUID, list[tuple[str, float, str, float | None, str]]] = {did: [] for did in dish_ids}
+    for dish_id, name, qty, unit, kcal_per_100, pantry_unit in rows:
+        kcal = float(kcal_per_100) if kcal_per_100 is not None else None
+        out.setdefault(dish_id, []).append((name, float(qty), unit, kcal, pantry_unit or unit))
     return out
+
+
+def _health_lines_for_score(rows: list[tuple[str, float, str, float | None, str]]) -> list[tuple[str, float, str]]:
+    return [(name, qty, unit) for name, qty, unit, _kcal, _iunit in rows]
 
 
 async def snapshots_for_dishes(
     session: AsyncSession,
     dishes: list[Dish],
 ) -> dict[uuid.UUID, DishHealthSnapshot]:
+    from app.dish_calories import (
+        apply_public_calorie_flags,
+        is_healthy_tag,
+        line_kcal,
+        sum_recipe_kcal,
+    )
+    from ckac_common.platform_config import (
+        DISH_CALORIES_FLAG,
+        DISH_HEALTHY_TAG_FLAG,
+        get_healthy_food_params,
+        is_feature_enabled,
+    )
+
+    calories_on = await is_feature_enabled(session, DISH_CALORIES_FLAG, default=True)
+    healthy_on = await is_feature_enabled(session, DISH_HEALTHY_TAG_FLAG, default=True)
+    max_kcal, min_score = await get_healthy_food_params(session)
+
     lines_by_dish = await load_recipe_lines(session, [d.id for d in dishes])
     out: dict[uuid.UUID, DishHealthSnapshot] = {}
     for dish in dishes:
-        snap = score_ingredient_lines(lines_by_dish.get(dish.id, []))
+        rows = lines_by_dish.get(dish.id, [])
+        snap = score_ingredient_lines(_health_lines_for_score(rows))
+        kcal_total, _mapped, n, complete = sum_recipe_kcal(
+            [(kcal, qty, unit, iunit) for _name, qty, unit, kcal, iunit in rows]
+        )
+        kcal_by_profile: dict[str, float] = {}
+        for name, qty, unit, kcal_per_100, iunit in rows:
+            line = line_kcal(
+                kcal_per_100=kcal_per_100,
+                quantity=qty,
+                recipe_unit=unit,
+                ingredient_unit=iunit,
+            )
+            if line is None:
+                continue
+            profile = lookup_health_profile(name)
+            key = profile.name if profile else name
+            kcal_by_profile[key] = round(kcal_by_profile.get(key, 0.0) + line, 1)
+        ingredients = [
+            ing.model_copy(update={"kcal": kcal_by_profile.get(ing.name)})
+            for ing in snap.ingredients
+        ]
+        seen = {ing.name.lower() for ing in ingredients}
+        for name, qty, unit, kcal_per_100, iunit in rows:
+            profile = lookup_health_profile(name)
+            key = (profile.name if profile else name).lower()
+            if key in seen:
+                continue
+            extras_kcal = line_kcal(
+                kcal_per_100=kcal_per_100,
+                quantity=qty,
+                recipe_unit=unit,
+                ingredient_unit=iunit,
+            )
+            ingredients.append(
+                IngredientHealthLine(
+                    name=name,
+                    score=0,
+                    benefits="Not in the health library — kcal is the pantry estimate.",
+                    disadvantages="",
+                    quantity=qty,
+                    unit=unit,
+                    kcal=extras_kcal,
+                )
+            )
+            seen.add(key)
+        note = (getattr(dish, "calories_description", None) or None)
+        tag = is_healthy_tag(
+            calories_kcal=kcal_total,
+            complete=complete,
+            health_score=snap.score,
+            recipe_lines=n,
+            max_kcal=max_kcal,
+            min_score=min_score,
+        )
+        pub_kcal, pub_note, pub_incomplete, pub_tag = apply_public_calorie_flags(
+            calories_kcal=kcal_total,
+            calories_description=note,
+            calories_incomplete=(n > 0 and not complete),
+            healthy_tag=tag,
+            calories_enabled=calories_on,
+            healthy_tag_enabled=healthy_on,
+        )
+        if not calories_on:
+            ingredients = [ing.model_copy(update={"kcal": None}) for ing in ingredients]
         out[dish.id] = snap.model_copy(
-            update={"dish_id": dish.id, "dish_name": dish.name, "kitchen_id": dish.kitchen_id}
+            update={
+                "dish_id": dish.id,
+                "dish_name": dish.name,
+                "kitchen_id": dish.kitchen_id,
+                "ingredients": ingredients,
+                "calories_kcal": pub_kcal,
+                "calories_description": pub_note,
+                "calories_incomplete": pub_incomplete,
+                "healthy_tag": pub_tag,
+            }
         )
     return out
 

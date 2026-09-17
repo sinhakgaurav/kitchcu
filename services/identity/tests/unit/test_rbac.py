@@ -3,6 +3,13 @@
 from app.rbac import role_has_permission, tabs_for_permissions
 
 
+def test_tabs_for_sales_hide_platform_kpis():
+    tabs = tabs_for_permissions({"sales:write", "kitchens:read"}, role="sales")
+    assert tabs == ["sales", "kitchens"]
+    assert "overview" not in tabs
+    assert "employees" not in tabs
+
+
 def test_wildcard_grants_all():
     assert role_has_permission({"*"}, "employees:write")
     assert role_has_permission({"*"}, "packages:read")

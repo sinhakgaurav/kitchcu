@@ -3,6 +3,14 @@
 from ckac_common.admin_rbac import role_has_permission, tabs_for_permissions, TAB_PERMISSIONS
 
 
+def test_sales_role_tabs_are_onboard_only():
+    tabs = tabs_for_permissions({"sales:write", "kitchens:read"}, role="sales")
+    assert tabs == ["sales", "kitchens"]
+    assert "overview" not in tabs
+    assert "api-keys" not in tabs
+    assert "control" not in tabs
+
+
 def test_wildcard_grants_all_tabs():
     tabs = tabs_for_permissions({"*"})
     assert set(tabs) == set(TAB_PERMISSIONS.keys())

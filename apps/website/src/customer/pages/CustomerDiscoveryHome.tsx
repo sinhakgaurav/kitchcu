@@ -4,6 +4,8 @@ import { useTranslation } from "react-i18next";
 import { BrandLogo } from "../../components/BrandLogo";
 import { DeliveryAddressPicker } from "../../components/DeliveryAddressPicker";
 import { NearbyKitchensList } from "../../components/NearbyKitchensList";
+import { ReportFoodFilter } from "../../components/ReportFoodFilter";
+import { ProductTour, TourReplayButton } from "../../components/ProductTour";
 import { SuperAdminLink } from "../../components/SuperAdminAccess";
 import { CitiesPresence } from "../../components/CitiesPresence";
 import { images } from "../../data/content";
@@ -21,6 +23,7 @@ import {
   type DiscoveryKitchenCard,
 } from "../../shared/publicApi";
 import { distanceKm } from "../../lib/locationMaps";
+import { DIET_FILTER_CHANGED } from "../../hooks/useReportFoodFilter";
 
 function formatKm(km: number): string {
   if (km < 1) return `${Math.round(km * 1000)} m`;
@@ -56,6 +59,7 @@ function KitchenCard({
   kitchen: DiscoveryKitchenCard;
   onOpen: (k: DiscoveryKitchenCard) => void;
 }) {
+  const { t } = useTranslation();
   return (
     <button type="button" className="disc-card" onClick={() => onOpen(kitchen)}>
       <div className="disc-card__media">
@@ -76,6 +80,11 @@ function KitchenCard({
         </span>
         <span className="disc-card__badges">
           {kitchen.has_veg ? <span className="disc-card__badge">Veg</span> : null}
+          {kitchen.better_for_report ? (
+            <span className="disc-card__badge disc-card__badge--better">
+              {t("customer.discovery.betterForReport")}
+            </span>
+          ) : null}
           {kitchen.has_live_capture ? <span className="disc-card__badge">Live photo</span> : null}
         </span>
         <span className="disc-card__price">
@@ -257,6 +266,14 @@ export function CustomerDiscoveryHome() {
     void load();
   }, [load, deliveryLoading]);
 
+  useEffect(() => {
+    const onChange = () => {
+      void load();
+    };
+    window.addEventListener(DIET_FILTER_CHANGED, onChange);
+    return () => window.removeEventListener(DIET_FILTER_CHANGED, onChange);
+  }, [load]);
+
   // Search runs server-side across every kitchen in radius, so typing (not just Enter)
   // is enough — the client only debounces to keep the request rate sane.
   useEffect(() => {
@@ -352,6 +369,20 @@ export function CustomerDiscoveryHome() {
 
   return (
     <div className="disc-home">
+      <ProductTour
+        id="customer"
+        skipLabel={t("customer.tour.skip")}
+        nextLabel={t("customer.tour.next")}
+        backLabel={t("customer.tour.back")}
+        doneLabel={t("customer.tour.done")}
+        stepLabel={(current, total) => t("customer.tour.step", { current, total })}
+        steps={[
+          { title: t("customer.tour.s1Title"), body: t("customer.tour.s1Body") },
+          { title: t("customer.tour.s2Title"), body: t("customer.tour.s2Body") },
+          { title: t("customer.tour.s3Title"), body: t("customer.tour.s3Body") },
+          { title: t("customer.tour.s4Title"), body: t("customer.tour.s4Body") },
+        ]}
+      />
       <header className="disc-home__hero">
         <div
           className="disc-home__hero-bg"
@@ -368,6 +399,9 @@ export function CustomerDiscoveryHome() {
               : t("customer.discovery.title")}
           </h1>
           <p className="disc-home__lede">{t("customer.discovery.lede")}</p>
+          <p className="disc-home__ops">
+            <TourReplayButton id="customer" label={t("customer.tour.replay")} />
+          </p>
           {isCustomerSignedIn(session) ? (
             <div className="disc-home__welcome">
               <Link to="/dashboard">{t("customer.nav.dashboard")}</Link>
@@ -424,13 +458,19 @@ export function CustomerDiscoveryHome() {
                   <option value={100}>100 km</option>
                 </select>
               </label>
+              <ReportFoodFilter variant="hero" />
             </div>
           </form>
 
           {geoError ? <p className="disc-home__hint">{geoError}</p> : null}
+          {feed?.diet_filter_applied ? (
+            <p className="disc-home__hint">{t("customer.discovery.dietFilterOn")}</p>
+          ) : null}
           {!loading && !fetchError && (feed?.total_kitchens ?? 0) === 0 ? (
             <div className="disc-home__banner">
-              {activeQuery ? (
+              {feed?.diet_filter_applied ? (
+                <p>{t("customer.discovery.dietFilterEmpty")}</p>
+              ) : activeQuery ? (
                 <>
                   <p>
                     Nothing matches “{activeQuery}” within {maxKm} km. Try a kitchen name, a dish

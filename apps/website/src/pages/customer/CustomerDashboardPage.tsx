@@ -13,8 +13,12 @@ import { Link, Navigate, useNavigate, useSearchParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import {
   fetchCustomerProfile,
+  fetchCustomerDietProfile,
   getCustomerToken,
   requestCustomerWhatsAppOtp,
+  updateCustomerDietFilter,
+  uploadCustomerCheckupReport,
+  type CustomerDietProfile,
   type CustomerProfile,
 } from "../../shared/customerApi";
 import {
@@ -1124,8 +1128,128 @@ function HealthPanel({
   healthLoading: boolean;
 }) {
   const { t } = useTranslation();
+  const [diet, setDiet] = useState<CustomerDietProfile | null>(null);
+  const [dietLoading, setDietLoading] = useState(true);
+  const [notes, setNotes] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  const loadDiet = useCallback(async () => {
+    setDietLoading(true);
+    try {
+      setDiet(await fetchCustomerDietProfile());
+    } catch {
+      setDiet(null);
+    } finally {
+      setDietLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadDiet();
+  }, [loadDiet]);
+
+  const onUpload = async (e: FormEvent) => {
+    e.preventDefault();
+    const file = fileRef.current?.files?.[0];
+    if (!file) {
+      setError(t("customer.dashboard.checkupNeedFile"));
+      return;
+    }
+    setBusy(true);
+    setError("");
+    try {
+      const next = await uploadCustomerCheckupReport(file, notes);
+      setDiet(next);
+      setNotes("");
+      if (fileRef.current) fileRef.current.value = "";
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t("customer.dashboard.checkupFailed"));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const setFilter = async (enabled: boolean) => {
+    setBusy(true);
+    setError("");
+    try {
+      setDiet(await updateCustomerDietFilter(enabled));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t("customer.dashboard.checkupFailed"));
+    } finally {
+      setBusy(false);
+    }
+  };
+
   return (
     <section className="glass customer-dash__card">
+      <h2>{t("customer.dashboard.checkupTitle")}</h2>
+      <p>{t("customer.dashboard.checkupIntro")}</p>
+      {error ? <p className="auth-card__error">{error}</p> : null}
+      <form className="customer-dash__checkup" onSubmit={(e) => void onUpload(e)}>
+        <label>
+          {t("customer.dashboard.checkupFile")}
+          <input ref={fileRef} type="file" accept="application/pdf,image/jpeg,image/png,image/webp" />
+        </label>
+        <label>
+          {t("customer.dashboard.checkupNotes")}
+          <textarea
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            rows={3}
+            placeholder={t("customer.dashboard.checkupNotesHint")}
+          />
+        </label>
+        <button type="submit" className="btn btn--primary btn--sm" disabled={busy}>
+          {busy ? t("customer.dashboard.checkupUploading") : t("customer.dashboard.checkupUpload")}
+        </button>
+      </form>
+      {dietLoading ? (
+        <p className="customer-dash__empty-hint">{t("customer.dashboard.healthLoading")}</p>
+      ) : diet?.has_checkup_report ? (
+        <div className="customer-dash__checkup-result">
+          {diet.summary ? <p>{diet.summary}</p> : null}
+          {diet.conditions.length > 0 ? (
+            <p>
+              {t("customer.dashboard.checkupConditions")}: {diet.conditions.join(", ")}
+            </p>
+          ) : null}
+          <p className="customer-dash__empty-hint">{diet.disclaimer}</p>
+          <p>{t("customer.dashboard.checkupAsk")}</p>
+          <div className="customer-dash__hero-actions">
+            <button
+              type="button"
+              className={`btn btn--sm${diet.diet_filter_enabled ? " btn--primary" : " btn--ghost"}`}
+              disabled={busy}
+              onClick={() => void setFilter(true)}
+            >
+              {t("customer.dashboard.checkupYes")}
+            </button>
+            <button
+              type="button"
+              className={`btn btn--sm${!diet.diet_filter_enabled ? " btn--primary" : " btn--ghost"}`}
+              disabled={busy}
+              onClick={() => void setFilter(false)}
+            >
+              {t("customer.dashboard.checkupNo")}
+            </button>
+          </div>
+          <p>
+            {diet.diet_filter_enabled
+              ? t("customer.dashboard.checkupOn")
+              : t("customer.dashboard.checkupOff")}
+          </p>
+          {diet.diet_filter_enabled ? (
+            <Link to="/" className="btn btn--ghost btn--sm customer-dash__inline-cta">
+              {t("customer.dashboard.checkupFindFood")}
+            </Link>
+          ) : null}
+        </div>
+      ) : (
+        <p className="customer-dash__empty-hint">{t("customer.dashboard.checkupEmpty")}</p>
+      )}
       <h2>{t("customer.dashboard.healthTitle")}</h2>
       <p>{t("customer.dashboard.healthIntro")}</p>
       {healthLoading ? (

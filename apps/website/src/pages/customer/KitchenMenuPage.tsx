@@ -16,7 +16,9 @@ import {
   getCart,
   projectKitchenReadyMin,
 } from "../../shared/customerCart";
-import { getCustomerToken } from "../../shared/customerApi";
+import { fetchDietCompatibleDishes, getCustomerToken } from "../../shared/customerApi";
+import { ReportFoodFilter } from "../../components/ReportFoodFilter";
+import { DIET_FILTER_CHANGED } from "../../hooks/useReportFoodFilter";
 import { getCustomerSession } from "../../shared/customerSession";
 import {
   dishHighlightBadges,
@@ -57,7 +59,9 @@ export function KitchenMenuPage() {
   const [search, setSearch] = useState("");
   const [sort, setSort] = useState<DishSort>("name_asc");
   const [highlights, setHighlights] = useState<DishHighlight[]>([]);
+  const [dietDishIds, setDietDishIds] = useState<Set<string> | null>(null);
   const [diet, setDiet] = useState("");
+  const [dietTick, setDietTick] = useState(0);
   const [promos, setPromos] = useState<PublicActivePromotion[]>([]);
   const checkoutHref = branded ? `${branded.basePath}/checkout` : "/checkout";
 
@@ -110,6 +114,31 @@ export function KitchenMenuPage() {
     };
   }, [kitchenId, branded]);
 
+  useEffect(() => {
+    const onChange = () => setDietTick((n) => n + 1);
+    window.addEventListener(DIET_FILTER_CHANGED, onChange);
+    return () => window.removeEventListener(DIET_FILTER_CHANGED, onChange);
+  }, []);
+
+  useEffect(() => {
+    if (!kitchenId || !getCustomerToken()) {
+      setDietDishIds(null);
+      return;
+    }
+    let cancelled = false;
+    void fetchDietCompatibleDishes(kitchenId)
+      .then((r) => {
+        if (cancelled) return;
+        setDietDishIds(r.filter_applied ? new Set(r.dish_ids) : null);
+      })
+      .catch(() => {
+        if (!cancelled) setDietDishIds(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [kitchenId, dietTick]);
+
   const dietChips = useMemo(() => {
     if (!menu) return [];
     return (menu.diet_categories || []).map((c) => ({
@@ -120,13 +149,15 @@ export function KitchenMenuPage() {
 
   const filteredDishes = useMemo(() => {
     if (!menu) return [];
-    return filterAndSortDishes(menu.dishes, {
+    const rows = filterAndSortDishes(menu.dishes, {
       q: search,
       sort,
       highlights,
       diet: diet || undefined,
     });
-  }, [menu, search, sort, highlights, diet]);
+    if (!dietDishIds) return rows;
+    return rows.filter((d) => dietDishIds.has(d.id));
+  }, [menu, search, sort, highlights, diet, dietDishIds]);
 
   const groups = useMemo(() => {
     if (!menu) return [];
@@ -148,16 +179,17 @@ export function KitchenMenuPage() {
               ? d.is_chefs_special
               : d.is_unique_recipe,
         );
+      const dishes = filterAndSortDishes(bucket, {
+        q: search,
+        sort,
+        diet: diet || undefined,
+      }).filter((d) => !dietDishIds || dietDishIds.has(d.id));
       return {
         ...meta,
-        dishes: filterAndSortDishes(bucket, {
-          q: search,
-          sort,
-          diet: diet || undefined,
-        }),
+        dishes,
       };
     }).filter((s) => s.dishes.length > 0);
-  }, [menu, search, diet, highlights, sort]);
+  }, [menu, search, diet, highlights, sort, dietDishIds]);
 
   const requestPlan = async (planId: string) => {
     if (!kitchenId) return;
@@ -201,6 +233,12 @@ export function KitchenMenuPage() {
           <header className="customer-menu__head">
             {!branded && <h1>{kitchenName || "Kitchen Menu"}</h1>}
             <p>{menu.dishes.length} dishes · live-capture when marked</p>
+            {dietDishIds ? (
+              <p className="owner-muted">Showing dishes that match your checkup filter — not medical advice.</p>
+            ) : null}
+            <div className="customer-menu__report-filter">
+              <ReportFoodFilter variant="menu" diet={diet} onDietChange={(next) => setDiet(next)} />
+            </div>
           </header>
 
           {promos.length > 0 && (
@@ -388,7 +426,13 @@ function DishCard({
   const hero = dish.media.find((m) => m.is_hero) ?? dish.media[0];
   const badges = dishHighlightBadges(dish);
   const readyMin = dish.projected_ready_min ?? dish.max_time_min ?? dish.prep_time_min;
-  const hasDetails = Boolean(dish.description || dish.ingredients_description || dish.health?.ingredients?.length);
+  const hasDetails = Boolean(
+    dish.description ||
+      dish.ingredients_description ||
+      dish.health?.ingredients?.length ||
+      dish.health?.calories_kcal != null ||
+      dish.health?.calories_description,
+  );
   return (
     <article className="customer-dish">
       {hero?.url ? (
@@ -409,17 +453,21 @@ function DishCard({
             ? ` · ★ ${summary.overall_rating.toFixed(1)}`
             : ""}
           {hero?.is_live_capture ? " · Live capture" : ""}
+          {dish.health?.calories_kcal != null ? ` · ${dish.health.calories_kcal} kcal` : ""}
           {dish.health?.score != null ? ` · Health ${dish.health.score}` : ""}
         </p>
-        {badges.length > 0 && (
+        {badges.length > 0 || dish.health?.healthy_tag ? (
           <div className="dish-badges">
+            {dish.health?.healthy_tag ? (
+              <span className="dish-badge dish-badge--healthy">Healthy</span>
+            ) : null}
             {badges.slice(0, 2).map((b) => (
               <span key={b.key} className={`dish-badge dish-badge--${b.key}`}>
                 {b.label}
               </span>
             ))}
           </div>
-        )}
+        ) : null}
         {hasDetails && (
           <details className="customer-dish__more">
             <summary>Details</summary>

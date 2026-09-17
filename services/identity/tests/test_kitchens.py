@@ -353,6 +353,32 @@ async def test_nearby_kitchens_search_matches_dish_name(client: AsyncClient, aut
 
 
 @pytest.mark.asyncio
+async def test_nearby_search_and_diet_apply_together(client: AsyncClient, auth_headers: dict):
+    """Diet must not wipe free-text search — both filters stay on."""
+    veg = await client.post(
+        "/api/v1/kitchens",
+        json={**KITCHEN_PAYLOAD, "name": "Veg Samosa Kitchen", "latitude": 18.5370, "longitude": 73.8960},
+        headers=auth_headers,
+    )
+    meat = await client.post(
+        "/api/v1/kitchens",
+        json={**KITCHEN_PAYLOAD, "name": "Nonveg Samosa Kitchen", "latitude": 18.5372, "longitude": 73.8962},
+        headers=auth_headers,
+    )
+    assert veg.status_code == 201
+    assert meat.status_code == 201
+    _seed_catalog_for_kitchen(uuid.UUID(veg.json()["id"]), category_slug="veg", dish_name="Samosa")
+    _seed_catalog_for_kitchen(uuid.UUID(meat.json()["id"]), category_slug="non_veg", dish_name="Samosa")
+
+    resp = await client.get(
+        "/api/v1/kitchens/public/nearby",
+        params={"latitude": 18.5362, "longitude": 73.8958, "q": "samosa", "diet": "veg"},
+    )
+    assert resp.status_code == 200
+    assert [k["name"] for k in resp.json()["kitchens"]] == ["Veg Samosa Kitchen"]
+
+
+@pytest.mark.asyncio
 async def test_nearby_kitchens_search_matches_kitchen_fields(client: AsyncClient, auth_headers: dict):
     """Name, code, and city stay searchable alongside dish names."""
     created = await client.post(

@@ -6,12 +6,13 @@ from fastapi import HTTPException, status
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-KNOWN_ROLES = ("superadmin", "ops", "support", "finance")
+KNOWN_ROLES = ("superadmin", "ops", "support", "finance", "sales")
 
 # Tab → minimum permission (write implies read for resource:action pairs)
 TAB_PERMISSIONS: dict[str, str] = {
     "overview": "kitchens:read",
     "kitchens": "kitchens:read",
+    "sales": "sales:write",
     "owners": "owners:write",  # ops has owners:write; support lacks — hide owners tab
     "customers": "customers:read",
     "orders": "kitchens:read",
@@ -74,7 +75,10 @@ async def assert_admin_permission(
         )
 
 
-def tabs_for_permissions(grants: set[str]) -> list[str]:
+def tabs_for_permissions(grants: set[str], role: str | None = None) -> list[str]:
+    """Field sales only get onboard + their kitchen book — not platform KPIs or secrets."""
+    if role == "sales" and "*" not in grants:
+        return ["sales", "kitchens"]
     if "*" in grants:
         return list(TAB_PERMISSIONS.keys())
     return [tab for tab, perm in TAB_PERMISSIONS.items() if role_has_permission(grants, perm)]

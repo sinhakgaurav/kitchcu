@@ -9,7 +9,7 @@ from pathlib import Path
 
 from pdf_guide import GuidePDF
 
-GUIDE_VERSION = "1.0"
+GUIDE_VERSION = "1.1"
 GUIDE_DATE = "September 2026"
 OUTPUT = Path(__file__).resolve().parent.parent / "docs" / "TESTER-INSTRUCTION-PACK.pdf"
 
@@ -25,18 +25,19 @@ def build() -> GuidePDF:
         subtitle="Tester Instruction Pack — Numbered UI and API steps",
         audience="Audience: QA testers, release sign-off, founders doing a full pass",
         lenses=[
-            "UI — every click on portal, customer, kitchen, and Super Admin",
-            "API — Swagger Authorize, public vs padlock, owner/customer/admin calls",
+            "UI — every click on portal, customer, kitchen, Super Admin, and Sales",
+            "API — Swagger Authorize, public vs padlock, owner/customer/admin/sales calls",
             "QA — Must vs Should, defect template, Go / No-Go",
         ],
         bullets=[
             "Local Docker URLs and demo OTP 123456 (no SMS is sent)",
             "Production *.kitchcu.com extras — real OTP, admin@kitchcu.com only",
             "Six-month seed checks: Reports, Orders 90/180d, CRM, GST years",
-            "Customer: discovery, cart, checkout, track, rate, branded /k/CKPNQ001",
-            "Owner: orders lifecycle, F19/F19b stock, tenant isolation",
-            "Admin: every top tab + kitchen workspace (code immutable)",
-            "Swagger: OAuth2Password POST /api/v1/auth/token; public security: []",
+            "Customer: discovery, first-run tips, cart, checkout, track, rate",
+            "Owner: orders lifecycle, F19/F19b stock, tenant isolation, first-run tips",
+            "Admin: every top tab + kitchen Train; Sales onboard 8-step playbook",
+            "Store apps: kitchCU - customers / kitchen owner / admin (three ids)",
+            "Swagger: OAuth2Password POST /api/v1/auth/token; sales 403 on /admin/stats",
             "Source markdown: docs/TESTER-INSTRUCTION-PACK.md",
         ],
     )
@@ -58,6 +59,7 @@ def build() -> GuidePDF:
                     "4. Customer PWA :13001",
                     "5. Kitchen / owner PWA :13002",
                     "6. Super Admin :13003",
+                    "6.4 Sales onboard + Train; 6.5 store apps",
                 ],
             ),
             (
@@ -91,7 +93,7 @@ def build() -> GuidePDF:
         [
             "Pick one environment (local Docker OR production). Never mix credentials.",
             "Confirm the stack (section 1). If smoke fails, stop — do not deep-test.",
-            "Work persona by persona: Portal -> Customer -> Kitchen -> Admin -> Swagger.",
+            "Work persona by persona: Portal -> Customer -> Kitchen -> Admin -> Sales -> store shells -> Swagger.",
             "Mark every case Pass / Fail / Blocked. Write the URL, what you typed, what you saw.",
             "On Fail use the defect template. Include screenshot and X-Correlation-ID.",
             "Pass rule: every Must case Pass. Should may Fail only with a written waiver.",
@@ -115,6 +117,9 @@ def build() -> GuidePDF:
             ["Customer PWA", "http://localhost:13001"],
             ["Kitchen (owner) PWA", "http://localhost:13002"],
             ["Super Admin", "http://localhost:13003"],
+            ["kitchCU - customers (store)", "in.kitchcu.customer -> :13001"],
+            ["kitchCU - kitchen owner (store)", "in.kitchcu.kitchen -> :13002"],
+            ["kitchCU - admin (store)", "in.kitchcu.admin -> :13003"],
             ["API gateway", "http://localhost:18000"],
             ["Swagger", "http://localhost:18000/docs"],
             ["ReDoc", "http://localhost:18000/redoc"],
@@ -147,6 +152,7 @@ def build() -> GuidePDF:
             ["Customer repeat", "9123456780 / 123456", "Rahul — richer history"],
             ["Customer guest", "9988776655 / 123456", "Ananya"],
             ["Super Admin", "admin@kitchcu.dev / admin123456", "Admin Overview"],
+            ["Sales (field)", "sales@kitchcu.dev / sales123456", "Admin Sales (extras seed)"],
         ],
         widths=[40, 65, 65],
     )
@@ -190,6 +196,8 @@ def build() -> GuidePDF:
             ["S4", "Admin admin@kitchcu.dev / admin123456", "Overview KPIs; login-hint if reveal on"],
             ["S5", "Portal :13000", "Brand hero; cities; no crash"],
             ["S6", "Gateway /docs Authorize OAuth2Password", "Public no padlock; three demo logins work"],
+            ["S7", "Sales sales@kitchcu.dev / sales123456", "Nav Sales + Kitchens only; no Overview"],
+            ["S8", "First-run tips C / Kitchen / Admin", "Skip / Next / Show tips; page still usable"],
         ],
         widths=[16, 78, 76],
     )
@@ -227,6 +235,7 @@ def build() -> GuidePDF:
             "5. Enter 123456 and submit. Land on discovery home (/). Navbar shows the diner.",
             "6. Wrong OTP 000000 -> error, stay on login.",
             "7. Logout. New login must not keep another diner's cart.",
+            "8. First-run tour: Skip / Next / Done. Show tips restarts it. Does not hide kitchens.",
         ]
     )
 
@@ -281,8 +290,9 @@ def build() -> GuidePDF:
             "3. Login 9876543210 / 123456. Land on /dashboard or inbox-first Orders — never black.",
             "4. Kitchen context prefers CKPNQ001.",
             "5. Hero: name + code on the left; New order / Brand CTAs same row top-right.",
-            "6. Pills readable (no clip). Recent orders clickable; status chips use the real machine.",
-            "7. Open a recent order -> /dashboard/orders/{id}. Back returns to the list.",
+            "6. First-run tips: Skip / Next / Show tips. Must not block Orders.",
+            "7. Pills readable (no clip). Recent orders clickable; status chips use the real machine.",
+            "8. Open a recent order -> /dashboard/orders/{id}. Back returns to the list.",
         ]
     )
 
@@ -394,10 +404,11 @@ def build() -> GuidePDF:
             ["Refunds", "Open list + settlements", "Status chips; no 500"],
             ["Tickets", "Open one", "Assignee / priority / reply"],
             ["Packages", "View mapper", "Read-only without packages:write"],
-            ["Employees", "List staff", "Write hidden without employees:write"],
+            ["Employees", "List staff", "Write hidden without employees:write; role includes sales"],
+            ["Sales", "Onboard + Train", "Kitchen code; 8-step playbook; other sales 403"],
             ["API Keys", "Open a key", "Masked after save — never full secret"],
             ["Referrals", "Settings + leads", "Loads"],
-            ["Control", "Flags / journeys", "Toggles persist; no raw secrets"],
+            ["Control", "Flags / journeys / calories", "Toggles persist; kcal cap; no raw secrets"],
             ["Audit", "Recent actions", "Writes appear; no OTP/token text"],
         ],
         widths=[32, 62, 76],
@@ -408,6 +419,7 @@ def build() -> GuidePDF:
         ["Tab", "Check"],
         [
             ["Profile", "Address / branded summary; code cannot be edited"],
+            ["Train", "8-step owner playbook; sales tick kitchens they onboarded"],
             ["WhatsApp", "Kitchen phone number id only — not Meta app secret"],
             ["Payments", "Kitchen Razorpay / Route — not platform SaaS keys"],
             ["Modules", "Per-kitchen module flags"],
@@ -421,6 +433,38 @@ def build() -> GuidePDF:
     )
     pdf.body(
         "Admin must not mutate owner menu items or cook-line status from this console."
+    )
+
+    pdf.chapter("Sales onboard + Train (P55) — Must")
+    pdf.bullets(
+        [
+            "1. Log out of Super Admin. Sign in sales@kitchcu.dev / sales123456.",
+            "2. Nav is Sales + Kitchens only. Fail if Overview, Employees, API Keys, or Control appear.",
+            "3. Sales form: owner name, unused phone (e.g. 9000012345), kitchen name, address, city, pin.",
+            "4. Onboard -> kitchen code CK... issued; kitchen appears in this sales book.",
+            "5. Open kitchen Train. Confirm 8 steps: profile, live hero, recipe, radius, KYC, "
+            "test order, WhatsApp check, owner can login alone.",
+            "6. Tick profile. Count 1/8. Reload persists. Training does not block going live.",
+            "7. Super Admin Employees lists role sales. Other sales JWT -> 403 on this kitchen Train.",
+        ]
+    )
+
+    pdf.chapter("Store apps (P55)")
+    pdf.table(
+        ["Listing name", "Package / bundle", "Host"],
+        [
+            ["kitchCU - customers", "in.kitchcu.customer", "customer.kitchcu.com / :13001"],
+            ["kitchCU - kitchen owner", "in.kitchcu.kitchen", "kitchen.kitchcu.com / :13002"],
+            ["kitchCU - admin", "in.kitchcu.admin", "admin.kitchcu.com / :13003"],
+        ],
+        widths=[50, 50, 70],
+    )
+    pdf.bullets(
+        [
+            "Three different downloads — installing customers must not replace kitchen owner.",
+            "Product logic stays in the PWAs. Play steps: apps/android/README.md (three AABs).",
+            "iOS WKWebView: apps/ios/README.md. Replace TEAMID in apple-app-site-association.",
+        ]
     )
 
     # ── API ──────────────────────────────────────────────────────────────
@@ -516,6 +560,9 @@ def build() -> GuidePDF:
             "7. GET /admin/auth/login-hint -> password present locally when reveal=1.",
             "8. Repeat one admin GET with the owner token -> 401.",
             "9. GET /api/v1/internal/anything via gateway -> 404 (never proxied).",
+            "10. Sales: Authorize sales@kitchcu.dev / sales123456.",
+            "11. GET /admin/me -> allowed_tabs sales + kitchens. GET /admin/stats -> 403.",
+            "12. POST /admin/sales/onboard -> 201 kitchen code. GET/PATCH .../training 8 steps.",
         ]
     )
 
@@ -558,6 +605,8 @@ def build() -> GuidePDF:
             ["X6", "Cities on 3 PWAs", "Same live / coming-soon set"],
             ["X7", "Customer vs owner menu", "Public heroes match; drafts hidden"],
             ["X8", "Subscription + reports", "No platform food-commission %"],
+            ["X9", "Sales JWT vs /admin/stats", "403"],
+            ["X10", "C/O/A first-run overlay", "Skip or complete; Show tips restarts"],
         ],
         widths=[16, 78, 76],
     )
@@ -572,6 +621,8 @@ def build() -> GuidePDF:
             "5. Do not paste production API secrets into tickets or chat.",
             "6. Prefer weekly QA cohort phones (7YYWW... owners, 8YYWW... customers) "
             "if ops provided them — PRODUCTION-PORTALS-CREDENTIALS-QA.md.",
+            "7. Store listings (when published): three Play URLs for in.kitchcu.customer / "
+            ".kitchen / .admin — not one combined APK.",
         ]
     )
 
@@ -599,9 +650,9 @@ def build() -> GuidePDF:
         widths=[50, 120],
     )
     pdf.body(
-        "Go criteria: smoke Pass; customer Must Pass; owner Must (orders, stock, "
-        "isolation, reports seed) Pass; admin tabs + kitchen workspace Pass; "
-        "API public/owner/customer/admin + negatives Pass; X1-X4 and X8 Pass."
+        "Go criteria: smoke Pass (incl. S7 sales + S8 tours); customer Must Pass; owner Must "
+        "(orders, stock, isolation, reports seed) Pass; admin tabs + Sales/Train Pass; "
+        "API public/owner/customer/admin/sales + negatives Pass; X1-X4 and X8-X10 Pass."
     )
 
     pdf.chapter("Cross-references")
@@ -613,7 +664,8 @@ def build() -> GuidePDF:
             ["Auth / OpenAPI", "docs/API.md sections 1.1-1.2"],
             ["Prod URLs + matrix", "docs/PRODUCTION-PORTALS-CREDENTIALS-QA.md"],
             ["Seed + credentials", "docs/ADVANCEMENT-TRACKER.md"],
-            ["Encyclopedia", "docs/CKAC-COMPLETE-GUIDE.md v3.2.6"],
+            ["Encyclopedia", "docs/CKAC-COMPLETE-GUIDE.md v3.2.7"],
+            ["Store shells", "apps/android/README.md and apps/ios/README.md"],
         ],
         widths=[50, 120],
     )

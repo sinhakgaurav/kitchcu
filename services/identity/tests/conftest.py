@@ -79,6 +79,22 @@ def _truncate_tables() -> None:
                 )
             except Exception:
                 pass
+            try:
+                cur.execute(
+                    """
+                    INSERT INTO ckac_identity.healthy_food_settings (id)
+                    VALUES (1)
+                    ON CONFLICT (id) DO UPDATE SET
+                      healthy_max_kcal = 500,
+                      healthy_min_score = 65
+                    """
+                )
+            except Exception:
+                pass
+            try:
+                cur.execute("TRUNCATE TABLE ckac_identity.kitchen_training_progress")
+            except Exception:
+                pass
             cur.execute("TRUNCATE TABLE ckac_events.outbox")
     finally:
         conn.close()

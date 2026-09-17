@@ -175,6 +175,63 @@ export async function uploadCustomerLivePhoto(
   });
 }
 
+export type CustomerDietProfile = {
+  has_checkup_report: boolean;
+  parsed_at: string | null;
+  diet_filter_enabled: boolean;
+  conditions: string[];
+  avoid_ingredients: string[];
+  avoid_categories: string[];
+  avoid_name_tokens: string[];
+  prefer_categories: string[];
+  confidence: number;
+  summary: string;
+  disclaimer: string;
+};
+
+export async function fetchCustomerDietProfile(): Promise<CustomerDietProfile> {
+  return customerFetch("/api/v1/customers/me/diet-profile");
+}
+
+export async function uploadCustomerCheckupReport(
+  file: File,
+  notes?: string,
+): Promise<CustomerDietProfile> {
+  const token = getCustomerToken();
+  const form = new FormData();
+  form.append("file", file, file.name);
+  if (notes?.trim()) form.append("notes", notes.trim());
+  const res = await fetch("/api/v1/customers/me/checkup-report", {
+    method: "POST",
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+    body: form,
+  });
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(typeof body.detail === "string" ? body.detail : "Upload failed");
+  }
+  return body as CustomerDietProfile;
+}
+
+export async function updateCustomerDietFilter(enabled: boolean): Promise<CustomerDietProfile> {
+  return customerFetch("/api/v1/customers/me/diet-filter", {
+    method: "PATCH",
+    body: JSON.stringify({ enabled }),
+  });
+}
+
+export async function fetchDietCompatibleDishes(kitchenId: string): Promise<{
+  kitchen_id: string;
+  dish_ids: string[];
+  compatible_count: number;
+  total_active: number;
+  filter_applied: boolean;
+}> {
+  return customerFetch(
+    `/api/v1/customers/me/diet-compatible-dishes?kitchen_id=${encodeURIComponent(kitchenId)}`,
+  );
+}
+
 export async function loginWithCustomerOAuthProvider(
   provider: string,
   opts?: { next?: string },

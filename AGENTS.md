@@ -19,11 +19,11 @@
 | `docs/PLATFORM-SOLUTION-BLUEPRINT.md` | **Solution blueprint** — expectations → CEO/CPO solution → CTO impl → arch/DB/UX per journey & admin controls |
 | `docs/PLATFORM-STRATEGIC-ANALYSIS.md` | **Strategic analysis** — competitive, gaps, Waves A–D |
 | `docs/PLATFORM-PERSONA-DEEP-DIVE.md` | **Persona deep dive** — lived experience, scorecards, RBAC reality |
-| `docs/CKAC-COMPLETE-GUIDE.md` | **Master guide v3.2.6** — CEO + CPO + CTO encyclopedia (definitions, how/why, flows, UI Catalog, aggregated OpenAPI reference + PDF) |
+| `docs/CKAC-COMPLETE-GUIDE.md` | **Master guide v3.2.7** — CEO + CPO + CTO encyclopedia (definitions, how/why, flows, UI Catalog, aggregated OpenAPI reference + PDF) |
 | `docs/CKAC-USERFLOWS.md` | **Full user journey pack** — every persona, every screen, every API call, step-by-step (+ PDF) |
-| `docs/QA-INSTRUCTION-PACK.md` | **QA instruction pack** — smoke, list/UI polish, F19b stock/bulk prep, sign-off (+ PDF) |
-| `docs/TESTER-INSTRUCTION-PACK.md` | **Tester book** — numbered UI + Swagger/API steps for every persona (+ PDF) |
-| `docs/API.md` | **Public API reference** — auth, how to Authorize login-required routes (§1.1–1.2: OAuth2Password `POST /api/v1/auth/token` or HTTPBearer); live OpenAPI at gateway `/docs`/`/redoc`/`/openapi.json` + portal `/openapi`; Super Admin shows username/password when login-hint reveal is on |
+| `docs/QA-INSTRUCTION-PACK.md` | **QA instruction pack** — smoke, list/UI polish, F19b stock/bulk prep, P55 sales/store/tours, sign-off (+ PDF) |
+| `docs/TESTER-INSTRUCTION-PACK.md` | **Tester book** — numbered UI + Swagger/API steps for every persona including sales + store apps (+ PDF) |
+| `docs/API.md` | **Public API reference** — auth, how to Authorize login-required routes (§1.1–1.2: OAuth2Password `POST /api/v1/auth/token` or HTTPBearer; §1.4 sales onboard); live OpenAPI at gateway `/docs`/`/redoc`/`/openapi.json` + portal `/openapi`; Super Admin shows username/password when login-hint reveal is on |
 | `docs/CKAC-ARCHITECTURE-CTO.md` | **CTO layers + CPO product ↔ code map** |
 | `docs/CKAC-PRODUCT-DEPTH-GUIDE.md` | Product depth guide (superseded by Complete Guide) |
 | `docs/CKAC-IMPLEMENTATION-GUIDE.md` | **What's built — mapped to planning & system benchmarks** |
@@ -86,7 +86,11 @@
 | **Branded storefront** | `services/identity/`, `apps/website/` | **P19** — kitchen `branded_page` + customer `/k/:code` |
 | **Owner KYC** | `services/identity/`, `apps/website/` | **P49** — owner profile + live photo, masked Aadhaar/PAN; Admin kitchen KYC tab |
 | **Dish ingredient health** | `services/catalog/`, `apps/website/` | **P50** — recipe-weighted plate score + benefits/disadvantages on customer menu/Health/orders; pantry Health column; `dish_health` flag |
+| **Dish calories + healthy tag** | `services/catalog/`, `apps/website/` | **P53** — pantry `kcal_per_100`; dish `calories_description`; recipe auto-sum; automatic Healthy (complete map, Control kcal cap, score floor); Admin Pantry kcal |
+| **Calories / Healthy Control** | identity + catalog + admin PWA | **P54** — Super Admin `dish_calories` / `dish_healthy_tag` + `healthy_max_kcal` |
 | **Unique bill / GST numbers** | `services/order/`, `services/billing/`, `apps/website/` | **P51** — `{kitchen_code}-BILL-YYYYMMDD-SEQ` and `{kitchen_code}-GST-YYYYMM-SEQ`; Super Admin phone nav + table scroll |
+| **Checkup diet filter** | `services/identity/`, `apps/website/` | **P52** — customer checkup upload + ML parse; opt-in “only food I can have”; kitchens ranked by compatible dishes; `customer_diet_report` flag |
+| **Store apps + sales onboard** | identity + website PWAs + `apps/android/` + `apps/ios/` | **P55** — TWA/WKWebView shells; sales role onboard + training; in-dashboard tours |
 | **Kitchen integrations admin** | identity + billing admin APIs, admin PWA | **P21** — WhatsApp / Razorpay per kitchen (platform keys stay Admin API Keys) |
 | **Package mapper + employees RBAC** | billing packages · identity employees · admin PWA | **P25–P28** — Admin Packages/Employees; kitchen Package/Marketing/Streaming tabs; Cursor super-admin gate |
 | **Dual referrals + GST export + admin ops** | identity referrals · billing GST export · admin PWA | **P37–P39** — customer↔kitchen referrals; GST Excel/PDF; kitchen Orders/Care, ticket triage, settlements |
@@ -469,4 +473,4 @@ Delivered order only → home_taste (1–5) + quality (1–5) → optional anony
 
 ---
 
-*Last updated: Phase 1 S1–S18 + P19–P51 · unique bill/invoice numbers + admin phone layout. Tracker: `docs/ADVANCEMENT-TRACKER.md`. Portals/QA: `docs/PRODUCTION-PORTALS-CREDENTIALS-QA.md`. Guide: `docs/CKAC-COMPLETE-GUIDE.md` v3.2.6. Prod: `*.kitchcu.com`. Next: kitchen staff build · live Razorpay · E1–E2.*
+*Last updated: Phase 1 S1–S18 + P19–P55 · store apps + sales onboarding. Tracker: `docs/ADVANCEMENT-TRACKER.md`. Portals/QA: `docs/PRODUCTION-PORTALS-CREDENTIALS-QA.md`. Guide: `docs/CKAC-COMPLETE-GUIDE.md` v3.2.7. Prod: `*.kitchcu.com`. Next: kitchen staff build · live Razorpay · E1–E2.*

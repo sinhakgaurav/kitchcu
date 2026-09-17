@@ -75,6 +75,8 @@ def test_resolve_service_url_catalog():
     assert resolve_service_url("/api/v1/kitchens/me") == settings.identity_service_url
     assert resolve_service_url("/api/v1/kitchens/abc/profile") == settings.identity_service_url
     assert resolve_service_url("/api/v1/admin/kitchens/abc/profile") == settings.identity_service_url
+    assert resolve_service_url("/api/v1/admin/sales/onboard") == settings.identity_service_url
+    assert resolve_service_url("/api/v1/admin/kitchens/abc/training") == settings.identity_service_url
     assert resolve_service_url("/api/v1/admin/kitchens/abc/orders/export.csv") == settings.identity_service_url
     assert resolve_service_url("/api/v1/admin/kitchens/abc/orders/parse-stats") == settings.identity_service_url
 
@@ -150,6 +152,7 @@ def test_resolve_service_url_billing():
     )
     assert resolve_service_url("/api/v1/admin/customers") == settings.identity_service_url
     assert resolve_service_url("/api/v1/admin/feature-flags") == settings.identity_service_url
+    assert resolve_service_url("/api/v1/admin/healthy-food") == settings.identity_service_url
     assert resolve_service_url("/api/v1/admin/journeys") == settings.identity_service_url
 
 

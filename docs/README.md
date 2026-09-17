@@ -10,13 +10,13 @@
 | **[PLATFORM-SOLUTION-BLUEPRINT.md](./PLATFORM-SOLUTION-BLUEPRINT.md)** | **Solution blueprint** — every journey: expectations, CEO/CPO problem→solution, CTO impl, achievements, gaps, arch/DB/UX; admin multilevel + package planner | CEO, CPO, CTO, Ops, Support, Finance, AI agents |
 | **[PLATFORM-STRATEGIC-ANALYSIS.md](./PLATFORM-STRATEGIC-ANALYSIS.md)** | **Strategic brief** — competitive honesty, gaps, Waves A–D | CEO, CPO, CTO, Investors, AI agents |
 | **[PLATFORM-PERSONA-DEEP-DIVE.md](./PLATFORM-PERSONA-DEEP-DIVE.md)** | **Persona lived experience** — friction, scorecards, RBAC reality | CEO, CPO, CTO, Ops, Support, Finance, AI agents |
-| **[CKAC-COMPLETE-GUIDE.md](./CKAC-COMPLETE-GUIDE.md)** | **Master guide v3.2.6 — modules through P47 (Swagger tester, owner JWT type-check, gated login-hint, 6-month seed), flows §17.9–17.10, UI Catalog, OpenAPI** | CEO, CPO, CTO, DBA, QA, Investors, AI agents |
-| **[CKAC-COMPLETE-GUIDE.pdf](./CKAC-COMPLETE-GUIDE.pdf)** | Complete Executive Guide PDF v3.2.6 (portrait; UI Catalog figures) | CEO, CPO, CTO, Investors |
+| **[CKAC-COMPLETE-GUIDE.md](./CKAC-COMPLETE-GUIDE.md)** | **Master guide v3.2.7 — modules through P55 (store apps, sales onboard, tours, calories/Healthy, diet filter), flows §17.9–17.11, UI Catalog, OpenAPI** | CEO, CPO, CTO, DBA, QA, Investors, AI agents |
+| **[CKAC-COMPLETE-GUIDE.pdf](./CKAC-COMPLETE-GUIDE.pdf)** | Complete Executive Guide PDF v3.2.7 (portrait; UI Catalog figures) | CEO, CPO, CTO, Investors |
 | **[design/PLATFORM-I18N-DESIGN.md](./design/PLATFORM-I18N-DESIGN.md)** | Platform i18n — 10 locales, gate, parity checker | Engineering, Product |
 | **[design/REFERRAL-PROGRAM-DESIGN.md](./design/REFERRAL-PROGRAM-DESIGN.md)** | Dual referral program design pack | Engineering, Product |
 | **[CKAC-USERFLOWS.md](./CKAC-USERFLOWS.md)** | **Full user journey pack** — every persona, every screen, every API call, step-by-step | Product, Design, Engineering, QA |
 | **[CKAC-USERFLOWS.pdf](./CKAC-USERFLOWS.pdf)** | User journey pack PDF | Product, Design, Investors |
-| **[TESTER-INSTRUCTION-PACK.md](./TESTER-INSTRUCTION-PACK.md)** | **Tester book** — numbered UI + Swagger/API steps for portal, customer, kitchen, admin | QA testers, release sign-off |
+| **[TESTER-INSTRUCTION-PACK.md](./TESTER-INSTRUCTION-PACK.md)** | **Tester book v1.1** — numbered UI + Swagger/API steps for portal, customer, kitchen, admin, **sales**, store apps | QA testers, release sign-off |
 | **[TESTER-INSTRUCTION-PACK.pdf](./TESTER-INSTRUCTION-PACK.pdf)** | Same pack as PDF | Testers (field use) |
 | **[assets/ui/](./assets/ui/)** | **Reference UI screenshots** (8 surfaces: portal, customer home/login, kitchen login, owner dashboard, admin login/overview/Control) — Complete Guide §18 | Product, Design, Engineering |
 | **[API.md](./API.md)** | **Public API reference** — auth, body/response examples, error codes; live aggregated spec via gateway `/openapi.json`/`/docs`/`/redoc` and portal `/openapi` | Engineering, Partners |
@@ -63,7 +63,8 @@ python scripts/generate_tester_instruction_pdf.py
 
 ## Quick Stats
 
-- **S1–S18 + P19–P47 shipped** — track progress in [ADVANCEMENT-TRACKER.md](./ADVANCEMENT-TRACKER.md); encyclopedia [Complete Guide v3.2.6](./CKAC-COMPLETE-GUIDE.md)
+- **S1–S18 + P19–P55 shipped** — track progress in [ADVANCEMENT-TRACKER.md](./ADVANCEMENT-TRACKER.md); encyclopedia [Complete Guide v3.2.7](./CKAC-COMPLETE-GUIDE.md)
+- **Store apps:** **kitchCU - customers** · **kitchCU - kitchen owner** · **kitchCU - admin** (`in.kitchcu.customer` / `.kitchen` / `.admin`) — [android README](../apps/android/README.md) · [ios README](../apps/ios/README.md)
 - **GCP seed:** first-boot `bulk-seed.sh` + Monday weekly cohort timer — [DEPLOYMENT-GCP.md](./DEPLOYMENT-GCP.md) §11.7–§11.7c
 - **i18n:** 12 locales (en + 11 IN) — parity `python scripts/check-i18n-locale-parity.py` · sync `python scripts/sync-i18n-missing-keys.py`
 - **Cities presence:** Pune, Mumbai, Delhi NCR, UP belt (Lucknow/Kanpur/Prayagraj/Varanasi/Jhansi), Dehradun + coming soon metros — UI `#cities` on portal / customer / kitchen

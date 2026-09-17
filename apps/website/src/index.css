@@ -3164,7 +3164,7 @@ html.theme-brand-light .contact__form label {
   width: 100%;
   box-sizing: border-box;
 }
-.admin-section-head { margin-bottom: 1.5rem; }
+.admin-section-head { margin-bottom: 1.5rem; display: flex; justify-content: space-between; gap: 1rem; align-items: flex-start; flex-wrap: wrap; }
 .admin-section-head h1 { font-family: var(--font-display); font-size: 1.5rem; margin: 0 0 0.35rem; }
 .admin-section-head p { color: var(--text-muted); font-size: 0.9rem; margin: 0; }
 .admin-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 1rem; margin-top: 1rem; }
@@ -4583,6 +4583,22 @@ html.theme-brand-light .social-btn {
 .customer-dash__tips { list-style: none; padding: 0; margin: 0.75rem 0 0; display: grid; gap: 0.65rem; }
 .customer-dash__tips li { display: flex; flex-direction: column; gap: 0.15rem; }
 .customer-dash__tips span { color: var(--text-muted); font-size: 0.9rem; }
+.customer-dash__checkup {
+  display: grid;
+  gap: 0.7rem;
+  margin: 0.85rem 0 1.25rem;
+  max-width: 32rem;
+}
+.customer-dash__checkup label { display: grid; gap: 0.3rem; font-size: 0.9rem; }
+.customer-dash__checkup textarea,
+.customer-dash__checkup input[type="file"] {
+  font: inherit;
+  border-radius: 10px;
+  border: 1px solid var(--line, rgba(15, 118, 110, 0.25));
+  padding: 0.45rem 0.6rem;
+  background: rgba(255, 255, 255, 0.7);
+}
+.customer-dash__checkup-result { display: grid; gap: 0.55rem; margin-bottom: 1.4rem; }
 @media (max-width: 720px) {
   .customer-profile-id {
     grid-template-columns: auto 1fr;
@@ -4663,6 +4679,28 @@ html.theme-brand-light .social-btn {
   font-size: 1.65rem;
   font-variant-numeric: tabular-nums;
   color: var(--brand-teal, #0d7377);
+}
+.dish-health__tag {
+  display: inline-block;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 0.18rem 0.5rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, #2f9e44 18%, #fffaf3);
+  color: #1e7a32;
+  margin-right: 0.2rem;
+}
+.dish-health__kcal {
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+  color: var(--brand-teal, #0d7377);
+}
+.dish-health__note {
+  margin: 0 0 0.7rem;
+  font-size: 0.9rem;
+  color: var(--text, #1a1a1a);
 }
 .dish-health__list {
   list-style: none;
@@ -5052,6 +5090,11 @@ html.theme-brand-light .social-btn {
   color: var(--orange-light, #ff8a50);
 }
 
+.dish-badge--healthy {
+  background: color-mix(in srgb, #2f9e44 22%, transparent);
+  color: #1e7a32;
+}
+
 .dish-highlight-fieldset {
   border: 1px solid var(--surface-border, rgba(255, 255, 255, 0.12));
   border-radius: 10px;
@@ -5095,4 +5138,68 @@ html.theme-brand-light .social-btn {
   clip: rect(0, 0, 0, 0);
   white-space: nowrap;
   border: 0;
+}
+
+.kc-tour {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding: 1.25rem;
+  background: rgba(11, 27, 50, 0.45);
+}
+.kc-tour__card {
+  width: min(28rem, 100%);
+  background: var(--cream, #fff8ee);
+  color: var(--navy, #0b1b32);
+  border-radius: var(--radius-lg);
+  padding: 1.25rem 1.35rem 1.1rem;
+  box-shadow: 0 18px 50px rgba(11, 27, 50, 0.28);
+  border: 1px solid rgba(46, 196, 182, 0.28);
+}
+.kc-tour__card h2 {
+  font-family: var(--font-display);
+  font-size: 1.2rem;
+  margin: 0 0 0.4rem;
+}
+.kc-tour__card p { margin: 0 0 1rem; color: #334155; }
+.kc-tour__count {
+  font-size: 0.75rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--teal-deep, #1a9b90);
+  margin: 0 0 0.35rem !important;
+}
+.kc-tour__actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.75rem;
+}
+.kc-tour__nav { display: flex; gap: 0.4rem; }
+.kc-train-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+}
+.kc-train-list li label {
+  display: flex;
+  gap: 0.7rem;
+  align-items: flex-start;
+  cursor: pointer;
+}
+.kc-train-list li span { display: flex; flex-direction: column; gap: 0.2rem; }
+.kc-train-list__done strong { color: var(--teal-deep, #1a9b90); }
+.kc-form-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(8rem, 1fr));
+  gap: 0.75rem;
+}
+@media (min-width: 720px) {
+  .kc-tour { align-items: center; }
 }

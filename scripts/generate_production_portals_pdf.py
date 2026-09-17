@@ -8,7 +8,7 @@ from pathlib import Path
 
 from pdf_guide import GuidePDF
 
-GUIDE_VERSION = "1.2"
+GUIDE_VERSION = "1.3"
 GUIDE_DATE = "September 2026"
 OUTPUT = Path(__file__).resolve().parent.parent / "docs" / "PRODUCTION-PORTALS-CREDENTIALS-QA.pdf"
 
@@ -30,7 +30,8 @@ def build() -> GuidePDF:
         ],
         bullets=[
             "Production: kitchcu.com, customer / kitchen / admin / api.kitchcu.com",
-            "Demo logins for local QA; production admin@kitchcu.com + Secret Manager",
+            "Three store apps: kitchCU - customers / kitchen owner / admin",
+            "Demo logins for local QA including sales@kitchcu.dev; production admin@kitchcu.com",
             "Weekly QA cohort + GCP bulk-seed.sh / systemd timer at /opt/ckac",
             "Cities presence: Delhi NCR, UP belt, Dehradun, Mumbai + coming soon",
             "F01-F48 condensed matrix with test steps",
@@ -69,7 +70,10 @@ def build() -> GuidePDF:
             ["Marketing portal", "https://kitchcu.com", "Prospects / owners"],
             ["Customer PWA", "https://customer.kitchcu.com", "Diners"],
             ["Kitchen PWA", "https://kitchen.kitchcu.com", "Owners"],
-            ["Admin console", "https://admin.kitchcu.com", "Platform staff"],
+            ["Admin console", "https://admin.kitchcu.com", "Staff + sales"],
+            ["kitchCU - customers", "in.kitchcu.customer", "Diners (store)"],
+            ["kitchCU - kitchen owner", "in.kitchcu.kitchen", "Owners (store)"],
+            ["kitchCU - admin", "in.kitchcu.admin", "Admin + sales (store)"],
             ["API gateway", "https://api.kitchcu.com", "All clients"],
             ["Media", "https://media.kitchcu.com", "Assets"],
         ],
@@ -87,6 +91,7 @@ def build() -> GuidePDF:
             ["Owner", "9876543210 / OTP 123456", "Kitchen CKPNQ001 + multi-city kitchens"],
             ["Customer", "9123456789 / OTP 123456", "Extra phones in AGENTS.md"],
             ["Admin", "admin@kitchcu.dev / admin123456", "Dev only"],
+            ["Sales", "sales@kitchcu.dev / sales123456", "Role sales; Sales + Kitchens"],
         ],
         widths=[35, 75, 60],
     )
@@ -170,6 +175,8 @@ def build() -> GuidePDF:
             ["F42-F44", "Pay + split", "Checkout intent; multi-kitchen settle"],
             ["Refunds", "UPI/bank payout", "C Account UPI; O refund status"],
             ["F45-F48", "Notify + live stream", "Status notify; Go live / watch"],
+            ["P52-P54", "Diet / calories / Healthy", "Report filter; Control kcal cap"],
+            ["P55", "Store apps + sales", "sales@ onboard; Train 8 steps; three listings"],
         ],
         widths=[25, 55, 90],
     )
@@ -182,6 +189,7 @@ def build() -> GuidePDF:
             "Admin login with production credentials only",
             "Customer #cities section visible; language switcher works",
             "Confirm APP_ENV=production rejects OTP 123456",
+            "Store apps (when listed): three Play/App names kitchCU - customers / kitchen owner / admin",
         ]
     )
 

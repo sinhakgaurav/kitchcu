@@ -30,6 +30,8 @@ export type DiscoveryKitchenCard = {
   min_dish_price: number | null;
   tagline: string | null;
   logo_url: string | null;
+  compatible_dish_count?: number | null;
+  better_for_report?: boolean;
 };
 
 export type DiscoveryDishCard = {
@@ -54,14 +56,17 @@ export type DiscoveryHome = {
   most_liked: DiscoveryKitchenCard[];
   live_now: DiscoveryKitchenCard[];
   cheapest_dishes: DiscoveryDishCard[];
+  diet_filter_applied?: boolean;
 };
 
 async function publicFetch<T>(path: string, init?: RequestInit): Promise<T> {
+  const token = getCustomerToken();
   const res = await fetch(path, {
     ...init,
     headers: {
       Accept: "application/json",
       "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
       ...(init?.headers as Record<string, string> | undefined),
     },
   });

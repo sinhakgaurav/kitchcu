@@ -9,7 +9,7 @@ from pathlib import Path
 
 from pdf_guide import GuidePDF
 
-GUIDE_VERSION = "1.5"
+GUIDE_VERSION = "1.6"
 GUIDE_DATE = "September 2026"
 OUTPUT = Path(__file__).resolve().parent.parent / "docs" / "CKAC-USERFLOWS.pdf"
 UI = Path(__file__).resolve().parent.parent / "docs" / "assets" / "ui"
@@ -32,12 +32,12 @@ def build() -> GuidePDF:
             "QA — success screens, failure paths, order status state machine",
         ],
         bullets=[
-            "9 major flows: owner onboarding, daily ops, customer checkout, multi-kitchen",
+            "9 major flows plus P55 sales onboard + store shells",
             "split settlement, GST close, admin ops, customer login, coupons, live stream",
             "Order status state machine + JWT auth types table",
             "Gateway proxy map + cross-links to API.md, Complete Guide, UI screenshots",
             "Every route/event traced directly from services/*/app source, September 2026",
-            "P47: Swagger OAuth2Password POST /api/v1/auth/token; owner JWT type=owner",
+            "P55: kitchCU - customers / kitchen owner / admin; sales@ onboard + Train",
         ],
     )
 
@@ -60,7 +60,8 @@ def build() -> GuidePDF:
             "7. Customer WhatsApp OTP / OAuth login",
         ]),
         ("PART III — Platform & Growth Flows", [
-            "6. Admin: login -> overview -> Customers/Refunds/Control/Tickets",
+            "6. Admin: login -> overview -> Customers/Refunds/Sales/Control/Tickets",
+            "6b. Sales onboard kitchen + Train + store shells (P55)",
             "8. Coupon apply / CRM promotion path",
             "9. Live stream opt-in (owner go-live, customer live filter)",
         ]),
@@ -109,7 +110,8 @@ def build() -> GuidePDF:
             ["Guest / prospect", "Portal", "kitchcu.in : 13000", "none"],
             ["Owner / chef", "Kitchen", "kitchen.kitchcu.in : 13002", "owner"],
             ["Customer / diner", "Customer", "customer.kitchcu.in : 13001", "customer"],
-            ["Platform admin", "Admin", "admin.kitchcu.in : 13003", "admin"],
+            ["Platform admin", "Admin / kitchCU - admin", "admin.kitchcu.in : 13003", "admin"],
+            ["Field sales", "Admin Sales tab", "admin.kitchcu.in : 13003", "admin (role sales)"],
         ],
         [45, 30, 75, 20],
         size=7,
@@ -149,6 +151,7 @@ def build() -> GuidePDF:
             ["Customer", "9123456780", "OTP 123456", "Rahul Menon - repeat/VIP segment"],
             ["Customer", "9988776655", "OTP 123456", "Ananya Guest - guest checkout"],
             ["Admin", "admin@kitchcu.dev", "admin123456", "Platform scope only"],
+            ["Sales", "sales@kitchcu.dev", "sales123456", "Role sales; Sales + Kitchens"],
         ],
         [30, 42, 38, 60],
         size=6,
@@ -319,19 +322,42 @@ def build() -> GuidePDF:
     pdf.chapter("Flow 6 -- Admin Login -> Overview -> Tickets")
     pdf.body(
         "Goal: platform-scope oversight -- is the platform healthy, who is stuck -- "
-        "never owner-scope menu/order mutation."
+        "never owner-scope menu/order mutation. Sales role sees Sales + Kitchens only."
     )
     pdf.mono(
         "POST /admin/auth/login              -> admin JWT (type=admin)\n"
-        "GET /admin/stats                    -> platform counters\n"
+        "GET /admin/stats                    -> platform counters (403 for role sales)\n"
         "GET /admin/owners | /admin/kitchens | /admin/orders  -> platform-wide lists\n"
         "PATCH /admin/kitchens/{id}/status   -> moderate (suspend etc.)\n"
+        "POST /admin/sales/onboard           -> kitchen.created + owner.created\n"
+        "GET/PATCH /admin/kitchens/{id}/training -> kitchen.training.updated\n"
         "GET /admin/tickets -> GET /admin/tickets/{id} -> PATCH ... -> POST .../reply\n"
         "  -> support.ticket.created / .updated / .replied (ckac:notify:support)"
     )
     pdf.body(
         "Admin JWT used against an owner-mutation route -> 403 by design (scope is "
         "intentionally narrow). Wrong password -> 401."
+    )
+
+    pdf.chapter("Flow 6b -- Sales onboard + Train + store shells (P55)")
+    pdf.body(
+        "Goal: field sales create a kitchen, walk the owner through an 8-step playbook. "
+        "Store listings wrap the same PWAs -- three downloads, not a native rewrite."
+    )
+    pdf.mono(
+        "POST /admin/auth/login  (sales@kitchcu.dev) -> JWT type=admin role=sales\n"
+        "GET /admin/me -> allowed_tabs sales + kitchens\n"
+        "GET /admin/stats -> 403\n"
+        "POST /admin/sales/onboard -> 201 kitchen code; onboarded_by_admin_id\n"
+        "GET/PATCH /admin/kitchens/{id}/training -> keys: profile, live_hero, recipe,\n"
+        "  radius, kyc, test_order, whatsapp, handoff; event kitchen.training.updated\n"
+        "Store: kitchCU - customers (in.kitchcu.customer)\n"
+        "       kitchCU - kitchen owner (in.kitchcu.kitchen)\n"
+        "       kitchCU - admin (in.kitchcu.admin)"
+    )
+    pdf.body(
+        "Other sales JWT cannot PATCH training for this kitchen (403). "
+        "Play steps: apps/android/README.md. iOS: apps/ios/README.md."
     )
 
     pdf.chapter("Flow 8 -- Coupon Apply / CRM Promotion Path")
@@ -471,17 +497,17 @@ def build() -> GuidePDF:
         ["Field", "Value"],
         [
             ["Document", "CKAC-USERFLOWS.md / .pdf"],
-            ["Version", "1.5"],
+            ["Version", "1.6"],
             ["Date", "September 2026"],
             ["Traceability", "Every route/event read directly from services/*/app source"],
             ["Change policy", "Update .md whenever a route/event/status changes; regenerate PDF same change"],
-            ["Supersedes", "v1.4; aligned with Complete Guide v3.2.6 (P47 Swagger tester)"],
+            ["Supersedes", "v1.5; aligned with Complete Guide v3.2.7 (P55 store apps + sales)"],
         ],
         [40, 130],
         size=7,
     )
     pdf.quote(
-        "KitchCu User Flow Documentation Pack v1.5 - Confidential - September 2026."
+        "KitchCu User Flow Documentation Pack v1.6 - Confidential - September 2026."
     )
 
     return pdf

@@ -74,6 +74,7 @@ class Dish(Base):
     delivery_time_min: Mapped[int | None] = mapped_column(Integer, nullable=True)
     max_time_min: Mapped[int] = mapped_column(Integer, default=30)
     ingredients_description: Mapped[str | None] = mapped_column(Text)
+    calories_description: Mapped[str | None] = mapped_column(Text)
     quality_measures: Mapped[str | None] = mapped_column(Text)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     is_featured: Mapped[bool] = mapped_column(Boolean, default=False)
@@ -112,6 +113,7 @@ class Ingredient(Base):
     pack_size: Mapped[float | None] = mapped_column(Numeric(12, 3), nullable=True)
     pack_label: Mapped[str | None] = mapped_column(String(80), nullable=True)
     photo_url: Mapped[str | None] = mapped_column(Text, nullable=True)
+    kcal_per_100: Mapped[float | None] = mapped_column(Numeric(8, 2), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(UTC)
     )

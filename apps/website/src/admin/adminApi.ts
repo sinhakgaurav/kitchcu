@@ -127,6 +127,9 @@ export type AdminCustomer = {
   has_payout: boolean;
   has_avatar?: boolean;
   has_live_photo?: boolean;
+  has_checkup_report?: boolean;
+  diet_filter_enabled?: boolean;
+  diet_conditions?: string[];
   address_count: number;
   created_at: string;
 };
@@ -135,6 +138,8 @@ export type AdminCustomerDetail = AdminCustomer & {
   avatar_url?: string | null;
   live_photo_url?: string | null;
   live_photo_captured_at?: string | null;
+  diet_summary?: string | null;
+  diet_avoid_categories?: string[];
   upi_vpa: string | null;
   upi_qr_url: string | null;
   bank_account_number_masked: string | null;
@@ -296,6 +301,30 @@ export async function updateAdminRateLimits(body: {
   });
 }
 
+export type AdminHealthyFoodSettings = {
+  healthy_max_kcal: number;
+  healthy_min_score: number;
+  dish_calories_enabled: boolean;
+  dish_healthy_tag_enabled: boolean;
+  updated_at: string | null;
+};
+
+export async function fetchAdminHealthyFood() {
+  return adminFetch<AdminHealthyFoodSettings>("/api/v1/admin/healthy-food");
+}
+
+export async function updateAdminHealthyFood(body: {
+  healthy_max_kcal?: number;
+  healthy_min_score?: number;
+  dish_calories_enabled?: boolean;
+  dish_healthy_tag_enabled?: boolean;
+}) {
+  return adminFetch<AdminHealthyFoodSettings>("/api/v1/admin/healthy-food", {
+    method: "PATCH",
+    body: JSON.stringify(body),
+  });
+}
+
 export type PlatformApiKey = {
   key: string;
   category: string;
@@ -417,6 +446,76 @@ export async function fetchAdminKitchens() {
 
 export async function fetchAdminKitchen(kitchenId: string) {
   return adminFetch<AdminKitchenDetail>(`/api/v1/admin/kitchens/${kitchenId}`);
+}
+
+export type KitchenTrainingStep = {
+  key: string;
+  title: string;
+  coach: string;
+  completed: boolean;
+  completed_at: string | null;
+  note: string | null;
+};
+
+export type KitchenTraining = {
+  kitchen_id: string;
+  completed: number;
+  total: number;
+  steps: KitchenTrainingStep[];
+};
+
+export type SalesKitchenCard = {
+  id: string;
+  code: string;
+  name: string;
+  city: string | null;
+  status: string;
+  owner_name: string;
+  owner_phone: string;
+  owner_id: string;
+  onboarded_by_admin_id: string | null;
+  training_completed: number;
+  training_total: number;
+};
+
+export type SalesOnboardResponse = {
+  owner_created: boolean;
+  kitchen: SalesKitchenCard;
+  training: KitchenTraining;
+  owner_login_hint: string;
+};
+
+export async function salesOnboardKitchen(data: {
+  owner_name: string;
+  owner_phone: string;
+  owner_email?: string | null;
+  kitchen_name: string;
+  description?: string | null;
+  address_line: string;
+  city: string;
+  state: string;
+  pincode?: string | null;
+  latitude: number;
+  longitude: number;
+}) {
+  return adminFetch<SalesOnboardResponse>("/api/v1/admin/sales/onboard", {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+}
+
+export async function fetchKitchenTraining(kitchenId: string) {
+  return adminFetch<KitchenTraining>(`/api/v1/admin/kitchens/${kitchenId}/training`);
+}
+
+export async function patchKitchenTraining(
+  kitchenId: string,
+  data: { step_key: string; completed: boolean; note?: string | null },
+) {
+  return adminFetch<KitchenTraining>(`/api/v1/admin/kitchens/${kitchenId}/training`, {
+    method: "PATCH",
+    body: JSON.stringify(data),
+  });
 }
 
 export async function updateAdminKitchenBrandedPage(
@@ -592,6 +691,7 @@ export type AdminPantryIngredient = {
   health_score?: number | null;
   health_benefits?: string | null;
   health_disadvantages?: string | null;
+  kcal_per_100?: number | null;
 };
 
 export type AdminKitchenPantry = {

@@ -5,10 +5,10 @@
 | Field | Value |
 |-------|-------|
 | Version | **2.0** |
-| Status | **S1–S18 shipped** + post-S18 **P19–P28** (packages, templates, employees RBAC, kitchen workspace); E1/E2 = design pack only |
-| Last updated | September 2026 |
+| Status | **S1–S18 shipped** + post-S18 **P19–P55** (store apps, sales onboard, tours, calories/Healthy, diet filter); E1/E2 = design pack only |
+| Last updated | 2026-09-17 |
 | Advancement | **[ADVANCEMENT-TRACKER.md](./ADVANCEMENT-TRACKER.md)** — sprint board + release gate |
-| Encyclopedia | **[CKAC-COMPLETE-GUIDE.md](./CKAC-COMPLETE-GUIDE.md) v3.2.6** — through P47 (Swagger `POST /api/v1/auth/token`, owner JWT type-check, gated login-hint, 6-month seed); UI Catalog; OpenAPI |
+| Encyclopedia | **[CKAC-COMPLETE-GUIDE.md](./CKAC-COMPLETE-GUIDE.md) v3.2.7** — through P55; UI Catalog; OpenAPI |
 | Companion docs | [Planning Benchmark](./CKAC-COMPLETE-PLANNING-BENCHMARK.md) · [System Benchmark](./CKAC-SYSTEM-BENCHMARK.md) · [CPO Blueprint v4.2](./CKAC-CPO-PRODUCT-BLUEPRINT.md) · [CTO Architecture](./CKAC-ARCHITECTURE-CTO.md) · [Development Phases](./DEVELOPMENT-PHASES.md) · [User Flows](./CKAC-USERFLOWS.md) · [API.md](./API.md) · [AGENTS.md](../AGENTS.md) · [UI shots](./assets/ui/) |
 
 > For deep definitions, module logic, Mermaid flows, and annotated screenshots, prefer the Complete Guide. This file remains the **code ↔ feature map** (what's wired where).
@@ -77,9 +77,10 @@
 
 | Persona | Goal | Surface today | Surface planned |
 |---------|------|---------------|-----------------|
-| **Raj (Owner)** | Run kitchen, see orders | **kitchen.kitchcu.in** PWA (orders, menu, reports) | Full offline PWA (S5+) |
-| **Priya (Customer)** | Order trusted food | **customer.kitchcu.in** PWA (browse, nearby) | Checkout + accounts (Phase 2) |
-| **Platform admin** | Moderate, support, refunds, packages, staff RBAC | **admin.kitchcu.in** (Overview, Packages, Employees, Control, kitchen workspace) | Super-admin plane ✅ P25–P28 |
+| **Raj (Owner)** | Run kitchen, see orders | **kitchen.kitchcu.in** PWA · **kitchCU - kitchen owner** | Same product (TWA/WKWebView) |
+| **Priya (Customer)** | Order trusted food | **customer.kitchcu.in** PWA · **kitchCU - customers** | Same product |
+| **Platform admin** | Moderate, support, refunds, packages, staff RBAC | **admin.kitchcu.in** · **kitchCU - admin** | Super-admin plane ✅ P25–P28 |
+| **Field sales** | Onboard kitchens + train owners | Admin **Sales** + kitchen **Train** (same admin app) | Role `sales`; no platform secrets ✅ P55 |
 
 **Maps to:** Planning Benchmark [§2.2 Personas](./CKAC-COMPLETE-PLANNING-BENCHMARK.md#22-personas-detailed) · System Benchmark [§2.2 Personas](./CKAC-SYSTEM-BENCHMARK.md#22-personas)
 
@@ -135,7 +136,7 @@ Legend: ✅ Done · 🟡 Partial · ⏳ Not started
 
 F19–F24, F46–F48 — **shipped** in S15–S18 (see [ADVANCEMENT-TRACKER.md](./ADVANCEMENT-TRACKER.md)). Per-dish go-live showcase = **P22**.
 
-### Post-S18 platform ops (P19–P41)
+### Post-S18 platform ops (P19–P55)
 
 | ID | Feature | Status | Code / notes |
 |----|---------|--------|--------------|
@@ -148,6 +149,12 @@ F19–F24, F46–F48 — **shipped** in S15–S18 (see [ADVANCEMENT-TRACKER.md](
 | P39 | Super-admin ops console | ✅ | Admin orders filters · ticket triage · settlements · kitchen Care/Orders |
 | P40 | Platform i18n + security harden | ✅ | `apps/website/src/i18n/` · sanitize HTML · API-key mask |
 | P41 | Audit gap close + GCP seed | ✅ | Identity profile PATCH · catalog owner dish list · owner Ratings/settlements · admin RBAC/stream · `infra/gcp-vm/bulk-seed.sh` + weekly timer at `/opt/ckac` |
+| P50 | Dish ingredient health | ✅ | Catalog `dish_health` · customer Health block |
+| P51 | Unique bill / GST numbers | ✅ | `{kitchen_code}-BILL-…` / `{kitchen_code}-GST-…` |
+| P52 | Checkup diet filter | ✅ | Identity `028` · customer **As per my report** |
+| P53 | Dish calories + Healthy tag | ✅ | Catalog `011` · pantry kcal · automatic Healthy |
+| P54 | Calories / Healthy Control | ✅ | Identity `029` · Admin Control kcal cap |
+| P55 | Store apps + sales onboard | ✅ | Identity `030` · Admin Sales/Train · `apps/android/` · `apps/ios/` · tours |
 
 **Maps to:** Planning Benchmark [§11 Feature Index](./CKAC-COMPLETE-PLANNING-BENCHMARK.md#11-feature-index-all-45-features) · [ADVANCEMENT-TRACKER.md](./ADVANCEMENT-TRACKER.md) · DEVELOPMENT-PHASES.md
 

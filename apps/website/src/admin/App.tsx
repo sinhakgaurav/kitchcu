@@ -24,6 +24,8 @@ import {
   fetchAdminKitchenStreamSummary,
   fetchAdminKitchenPantry,
   fetchAdminKitchenWhatsApp,
+  fetchKitchenTraining,
+  patchKitchenTraining,
   updateAdminKitchenDeliverySettings,
   updateAdminKitchenProfile,
   updateAdminKitchenBrandedPage,
@@ -67,6 +69,7 @@ import {
   type AdminKitchenWhatsApp,
   type AdminPackage,
   type AdminMe,
+  type KitchenTraining,
   type AdminGstMonthlyReport,
   type AdminGstProfile,
   type AdminReferralLead,
@@ -83,6 +86,7 @@ import {
   AdminEmployeesPanel,
   AdminPackagesPanel,
   AdminRefunds,
+  AdminSalesPanel,
 } from "./AdminPanels";
 import {
   buildOrderTimeline,
@@ -91,6 +95,7 @@ import {
   buildTopKitchens,
 } from "./adminCharts";
 import { roleHasPermission } from "./rbac";
+import { ProductTour, TourReplayButton } from "../components/ProductTour";
 import { ADMIN_DEV_EMAIL, ADMIN_HOST, CUSTOMER_HOST, KITCHEN_HOST } from "../shared/brand";
 import { DEMO_ADMIN, DEMO_OWNERS, adminLoginDefaults } from "../shared/demo";
 import { showDemoCredentials } from "../shared/env";
@@ -105,6 +110,7 @@ import "../owner-app.css";
 type Tab =
   | "overview"
   | "kitchens"
+  | "sales"
   | "owners"
   | "customers"
   | "orders"
@@ -119,6 +125,7 @@ type Tab =
 
 const TABS: { id: Tab; label: string }[] = [
   { id: "overview", label: "Overview" },
+  { id: "sales", label: "Sales" },
   { id: "kitchens", label: "Kitchens" },
   { id: "owners", label: "Owners" },
   { id: "customers", label: "Customers" },
@@ -147,10 +154,12 @@ type KitchenPanelTab =
   | "gst"
   | "orders"
   | "pantry"
-  | "kyc";
+  | "kyc"
+  | "train";
 
 const KITCHEN_PANEL_TABS: { id: KitchenPanelTab; label: string }[] = [
   { id: "profile", label: "Profile" },
+  { id: "train", label: "Train" },
   { id: "brand", label: "Brand" },
   { id: "whatsapp", label: "WhatsApp" },
   { id: "payments", label: "Payments" },
@@ -179,7 +188,11 @@ const TAB_META: Record<Tab, { title: string; desc: string }> = {
   },
   kitchens: {
     title: "Kitchens",
-    desc: "Kitchen workspace — brand, WhatsApp, payments, GST, pantry, KYC, package, marketing, modules, streaming",
+    desc: "Kitchen workspace — brand, WhatsApp, payments, GST, pantry, KYC, package, marketing, modules, streaming, owner training",
+  },
+  sales: {
+    title: "Sales onboarding",
+    desc: "Create owner + kitchen on-site, then walk the 8-step training playbook",
   },
   owners: { title: "Owners", desc: "Subscription tiers and kitchen counts — force plan changes" },
   customers: {
@@ -198,7 +211,7 @@ const TAB_META: Record<Tab, { title: string; desc: string }> = {
   },
   employees: {
     title: "Employees",
-    desc: "kitchCU staff CRUD with RBAC roles (superadmin, ops, support, finance)",
+    desc: "kitchCU staff CRUD with RBAC roles (superadmin, ops, support, finance, sales)",
   },
   "api-keys": {
     title: "Platform API keys",
@@ -433,9 +446,50 @@ export default function AdminApp() {
 
         <div className="admin-main">
           <header className="admin-section-head">
-            <h1>{TAB_META[tab]?.title || "Admin"}</h1>
-            <p>{TAB_META[tab]?.desc || ""}</p>
+            <div>
+              <h1>{TAB_META[tab]?.title || "Admin"}</h1>
+              <p>{TAB_META[tab]?.desc || ""}</p>
+            </div>
+            <TourReplayButton id={me?.role === "sales" ? "sales" : "admin"} label="Show tips" />
           </header>
+
+          {me?.role === "sales" ? (
+            <ProductTour
+              id="sales"
+              steps={[
+                {
+                  title: "Onboard on-site",
+                  body: "Open Sales. Enter the owner’s phone and name, kitchen address, and the map pin that matches the stall. Create — they get a kitchen code.",
+                },
+                {
+                  title: "Train with the owner",
+                  body: "Tick the playbook while they do it on the Kitchen app: live dish photo, recipe, radius, KYC, a test order, then they log in alone.",
+                },
+                {
+                  title: "Your kitchen book",
+                  body: "Kitchens lists only kitchens you onboarded. You can correct profile and pin. You cannot open Control, API Keys, or another rep’s book.",
+                },
+              ]}
+            />
+          ) : (
+            <ProductTour
+              id="admin"
+              steps={[
+                {
+                  title: "Platform pulse",
+                  body: "Overview is KPIs only. Hire sales under Employees (role sales) so field staff onboard without seeing secrets.",
+                },
+                {
+                  title: "Kitchen workspace",
+                  body: "Open a kitchen for profile, KYC, WhatsApp phone id, payments, package, and Train. Kitchen code never changes.",
+                },
+                {
+                  title: "Control and keys",
+                  body: "Flags and platform Meta/Razorpay secrets stay here. Sales never pastes SaaS secrets. Same product in the Admin store app.",
+                },
+              ]}
+            />
+          )}
 
           {error && <p className="auth-card__error">{error}</p>}
 
@@ -458,8 +512,14 @@ export default function AdminApp() {
               onFocusConsumed={() => setFocusKitchenId(null)}
               canWriteKitchen={roleHasPermission(me?.permissions, "kitchens:write")}
               canWritePackages={roleHasPermission(me?.permissions, "packages:write")}
+              canTrain={
+                roleHasPermission(me?.permissions, "sales:write") ||
+                roleHasPermission(me?.permissions, "kitchens:write")
+              }
+              isSales={me?.role === "sales"}
             />
           )}
+          {tab === "sales" && <AdminSalesPanel />}
           {tab === "owners" && <AdminOwners />}
           {tab === "customers" && (
             <AdminCustomers canWrite={roleHasPermission(me?.permissions, "customers:write")} />
@@ -1009,11 +1069,15 @@ function AdminKitchens({
   onFocusConsumed,
   canWriteKitchen = false,
   canWritePackages = false,
+  canTrain = false,
+  isSales = false,
 }: {
   focusKitchenId?: string | null;
   onFocusConsumed?: () => void;
   canWriteKitchen?: boolean;
   canWritePackages?: boolean;
+  canTrain?: boolean;
+  isSales?: boolean;
 } = {}) {
   const [rows, setRows] = useState<AdminKitchen[]>([]);
   const [loading, setLoading] = useState(true);
@@ -1028,6 +1092,7 @@ function AdminKitchens({
   const [allPackages, setAllPackages] = useState<AdminPackage[]>([]);
   const [templates, setTemplates] = useState<{ id: string; channel: string; name: string; is_active: boolean; body: string }[]>([]);
   const [panelTab, setPanelTab] = useState<KitchenPanelTab>("profile");
+  const [training, setTraining] = useState<KitchenTraining | null>(null);
   const [porterAutoBook, setPorterAutoBook] = useState(true);
   const [porterDelayMin, setPorterDelayMin] = useState(15);
   const [tiffinSummary, setTiffinSummary] = useState<AdminTiffinSummary | null>(null);
@@ -1100,6 +1165,11 @@ function AdminKitchens({
         .then(setPantry)
         .catch((e) => setError(e instanceof Error ? e.message : "Pantry load failed"));
     }
+    if (t === "train" && canTrain) {
+      void fetchKitchenTraining(selectedId)
+        .then(setTraining)
+        .catch(() => setTraining(null));
+    }
   };
 
   const openKitchen = async (id: string) => {
@@ -1108,6 +1178,35 @@ function AdminKitchens({
     setOk("");
     setPanelTab("profile");
     try {
+      if (isSales) {
+        const d = await fetchAdminKitchen(id);
+        setDetail(d);
+        setProfileName(d.name);
+        setProfileAddress(d.address_line ?? "");
+        setProfileCity(d.city ?? "");
+        setProfileState(d.state ?? "");
+        setProfilePincode(d.pincode ?? "");
+        setProfileLat(d.latitude != null ? String(d.latitude) : "");
+        setProfileLng(d.longitude != null ? String(d.longitude) : "");
+        setWa(null);
+        setPgw(null);
+        setModules(null);
+        setKitchenPkg(null);
+        setAllPackages([]);
+        setTemplates([]);
+        setTiffinSummary(null);
+        setTiffinSubs([]);
+        setStreamSummary(null);
+        setPantry(null);
+        setGstProfile(null);
+        setGstReport(null);
+        setKitchenOrders([]);
+        setKitchenParseStats(null);
+        if (canTrain) {
+          void fetchKitchenTraining(id).then(setTraining).catch(() => setTraining(null));
+        }
+        return;
+      }
       const [d, w, p, m, pkg, pkgs, tmpl, tf, subs, stream] = await Promise.all([
         fetchAdminKitchen(id),
         fetchAdminKitchenWhatsApp(id),
@@ -1166,6 +1265,9 @@ function AdminKitchens({
       setPgwActive(p.is_active);
       setKeySecret("");
       setWebhookSecret("");
+      if (canTrain) {
+        void fetchKitchenTraining(id).then(setTraining).catch(() => setTraining(null));
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to load kitchen workspace");
     }
@@ -1188,6 +1290,10 @@ function AdminKitchens({
   const suspended = rows.filter((k) => k.status === "suspended").length;
   const waLinked = rows.filter((k) => k.whatsapp_connected).length;
   const pgwReady = rows.filter((k) => k.payment_gateway_configured).length;
+  const canEditProfile = canWriteKitchen || canTrain;
+  const visibleKitchenTabs = isSales
+    ? KITCHEN_PANEL_TABS.filter((t) => t.id === "profile" || t.id === "train")
+    : KITCHEN_PANEL_TABS;
 
   const kitchenColumns = useMemo<DataColumn<AdminKitchen>[]>(
     () => [
@@ -1540,7 +1646,7 @@ function AdminKitchens({
                   aria-label="Kitchen workspace section"
                   onChange={(e) => openKitchenPanel(e.target.value as KitchenPanelTab)}
                 >
-                  {KITCHEN_PANEL_TABS.map((t) => (
+                  {visibleKitchenTabs.map((t) => (
                     <option key={t.id} value={t.id}>
                       {t.label}
                     </option>
@@ -1548,7 +1654,7 @@ function AdminKitchens({
                 </select>
               </label>
               <div className="admin-kitchen-panel__tabs-btns">
-                {KITCHEN_PANEL_TABS.map((t) => (
+                {visibleKitchenTabs.map((t) => (
                   <button
                     key={t.id}
                     type="button"
@@ -1633,9 +1739,12 @@ function AdminKitchens({
               <div className="admin-kitchen-panel__body">
                 <p className="report-hint">
                   F19 pantry is kitchen-scoped. Recipes deduct from these SKUs when an order is marked
-                  ready. Health score is a platform library match on the SKU name (benefits and
-                  cautions for typical home-kitchen use — not medical advice). Support can see brand,
-                  pack weight, photo, and which dishes still lack a mapping.
+                  ready. Health score is a platform library match on the SKU name. kcal / 100 is the
+                  owner pantry estimate (per 100 g/ml, or per piece). Dish calories sum from recipe
+                  amounts — Healthy is automatic (complete map, kcal at/under the Control cap,
+                  health at/over the Control floor), not a pin. Tune the cap on Control → Dish
+                  calories & Healthy.
+                  Not medical advice or a lab nutrition label.
                 </p>
                 {!pantry ? (
                   <p className="admin-panel__empty">Loading pantry…</p>
@@ -1673,6 +1782,7 @@ function AdminKitchens({
                               <th>Brand</th>
                               <th>Pack</th>
                               <th>Stock</th>
+                              <th>kcal / 100</th>
                               <th>Health</th>
                               <th>Status</th>
                             </tr>
@@ -1695,6 +1805,11 @@ function AdminKitchens({
                                 <td>
                                   {ing.current_stock} {ing.unit}
                                   {ing.packs_on_hand != null ? ` · ${ing.packs_on_hand} packs` : ""}
+                                </td>
+                                <td>
+                                  {ing.kcal_per_100 != null
+                                    ? `${ing.kcal_per_100} / 100 ${ing.unit === "pcs" ? "pc" : ing.unit}`
+                                    : "—"}
                                 </td>
                                 <td className="owner-table__health">
                                   {ing.health_score != null ? (
@@ -1872,14 +1987,62 @@ function AdminKitchens({
                     </label>
                   </div>
                   <p className="report-hint">Changing city does not rename the kitchen code. Pin drives discovery and delivery quotes.</p>
-                  {canWriteKitchen ? (
+                  {canEditProfile ? (
                     <button type="submit" className="btn btn--primary" disabled={busy}>
                       {busy ? "Saving…" : "Save profile and map pin"}
                     </button>
                   ) : (
-                    <p className="report-hint">Needs kitchens:write to edit this kitchen.</p>
+                    <p className="report-hint">Needs kitchens:write or sales:write to edit this kitchen.</p>
                   )}
                 </form>
+              </div>
+            )}
+
+            {panelTab === "train" && (
+              <div className="admin-kitchen-panel__body">
+                <p className="report-hint">
+                  Walk the owner through the Kitchen app. Training does not block going live.
+                  {training ? ` ${training.completed} of ${training.total} done.` : ""}
+                </p>
+                {!canTrain ? (
+                  <p className="report-hint">Needs sales:write to tick steps.</p>
+                ) : !training ? (
+                  <p className="owner-muted">Loading playbook…</p>
+                ) : (
+                  <ul className="kc-train-list">
+                    {training.steps.map((step) => (
+                      <li key={step.key} className={step.completed ? "kc-train-list__done" : undefined}>
+                        <label>
+                          <input
+                            type="checkbox"
+                            checked={step.completed}
+                            disabled={busy}
+                            onChange={async (e) => {
+                              if (!selectedId) return;
+                              setBusy(true);
+                              try {
+                                setTraining(
+                                  await patchKitchenTraining(selectedId, {
+                                    step_key: step.key,
+                                    completed: e.target.checked,
+                                  }),
+                                );
+                              } catch (err) {
+                                setError(err instanceof Error ? err.message : "Training update failed");
+                              } finally {
+                                setBusy(false);
+                              }
+                            }}
+                          />
+                          <span>
+                            <strong>{step.title}</strong>
+                            <span className="report-hint">{step.coach}</span>
+                          </span>
+                        </label>
+                      </li>
+                    ))}
+                  </ul>
+                )}
               </div>
             )}
 

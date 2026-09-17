@@ -9,7 +9,7 @@ from pathlib import Path
 
 from pdf_guide import GuidePDF
 
-GUIDE_VERSION = "1.2"
+GUIDE_VERSION = "1.3"
 GUIDE_DATE = "September 2026"
 OUTPUT = Path(__file__).resolve().parent.parent / "docs" / "QA-INSTRUCTION-PACK.pdf"
 
@@ -35,6 +35,7 @@ def build() -> GuidePDF:
             "Bulk prep, CRM, Coupons) + header/dropdown/layout polish checks",
             "F19/F19b: pantry, recipes, deduct modes, mark prepared, Ready-time stock",
             "P47: Swagger OAuth2Password /api/v1/auth/token; public ops no padlock",
+            "P55: sales@kitchcu.dev onboard + Train; first-run tips; three store apps",
             "Security, correlation IDs, tenant isolation, pytest focus commands",
         ],
     )
@@ -101,6 +102,7 @@ def build() -> GuidePDF:
             ["Customer", "http://localhost:13001"],
             ["Kitchen (owner)", "http://localhost:13002"],
             ["Admin", "http://localhost:13003"],
+            ["Store shells", "in.kitchcu.customer / .kitchen / .admin"],
             ["Gateway", "http://localhost:18000"],
         ],
         widths=[45, 125],
@@ -117,6 +119,7 @@ def build() -> GuidePDF:
             ["Owner", "9876543210 / OTP 123456", "Kitchen CKPNQ001"],
             ["Customer", "9123456789 / OTP 123456", "See AGENTS.md for more"],
             ["Admin", "admin@kitchcu.dev / admin123456", "Platform JWT only"],
+            ["Sales", "sales@kitchcu.dev / sales123456", "Role sales; Sales + Kitchens"],
         ],
         widths=[35, 70, 65],
     )
@@ -131,6 +134,8 @@ def build() -> GuidePDF:
             ["S4", "Admin login -> overview", "Dashboard loads; username/password + API docs links visible"],
             ["S5", "Portal home", "Brand hero; no crash"],
             ["S6", "Gateway /docs or portal /openapi", "Schema loads; OAuth2Password Authorize; public no padlock"],
+            ["S7", "Sales login sales@kitchcu.dev", "Nav Sales+Kitchens; onboard kitchen; /admin/stats 403"],
+            ["S8", "First-run tips C / Kitchen / Admin", "Skip / Next / Show tips"],
         ],
         widths=[18, 72, 80],
     )
@@ -229,6 +234,9 @@ def build() -> GuidePDF:
         [
             ["R1", "Customer checkout", "Order reaches owner inbox"],
             ["R5", "Tenant isolation", "No cross-kitchen CRM/stock data"],
+            ["R6", "Sales onboard", "Sales+Kitchens only; other sales 403"],
+            ["R7", "In-app tips", "C/O/A first-run tour Skip/Next/Show tips"],
+            ["R8", "Store apps", "Three listings: kitchCU - customers / kitchen owner / admin"],
             ["X1", "Owner JWT on admin APIs", "Rejected"],
             ["X2", "Logs", "No OTP / full phone / tokens"],
             ["X3", "Correlation ID", "Forwarded when sent"],

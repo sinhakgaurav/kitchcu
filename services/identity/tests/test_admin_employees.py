@@ -70,6 +70,7 @@ async def test_superadmin_employees_crud(client: AsyncClient):
     assert roles.status_code == 200, roles.text
     assert "superadmin" in roles.json()
     assert "support" in roles.json()
+    assert "sales" in roles.json()
 
     email = f"new-{uuid.uuid4().hex[:8]}@test.ckac"
     created = await client.post(

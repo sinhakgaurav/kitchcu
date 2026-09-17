@@ -7,7 +7,8 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.brand_media import upload_brand_media
-from app.models import Kitchen, Owner
+from app.customer_routes import get_optional_customer
+from app.models import Customer, Kitchen, Owner
 from app.owner_kyc import (
     KYC_FEATURE,
     OwnerKycUpdateRequest,
@@ -611,6 +612,7 @@ async def kitchen_whatsapp_put(
 )
 async def discovery_home(
     session: Annotated[AsyncSession, Depends(get_db)],
+    customer: Annotated[Customer | None, Depends(get_optional_customer)],
     latitude: float = Query(..., ge=-90, le=90, examples=[18.5204]),
     longitude: float = Query(..., ge=-180, le=180, examples=[73.8567]),
     max_km: float = Query(25.0, gt=0, le=200, examples=[25.0]),
@@ -629,6 +631,7 @@ async def discovery_home(
         max_km=max_km,
         section_limit=section_limit,
         q=q,
+        customer=customer,
     )
 
 
@@ -637,10 +640,11 @@ async def discovery_home(
     response_model=KitchenNearbyListResponse,
     summary="Discover active kitchens near a location",
     description=(
-        "Public, unauthenticated discovery endpoint used by the customer app. Lists active "
+        "Public discovery endpoint used by the customer app. Lists active "
         "cloud kitchens within `max_km` of the given point, sorted by distance, with optional "
         "free-text search and diet/live-capture/live-streaming filters.\n\n"
-        "**Auth:** none — public endpoint.\n\n"
+        "**Auth:** none. Optional customer JWT applies the checkup food filter when the diner "
+        "opted in on the Health tab or the nearby **As per my report** filter.\n\n"
         "**Response 200:** distance-sorted kitchen list with per-kitchen discovery signals "
         "(`has_veg`, `has_non_veg`, `has_live_capture`, `is_live_now`). When nothing is in "
         "range, `nearest` carries the closest active kitchens so the caller can still show "
@@ -651,6 +655,7 @@ async def discovery_home(
 )
 async def kitchens_public_nearby(
     session: Annotated[AsyncSession, Depends(get_db)],
+    customer: Annotated[Customer | None, Depends(get_optional_customer)],
     latitude: float = Query(..., ge=-90, le=90, description="Customer latitude", examples=[18.5204]),
     longitude: float = Query(..., ge=-180, le=180, description="Customer longitude", examples=[73.8567]),
     limit: int = Query(20, ge=1, le=100, description="Max kitchens to return.", examples=[20]),
@@ -666,11 +671,15 @@ async def kitchens_public_nearby(
         examples=["samosa"],
     ),
 ) -> KitchenNearbyListResponse:
+    from app.diet_report import active_diet_profile, apply_diet_to_kitchens
+
+    profile = await active_diet_profile(session, customer)
+    fetch_limit = min(100, max(limit * 5, 40)) if profile else limit
     kitchens = await list_kitchens_nearby(
         session,
         latitude=latitude,
         longitude=longitude,
-        limit=limit,
+        limit=fetch_limit,
         max_km=max_km,
         sort=sort,
         diet=diet,
@@ -678,13 +687,17 @@ async def kitchens_public_nearby(
         live_only=live_only,
         q=q,
     )
-    # Nothing in range is a dead end for the diner, so surface the closest kitchens
-    # instead. Only costs a query when the radius search came back empty.
+    diet_applied = False
+    if profile:
+        kitchens = await apply_diet_to_kitchens(session, kitchens, profile, limit=limit)
+        diet_applied = True
     nearest = (
         []
         if kitchens
         else await list_nearest_kitchens(session, latitude=latitude, longitude=longitude, q=q)
     )
+    if profile and nearest:
+        nearest = await apply_diet_to_kitchens(session, nearest, profile, limit=6)
     return KitchenNearbyListResponse(
         kitchens=kitchens,
         nearest=nearest,
@@ -692,6 +705,7 @@ async def kitchens_public_nearby(
         customer_latitude=latitude,
         customer_longitude=longitude,
         sort=sort,
+        diet_filter_applied=diet_applied,
     )
 
 

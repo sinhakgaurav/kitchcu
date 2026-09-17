@@ -690,7 +690,7 @@ Publish order.status.changed -> ckac:orders:order
         ("Sprints done", "S1-S4 complete; S5 partial"),
         ("Services live", "5 (+ gateway)"),
         ("Automated tests", "90+ passing"),
-        ("Apps live", "Portal + 3 PWAs"),
+        ("Apps live", "4 PWAs + 3 store shells"),
     ])
     pdf.table(
         ["Sprint", "Deliverable", "Status"],
@@ -996,7 +996,8 @@ Customer cart:
         "Data: PostgreSQL schema-per-domain + PostGIS; Redis Streams + transactional outbox",
         "Writes never cross schemas; Growth/Ratings read orders cross-schema for evidence only",
         "PWAs: portal, customer.kitchcu.in, kitchen.kitchcu.in, admin.kitchcu.in",
-        "Full diagrams (architecture, flows, ER, UI anatomy): CKAC-COMPLETE-GUIDE.pdf v3.2.6",
+        "Store: kitchCU - customers / kitchen owner / admin (TWA + WKWebView)",
+        "Full diagrams (architecture, flows, ER, UI anatomy): CKAC-COMPLETE-GUIDE.pdf v3.2.7",
     ], size=10)
     pdf.mono(
         "PWAs -> Gateway -> Identity|Catalog|Order|Billing|Marketing|Ratings|\n"
@@ -1060,7 +1061,7 @@ Customer cart:
     pdf.set_text_color(*GRAY)
     pdf.multi_cell(
         257, 6,
-        "Full guide: CKAC-COMPLETE-GUIDE.md / .pdf (v3.2.6) | CPO blueprint v4.2 | "
+        "Full guide: CKAC-COMPLETE-GUIDE.md / .pdf (v3.2.7) | CPO blueprint v4.2 | "
         "User journeys: CKAC-USERFLOWS.md / .pdf | API: docs/API.md + gateway /docs "
         "(aggregated OpenAPI) | UI shots: docs/assets/ui/ | E1-E2 quality-loop design pack",
     )

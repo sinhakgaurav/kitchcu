@@ -143,6 +143,10 @@ export function MenuPage() {
                         (cook {d.prep_time_min}m
                         {d.delivery_time_min != null ? ` · deliver ${d.delivery_time_min}m` : ""})
                       </span>
+                      {d.health?.calories_kcal != null
+                        ? ` · ${d.health.calories_kcal} kcal${d.health.calories_incomplete ? " (partial)" : ""}`
+                        : ""}
+                      {d.health?.healthy_tag ? " · Healthy" : ""}
                     </p>
                     {badges.length > 0 && (
                       <div className="dish-badges">
@@ -234,6 +238,7 @@ function DishEditForm({
   const [unique, setUnique] = useState(!!dish.is_unique_recipe);
   const [descriptionHtml, setDescriptionHtml] = useState(dish.description ?? "");
   const [ingredientsHtml, setIngredientsHtml] = useState(dish.ingredients_description ?? "");
+  const [caloriesNote, setCaloriesNote] = useState(dish.calories_description ?? "");
 
   useEffect(() => {
     const h = dish.media.find((m) => m.is_hero) ?? dish.media[0];
@@ -244,6 +249,7 @@ function DishEditForm({
     setHeroChanged(false);
     setDescriptionHtml(dish.description ?? "");
     setIngredientsHtml(dish.ingredients_description ?? "");
+    setCaloriesNote(dish.calories_description ?? "");
     setFeatured(!!dish.is_featured);
     setChefs(!!dish.is_chefs_special);
     setUnique(!!dish.is_unique_recipe);
@@ -275,6 +281,7 @@ function DishEditForm({
         is_unique_recipe: unique,
         description: descriptionHtml.trim() || null,
         ingredients_description: ingredientsHtml.trim() || null,
+        calories_description: caloriesNote.trim() || null,
         ...(heroChanged && heroUrl
           ? {
               media: {
@@ -353,6 +360,27 @@ function DishEditForm({
           minHeight={100}
         />
       </div>
+      <label>
+        Calories note (optional)
+        <input
+          value={caloriesNote}
+          maxLength={500}
+          onChange={(e) => setCaloriesNote(e.target.value)}
+          placeholder="Light lunch bowl — dal + greens."
+        />
+      </label>
+      {dish.health?.calories_kcal != null ? (
+        <p className="auth-card__hint">
+          Recipe total {dish.health.calories_kcal} kcal
+          {dish.health.calories_incomplete ? " (incomplete pantry kcal)" : ""}
+          {dish.health.healthy_tag ? " · Healthy" : ""}. Map pantry kcal on Ingredients to change the
+          number.
+        </p>
+      ) : (
+        <p className="auth-card__hint">
+          Plate kcal is calculated from pantry kcal × recipe amounts. Add kcal on Ingredients.
+        </p>
+      )}
       <div className="owner-dish-edit__checks">
         <label className="dish-highlight-check">
           <input type="checkbox" checked={featured} onChange={(e) => setFeatured(e.target.checked)} />

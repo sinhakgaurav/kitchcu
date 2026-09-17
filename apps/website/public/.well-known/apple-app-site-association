@@ -1,0 +1,19 @@
+{
+  "applinks": {
+    "apps": [],
+    "details": [
+      {
+        "appID": "TEAMID.in.kitchcu.customer",
+        "paths": ["*"]
+      },
+      {
+        "appID": "TEAMID.in.kitchcu.kitchen",
+        "paths": ["*"]
+      },
+      {
+        "appID": "TEAMID.in.kitchcu.admin",
+        "paths": ["*"]
+      }
+    ]
+  }
+}

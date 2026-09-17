@@ -1135,6 +1135,55 @@
   align-self: flex-end;
 }
 
+.report-food-filter {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.report-food-filter select {
+  padding: 0.5rem 0.75rem;
+  border-radius: 8px;
+  border: 1px solid var(--surface-border);
+  background: var(--veil-5);
+  color: var(--text);
+  font-size: 0.85rem;
+  max-width: 16rem;
+}
+
+.report-food-filter__error {
+  color: var(--orange-light, #e07a3d);
+  font-size: 0.75rem;
+}
+
+.report-food-filter--hero {
+  color: rgba(255, 255, 255, 0.78);
+}
+
+.report-food-filter--hero select {
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  border-radius: 8px;
+  padding: 0.55rem 0.65rem;
+  background: rgba(255, 255, 255, 0.14);
+  color: #fff;
+  font: inherit;
+  max-width: 18rem;
+}
+
+.report-food-filter--hero select option {
+  color: var(--disc-ink);
+}
+
+.customer-menu__report-filter {
+  margin-top: 0.65rem;
+}
+
+.customer-menu__report-filter .report-food-filter {
+  max-width: 18rem;
+}
+
 .nearby-kitchens__map {
   margin-bottom: 1.5rem;
   border-radius: var(--radius);
@@ -1185,6 +1234,12 @@
   background: rgba(0, 137, 123, 0.15);
   color: var(--teal-light);
   border: 1px solid rgba(0, 137, 123, 0.25);
+}
+
+.nearby-kitchens__badge--better {
+  background: rgba(234, 88, 12, 0.16);
+  color: #c2410c;
+  border-color: rgba(234, 88, 12, 0.35);
 }
 
 .nearby-kitchens__loading { text-align: center; padding: 2rem; }
@@ -1939,6 +1994,28 @@
   line-height: 1.4;
   color: var(--text-muted);
 }
+.owner-kcal-input {
+  width: 5.5rem;
+  max-width: 100%;
+  padding: 0.35rem 0.45rem;
+  border: 1px solid var(--surface-border, rgba(0, 0, 0, 0.12));
+  border-radius: 8px;
+  background: var(--surface, #fff);
+  font-variant-numeric: tabular-nums;
+}
+.owner-recipe-kcal {
+  margin: 0.85rem 0 0.5rem;
+  padding: 0.75rem 0.9rem;
+  border-radius: 12px;
+  border: 1px solid color-mix(in srgb, var(--brand-teal, #0d7377) 22%, transparent);
+  background: color-mix(in srgb, var(--brand-teal, #0d7377) 7%, #fffaf3);
+}
+.owner-recipe-kcal p {
+  margin: 0;
+}
+.owner-recipe-kcal .auth-card__hint {
+  margin-top: 0.35rem;
+}
 @media (max-width: 720px) {
   .owner-recipe-card__row { grid-template-columns: 1fr; }
 }
@@ -2380,6 +2457,11 @@
   padding: 0.12rem 0.4rem; border-radius: 999px;
   background: rgba(15, 118, 110, 0.1); color: var(--disc-accent, #0f766e);
   border: 1px solid rgba(15, 118, 110, 0.2);
+}
+.disc-card__badge--better {
+  background: rgba(234, 88, 12, 0.12);
+  color: #c2410c;
+  border-color: rgba(234, 88, 12, 0.28);
 }
 .disc-card__actions { display: flex; flex-wrap: wrap; gap: 0.35rem; margin-top: 0.45rem; }
 .disc-card--live { min-width: 12rem; }

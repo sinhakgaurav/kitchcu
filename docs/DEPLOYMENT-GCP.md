@@ -324,6 +324,11 @@ A records for `kitchcu.com`, `www.kitchcu.com`, `customer.kitchcu.com`,
 each hostname the first time it sees traffic on port 80 for it — no manual cert step,
 but DNS must resolve first.
 
+Store apps (P55) are TWA / WKWebView shells over those same hosts. Play listings:
+**kitchCU - customers** (`in.kitchcu.customer`), **kitchCU - kitchen owner** (`in.kitchcu.kitchen`),
+**kitchCU - admin** (`in.kitchcu.admin`). Serve `/.well-known/assetlinks.json` (and AASA) on
+customer / kitchen / admin hosts — see `apps/android/README.md` and `apps/ios/README.md`.
+
 ### 11.7 Verify + bulk seed demo data
 
 With `run-seed=1` in VM metadata (recommended for demo VMs), `startup.sh` waits for
@@ -410,28 +415,38 @@ gcloud compute ssh ckac-vm --zone=asia-south1-a --command="systemctl cat kitchcu
 
 **Prereq:** changes merged/pushed to `origin/main` (VM pulls hard-reset from GitHub).
 
+One command — **update** (`git fetch` + `origin/main`) + **setup** (serial image
+build, compose up, seed systemd units) + **seeder** (`bulk-seed.sh`). Keeps the
+DB; Alembic runs on container start. 20–40 min on e2-small.
+
 ```bash
-# Project + zone (adjust if yours differ)
 gcloud config set project kitchcu
+gcloud compute ssh ckac-vm --zone=asia-south1-a --command="sudo bash -lc 'cd /opt/ckac && git fetch origin main && git reset --hard origin/main && bash infra/gcp-vm/update-setup-seed.sh'"
+```
 
-# Pull main + rebuild images + migrate + restart stack (keeps volumes/DB)
-gcloud compute ssh ckac-vm --zone=asia-south1-a \
-  --command="sudo google_metadata_script_runner startup"
+Wipe DB then rebuild + seed (`--fresh`, same as `reset-fresh.sh`):
 
-# Follow logs until compose is healthy (10–25 min on e2-small)
-gcloud compute ssh ckac-vm --zone=asia-south1-a \
-  --command="sudo tail -f /var/log/ckac-startup.log"
+```bash
+gcloud compute ssh ckac-vm --zone=asia-south1-a --command="sudo bash -lc 'cd /opt/ckac && git fetch origin main && git reset --hard origin/main && bash infra/gcp-vm/update-setup-seed.sh --fresh'"
+```
 
-# Smoke
+Follow seed log in another session:
+
+```bash
+gcloud compute ssh ckac-vm --zone=asia-south1-a --command="sudo tail -f /var/log/ckac-bulk-seed.log"
+```
+
+Smoke:
+
+```bash
 curl -sS https://api.kitchcu.com/health/ready
 curl -sS -o /dev/null -w "%{http_code}\n" https://admin.kitchcu.com/
 curl -sS -o /dev/null -w "%{http_code}\n" https://kitchen.kitchcu.com/
 ```
 
-Re-runs `startup.sh`: `git reset --hard origin/main`, rewrites `.env` from the same
-metadata, then **batch-builds** images (avoids `context deadline exceeded` on e2-small)
-and `docker compose up -d`. Alembic migrations run as part of the compose/startup path —
-new revisions (identity `013`, billing `008`, marketing `002`) apply automatically.
+`startup.sh` (metadata runner) still exists for first boot and for rewriting `.env`
+from GCE metadata. Prefer `update-setup-seed.sh` after a code push so seed always
+runs — `startup.sh` skips seed when `/var/lib/ckac/.bulk-seeded` already exists.
 
 **Post-deploy smoke for P25–P28:** Admin → Packages + Employees; open a kitchen → Package /
 Marketing / Streaming; Owner → Growth → Templates; Stream go-live with dish phases.

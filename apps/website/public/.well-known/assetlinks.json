@@ -1,0 +1,26 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "in.kitchcu.customer",
+      "sha256_cert_fingerprints": ["REPLACE_WITH_UPLOAD_KEYSTORE_SHA256"]
+    }
+  },
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "in.kitchcu.kitchen",
+      "sha256_cert_fingerprints": ["REPLACE_WITH_UPLOAD_KEYSTORE_SHA256"]
+    }
+  },
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "in.kitchcu.admin",
+      "sha256_cert_fingerprints": ["REPLACE_WITH_UPLOAD_KEYSTORE_SHA256"]
+    }
+  }
+]

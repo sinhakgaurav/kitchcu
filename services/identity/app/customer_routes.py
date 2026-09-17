@@ -20,11 +20,15 @@ from app.customer_media import (
 
 from app.customer_schemas import (
     CustomerAuthResponse,
+    CustomerDietProfileResponse,
     CustomerNotificationPrefsRequest,
     CustomerPayoutUpdateRequest,
     CustomerPhoneRequest,
     CustomerPhoneVerifyRequest,
     CustomerResponse,
+    DietCompatibleDishesResponse,
+    DietFilterUpdateRequest,
+    customer_diet_to_response,
     customer_to_response,
     update_customer_notification_prefs,
     update_customer_payout,
@@ -99,6 +103,28 @@ async def get_current_customer(
     customer = await session.get(Customer, customer_id)
     if not customer or customer.status != "active":
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Customer not found")
+    return customer
+
+
+async def get_optional_customer(
+    credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(security)],
+    session: Annotated[AsyncSession, Depends(get_db)],
+) -> Customer | None:
+    """Public discovery may attach a customer JWT; ignore missing or non-customer tokens."""
+    if not credentials:
+        return None
+    try:
+        payload = jwt.decode(
+            credentials.credentials, settings.jwt_secret, algorithms=[settings.jwt_algorithm]
+        )
+        if payload.get("type") != "customer":
+            return None
+        customer_id = uuid.UUID(payload["sub"])
+    except (JWTError, ValueError):
+        return None
+    customer = await session.get(Customer, customer_id)
+    if not customer or customer.status != "active":
+        return None
     return customer
 
 
@@ -462,6 +488,174 @@ async def customer_live_photo_upload(
     await session.flush()
     await publish_customer_photo_updated(publisher, session, customer, photo_kind="live_photo")
     return customer_to_response(customer)
+
+
+@router.post(
+    "/customers/me/checkup-report",
+    response_model=CustomerDietProfileResponse,
+    summary="Upload the latest checkup report",
+    description=(
+        "Customer-only — PDF (text) or a photo plus optional notes. An in-process ML model "
+        "plus lab thresholds build a diet profile used only if the diner opts in. "
+        "Not medical advice. Raw report text is not logged or returned."
+    ),
+    responses={401: RESP_401, 400: RESP_400, 422: RESP_422},
+    tags=["Customer Dashboard"],
+)
+async def customer_checkup_upload(
+    customer: Annotated[Customer, Depends(get_current_customer)],
+    session: Annotated[AsyncSession, Depends(get_db)],
+    publisher: Annotated[EventPublisher, Depends(get_publisher)],
+    file: Annotated[UploadFile, File()],
+    notes: Annotated[str | None, Form()] = None,
+) -> CustomerDietProfileResponse:
+    from datetime import UTC, datetime
+
+    from ckac_common.platform_config import feature_http_status, require_feature
+
+    from app.diet_report import (
+        DIET_FEATURE,
+        extract_report_text,
+        parse_report_to_profile,
+        upload_checkup_file,
+    )
+
+    try:
+        await require_feature(session, DIET_FEATURE)
+    except ValueError as exc:
+        code = feature_http_status(exc) or status.HTTP_400_BAD_REQUEST
+        raise HTTPException(status_code=code, detail=str(exc)) from exc
+
+    data = await file.read()
+    text_blob = extract_report_text(data=data, notes=notes)
+    if not text_blob:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Could not read text from this file. Upload a text PDF or add a short summary.",
+        )
+    profile = parse_report_to_profile(text_blob)
+    customer.checkup_report_url = upload_checkup_file(customer_id=customer.id, data=data)
+    customer.diet_profile = profile.to_dict()
+    customer.checkup_parsed_at = datetime.now(UTC)
+    from sqlalchemy.orm.attributes import flag_modified
+
+    flag_modified(customer, "diet_profile")
+    await session.flush()
+    await _publish_diet_profile_updated(publisher, session, customer)
+    return customer_diet_to_response(customer)
+
+
+@router.get(
+    "/customers/me/diet-profile",
+    response_model=CustomerDietProfileResponse,
+    summary="Get the authenticated customer's diet profile",
+    responses={401: RESP_401},
+    tags=["Customer Dashboard"],
+)
+async def customer_diet_profile(
+    customer: Annotated[Customer, Depends(get_current_customer)],
+) -> CustomerDietProfileResponse:
+    return customer_diet_to_response(customer)
+
+
+@router.patch(
+    "/customers/me/diet-filter",
+    response_model=CustomerDietProfileResponse,
+    summary="Show only food the checkup profile allows",
+    responses={401: RESP_401, 400: RESP_400},
+    tags=["Customer Dashboard"],
+)
+async def customer_diet_filter_update(
+    body: DietFilterUpdateRequest,
+    customer: Annotated[Customer, Depends(get_current_customer)],
+    session: Annotated[AsyncSession, Depends(get_db)],
+    publisher: Annotated[EventPublisher, Depends(get_publisher)],
+) -> CustomerDietProfileResponse:
+    from ckac_common.platform_config import feature_http_status, require_feature
+
+    from app.diet_report import DIET_FEATURE
+
+    try:
+        await require_feature(session, DIET_FEATURE)
+    except ValueError as exc:
+        code = feature_http_status(exc) or status.HTTP_400_BAD_REQUEST
+        raise HTTPException(status_code=code, detail=str(exc)) from exc
+
+    if body.enabled and not customer.diet_profile:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Upload a checkup report before filtering menus.",
+        )
+    customer.diet_filter_enabled = body.enabled
+    await session.flush()
+    await _publish_diet_profile_updated(publisher, session, customer)
+    return customer_diet_to_response(customer)
+
+
+@router.get(
+    "/customers/me/diet-compatible-dishes",
+    response_model=DietCompatibleDishesResponse,
+    summary="Active dishes this diner can have at a kitchen",
+    responses={401: RESP_401, 422: RESP_422},
+    tags=["Customer Dashboard"],
+)
+async def customer_diet_compatible_dishes(
+    customer: Annotated[Customer, Depends(get_current_customer)],
+    session: Annotated[AsyncSession, Depends(get_db)],
+    kitchen_id: uuid.UUID = Query(..., description="Kitchen to match against the diet profile."),
+) -> DietCompatibleDishesResponse:
+    from app.diet_report import (
+        active_diet_profile,
+        compatible_counts,
+        compatible_dish_ids_for_kitchen,
+        load_kitchen_dishes,
+    )
+
+    rows = await load_kitchen_dishes(session, [kitchen_id])
+    total = len(rows)
+    profile = await active_diet_profile(session, customer)
+    if profile is None:
+        return DietCompatibleDishesResponse(
+            kitchen_id=kitchen_id,
+            dish_ids=[row.dish_id for row in rows],
+            compatible_count=total,
+            total_active=total,
+            filter_applied=False,
+        )
+    ids = compatible_dish_ids_for_kitchen(rows, profile, kitchen_id)
+    counts = compatible_counts(rows, profile)
+    n, tot = counts.get(kitchen_id, (len(ids), total))
+    return DietCompatibleDishesResponse(
+        kitchen_id=kitchen_id,
+        dish_ids=ids,
+        compatible_count=n,
+        total_active=tot,
+        filter_applied=True,
+    )
+
+
+async def _publish_diet_profile_updated(
+    publisher: EventPublisher,
+    session: AsyncSession,
+    customer: Customer,
+) -> None:
+    from app.diet_report import profile_from_dict
+
+    profile = profile_from_dict(customer.diet_profile)
+    event = EventPublisher.build(
+        event_type="customer.diet_profile.updated",
+        aggregate_type="customer",
+        aggregate_id=str(customer.id),
+        producer="identity-service",
+        payload={
+            "customer_id": str(customer.id),
+            "conditions": list(profile.conditions) if profile else [],
+            "diet_filter_enabled": bool(customer.diet_filter_enabled),
+            "has_report": bool(customer.checkup_report_url),
+            "confidence": profile.confidence if profile else 0.0,
+        },
+    )
+    await publisher.publish(stream_key("identity", "customer"), event, session=session)
 
 
 @router.patch(
