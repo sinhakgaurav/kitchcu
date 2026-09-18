@@ -32,6 +32,7 @@ from demo_data import (  # noqa: E402
     DEMO_CUSTOMER_ADDRESSES,
     DEMO_CUSTOMERS,
     presence_kitchen_owner_pairs,
+    pune_extra_kitchen_spec,
 )
 from seed_common import (  # noqa: E402
     ApiError,
@@ -108,28 +109,26 @@ def ensure_extra_owners() -> list[tuple[dict, dict]]:
             kitchen = kitchens[0]
             print(f"  {owner['name']} kitchen: {kitchen.get('code')} - {kitchen.get('name')}")
         else:
-            lat = 18.5362 + (hash(owner["phone"]) % 100) * 0.0003
-            lon = 73.8958 + (hash(owner["phone"]) % 100) * 0.0003
             kitchen = request(
                 "POST",
                 "/api/v1/kitchens",
-                {
-                    "name": owner.get("kitchen_label") or f"{owner['name'].split()[0]} Kitchen",
-                    "description": f"Demo kitchen for {owner['name']}",
-                    "address_line": "Pune demo lane",
-                    "city": "Pune",
-                    "state": "Maharashtra",
-                    "pincode": "411001",
-                    "latitude": lat,
-                    "longitude": lon,
-                },
+                pune_extra_kitchen_spec(owner),
                 token=token,
             )
             print(f"  Created {kitchen['code']} - {kitchen['name']}")
         try:
-            seed_kitchen_menu(token, kitchen["id"])
+            mapped = seed_kitchen_menu(token, kitchen["id"])
+            seed_kitchen_modules(token, kitchen["id"], mapped)
+            first_dish = next(iter(mapped.values()), None)
+            seed_kitchen_integrations(
+                token,
+                kitchen["id"],
+                kitchen.get("name") or owner.get("kitchen_label") or owner["name"],
+                kitchen_code=kitchen.get("code"),
+                dish_id=first_dish,
+            )
         except Exception as exc:  # noqa: BLE001
-            print(f"  (menu seed skipped: {exc})")
+            print(f"  (menu/modules seed skipped: {exc})")
         created.append((owner, kitchen))
     return created
 
@@ -187,9 +186,18 @@ def ensure_presence_kitchens() -> list[tuple[dict, dict]]:
         else:
             print(f"  {owner['name']}: {kitchen.get('code')} - {kitchen.get('name')}")
         try:
-            seed_kitchen_menu(token, kitchen["id"])
+            mapped = seed_kitchen_menu(token, kitchen["id"])
+            seed_kitchen_modules(token, kitchen["id"], mapped)
+            first_dish = next(iter(mapped.values()), None)
+            seed_kitchen_integrations(
+                token,
+                kitchen["id"],
+                kitchen.get("name") or spec["name"],
+                kitchen_code=kitchen.get("code"),
+                dish_id=first_dish,
+            )
         except Exception as exc:  # noqa: BLE001
-            print(f"  (menu seed skipped: {exc})")
+            print(f"  (menu/modules seed skipped: {exc})")
         created.append((owner, kitchen))
     return created
 

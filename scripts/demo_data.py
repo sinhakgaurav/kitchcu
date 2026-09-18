@@ -340,6 +340,35 @@ DEMO_KITCHENS_CITIES = [
 PRESENCE_OWNER_PHONE_START = 9876543220
 
 
+def pune_extra_kitchen_spec(owner: dict) -> dict:
+    """One Pune kitchen for an extra demo owner (Priya / Amit / Sneha / …)."""
+    lat = 18.5362 + (hash(owner["phone"]) % 100) * 0.0003
+    lon = 73.8958 + (hash(owner["phone"]) % 100) * 0.0003
+    return {
+        "name": owner.get("kitchen_label") or f"{owner['name'].split()[0]} Kitchen",
+        "description": f"Demo kitchen for {owner['name']}",
+        "address_line": "Pune demo lane",
+        "city": "Pune",
+        "state": "Maharashtra",
+        "pincode": "411001",
+        "latitude": lat,
+        "longitude": lon,
+    }
+
+
+def secondary_demo_owner_specs() -> list[tuple[dict, dict]]:
+    """Every non-primary demo login that must have a filled kitchen after seed-all.
+
+    Extra owners (3211–3213) plus city/presence hosts (3220+). Raj (3210) is
+    harvested separately by the bulk seeder as the primary demo owner.
+    """
+    pairs: list[tuple[dict, dict]] = [
+        (owner, pune_extra_kitchen_spec(owner)) for owner in DEMO_OWNERS_EXTRA
+    ]
+    pairs.extend(presence_kitchen_owner_pairs())
+    return pairs
+
+
 def presence_kitchen_owner_pairs() -> list[tuple[dict, dict]]:
     """(owner, kitchen payload) for extra Pune + city presence kitchens."""
     pairs: list[tuple[dict, dict]] = []

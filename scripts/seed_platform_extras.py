@@ -211,41 +211,54 @@ def ensure_customer_orders(
     return created
 
 
-def ensure_ratings(customers: list[dict], kitchen_id: str) -> int:
+def ensure_ratings(customers: list[dict], kitchen_id: str, *, per_customer: int = 12) -> int:
+    """Rate delivered PWA orders for every diner (kitchen_id kept for callers)."""
+    del kitchen_id  # ratings are posted against the diner's own orders
     count = 0
     for idx, cust in enumerate(customers):
+        token = cust.get("token")
+        if not token:
+            continue
+        submitted = 0
         try:
-            orders = request("GET", "/api/v1/customers/me/orders", token=cust["token"])
-            for order in orders.get("orders", [])[:8]:
-                if order.get("status") != "delivered":
-                    continue
-                items = order.get("items") or []
-                if not items:
-                    continue
-                dish_id = items[0].get("dish_id")
-                if not dish_id:
-                    continue
-                rating: dict = {
-                    "dish_id": dish_id,
-                    "home_taste_score": 5,
-                    "quality_score": 4,
-                }
-                if idx == 0 and count == 0:
-                    # A/V review coverage (F16-F18) — one anonymous video review.
-                    rating["media_url"] = "https://cdn.kitchcu.dev/demo/reviews/sample-review.mp4"
-                    rating["media_type"] = "video"
-                    rating["is_anonymous"] = True
+            orders = request("GET", "/api/v1/customers/me/orders", token=token)
+        except ApiError as exc:
+            log(f"  ! rating list for {cust.get('name')}: {exc}")
+            continue
+        for order in orders.get("orders", []):
+            if submitted >= per_customer:
+                break
+            if order.get("status") != "delivered":
+                continue
+            items = order.get("items") or []
+            if not items:
+                continue
+            dish_id = items[0].get("dish_id")
+            if not dish_id:
+                continue
+            rating: dict = {
+                "dish_id": dish_id,
+                "home_taste_score": 5 - (submitted % 2),
+                "quality_score": 4 + (submitted % 2),
+            }
+            if idx == 0 and count == 0:
+                # A/V review coverage (F16-F18) — one anonymous video review.
+                rating["media_url"] = "https://cdn.kitchcu.dev/demo/reviews/sample-review.mp4"
+                rating["media_type"] = "video"
+                rating["is_anonymous"] = True
+            try:
                 request(
                     "POST",
                     f"/api/v1/customers/me/orders/{order['id']}/ratings",
                     {"ratings": [rating]},
-                    token=cust["token"],
+                    token=token,
                 )
                 count += 1
-        except ApiError as exc:
-            if "Already rated" in str(exc):
-                continue
-            log(f"  ! rating for {cust['name']}: {exc}")
+                submitted += 1
+            except ApiError as exc:
+                if "Already rated" in str(exc):
+                    continue
+                log(f"  ! rating for {cust.get('name')}: {exc}")
     log(f"  Ratings submitted: {count}")
     return count
 

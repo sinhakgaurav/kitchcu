@@ -37,6 +37,11 @@ GCP (VM repo is /opt/ckac):
   sudo systemctl start kitchcu-bulk-seed.service
   sudo bash /opt/ckac/infra/gcp-vm/bulk-seed.sh
 
+On a full run (CKAC_BULK_FULL=1, the seed-all / GCP default) every demo login
+gets the same fill: extra owners 3211–3215, city hosts 3220+, pantry photos,
+recipes, 6-month order history, and feature volume. Dry-run smoke
+(CKAC_BULK_FULL=0) still only expands the primary owner.
+
 Requires: docker compose up (gateway + postgres). The primary demo owner is
 created automatically, so running seed-dev-data.py first is optional.
 Dishes without a live-capture hero stay inactive; orders use active dishes only.
@@ -77,7 +82,14 @@ from order_history import (  # noqa: E402
     plan_summary,
     slot_to_utc,
 )
-from demo_data import DEMO_CUSTOMER_ADDRESSES, DEMO_KITCHEN_CODE, DEMO_OTP, DEMO_OWNER  # noqa: E402
+from demo_data import (  # noqa: E402
+    DEMO_CUSTOMER_ADDRESSES,
+    DEMO_KITCHEN_CODE,
+    DEMO_OTP,
+    DEMO_OWNER,
+    pune_extra_kitchen_spec,
+    secondary_demo_owner_specs,
+)
 from seed_common import (  # noqa: E402
     ApiError,
     apply_planned_order_times,
@@ -653,6 +665,81 @@ def ensure_city_customer_orders(
     return created
 
 
+def harvest_secondary_demo_kitchens(
+    *,
+    all_dishes: list[dict],
+    customers_by_city: dict[str, list[dict]],
+    dish_ids_by_kitchen: dict[str, dict[str, str]],
+    kitchen_ctxs: list[dict],
+) -> list[tuple[dict, list[dict]]]:
+    """Fill extra owners + city hosts so every demo login has 6-month history.
+
+    seed-dev already registers these logins with a menu. Bulk used to skip them
+    (CKAC_BULK_OWNERS defaulted to 0), so Reports / CRM / GST / mapper were empty
+    the moment someone signed in as Priya, Amit, Sneha, or a city host.
+    """
+    seen_ids = {ctx["id"] for ctx in kitchen_ctxs}
+    harvested: list[tuple[dict, list[dict]]] = []
+    pairs = list(secondary_demo_owner_specs())
+    have = {owner["phone"] for owner, _ in pairs}
+    for owner in EXTRA_OWNERS:
+        if owner["phone"] in have:
+            continue
+        pairs.append((owner, pune_extra_kitchen_spec(owner)))
+        have.add(owner["phone"])
+
+    log("")
+    log(f"Secondary demo logins — 6-month fill ({len(pairs)} owners)")
+    log("-" * 50)
+    for owner, spec in pairs:
+        ensure_owner(owner["phone"], owner["name"], owner["email"])
+        try:
+            token = login_owner(owner["phone_e164"], DEMO_OTP)
+        except ApiError as exc:
+            log(f"  ! login {owner['phone']}: {exc}")
+            continue
+        kitchens = list_kitchens(token)
+        if not kitchens:
+            try:
+                created = request("POST", "/api/v1/kitchens", spec, token=token)
+                kitchens = [created]
+                log(f"  + kitchen {created['code']} - {created['name']} ({owner['name']})")
+            except ApiError as exc:
+                log(f"  ! create kitchen {owner['phone']}: {exc}")
+                continue
+        for kitchen in kitchens:
+            if kitchen["id"] in seen_ids:
+                continue
+            city = str(kitchen.get("city") or spec.get("city") or "")
+            dish_ids = ensure_kitchen_complete(
+                token,
+                kitchen,
+                all_dishes,
+                orders_target=BULK_ORDERS_PER_KITCHEN,
+                drafts_target=BULK_DRAFTS_PER_KITCHEN,
+                city_customers=customers_by_city.get(city, []),
+            )
+            dish_ids_by_kitchen[kitchen["id"]] = dish_ids
+            kitchen_ctxs.append(kitchen_volume_ctx(token, kitchen, dish_ids))
+            seen_ids.add(kitchen["id"])
+        harvested.append((owner, kitchens))
+        log(f"  {owner['name']} ({owner['phone']}): {len(kitchens)} kitchen(s)")
+    return harvested
+
+
+def _dedupe_kitchens(*groups: list[dict]) -> list[dict]:
+    out: list[dict] = []
+    seen: set[str] = set()
+    for group in groups:
+        for kitchen in group:
+            kid = kitchen.get("id")
+            if not kid or kid in seen:
+                continue
+            out.append(kitchen)
+            seen.add(kid)
+    return out
+
+
 def main() -> None:
     owner_count = min(BULK_OWNERS, len(EXTRA_OWNERS))
     if BULK_OWNERS > len(EXTRA_OWNERS):
@@ -822,8 +909,8 @@ def main() -> None:
                     token,
                     k,
                     all_dishes,
-                    orders_target=BULK_ORDERS_PER_OWNER,
-                    drafts_target=BULK_DRAFTS_PER_OWNER,
+                    orders_target=BULK_ORDERS_PER_KITCHEN,
+                    drafts_target=BULK_DRAFTS_PER_KITCHEN,
                     city_customers=customers_by_city.get(str(k.get("city") or ""), []),
                 )
                 dish_ids_by_kitchen[k["id"]] = dish_ids
@@ -867,7 +954,20 @@ def main() -> None:
         if BULK_FULL:
             log(f"  {owner['name']}: {len(kitchens)} kitchen(s) fully seeded")
 
-    all_kitchens = list(demo_kitchens) + [k for _, ks in seeded_owners for k in ks]
+    harvested_owners: list[tuple[dict, list[dict]]] = []
+    if BULK_FULL:
+        harvested_owners = harvest_secondary_demo_kitchens(
+            all_dishes=all_dishes,
+            customers_by_city=customers_by_city,
+            dish_ids_by_kitchen=dish_ids_by_kitchen,
+            kitchen_ctxs=kitchen_ctxs,
+        )
+
+    all_kitchens = _dedupe_kitchens(
+        demo_kitchens,
+        [k for _, ks in seeded_owners for k in ks],
+        [k for _, ks in harvested_owners for k in ks],
+    )
     ensure_city_customer_orders(
         customers_by_city,
         all_kitchens,
@@ -946,7 +1046,11 @@ def main() -> None:
     log("")
     log("Owner logins (kitchen app http://localhost:13002)")
     log(f"  {DEMO_OWNER['phone']} / {DEMO_OTP} — {DEMO_OWNER['name']} ({primary['code']})")
-    for owner, kitchens in seeded_owners:
+    logged_phones = {DEMO_OWNER["phone"]}
+    for owner, kitchens in [*seeded_owners, *harvested_owners]:
+        if owner["phone"] in logged_phones or not kitchens:
+            continue
+        logged_phones.add(owner["phone"])
         kitchen = kitchens[0]
         log(f"  {owner['phone']} / {DEMO_OTP} — {owner['name']} ({kitchen['code']})")
     log("")

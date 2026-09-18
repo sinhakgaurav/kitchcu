@@ -29,6 +29,8 @@ from feature_volume import (  # noqa: E402
 def test_every_owner_module_is_on_the_kitchen_checklist() -> None:
     required = {
         "menu",
+        "pantry",
+        "recipes",
         "orders",
         "coupons",
         "promotions",
@@ -140,3 +142,5 @@ def test_bulk_seeder_runs_feature_volume() -> None:
     text = (SCRIPTS / "seed-bulk-data.py").read_text(encoding="utf-8")
     assert "seed_feature_volume" in text
     assert "CKAC_FEATURE_VOLUME" in text
+    assert "harvest_secondary_demo_kitchens" in text
+    assert "kitchen_ctxs" in text

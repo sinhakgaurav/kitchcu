@@ -1,8 +1,7 @@
-# Full platform seed — dev baseline + bulk data + all personas
-# Optional env:
+# Full platform seed — baseline + bulk/feature-volume + current weekly cohort.
 # Optional env:
 #   CKAC_BULK_KITCHENS=30 CKAC_BULK_FULL=1 CKAC_FEATURE_VOLUME=1 CKAC_SEED_EXTRAS=1
-#   CKAC_WEEKLY_MANIFEST=C:\temp\weekly-cohort.json
+#   CKAC_BULK_MONTHS=6  CKAC_WEEKLY_MANIFEST=C:\temp\weekly-cohort.json
 $ErrorActionPreference = "Stop"
 $root = Split-Path -Parent $PSScriptRoot
 Set-Location $root
@@ -14,6 +13,15 @@ if (-not $env:CKAC_GATEWAY_URL) {
 }
 if (-not $env:CKAC_SEED_EXTRAS) {
     $env:CKAC_SEED_EXTRAS = "1"
+}
+if (-not $env:CKAC_FEATURE_VOLUME) {
+    $env:CKAC_FEATURE_VOLUME = "1"
+}
+if (-not $env:CKAC_BULK_FULL) {
+    $env:CKAC_BULK_FULL = "1"
+}
+if (-not $env:CKAC_BULK_MONTHS) {
+    $env:CKAC_BULK_MONTHS = "6"
 }
 
 Write-Host "=== CKAC full platform seed ===" -ForegroundColor Cyan

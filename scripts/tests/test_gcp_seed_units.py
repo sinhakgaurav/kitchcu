@@ -49,6 +49,8 @@ def test_seed_all_runs_every_seeder() -> None:
         assert "seed-dev-data.py" in text
         assert "seed-bulk-data.py" in text
         assert "weekly_test_data.py" in text
+        assert "CKAC_BULK_MONTHS" in text
+        assert "CKAC_FEATURE_VOLUME" in text
     compose = (ROOT / "docker-compose.yml").read_text(encoding="utf-8")
     assert "seed-dev-data.py" in compose
     assert "seed-bulk-data.py" in compose

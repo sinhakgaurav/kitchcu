@@ -21,7 +21,15 @@ from bulk_demo_data import (  # noqa: E402
     city_customer_specs,
     owner_kitchen_specs,
 )
-from demo_data import DEMO_CUSTOMERS, DEMO_OWNERS  # noqa: E402
+from demo_data import (  # noqa: E402
+    DEMO_CUSTOMERS,
+    DEMO_OWNER,
+    DEMO_OWNERS,
+    DEMO_OWNERS_EXTRA,
+    PRESENCE_OWNER_PHONE_START,
+    presence_kitchen_owner_pairs,
+    secondary_demo_owner_specs,
+)
 
 PRESENCE_CITIES = {
     "Pune",
@@ -106,3 +114,34 @@ def test_city_customer_phones_do_not_collide_with_demo_logins() -> None:
 def test_city_customer_phone_is_stable() -> None:
     assert city_customer_phone(1, 1) == city_customer_phone(1, 1)
     assert city_customer_phone(1, 1) != city_customer_phone(2, 1)
+
+
+def test_secondary_demo_owners_cover_extra_and_presence_logins() -> None:
+    pairs = secondary_demo_owner_specs()
+    phones = [owner["phone"] for owner, _ in pairs]
+    extra_phones = {owner["phone"] for owner in DEMO_OWNERS_EXTRA}
+    presence_phones = {owner["phone"] for owner, _ in presence_kitchen_owner_pairs()}
+    assert extra_phones <= set(phones)
+    assert presence_phones <= set(phones)
+    assert DEMO_OWNER["phone"] not in phones
+    assert str(PRESENCE_OWNER_PHONE_START) in phones
+    assert len(phones) == len(set(phones))
+    cities = {spec["city"] for _, spec in pairs}
+    assert {"Pune", "Mumbai", "Delhi"} <= cities
+    for owner, spec in pairs:
+        assert owner["phone_e164"].startswith("+91")
+        assert spec["name"]
+        assert spec["latitude"] and spec["longitude"]
+
+
+def test_bulk_full_harvests_secondary_demo_logins_with_six_month_orders() -> None:
+    text = (SCRIPTS / "seed-bulk-data.py").read_text(encoding="utf-8")
+    assert "def harvest_secondary_demo_kitchens" in text
+    assert "secondary_demo_owner_specs" in text
+    assert "EXTRA_OWNERS" in text
+    assert "orders_target=BULK_ORDERS_PER_KITCHEN" in text
+    assert "ensure_kitchen_complete" in text
+    assert "harvest_secondary_demo_kitchens(" in text
+    call_idx = text.index("harvested_owners = harvest_secondary_demo_kitchens(")
+    window = text[max(0, call_idx - 80) : call_idx]
+    assert "BULK_FULL" in window
