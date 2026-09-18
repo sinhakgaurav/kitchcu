@@ -45,7 +45,8 @@ services:
   # Local object storage when GCS HMAC keys are blocked by org policy
   # (constraints/iam.disableServiceAccountKeyCreation). Set metadata media-backend=minio.
   minio:
-    image: minio/minio:latest
+    # Docker Hub removed minio/minio (Apr 2026). Quay still serves the last CE image.
+    image: quay.io/minio/minio:RELEASE.2025-09-07T16-13-09Z
     restart: unless-stopped
     command: server /data --console-address ":9001"
     environment:

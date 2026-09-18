@@ -27,7 +27,8 @@ services:
       retries: 5
 
   minio:
-    image: minio/minio:latest
+    # Docker Hub removed minio/minio (Apr 2026). Quay still serves the last CE image.
+    image: quay.io/minio/minio:RELEASE.2025-09-07T16-13-09Z
     command: server /data --console-address ":9001"
     environment:
       MINIO_ROOT_USER: ${MINIO_ROOT_USER:-ckac}
