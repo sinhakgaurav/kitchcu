@@ -1,7 +1,7 @@
 # KitchCu — Production Portals, Credentials & Feature QA
 
 **Audience:** CEO · CPO · CTO · QA · Ops · Support  
-**Last updated:** 2026-09-17  
+**Last updated:** 2026-09-18  
 **Related:** [DEPLOYMENT-GCP.md](./DEPLOYMENT-GCP.md) · [TESTER-INSTRUCTION-PACK.md](./TESTER-INSTRUCTION-PACK.md) (numbered UI + API) · [QA-INSTRUCTION-PACK.md](./QA-INSTRUCTION-PACK.md) · [ADVANCEMENT-TRACKER.md](./ADVANCEMENT-TRACKER.md)
 
 This pack is the single place for **production portal URLs**, **who logs in where**, **demo vs production credentials policy**, and a **feature → responsibility → test steps** matrix.
@@ -33,10 +33,12 @@ Local equivalents (dev): portal `:13000` · customer `:13001` · kitchen `:13002
 
 | Persona | Login | Secret | Notes |
 |---------|-------|--------|-------|
-| **Owner** | Phone `9876543210` | OTP `123456` | Printed on kitchen Sign in (open demo list). Extra owners `9876543211`–`9876543213` |
-| **Customer** | Phone `9123456789` | OTP `123456` | Printed on customer Sign in (open demo list). Also `9123456780`, `9988776655`, `9123456781`, `9123456782` |
+| **Owner** | Phone `9876543210` | OTP `123456` | Printed on kitchen Sign in. Extra `9876543211`–`9876543213`; volume `3214`–`3215`; sales-onboarded `3301`–`3303` |
+| **Customer** | Phone `9123456789` | OTP `123456` | Printed on customer Sign in. Also `9123456780`, `9988776655`, `9123456781`, `9123456782` + 6/city on full bulk |
 | **Super Admin** | `admin@kitchcu.dev` | `admin123456` | Dev only — never use on production |
+| **Ops / support / finance** | `ops@` / `support@` / `finance@kitchcu.dev` | `ops123456` / `support123456` / `finance123456` | RBAC; Admin UI English |
 | **Sales (field)** | `sales@kitchcu.dev` | `sales123456` | Seeded by extras; role `sales` — Sales + Kitchens only |
+| **Sales west** | `sales.west@kitchcu.dev` | `sales123456` | Second sales book |
 
 Seed: `.\scripts\seed-all.ps1` (includes multi-city kitchens: Delhi, Gurugram, Noida, Dehradun, Prayagraj, Varanasi, Kanpur, Lucknow, Jhansi, Mumbai).
 
@@ -209,6 +211,7 @@ Legend: **O** = Owner · **C** = Customer · **A** = Admin · **P** = Platform/s
 | P53 | Dish calories + Healthy | Honest plate kcal from recipe | O Ingredients: pantry kcal + recipe running total; C menu shows kcal / Healthy; Admin Kitchens → Pantry kcal column. Not a lab label |
 | P54 | Calories / Healthy Control | Super Admin enable/disable + kcal cap | Admin Control → Dish calories & Healthy: Calories ON/OFF, Healthy tag ON/OFF, Save max kcal; C menu follows |
 | P55 | Store apps + sales onboard | Field kitchen acquisition | Sales login `sales@kitchcu.dev`; **Sales** tab onboard; kitchen **Train** checklist; first-run tips on C/O/A; Android/iOS shells wrap the PWAs |
+| P56 | Owner Today OS | Cook-line, not a warehouse | O Home: **Do this now** + live board of open tickets only. `GET …/orders?open=true&limit=50` has `lane_counts`. Delivered history stays on Orders / CSV |
 | F33 | History + reorder | One-tap repeat | Orders → Reorder → cart filled |
 | F34–F35 | Tiffin / meal plans | Monthly subscriptions | C plans tab; O tiffin plans CRUD |
 | F36–F38 | Coupons / CRM / promos | Owner-owned offers | Create coupon → apply at checkout; CRM list |

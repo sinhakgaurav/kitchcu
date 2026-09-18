@@ -9,7 +9,7 @@ from pathlib import Path
 
 from pdf_guide import GuidePDF
 
-GUIDE_VERSION = "1.1"
+GUIDE_VERSION = "1.2"
 GUIDE_DATE = "September 2026"
 OUTPUT = Path(__file__).resolve().parent.parent / "docs" / "TESTER-INSTRUCTION-PACK.pdf"
 
@@ -287,12 +287,12 @@ def build() -> GuidePDF:
         [
             "1. Open http://localhost:13002 — landing, not a crash.",
             "2. /login demo strip lists owner phones. OTP story matches (no fake SMS).",
-            "3. Login 9876543210 / 123456. Land on /dashboard or inbox-first Orders — never black.",
+            "3. Login 9876543210 / 123456. Land on /dashboard Today OS — never black.",
             "4. Kitchen context prefers CKPNQ001.",
-            "5. Hero: name + code on the left; New order / Brand CTAs same row top-right.",
+            "5. Hero: name + code on the left; Do this now CTA + New order same row top-right.",
             "6. First-run tips: Skip / Next / Show tips. Must not block Orders.",
-            "7. Pills readable (no clip). Recent orders clickable; status chips use the real machine.",
-            "8. Open a recent order -> /dashboard/orders/{id}. Back returns to the list.",
+            "7. Do this now matches highest-priority open work. Live board = in-flight only (no 6-month dump).",
+            "8. Open a live-board row -> /dashboard/orders/{id}. View all -> Orders inbox.",
         ]
     )
 
@@ -525,7 +525,7 @@ def build() -> GuidePDF:
             "1. Authorize as owner 9876543210 / 123456.",
             "2. GET /api/v1/owners/me -> 200. Repeat with a customer token -> 401.",
             "3. Copy the CKPNQ001 kitchen id.",
-            "4. GET /kitchens/{id}/orders -> 200, seeded history (not only today).",
+            "4. GET /kitchens/{id}/orders?open=true&limit=50 -> 200, in-flight + lane_counts. limit=500 -> 422. History is CSV.",
             "5. Analytics / reports path -> 200; 6-month series present if seeded.",
             "6. Menu / dishes -> 200.",
             "7. CRM contacts -> 200; not 0-2 rows on CKPNQ001 after 6-month seed.",
@@ -664,7 +664,7 @@ def build() -> GuidePDF:
             ["Auth / OpenAPI", "docs/API.md sections 1.1-1.2"],
             ["Prod URLs + matrix", "docs/PRODUCTION-PORTALS-CREDENTIALS-QA.md"],
             ["Seed + credentials", "docs/ADVANCEMENT-TRACKER.md"],
-            ["Encyclopedia", "docs/CKAC-COMPLETE-GUIDE.md v3.2.7"],
+            ["Encyclopedia", "docs/CKAC-COMPLETE-GUIDE.md v3.2.8"],
             ["Store shells", "apps/android/README.md and apps/ios/README.md"],
         ],
         widths=[50, 120],

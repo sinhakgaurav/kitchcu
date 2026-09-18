@@ -11,9 +11,9 @@
 
 | Field | Value |
 |-------|-------|
-| Version | **1.2** |
-| Date | 2026-09-17 |
-| Baseline | S1–S18 + P19–P55 |
+| Version | **1.3** |
+| Date | 2026-09-18 |
+| Baseline | S1–S18 + P19–P56 |
 | Code roots | `apps/website/` · `services/*/` · `packages/ckac-common/` |
 
 **How to read**

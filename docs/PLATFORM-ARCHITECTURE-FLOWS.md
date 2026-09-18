@@ -1,12 +1,12 @@
 # KitchCu — Platform Architecture & Flow Report
 
-**Living executive report.** Current-state architecture, persona flows, events, and gaps after Phase 1 S1–S18 + post-S18 **P19–P55**.
+**Living executive report.** Current-state architecture, persona flows, events, and gaps after Phase 1 S1–S18 + post-S18 **P19–P56**.
 
 | Field | Value |
 |-------|-------|
-| Version | **1.1** |
-| Date | 2026-09-17 |
-| Baseline | S1–S18 + P19–P55 |
+| Version | **1.2** |
+| Date | 2026-09-18 |
+| Baseline | S1–S18 + P19–P56 |
 | Production | `*.kitchcu.com` (GCP VM + Caddy) |
 | Companions | [ADVANCEMENT-TRACKER](./ADVANCEMENT-TRACKER.md) · [PERSONA DEEP DIVE](./PLATFORM-PERSONA-DEEP-DIVE.md) · [SOLUTION BLUEPRINT](./PLATFORM-SOLUTION-BLUEPRINT.md) · [DELIVERY PAYER](./DELIVERY-PAYER-MODE-DESIGN.md) · [ARCHITECTURE CTO](./CKAC-ARCHITECTURE-CTO.md) |
 
@@ -258,7 +258,7 @@ P19 branded storefront · P20 golden day · P21 WA/PG workspace · P22 dish show
 | **This file** | Architecture + flow snapshot (current state) |
 | [PLATFORM-PERSONA-DEEP-DIVE.md](./PLATFORM-PERSONA-DEEP-DIVE.md) | Lived voice + friction |
 | [PLATFORM-SOLUTION-BLUEPRINT.md](./PLATFORM-SOLUTION-BLUEPRINT.md) | Expectations → solution → gaps per journey |
-| [ADVANCEMENT-TRACKER.md](./ADVANCEMENT-TRACKER.md) | Ship board P19–P55 |
+| [ADVANCEMENT-TRACKER.md](./ADVANCEMENT-TRACKER.md) | Ship board P19–P56 |
 | [CKAC-ARCHITECTURE-CTO.md](./CKAC-ARCHITECTURE-CTO.md) | Layered arch + registry |
 | [CKAC-USERFLOWS.md](./CKAC-USERFLOWS.md) | Step APIs |
 
@@ -268,6 +268,7 @@ P19 branded storefront · P20 golden day · P21 WA/PG workspace · P22 dish show
 
 | Version | Date | Changes |
 |---------|------|---------|
+| **1.2** | 2026-09-18 | P56 Today OS + bounded order list; baseline P19–P56 |
 | **1.1** | 2026-09-17 | P55 store shells + sales onboard; baseline P19–P55 |
 | **1.0** | 2026-07-19 | Full platform architecture & flow report post P32.1 |
 

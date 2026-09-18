@@ -7,7 +7,7 @@
 | Version | **2.0** |
 | Date | 2026-07-19 |
 | Audience | CTO, Engineering Managers, Tech Leads, CPO (product ↔ code traceability) |
-| Status | **S1–S18 + P19–P55 shipped** (gateway + 13 domain services + 4 PWAs + 3 store shells) |
+| Status | **S1–S18 + P19–P56 shipped** (gateway + 13 domain services + 4 PWAs + 3 store shells; Today OS) |
 | Companion | [Architecture Flows](./PLATFORM-ARCHITECTURE-FLOWS.md) · [Complete Guide](./CKAC-COMPLETE-GUIDE.md) · [Implementation Guide](./CKAC-IMPLEMENTATION-GUIDE.md) · [Advancement Tracker](./ADVANCEMENT-TRACKER.md) · [AGENTS.md](../AGENTS.md) |
 
 ---

@@ -22,12 +22,19 @@ from bulk_demo_data import (  # noqa: E402
     owner_kitchen_specs,
 )
 from demo_data import (  # noqa: E402
+    DEMO_ADMIN_STAFF,
     DEMO_CUSTOMERS,
     DEMO_OWNER,
     DEMO_OWNERS,
     DEMO_OWNERS_EXTRA,
+    DEMO_OWNERS_VOLUME,
+    DEMO_SALES,
+    DEMO_SALES_ONBOARDS,
     PRESENCE_OWNER_PHONE_START,
+    SALES_ONBOARD_TRAINING_ALL,
+    demo_protected_owner_phones,
     presence_kitchen_owner_pairs,
+    sales_onboard_owner_specs,
     secondary_demo_owner_specs,
 )
 
@@ -104,6 +111,8 @@ def test_city_customers_cover_every_location() -> None:
 
 def test_city_customer_phones_do_not_collide_with_demo_logins() -> None:
     reserved = {o["phone"] for o in DEMO_OWNERS} | {c["phone"] for c in DEMO_CUSTOMERS}
+    reserved |= {o["phone"] for o in DEMO_OWNERS_VOLUME}
+    reserved |= {row["owner_phone"] for row in DEMO_SALES_ONBOARDS}
     bulk = {s["phone"] for s in city_customer_specs(5)}
     assert not bulk & reserved
     for phone in bulk:
@@ -138,6 +147,7 @@ def test_bulk_full_harvests_secondary_demo_logins_with_six_month_orders() -> Non
     text = (SCRIPTS / "seed-bulk-data.py").read_text(encoding="utf-8")
     assert "def harvest_secondary_demo_kitchens" in text
     assert "secondary_demo_owner_specs" in text
+    assert "sales_onboard_owner_specs" in text
     assert "EXTRA_OWNERS" in text
     assert "orders_target=BULK_ORDERS_PER_KITCHEN" in text
     assert "ensure_kitchen_complete" in text
@@ -145,3 +155,57 @@ def test_bulk_full_harvests_secondary_demo_logins_with_six_month_orders() -> Non
     call_idx = text.index("harvested_owners = harvest_secondary_demo_kitchens(")
     window = text[max(0, call_idx - 80) : call_idx]
     assert "BULK_FULL" in window
+
+
+def test_full_bulk_defaults_multi_owner_multi_customer() -> None:
+    text = (SCRIPTS / "seed-bulk-data.py").read_text(encoding="utf-8")
+    assert "len(EXTRA_OWNERS) if BULK_FULL else 0" in text
+    assert "6 if BULK_FULL else 3" in text
+    from bulk_demo_data import EXTRA_OWNERS
+
+    assert len(EXTRA_OWNERS) >= 5
+    phones = {o["phone"] for o in EXTRA_OWNERS}
+    assert {o["phone"] for o in DEMO_OWNERS_EXTRA} <= phones
+    assert {o["phone"] for o in DEMO_OWNERS_VOLUME} <= phones
+
+
+def test_admin_staff_covers_every_rbac_role_except_bootstrap_superadmin() -> None:
+    roles = {s["role"] for s in DEMO_ADMIN_STAFF}
+    assert roles == {"ops", "support", "finance", "sales"}
+    emails = [s["email"].lower() for s in DEMO_ADMIN_STAFF]
+    assert len(emails) == len(set(emails))
+    assert DEMO_SALES["email"] in emails
+    assert sum(1 for s in DEMO_ADMIN_STAFF if s["role"] == "sales") >= 2
+    for staff in DEMO_ADMIN_STAFF:
+        assert len(staff["password"]) >= 8
+        assert staff["email"].endswith("@kitchcu.dev")
+
+
+def test_sales_onboards_cover_multiple_reps_and_kitchens() -> None:
+    assert len(DEMO_SALES_ONBOARDS) >= 4
+    sales_emails = {row["sales_email"] for row in DEMO_SALES_ONBOARDS}
+    assert DEMO_SALES["email"] in sales_emails
+    assert len(sales_emails) >= 2
+    kitchens = [row["kitchen_name"] for row in DEMO_SALES_ONBOARDS]
+    assert len(kitchens) == len(set(kitchens))
+    owner_phones = [row["owner_phone"] for row in DEMO_SALES_ONBOARDS]
+    assert len(set(owner_phones)) >= 2
+    assert max(len(row["training_steps"]) for row in DEMO_SALES_ONBOARDS) == len(
+        SALES_ONBOARD_TRAINING_ALL
+    )
+    assert any(len(row["training_steps"]) < len(SALES_ONBOARD_TRAINING_ALL) for row in DEMO_SALES_ONBOARDS)
+    west_kitchens = [row for row in DEMO_SALES_ONBOARDS if row["owner_phone"] == "9876543303"]
+    assert len(west_kitchens) >= 2
+    reserved = {o["phone"] for o in DEMO_OWNERS} | {c["phone"] for c in DEMO_CUSTOMERS}
+    assert not set(owner_phones) & reserved
+    for row in DEMO_SALES_ONBOARDS:
+        assert row["owner_phone"].startswith("98765433")
+        assert set(row["training_steps"]) <= set(SALES_ONBOARD_TRAINING_ALL)
+
+
+def test_protected_owner_phones_keep_volume_and_sales_kitchens() -> None:
+    phones = set(demo_protected_owner_phones())
+    assert DEMO_OWNER["phone_e164"] in phones
+    assert all(o["phone_e164"] in phones for o in DEMO_OWNERS_VOLUME)
+    assert all(o["phone_e164"] in phones for o, _ in sales_onboard_owner_specs())
+    assert len(sales_onboard_owner_specs()) >= 3

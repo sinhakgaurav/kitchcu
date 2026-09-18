@@ -133,6 +133,8 @@ $env:CKAC_BULK_FULL = "0"
 $env:CKAC_BULK_MONTHS = "0"
 $env:CKAC_BULK_BACKDATE_DAYS = "7"
 $env:CKAC_FEATURE_VOLUME = "0"
+$env:CKAC_BULK_OWNERS = "0"
+$env:CKAC_BULK_CUSTOMERS_PER_CITY = "1"
 python scripts/seed-bulk-data.py
 if ($LASTEXITCODE -ne 0) { throw "seed smoke failed" }
 

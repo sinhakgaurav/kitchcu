@@ -144,3 +144,6 @@ def test_bulk_seeder_runs_feature_volume() -> None:
     assert "CKAC_FEATURE_VOLUME" in text
     assert "harvest_secondary_demo_kitchens" in text
     assert "kitchen_ctxs" in text
+    extras = (SCRIPTS / "seed_platform_extras.py").read_text(encoding="utf-8")
+    assert "ensure_admin_staff" in extras
+    assert "ensure_sales_onboards" in extras

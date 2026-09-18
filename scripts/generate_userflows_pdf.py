@@ -9,7 +9,7 @@ from pathlib import Path
 
 from pdf_guide import GuidePDF
 
-GUIDE_VERSION = "1.6"
+GUIDE_VERSION = "1.7"
 GUIDE_DATE = "September 2026"
 OUTPUT = Path(__file__).resolve().parent.parent / "docs" / "CKAC-USERFLOWS.pdf"
 UI = Path(__file__).resolve().parent.parent / "docs" / "assets" / "ui"
@@ -208,6 +208,7 @@ def build() -> GuidePDF:
     pdf.chapter("Flow 2 -- Owner Daily Login + Order Intake + Lifecycle + Tracking")
     pdf.body("Goal: steady-state daily ops loop. Persona: Owner. Entry: kitchen.kitchcu.in dashboard.")
     pdf.mono(
+        "Owner: GET .../orders?open=true&limit=50 -> Do this now + live board (P56)\n"
         "Customer WA message -> Meta webhook -> Notification\n"
         "  -> POST /internal/kitchens/{id}/orders/from-whatsapp (X-Internal-Key)\n"
         "  -> order_drafts row -> order.draft.created\n"
@@ -463,7 +464,7 @@ def build() -> GuidePDF:
     )
     pdf.figure(
         UI / "04-owner-dashboard-pdf.jpg",
-        "Owner dashboard — Flow 2/5 home; CommissionAdvantagePanel reinforces SaaS model.",
+        "Owner dashboard — Flow 2 Today OS: Do this now + live board (open tickets only).",
         max_h=70,
     )
     pdf.figure(
@@ -497,17 +498,17 @@ def build() -> GuidePDF:
         ["Field", "Value"],
         [
             ["Document", "CKAC-USERFLOWS.md / .pdf"],
-            ["Version", "1.6"],
+            ["Version", "1.7"],
             ["Date", "September 2026"],
             ["Traceability", "Every route/event read directly from services/*/app source"],
             ["Change policy", "Update .md whenever a route/event/status changes; regenerate PDF same change"],
-            ["Supersedes", "v1.5; aligned with Complete Guide v3.2.7 (P55 store apps + sales)"],
+            ["Supersedes", "v1.6; aligned with Complete Guide v3.2.8 (P56 Today OS)"],
         ],
         [40, 130],
         size=7,
     )
     pdf.quote(
-        "KitchCu User Flow Documentation Pack v1.6 - Confidential - September 2026."
+        "KitchCu User Flow Documentation Pack v1.7 - Confidential - September 2026."
     )
 
     return pdf

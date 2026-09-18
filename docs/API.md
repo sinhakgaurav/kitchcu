@@ -2,7 +2,7 @@
 
 | Field | Value |
 |-------|-------|
-| Version | 1.2 |
+| Version | 1.3 |
 | Base URL | Gateway `http://localhost:18000` (or same-origin `/api` via PWAs) |
 | Prefix | `/api/v1` |
 | Live explorer | Portal [`/openapi`](http://localhost:13000/openapi) · Gateway [`/docs`](http://localhost:18000/docs) · [`/redoc`](http://localhost:18000/redoc) |
@@ -109,7 +109,29 @@ Field sales use the **same** admin login (`POST /api/v1/admin/auth/login`) with 
 | `PATCH` | `/api/v1/admin/kitchens/{id}/training` | trainable kitchen | `{ "key": "profile", "completed": true }` |
 | `GET` | `/api/v1/admin/stats` | not granted to sales | **403** for role `sales` |
 
-Kill-switch: feature flag `sales_onboarding`. Local demo: `sales@kitchcu.dev` / `sales123456`.
+Kill-switch: feature flag `sales_onboarding`. Local demo: `sales@kitchcu.dev` / `sales123456`. Extra staff: `ops@` / `support@` / `finance@` / `sales.west@kitchcu.dev` (see Advancement Tracker credentials).
+
+### 1.5 Owner order list (P56)
+
+**Auth:** Owner JWT (`type=owner`) — caller must own `kitchen_id`.
+
+`GET /api/v1/kitchens/{kitchen_id}/orders`
+
+| Query | Default | Notes |
+|-------|---------|-------|
+| `status` | — | One lifecycle status. When set, `open` is ignored |
+| `open` | `false` | `true` = in-flight only (`status NOT IN delivered, cancelled`) |
+| `source` | — | `manual`, `whatsapp`, `customer_pwa`, `customer_pwa_multi`, `manual_message` |
+| `created_after` / `created_before` | — | Inclusive ISO datetimes |
+| `limit` | `50` | Min 1, max **100**. `500` → `422` |
+
+**Response `200`** — `OrderListResponse`
+
+- `orders` — newest first, page size ≤ `limit`
+- `total` — number of rows in this page
+- `lane_counts` — `{status: count}` for **all** open orders of that kitchen when `open=true` (the live board uses this, not the page)
+
+Full history is `GET …/orders/export.csv` (capped), not this list. Home uses `open=true&limit=50`. Orders inbox uses `limit=100` plus date filters.
 
 ---
 

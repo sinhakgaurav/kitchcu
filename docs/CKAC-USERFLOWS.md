@@ -4,10 +4,10 @@
 
 | Field | Value |
 |-------|-------|
-| Version | **1.6** |
-| Date | 2026-09-17 |
+| Version | **1.7** |
+| Date | 2026-09-18 |
 | Audience | CPO, Product, Engineering, QA, Investors |
-| Status | Traces to code shipped through **S1–S18 + P19–P55** (store apps, sales onboard, in-dashboard tours, Swagger `POST /api/v1/auth/token`, owner JWT `type=owner`, gated login-hint, 6-month demo history) |
+| Status | Traces to code shipped through **S1–S18 + P19–P56** (Today OS, bounded order list, store apps, sales onboard, 6-month demo history, bulk personas) |
 | Companion PDF | [`docs/CKAC-USERFLOWS.pdf`](./CKAC-USERFLOWS.pdf) (generate with `scripts/generate_userflows_pdf.py`) |
 
 ---
@@ -70,11 +70,15 @@ This document is the **single source of truth for "how does a user actually get 
 | Owner | `9876543211` | OTP `123456` | Priya Mehta — Mehta Tiffins |
 | Owner | `9876543212` | OTP `123456` | Amit Desai — Desai Cloud Kitchen |
 | Owner | `9876543213` | OTP `123456` | Sneha Kulkarni — Kulkarni Home Food |
+| Owner (volume, full bulk) | `9876543214`–`9876543215` | OTP `123456` | Multiple kitchens each |
+| Sales-onboarded | `9876543301`–`9876543303` | OTP `123456` | P55 Train kitchens |
 | Customer | `9123456789` | OTP `123456` | Priya Customer — default diner |
 | Customer | `9123456780` | OTP `123456` | Rahul Menon — repeat/VIP segment |
 | Customer | `9988776655` | OTP `123456` | Ananya Guest — guest checkout |
 | Admin (local) | `admin@kitchcu.dev` | `admin123456` | Platform scope only |
+| Ops / support / finance | `ops@` / `support@` / `finance@kitchcu.dev` | matching `*123456` | RBAC; Admin stays English |
 | Sales (local) | `sales@kitchcu.dev` | `sales123456` | Role `sales` — Sales + Kitchens; extras seed |
+| Sales west | `sales.west@kitchcu.dev` | `sales123456` | Second sales book |
 | Admin (prod `admin.kitchcu.com`) | `admin@kitchcu.com` | GCE `admin-password` → `ADMIN_PASSWORD` | Synced to DB on login — do not use `.dev` email in prod |
 
 ---
@@ -214,9 +218,9 @@ sequenceDiagram
 
 ### Step-by-step UI actions
 
-1. Owner logs in (phone -> OTP `123456`) — lands on the dashboard status strip (revenue, orders, pending).
-2. **Path A — WhatsApp:** a customer message arrives on the kitchen's WhatsApp number; it appears in the "Drafts" queue for review.
-3. **Path B — Manual:** owner taps New Order and keys the order directly (as in Flow 1 step 6).
+1. Owner logs in (phone -> OTP `123456`) — lands on **Today OS** (`/dashboard`): **Do this now** (priority: drafts → accept → handoff → cook → track) plus a **live board** of in-flight tickets only. Six-month history is **not** on Home.
+2. **Path A — WhatsApp:** a customer message arrives on the kitchen's WhatsApp number; it appears in the "Drafts" queue for review. Home Now card / draft pill deep-links to `?tab=drafts`.
+3. **Path B — Manual:** owner taps New Order (hero ghost CTA) and keys the order directly (as in Flow 1 step 6).
 4. Owner reviews/edits the draft, taps **Confirm** to convert it to a real order.
 5. Owner advances the order through the lifecycle as kitchen work progresses: Accept -> Start Preparing -> Mark Ready -> Out for Delivery -> Delivered.
 6. **Stock (F19b):** on first transition to **Ready**, order service calls catalog `deduct-order` when kitchen mode is `order_ready` (default). Porter booking still happens on **Accept** when customer chose platform delivery.
@@ -228,6 +232,7 @@ sequenceDiagram
 | Step | Method + Path | Auth | Notes |
 |------|----------------|------|-------|
 | 1 | `POST /api/v1/auth/otp/request` -> `POST /api/v1/auth/otp/verify` | none | Same as Flow 1 |
+| 1 (home) | `GET /api/v1/kitchens/{kitchen_id}/orders?open=true&limit=50` | owner | Live board + `lane_counts` (P56). Never unbounded history |
 | 2 | *(inbound)* `POST /api/v1/webhooks/whatsapp` | none (Meta signature) | notification service receives raw message |
 | 2 | `POST /api/v1/internal/kitchens/{kitchen_id}/orders/from-whatsapp` | internal key | notification -> order service; creates `order_drafts` row |
 | 2 (owner view) | `GET /api/v1/kitchens/{kitchen_id}/orders/drafts` | owner | List pending drafts |
@@ -236,7 +241,7 @@ sequenceDiagram
 | 4 | `POST /api/v1/kitchens/{kitchen_id}/orders/drafts/{draft_id}/confirm` | owner | Draft -> `OrderResponse` (status `received`) |
 | 5 (each hop) | `PATCH /api/v1/orders/{order_id}/status` | owner | `{status: accepted\|preparing\|ready\|out_for_delivery\|delivered\|cancelled}` |
 | 6 | `POST /api/v1/internal/kitchens/{kitchen_id}/stock/deduct-order` | internal | Triggered on first `ready` when deduct mode ≠ `prep_batch_only` |
-| — | `GET /api/v1/kitchens/{kitchen_id}/orders?status=&source=` | owner | Orders inbox list/filter |
+| — | `GET /api/v1/kitchens/{kitchen_id}/orders?status=&source=&limit=100` | owner | Orders inbox (windowed). CSV for full history |
 | 8 | `GET /api/v1/delivery/track/{token}` | none (signed token) | Public tracking page data |
 
 ### Domain events published
@@ -936,11 +941,11 @@ Gateway-owned (not forwarded): `GET /`, `GET /health/live`, `GET /health/ready`,
 | Field | Value |
 |-------|-------|
 | Document | `CKAC-USERFLOWS.md` |
-| Version | 1.6 |
+| Version | 1.7 |
 | Date | September 2026 |
 | Author | KitchCu engineering (AI-assisted, human-reviewed) |
 | Traceability | Every route/event cited here was read directly from `services/*/app/routes.py`, `schemas.py`, and `main.py` in this repository as of September 2026 — not inferred from memory |
 | Companion | `docs/CKAC-USERFLOWS.pdf` — generate/refresh via `python scripts/generate_userflows_pdf.py` |
-| QA checklist | `docs/QA-INSTRUCTION-PACK.md` (+ PDF) — smoke, lists/UI, F19b, P55; `python scripts/generate_qa_instruction_pdf.py` |
+| QA checklist | `docs/QA-INSTRUCTION-PACK.md` (+ PDF) — smoke, lists/UI, F19b, P55–P56; `python scripts/generate_qa_instruction_pdf.py` |
 | Change policy | Update this file whenever a route, event name, or status transition changes; regenerate the PDF in the same change |
-| Supersedes | v1.5; aligned with Complete Guide v3.2.7 (P55 store apps + sales onboard) |
+| Supersedes | v1.6; aligned with Complete Guide v3.2.8 (P56 Today OS + bounded order list) |

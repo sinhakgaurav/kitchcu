@@ -997,7 +997,7 @@ Customer cart:
         "Writes never cross schemas; Growth/Ratings read orders cross-schema for evidence only",
         "PWAs: portal, customer.kitchcu.in, kitchen.kitchcu.in, admin.kitchcu.in",
         "Store: kitchCU - customers / kitchen owner / admin (TWA + WKWebView)",
-        "Full diagrams (architecture, flows, ER, UI anatomy): CKAC-COMPLETE-GUIDE.pdf v3.2.7",
+        "Full diagrams (architecture, flows, ER, UI anatomy): CKAC-COMPLETE-GUIDE.pdf v3.2.8",
     ], size=10)
     pdf.mono(
         "PWAs -> Gateway -> Identity|Catalog|Order|Billing|Marketing|Ratings|\n"
@@ -1061,7 +1061,7 @@ Customer cart:
     pdf.set_text_color(*GRAY)
     pdf.multi_cell(
         257, 6,
-        "Full guide: CKAC-COMPLETE-GUIDE.md / .pdf (v3.2.7) | CPO blueprint v4.2 | "
+        "Full guide: CKAC-COMPLETE-GUIDE.md / .pdf (v3.2.8) | CPO blueprint v4.2 | "
         "User journeys: CKAC-USERFLOWS.md / .pdf | API: docs/API.md + gateway /docs "
         "(aggregated OpenAPI) | UI shots: docs/assets/ui/ | E1-E2 quality-loop design pack",
     )

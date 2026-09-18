@@ -19,9 +19,9 @@
 | `docs/PLATFORM-SOLUTION-BLUEPRINT.md` | **Solution blueprint** — expectations → CEO/CPO solution → CTO impl → arch/DB/UX per journey & admin controls |
 | `docs/PLATFORM-STRATEGIC-ANALYSIS.md` | **Strategic analysis** — competitive, gaps, Waves A–D |
 | `docs/PLATFORM-PERSONA-DEEP-DIVE.md` | **Persona deep dive** — lived experience, scorecards, RBAC reality |
-| `docs/CKAC-COMPLETE-GUIDE.md` | **Master guide v3.2.7** — CEO + CPO + CTO encyclopedia (definitions, how/why, flows, UI Catalog, aggregated OpenAPI reference + PDF) |
+| `docs/CKAC-COMPLETE-GUIDE.md` | **Master guide v3.2.8** — CEO + CPO + CTO encyclopedia (definitions, how/why, flows, UI Catalog, aggregated OpenAPI reference + PDF) |
 | `docs/CKAC-USERFLOWS.md` | **Full user journey pack** — every persona, every screen, every API call, step-by-step (+ PDF) |
-| `docs/QA-INSTRUCTION-PACK.md` | **QA instruction pack** — smoke, list/UI polish, F19b stock/bulk prep, P55 sales/store/tours, sign-off (+ PDF) |
+| `docs/QA-INSTRUCTION-PACK.md` | **QA instruction pack** — smoke, list/UI polish, F19b stock/bulk prep, P55 sales/store, P56 Today OS, sign-off (+ PDF) |
 | `docs/TESTER-INSTRUCTION-PACK.md` | **Tester book** — numbered UI + Swagger/API steps for every persona including sales + store apps (+ PDF) |
 | `docs/API.md` | **Public API reference** — auth, how to Authorize login-required routes (§1.1–1.2: OAuth2Password `POST /api/v1/auth/token` or HTTPBearer; §1.4 sales onboard); live OpenAPI at gateway `/docs`/`/redoc`/`/openapi.json` + portal `/openapi`; Super Admin shows username/password when login-hint reveal is on |
 | `docs/CKAC-ARCHITECTURE-CTO.md` | **CTO layers + CPO product ↔ code map** |
@@ -91,6 +91,7 @@
 | **Unique bill / GST numbers** | `services/order/`, `services/billing/`, `apps/website/` | **P51** — `{kitchen_code}-BILL-YYYYMMDD-SEQ` and `{kitchen_code}-GST-YYYYMM-SEQ`; Super Admin phone nav + table scroll |
 | **Checkup diet filter** | `services/identity/`, `apps/website/` | **P52** — customer checkup upload + ML parse; opt-in “only food I can have”; kitchens ranked by compatible dishes; `customer_diet_report` flag |
 | **Store apps + sales onboard** | identity + website PWAs + `apps/android/` + `apps/ios/` | **P55** — TWA/WKWebView shells; sales role onboard + training; in-dashboard tours |
+| **Owner Today OS + bounded order list** | `services/order/`, `apps/website/` | **P56** — Home Do this now + live board; `GET …/orders?open=&limit=` (50/100) + `lane_counts`; Alembic `012` |
 | **Kitchen integrations admin** | identity + billing admin APIs, admin PWA | **P21** — WhatsApp / Razorpay per kitchen (platform keys stay Admin API Keys) |
 | **Package mapper + employees RBAC** | billing packages · identity employees · admin PWA | **P25–P28** — Admin Packages/Employees; kitchen Package/Marketing/Streaming tabs; Cursor super-admin gate |
 | **Dual referrals + GST export + admin ops** | identity referrals · billing GST export · admin PWA | **P37–P39** — customer↔kitchen referrals; GST Excel/PDF; kitchen Orders/Care, ticket triage, settlements |
@@ -448,9 +449,9 @@ Delivered order only → home_taste (1–5) + quality (1–5) → optional anony
 | Where does business logic go? | `schemas.py` domain functions or `domain/` package — not in routes |
 | How to handle phone numbers? | Normalize to E.164 (`+91...`) via Pydantic validator |
 | Default OTP in dev? | `123456` (replace with Redis + WhatsApp in prod) |
-| Demo owner / kitchen? | Run `python scripts/seed-dev-data.py` or `.\scripts\seed-all.ps1` → phones `9876543210`–`9876543213`, OTP `123456`, primary `CKPNQ001` (Pune). City presence kitchens (Delhi, Gurugram, Noida, Lucknow, Kanpur, Prayagraj, Varanasi, Jhansi, Dehradun, Mumbai) belong to dedicated hosts `9876543220+`, not Raj. |
-| Demo customers? | WhatsApp OTP `123456` — `9123456789`, `9123456780`, `9988776655`, `9123456781`, `9123456782` (5 total — needed for CRM/learning-trial invite minimum) |
-| Platform admin (local)? | `admin@kitchcu.dev` / `admin123456` |
+| Demo owner / kitchen? | Run `python scripts/seed-dev-data.py` or `.\scripts\seed-all.ps1` → phones `9876543210`–`9876543213`, OTP `123456`, primary `CKPNQ001` (Pune). Full bulk: volume `3214`–`3215` (multi-kitchen), city hosts `9876543220+`, sales-onboarded `3301`–`3303`. |
+| Demo customers? | WhatsApp OTP `123456` — `9123456789`, `9123456780`, `9988776655`, `9123456781`, `9123456782` (5 named) plus 6/city on `CKAC_BULK_FULL=1` |
+| Platform admin (local)? | `admin@kitchcu.dev` / `admin123456`. Staff: `ops@` / `support@` / `finance@` / `sales@` / `sales.west@kitchcu.dev` |
 | Platform admin (prod `admin.kitchcu.com`)? | `admin@kitchcu.com` + GCE metadata `admin-password` (`ADMIN_PASSWORD`) — hash synced on login |
 | Advancement tracker? | `docs/ADVANCEMENT-TRACKER.md` |
 | Primary user for Phase 1? | Owner — optimize owner flows before customer PWA |
@@ -473,4 +474,4 @@ Delivered order only → home_taste (1–5) + quality (1–5) → optional anony
 
 ---
 
-*Last updated: Phase 1 S1–S18 + P19–P55 · store apps + sales onboarding. Tracker: `docs/ADVANCEMENT-TRACKER.md`. Portals/QA: `docs/PRODUCTION-PORTALS-CREDENTIALS-QA.md`. Guide: `docs/CKAC-COMPLETE-GUIDE.md` v3.2.7. Prod: `*.kitchcu.com`. Next: kitchen staff build · live Razorpay · E1–E2.*
+*Last updated: Phase 1 S1–S18 + P19–P56 · Today OS + bounded order list · store apps + sales onboarding. Tracker: `docs/ADVANCEMENT-TRACKER.md`. Portals/QA: `docs/PRODUCTION-PORTALS-CREDENTIALS-QA.md`. Guide: `docs/CKAC-COMPLETE-GUIDE.md` v3.2.8. Prod: `*.kitchcu.com`. Next: kitchen staff build · live Razorpay · E1–E2.*

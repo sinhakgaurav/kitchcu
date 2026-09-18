@@ -5,9 +5,9 @@
 
 | Field | Value |
 |-------|-------|
-| Version | **1.5** |
-| Date | 2026-09-17 |
-| Baseline | S1–S18 + P19–P55 |
+| Version | **1.6** |
+| Date | 2026-09-18 |
+| Baseline | S1–S18 + P19–P56 |
 | Architecture flows | [`PLATFORM-ARCHITECTURE-FLOWS.md`](./PLATFORM-ARCHITECTURE-FLOWS.md) |
 | Persona lived experience | [`PLATFORM-PERSONA-DEEP-DIVE.md`](./PLATFORM-PERSONA-DEEP-DIVE.md) |
 | Strategic waves | [`PLATFORM-STRATEGIC-ANALYSIS.md`](./PLATFORM-STRATEGIC-ANALYSIS.md) |
@@ -458,6 +458,7 @@ Status tags: ✅ Done well · 🟡 Partial · 🔴 Gap / not built · 📋 Desig
 | **1.1** | 2026-07-18 | Wave A/B gap-fill: admin RBAC enforced + tab filter; hard entitlements + owner nav; template send; customer Watch live |
 | **1.2** | 2026-07-18 | P30: LiveKit embed (watch+publish), template per-phone fan-out, admin audit events + Audit tab |
 | **1.3** | 2026-07-18 | P31: messaging wallet debit on template send; Meta Cloud outbound client; billing→identity audit |
+| **1.6** | 2026-09-18 | P56: owner Today OS (Do this now + live board) + bounded `GET …/orders`; baseline P19–P56 |
 | **1.5** | 2026-09-17 | P55: three store apps, sales onboard + Train; baseline P19–P55 |
 | **1.4** | 2026-07-19 | P32/P32.1 Porter + delivery cost-share in A2; scoreboard; architecture flows companion |
 
@@ -465,4 +466,4 @@ Status tags: ✅ Done well · 🟡 Partial · 🔴 Gap / not built · 📋 Desig
 
 ---
 
-*KitchCu Platform Solution Blueprint v1.5 — Confidential — September 2026*
+*KitchCu Platform Solution Blueprint v1.6 — Confidential — September 2026*

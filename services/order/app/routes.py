@@ -52,12 +52,16 @@ from app.schemas import (
     kitchen_parse_stats,
     list_kitchen_drafts,
     list_kitchen_orders,
+    LIST_DEFAULT_LIMIT,
+    LIST_MAX_LIMIT,
     update_draft,
     attach_rating_stats,
+    count_open_orders_by_status,
     list_customer_orders,
     load_order_rating_stats,
     master_order_to_response,
     order_to_response,
+    orders_to_responses,
     repeat_customer_order,
     set_delivery_fulfillment,
     update_order_status,
@@ -428,7 +432,7 @@ async def customer_orders_list(
     if not phone:
         return OrderListResponse(kitchen_id=uuid.UUID(int=0), orders=[], total=0)
     orders = await list_customer_orders(session, phone)
-    enriched = [await order_to_response(session, o) for o in orders]
+    enriched = await orders_to_responses(session, orders)
     stats = await load_order_rating_stats(session, [o.id for o in orders])
     enriched = [attach_rating_stats(row, stats) for row in enriched]
     kitchen_id = orders[0].kitchen_id if orders else uuid.UUID(int=0)
@@ -600,10 +604,12 @@ async def drafts_parse_stats(
     summary="List a kitchen's orders (owner dashboard)",
     description=(
         "**Auth:** Owner JWT (Bearer) — caller must own `kitchen_id`.\n\n"
-        "**Query:** optional `status` (any status in the order lifecycle), `source` "
-        "(`manual`, `customer_pwa`, `customer_pwa_multi`, `whatsapp`, `manual_message`), "
-        "`created_after`, and `created_before` (ISO datetimes, inclusive).\n\n"
-        "**Response:** `OrderListResponse`, newest first."
+        "**Query:** optional `status` (any status in the order lifecycle), `open=true` "
+        "(in-flight only — excludes delivered/cancelled; ignored when `status` is set), "
+        "`source` (`manual`, `customer_pwa`, `customer_pwa_multi`, `whatsapp`, `manual_message`), "
+        "`created_after`, `created_before` (ISO datetimes, inclusive), "
+        "and `limit` (default 50, max 100). Full history is CSV export, not this list.\n\n"
+        "**Response:** `OrderListResponse`, newest first. `total` is the page size returned."
     ),
     responses=auth_errors(include_403=True),
 )
@@ -615,6 +621,8 @@ async def orders_list(
     source: Annotated[str | None, Query()] = None,
     created_after: Annotated[datetime | None, Query()] = None,
     created_before: Annotated[datetime | None, Query()] = None,
+    open_only: Annotated[bool, Query(alias="open")] = False,
+    limit: Annotated[int, Query(ge=1, le=LIST_MAX_LIMIT)] = LIST_DEFAULT_LIMIT,
 ) -> OrderListResponse:
     await verify_kitchen_owner(kitchen_id, owner_id, session)
     orders = await list_kitchen_orders(
@@ -624,9 +632,17 @@ async def orders_list(
         source=source,
         created_after=created_after,
         created_before=created_before,
+        open_only=open_only,
+        limit=limit,
     )
-    enriched = [await order_to_response(session, o) for o in orders]
-    return OrderListResponse(kitchen_id=kitchen_id, orders=enriched, total=len(enriched))
+    enriched = await orders_to_responses(session, orders)
+    lane_counts = await count_open_orders_by_status(session, kitchen_id) if open_only else None
+    return OrderListResponse(
+        kitchen_id=kitchen_id,
+        orders=enriched,
+        total=len(enriched),
+        lane_counts=lane_counts,
+    )
 
 
 @router.get(

@@ -4,11 +4,11 @@
 
 | Field | Value |
 |-------|-------|
-| Version | **3.2.7** |
-| Status | Phase 1 **S1–S18** + post-S18 **P19–P55**; store apps (**kitchCU - customers / kitchen owner / admin**); sales onboard + Train; in-dashboard tours; dish calories/Healthy Control; checkup diet filter; prod `*.kitchcu.com`; Swagger `POST /api/v1/auth/token`; 6-month demo history; portals/QA [`PRODUCTION-PORTALS-CREDENTIALS-QA.md`](./PRODUCTION-PORTALS-CREDENTIALS-QA.md); tester book [`TESTER-INSTRUCTION-PACK.md`](./TESTER-INSTRUCTION-PACK.md); tracker [`ADVANCEMENT-TRACKER.md`](./ADVANCEMENT-TRACKER.md); **E1/E2** design pack only |
+| Version | **3.2.8** |
+| Status | Phase 1 **S1–S18** + post-S18 **P19–P56**; owner Today OS (Do this now + live board); scale-safe order list; store apps; sales onboard; 6-month demo history + bulk personas; prod `*.kitchcu.com`; **E1/E2** design pack only |
 | Audience | CEO, CPO, CTO, Product, Engineering, DBA, QA, Investors, AI coding agents |
-| Last updated | 2026-09-17 |
-| Supersedes | `CKAC-COMPLETE-GUIDE.md` v3.2.6 (2026-09-12) |
+| Last updated | 2026-09-18 |
+| Supersedes | `CKAC-COMPLETE-GUIDE.md` v3.2.7 (2026-09-17) |
 | Operating charter | [`.cursor/rules/kitchcu-executive-operating-charter.mdc`](../.cursor/rules/kitchcu-executive-operating-charter.mdc) — always-on, non-negotiable |
 | Engineering constitution | [`KITCHCU-ENGINEERING-STANDARDS.md`](./KITCHCU-ENGINEERING-STANDARDS.md) |
 | Agent quick spec | [`AGENTS.md`](../AGENTS.md) |
@@ -67,6 +67,7 @@
 17.9 [Delivery Payer Modes & Maps Tracking](#179-delivery-payer-modes--maps-tracking)
 17.10 [Super Admin Control Plane](#1710-super-admin-control-plane)
 17.11 [Sales onboard, owner training & store apps](#1711-sales-onboard-owner-training--store-apps)
+17.12 [Owner Today OS (Do this now + live board)](#1712-owner-today-os-do-this-now--live-board)
 
 **Part V — UI Catalog**
 18. [UI Catalog — Reference Surfaces (Login, Ops, Control)](#18-ui-catalog--reference-surfaces-login-ops-control)
@@ -329,10 +330,10 @@ Each module is a **bounded product + engineering context**: one row per module w
 |--|--|
 | **Definition** | Order intake (any channel), lifecycle state machine, PDF bills, and owner analytics. |
 | **Problem solved** | P1, P3, P8, C3 — the single operational source of truth for "what did we sell, to whom, and where is it right now." |
-| **Logic / how it works** | Orders can originate from manual entry, WhatsApp draft confirmation, or customer PWA checkout — all converge on one `orders` table and one status machine: `received → accepted → preparing → ready → out_for_delivery → delivered`, with `cancelled` reachable from any pre-delivered state. Every transition appends an immutable `order_status_events` row (audit trail) and publishes `order.status.changed`. A PDF bill is generated per order/master order. Delivery fulfillment stores `delivery_mode` (`self` \| `platform`), `delivery_payer` (`owner` \| `customer`), `owner_delivery_cost`, and customer lat/lng for Maps tracking; owners set fulfillment via `PATCH /orders/{id}/delivery-fulfillment`. `services/order/app/analytics.py` computes revenue summaries, 30-day trend, top dishes, IST-bucketed peak hours, and repeat/VIP/churn customer segments, Redis-cached (120s TTL) per kitchen. |
-| **Data / events** | Schema `ckac_orders`: `orders` (incl. delivery payer fields), `order_items`, `order_status_events`, `order_drafts`, `master_orders`. Events on `ckac:orders:order` / `ckac:orders:draft` / `ckac:orders:master_order`: `order.placed`, `order.status.changed`, `order.draft.created`. Migration `005_delivery_payer_mode`. |
-| **Surfaces** | Kitchen PWA (Orders, New Order, Order Detail + Maps, Reports, **CommissionAdvantagePanel** on Home) · Customer PWA (checkout, Track page with Google Maps, order history, customer dashboard). |
-| **Status** | ✅ S3 + analytics + PDF bills + master orders (S8) · **delivery payer + Maps tracking** ✅. |
+| **Logic / how it works** | Orders can originate from manual entry, WhatsApp draft confirmation, or customer PWA checkout — all converge on one `orders` table and one status machine: `received → accepted → preparing → ready → out_for_delivery → delivered`, with `cancelled` reachable from any pre-delivered state. Every transition appends an immutable `order_status_events` row (audit trail) and publishes `order.status.changed`. A PDF bill is generated per order/master order. Delivery fulfillment stores `delivery_mode` (`self` \| `platform`), `delivery_payer` (`owner` \| `customer`), `owner_delivery_cost`, and customer lat/lng for Maps tracking; owners set fulfillment via `PATCH /orders/{id}/delivery-fulfillment`. **List is bounded (P56):** `GET /kitchens/{id}/orders` defaults `limit=50` (max 100); `open=true` excludes delivered/cancelled and returns `lane_counts` for the full rush; items+events hydrate in two queries, not 2N; partial index `ix_orders_kitchen_open_created`. Full history is CSV export, not the live list. `services/order/app/analytics.py` computes revenue summaries, 30-day trend, top dishes, IST-bucketed peak hours, and repeat/VIP/churn customer segments, Redis-cached (120s TTL) per kitchen. |
+| **Data / events** | Schema `ckac_orders`: `orders` (incl. delivery payer fields), `order_items`, `order_status_events`, `order_drafts`, `master_orders`. Events on `ckac:orders:order` / `ckac:orders:draft` / `ckac:orders:master_order`: `order.placed`, `order.status.changed`, `order.draft.created`. Migrations `005_delivery_payer_mode`, **`012_open_orders_index`**. |
+| **Surfaces** | Kitchen PWA (Home **Do this now** + live board, Orders inbox, New Order, Order Detail + Maps, Reports) · Customer PWA (checkout, Track page with Google Maps, order history, customer dashboard). |
+| **Status** | ✅ S3 + analytics + PDF bills + master orders (S8) · delivery payer + Maps · **P56 Today OS + bounded list**. |
 
 ---
 
@@ -485,10 +486,10 @@ Each module is a **bounded product + engineering context**: one row per module w
 |--|--|
 | **Definition** | Installable React surfaces for every persona — including super-admin control. |
 | **Problem solved** | Distribution without app-store gatekeeping or review delays; deep-linkable from WhatsApp; platform ops in one Admin shell. |
-| **Logic / how it works** | One Vite monorepo (`apps/website/`) builds four independent bundles (`portal`, `customer`, `kitchen`, `admin`) sharing components, brand tokens (`shared/brand.ts`), and API helpers, but each with its own `main.tsx` entry, manifest, and service worker where offline matters (customer, kitchen). **`OwnerPageShell`** unifies the kitchen dashboard (incl. Growth → **Templates** for WA/email). **`AuthLoginHighlights`** lists subdomain-specific value props. Owner Home includes **`CommissionAdvantagePanel`**. Customer **Dashboard** covers savings, health tips, refunds, and addresses. Admin tabs: Overview · Kitchens · Owners · Customers · Orders · Refunds · Tickets · **Packages** · **Employees** · **Sales** · **Control**. Kitchen workspace: Profile / **Train** / WhatsApp / Payments / Package / Marketing / Modules / Streaming. First-run **ProductTour** (`kitchcu_tour_{persona}_v1`) on customer, kitchen, and admin. |
+| **Logic / how it works** | One Vite monorepo (`apps/website/`) builds four independent bundles (`portal`, `customer`, `kitchen`, `admin`) sharing components, brand tokens (`shared/brand.ts`), and API helpers, but each with its own `main.tsx` entry, manifest, and service worker where offline matters (customer, kitchen). **`OwnerPageShell`** unifies the kitchen dashboard (incl. Growth → **Templates** for WA/email). **`OwnerHomePage`** is the Today OS: one **Do this now** action + live board of open tickets (P56). **`AuthLoginHighlights`** lists subdomain-specific value props. Customer **Dashboard** covers savings, health tips, refunds, and addresses. Admin tabs: Overview · Kitchens · Owners · Customers · Orders · Refunds · Tickets · **Packages** · **Employees** · **Sales** · **Control**. Kitchen workspace: Profile / **Train** / WhatsApp / Payments / Package / Marketing / Modules / Streaming. First-run **ProductTour** (`kitchcu_tour_{persona}_v1`) on customer, kitchen, and admin. |
 | **Data / events** | Client-only; identity RBAC + feature flags / journeys + billing packages/refunds power Admin. |
 | **Surfaces** | All four apps — see §18/§21. Store listings wrap the same PWAs (M18). |
-| **Status** | ✅ Continuous polish; Packages · Employees · Sales · Templates · super-admin kitchen workspace ✅ (P25–P28, P55). |
+| **Status** | ✅ Continuous polish; Packages · Employees · Sales · Templates · super-admin kitchen workspace ✅ (P25–P28, P55); Today OS ✅ P56. |
 
 ---
 
@@ -1097,6 +1098,7 @@ curl "http://localhost:18000/openapi.json?refresh=true"   # force refresh after 
 | Dish calories + automatic Healthy tag | P53 | ✅ |
 | Calories / Healthy Super Admin Control | P54 | ✅ |
 | Store apps + sales onboard + in-dashboard tours | P55 | ✅ |
+| Owner Today OS + bounded open-order list (`open`, `limit`, `lane_counts`) | P56 | ✅ |
 | **Purchases ledger + chef-standard lock (E1/E2)** | **S19 proposed** | **📋 Design only — not started** |
 
 ---
@@ -1313,6 +1315,19 @@ Gateway note: admin **billing** paths (packages, refunds, payment-gateway, GST) 
 
 Sales `GET /admin/stats` → 403. Another sales JWT cannot PATCH training for a kitchen they did not onboard.
 
+## 17.12 Owner Today OS (Do this now + live board)
+
+**Context.** After a 6-month harvest, Home must not load unbounded history. The owner’s first screen is a cook-line: one next action, then only tickets that still need them.
+
+| Step | Actor | Action | Result |
+|------|-------|--------|--------|
+| 1 | Owner | Lands `/dashboard` | Hero CTA = current Now move; **Do this now** card |
+| 2 | PWA | `GET /kitchens/{id}/orders?open=true&limit=50` | Page of in-flight orders + `lane_counts` for the full rush |
+| 3 | Priority | drafts → received → ready → cooking → out → thin menu → unpublished brand → clear | One CTA. Delay on **received** is how diners bounce to aggregators |
+| 4 | Live board | Lanes received / accepted / preparing / ready / out_for_delivery | Delivered/cancelled never appear. **View all** → Orders (windowed; CSV for export) |
+
+Index: `ix_orders_kitchen_open_created` (partial). Super-admin gate: none (owner ops only).
+
 ---
 
 # Part V — UI Catalog
@@ -1376,10 +1391,10 @@ Screenshots live at [`docs/assets/ui/`](./assets/ui/) (PNG for markdown; `*-pdf.
 | | |
 |--|--|
 | **Surface** | Kitchen PWA — `OwnerHomePage` / `OwnerPageShell` |
-| **Anatomy** | Side nav (capability ladder) → status strip → **New Order** → recent orders → **`CommissionAdvantagePanel`** (0% food commission vs aggregator comparison chart) → low-stock alerts. |
-| **UX intent** | Inbox-first ops; commission panel reinforces the business model every session. |
-| **Brand cues** | Dark navy ops `#0B1B32`. |
-| **Demo** | Seeded `CKPNQ001` kitchen. |
+| **Anatomy** | Side nav (capability ladder) → hero (kitchen name + code + **Do this now** CTA) → **Now** command card → KPIs → **Live board** (open lanes only: received / accepted / preparing / ready / out for delivery) → revenue pulse. History is **not** on Home. |
+| **UX intent** | One job: the next ticket the kitchen must act on. Facebook-style command surface, not a 6-month warehouse. `GET …/orders?open=true&limit=50` plus `lane_counts` for the full rush. |
+| **Brand cues** | Cream ops board; orange Now (alert) / teal Now (live). |
+| **Demo** | Seeded `CKPNQ001`. After seed-dev: typically 1 received + 1 preparing on the live board. |
 
 ### 18.6 Admin Login (highlights)
 
@@ -1496,11 +1511,16 @@ The `.kc-field` flex-column pattern (`display: flex; flex-direction: column; gap
 | Owner | `9876543211` (Priya Mehta) | OTP `123456` | Mehta Tiffins |
 | Owner | `9876543212` (Amit Desai) | OTP `123456` | Desai Cloud Kitchen |
 | Owner | `9876543213` (Sneha Kulkarni) | OTP `123456` | Kulkarni Home Food |
+| Owner (volume, full bulk) | `9876543214`–`9876543215` | OTP `123456` | Multiple kitchens each |
+| Sales-onboarded owners | `9876543301`–`9876543303` | OTP `123456` | P55 Train kitchens |
 | Customer (default diner) | `9123456789` (Priya Customer) | OTP `123456` | Default seeded diner |
 | Customer (repeat buyer) | `9123456780` (Rahul Menon) | OTP `123456` | Weighted into repeat/VIP demo segments |
 | Customer (guest) | `9988776655` (Ananya Guest) | OTP `123456` | Guest checkout path |
+| City diners (full bulk) | 6 per seeded city | OTP `123456` | Discovery / CRM volume |
 | Platform admin (local) | `admin@kitchcu.dev` | `admin123456` | Platform-scope only — no owner JWT accepted |
+| Ops / support / finance | `ops@` / `support@` / `finance@kitchcu.dev` | `ops123456` / `support123456` / `finance123456` | RBAC roles; Admin stays English |
 | Field sales (local) | `sales@kitchcu.dev` | `sales123456` | Role `sales` — Sales + Kitchens; extras seed |
+| Field sales west | `sales.west@kitchcu.dev` | `sales123456` | Second sales book (`3303`) |
 | Platform admin (prod) | `admin@kitchcu.com` | `ADMIN_PASSWORD` from GCE metadata | Same JWT type=admin; password re-synced from env on login |
 
 All OTPs are the fixed dev value `123456` (`ckac_common` dev OTP provider) — production OTP delivery via WhatsApp/SMS is a named target, not yet wired. Seed data is generated by `scripts/seed-dev-data.py` and `scripts/seed-bulk-data.py`, kept in sync with `apps/website/src/shared/demo.ts` (the single frontend source of truth for these values — never hardcode a demo phone number elsewhere).
@@ -1620,7 +1640,7 @@ Full acceptance criteria for every feature: [`CKAC-COMPLETE-PLANNING-BENCHMARK.m
 
 | Doc | Role |
 |-----|------|
-| **This guide (v3.2.7)** | CEO/CPO/CTO master encyclopedia |
+| **This guide (v3.2.8)** | CEO/CPO/CTO master encyclopedia |
 | [`PLATFORM-SOLUTION-BLUEPRINT.md`](./PLATFORM-SOLUTION-BLUEPRINT.md) | Expectations → CEO/CPO solution → CTO impl → arch/DB/UX per journey & admin controls |
 | [`PLATFORM-PERSONA-DEEP-DIVE.md`](./PLATFORM-PERSONA-DEEP-DIVE.md) | Persona lived experience + scorecards |
 | [`PLATFORM-STRATEGIC-ANALYSIS.md`](./PLATFORM-STRATEGIC-ANALYSIS.md) | Competitive honesty + Waves A–D |
@@ -1648,6 +1668,7 @@ Full acceptance criteria for every feature: [`CKAC-COMPLETE-PLANNING-BENCHMARK.m
 
 | Version | Date | Changes |
 |---------|------|---------|
+| **3.2.8** | 2026-09-18 | **P56** owner Today OS (Do this now + live board); bounded `GET …/orders` (`open`, `limit` 50/100, `lane_counts`, Alembic `012`); bulk seed personas (admin roles, multi-kitchen owners, 6 diners/city, sales onboard `3301–3303`); docs/PDFs refresh. |
 | **3.2.7** | 2026-09-17 | **P55** three store apps (**kitchCU - customers / kitchen owner / admin**); sales role + Sales/Train; in-dashboard tours; **P50–P54** health/calories/diet Control; tester/QA/portals packs + PDFs refresh. |
 | **3.2.6** | 2026-09-12 | **P47** Swagger/OpenAPI: padlock only on JWT routes; `POST /api/v1/auth/token`; owner JWT `type=owner`; login-hint gated (`ADMIN_LOGIN_REVEAL_PASSWORD`); 6-month bulk history seed; community orphan-recipe + customer-refunds 500s closed; docs/PDFs refresh. |
 | **3.2.5** | 2026-09-07 | P41: owner/admin kitchen profile PATCH (code immutable); owner dish list includes drafts; Ratings page; order filters/draft remap; settlements + payment-mix; admin RBAC UI + stream summary; Super Admin links; live-capture-safe bulk seed; weekly cron path `/opt/ckac`; docs/PDFs refresh. |
@@ -1664,4 +1685,4 @@ Full acceptance criteria for every feature: [`CKAC-COMPLETE-PLANNING-BENCHMARK.m
 
 ---
 
-*KitchCu Complete Executive & Engineering Guide v3.2.7 — Confidential — September 2026*
+*KitchCu Complete Executive & Engineering Guide v3.2.8 — Confidential — September 2026*

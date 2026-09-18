@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""Generate Kitchcu Complete Executive Guide PDF v3.2.7 — deep encyclopedia (CEO + CPO + CTO).
+"""Generate Kitchcu Complete Executive Guide PDF v3.2.8 — deep encyclopedia (CEO + CPO + CTO).
 
-Source of truth: docs/CKAC-COMPLETE-GUIDE.md v3.2.7 (September 2026).
+Source of truth: docs/CKAC-COMPLETE-GUIDE.md v3.2.8 (September 2026).
 Shared layout: scripts/pdf_guide.py (GuidePDF) — header clearance, caption-above figures.
 """
 
@@ -9,7 +9,7 @@ from pathlib import Path
 
 from pdf_guide import GuidePDF
 
-GUIDE_VERSION = "3.2.7"
+GUIDE_VERSION = "3.2.8"
 GUIDE_DATE = "September 2026"
 OUTPUT = Path(__file__).resolve().parent.parent / "docs" / "CKAC-COMPLETE-GUIDE.pdf"
 UI = Path(__file__).resolve().parent.parent / "docs" / "assets" / "ui"
@@ -33,7 +33,7 @@ def build() -> GuidePDF:
         ],
         bullets=[
             "Part 0 definitions + glossary (tenant, outbox, EventEnvelope, live-capture, master order)",
-            "Parts I-III: CEO / CPO / CTO lenses through P55 store apps + sales onboard; E1/E2 design-ready",
+            "Parts I-III: CEO / CPO / CTO lenses through P56 Today OS + bounded order list; E1/E2 design-ready",
             "Aggregated OpenAPI portal (/openapi.json, /docs, /redoc, portal /openapi) + docs/API.md",
             "Parts IV-V: product flows (+ delivery payer, super-admin) + UI Catalog (8 JPEGs)",
             "Addons: dish ready-within, Maps tracking, login highlights, Control plane, refunds",
@@ -79,6 +79,7 @@ def build() -> GuidePDF:
             "17.9 Delivery payer modes + Maps tracking",
             "17.10 Super admin Control plane",
             "17.11 Sales onboard, training & store apps (P55)",
+            "17.12 Owner Today OS — Do this now + live board (P56)",
             "Full journey pack: docs/CKAC-USERFLOWS.md / .pdf",
         ]),
         ("PART V — UI Catalog", [
@@ -838,6 +839,7 @@ def build() -> GuidePDF:
             ["P47 Swagger token + owner JWT type", "P47", "Done"],
             ["P50-P54 health / calories / diet Control", "P50-P54", "Done"],
             ["P55 store apps + sales onboard + tours", "P55", "Done"],
+            ["P56 Today OS + bounded open-order list", "P56", "Done"],
             ["E1/E2 purchases + chef lock", "S19 proposed", "Design only"],
         ],
         [80, 40, 50],
@@ -949,7 +951,7 @@ def build() -> GuidePDF:
         "Dish timing: prep_time_min + delivery_time_min + max_time_min -> ready-within",
         "Cart/checkout uses max projected_ready_min across line items",
         "Owner PATCH /orders/{id}/delivery-fulfillment for self vs platform",
-        "CommissionAdvantagePanel on owner home: 0% food take vs typical aggregators",
+        "Home Today OS (P56): Do this now + live board; GET .../orders?open=true&limit=50 + lane_counts",
     ])
 
     pdf.chapter("Super Admin Control Plane")
@@ -970,6 +972,15 @@ def build() -> GuidePDF:
         "Store listings wrap PWAs: kitchCU - customers / kitchen owner / admin",
         "Ids in.kitchcu.customer / .kitchen / .admin — three Play/App downloads",
         "First-run ProductTour on customer, kitchen, admin (Skip / Next / Show tips)",
+    ])
+
+    pdf.chapter("Owner Today OS (Do this now + live board)")
+    pdf.bullets([
+        "Home is a cook-line: one Do this now action, then open tickets only",
+        "Priority: drafts -> accept received -> handoff ready -> cooking -> track",
+        "GET /kitchens/{id}/orders?open=true&limit=50 (max 100) + lane_counts for the full rush",
+        "Partial index ix_orders_kitchen_open_created; list hydrate in 2 queries not 2N",
+        "Full history stays on Orders date filters + CSV export — never dumped on Home",
     ])
 
     # ═════════════════════════════════════════════════════════════════════
@@ -1019,8 +1030,8 @@ def build() -> GuidePDF:
     pdf.chapter("Owner Dashboard")
     pdf.figure(
         UI / "04-owner-dashboard-pdf.jpg",
-        "Owner dashboard — Dark ops. Side nav capability ladder; New Order; recent "
-        "orders; CommissionAdvantagePanel (0% food commission). Navy #0B1B32.",
+        "Owner dashboard — Today OS. Do this now command + live board of in-flight "
+        "tickets only (P56). History is Orders/CSV, not Home.",
         max_h=78,
     )
 
@@ -1124,14 +1135,13 @@ def build() -> GuidePDF:
         ["Role", "ID", "Secret", "Notes"],
         [
             ["Owner primary", "9876543210", "OTP 123456", "CKPNQ001 Sharma Pune"],
-            ["Owner", "9876543211", "OTP 123456", "Mehta Tiffins"],
-            ["Owner", "9876543212", "OTP 123456", "Desai Cloud Kitchen"],
-            ["Owner", "9876543213", "OTP 123456", "Kulkarni Home Food"],
+            ["Owner", "9876543211-3213", "OTP 123456", "Named extra kitchens"],
+            ["Volume / sales onboard", "3214-3215 / 3301-3303", "OTP 123456", "Full bulk + P55 Train"],
             ["Customer", "9123456789", "OTP 123456", "Default diner"],
-            ["Customer", "9123456780", "OTP 123456", "Repeat/VIP segment"],
-            ["Customer", "9988776655", "OTP 123456", "Guest path"],
+            ["Customer extra", "9123456780 / 9988776655", "OTP 123456", "Repeat / guest"],
             ["Admin", "admin@kitchcu.dev", "admin123456", "Platform scope only"],
-            ["Sales", "sales@kitchcu.dev", "sales123456", "Role sales; Sales + Kitchens"],
+            ["Ops / support / finance", "ops@ / support@ / finance@", "*123456", "RBAC; Admin English"],
+            ["Sales", "sales@ / sales.west@", "sales123456", "Sales + Kitchens only"],
         ],
         [32, 42, 38, 58],
         size=6,
@@ -1248,7 +1258,7 @@ def build() -> GuidePDF:
     pdf.table(
         ["Document", "Role"],
         [
-            ["CKAC-COMPLETE-GUIDE.md/.pdf v3.2.7", "This CEO/CPO/CTO encyclopedia"],
+            ["CKAC-COMPLETE-GUIDE.md/.pdf v3.2.8", "This CEO/CPO/CTO encyclopedia"],
             ["CKAC-USERFLOWS.md/.pdf", "Full step-by-step user journey pack"],
             ["API.md", "Public API reference + OpenAPI URLs"],
             ["E1-E2-*-DESIGN.md", "S19 quality-loop design pack"],
@@ -1268,12 +1278,11 @@ def build() -> GuidePDF:
 
     pdf.chapter("Document control")
     pdf.body(
-        "v3.2.7 September 2026 — P55 three store apps (kitchCU - customers / kitchen owner / "
-        "admin), sales onboard + Train, in-dashboard tours; P50-P54 calories/Healthy/diet. "
-        "Builds on P47 Swagger tester, 6-month seed, P41 profile PATCH."
+        "v3.2.8 September 2026 — P56 owner Today OS (Do this now + live board) and bounded "
+        "order list (open/limit/lane_counts); bulk seed personas. Builds on P55 store apps."
     )
     pdf.quote(
-        "KitchCu Complete Executive & Engineering Guide v3.2.7 — Confidential — September 2026. "
+        "KitchCu Complete Executive & Engineering Guide v3.2.8 — Confidential — September 2026. "
         "India's first — and the world's third — platform with this feature stack."
     )
 

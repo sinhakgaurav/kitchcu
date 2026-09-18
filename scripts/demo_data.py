@@ -60,6 +60,135 @@ DEMO_SALES = {
     "role": "sales",
 }
 
+# Extra owner logins minted by bulk (multiple kitchens each). Keep them off the
+# seed-dev orphan-suspend list so a re-run of seed-dev does not hide their kitchens.
+DEMO_OWNERS_VOLUME = [
+    {
+        "phone": "9876543214",
+        "phone_e164": "+919876543214",
+        "name": "Vikram Patil",
+        "email": "vikram@kitchcu.dev",
+        "kitchen_label": "Patil Cloud Kitchen",
+        "role": "volume",
+    },
+    {
+        "phone": "9876543215",
+        "phone_e164": "+919876543215",
+        "name": "Ananya Joshi",
+        "email": "ananya@kitchcu.dev",
+        "kitchen_label": "Joshi Home Food",
+        "role": "volume",
+    },
+]
+
+# Platform staff for Admin → Employees (bootstrap superadmin is ADMIN_EMAIL, not this list).
+DEMO_ADMIN_STAFF = [
+    {
+        "email": "ops@kitchcu.dev",
+        "password": "ops123456",
+        "name": "Ops Lead",
+        "role": "ops",
+    },
+    {
+        "email": "support@kitchcu.dev",
+        "password": "support123456",
+        "name": "Care Support",
+        "role": "support",
+    },
+    {
+        "email": "finance@kitchcu.dev",
+        "password": "finance123456",
+        "name": "Finance Desk",
+        "role": "finance",
+    },
+    DEMO_SALES,
+    {
+        "email": "sales.west@kitchcu.dev",
+        "password": "sales123456",
+        "name": "Field Sales West",
+        "role": "sales",
+    },
+]
+
+SALES_ONBOARD_TRAINING_ALL = (
+    "profile",
+    "live_hero",
+    "recipe",
+    "radius",
+    "kyc",
+    "test_order",
+    "whatsapp",
+    "handoff",
+)
+
+# Field-sales onboarded kitchens (P55). Phones 3301+ stay off 3210–3215 / 3220+.
+DEMO_SALES_ONBOARDS = [
+    {
+        "sales_email": "sales@kitchcu.dev",
+        "sales_password": "sales123456",
+        "owner_name": "Meera Field",
+        "owner_phone": "9876543301",
+        "owner_email": "meera.field@kitchcu.dev",
+        "kitchen_name": "Meera Field Tiffins",
+        "description": "Sales-onboarded Pune tiffin kitchen",
+        "address_line": "12 FC Road",
+        "city": "Pune",
+        "state": "Maharashtra",
+        "pincode": "411004",
+        "latitude": 18.5204,
+        "longitude": 73.8567,
+        "training_steps": list(SALES_ONBOARD_TRAINING_ALL),
+    },
+    {
+        "sales_email": "sales@kitchcu.dev",
+        "sales_password": "sales123456",
+        "owner_name": "Rohit Kothrud",
+        "owner_phone": "9876543302",
+        "owner_email": "rohit.kothrud@kitchcu.dev",
+        "kitchen_name": "Kothrud Sales Kitchen",
+        "description": "Mid-training sales kitchen — Pune west",
+        "address_line": "Kothrud main road",
+        "city": "Pune",
+        "state": "Maharashtra",
+        "pincode": "411038",
+        "latitude": 18.5074,
+        "longitude": 73.8077,
+        "training_steps": ["profile", "live_hero", "recipe", "radius"],
+    },
+    {
+        "sales_email": "sales.west@kitchcu.dev",
+        "sales_password": "sales123456",
+        "owner_name": "Nisha West",
+        "owner_phone": "9876543303",
+        "owner_email": "nisha.west@kitchcu.dev",
+        "kitchen_name": "Andheri Sales Tiffins",
+        "description": "West-rep onboarded Mumbai kitchen",
+        "address_line": "Andheri East",
+        "city": "Mumbai",
+        "state": "Maharashtra",
+        "pincode": "400069",
+        "latitude": 19.1136,
+        "longitude": 72.8697,
+        "training_steps": ["profile", "live_hero"],
+    },
+    {
+        "sales_email": "sales.west@kitchcu.dev",
+        "sales_password": "sales123456",
+        "owner_name": "Nisha West",
+        "owner_phone": "9876543303",
+        "owner_email": "nisha.west@kitchcu.dev",
+        "kitchen_name": "Bandra West Meals",
+        "description": "Second kitchen for the west-rep owner",
+        "address_line": "Bandra West",
+        "city": "Mumbai",
+        "state": "Maharashtra",
+        "pincode": "400050",
+        "latitude": 19.0596,
+        "longitude": 72.8295,
+        "training_steps": ["profile"],
+    },
+]
+
 # Customer WhatsApp OTP demos (dev OTP always DEMO_OTP)
 # Extra saved pins for the primary diner so discovery can switch cities.
 DEMO_CUSTOMER_ADDRESSES = [
@@ -367,6 +496,50 @@ def secondary_demo_owner_specs() -> list[tuple[dict, dict]]:
     ]
     pairs.extend(presence_kitchen_owner_pairs())
     return pairs
+
+
+def sales_onboard_owner_specs() -> list[tuple[dict, dict]]:
+    """Unique owners created by field sales onboard (one spec per phone)."""
+    pairs: list[tuple[dict, dict]] = []
+    seen: set[str] = set()
+    for row in DEMO_SALES_ONBOARDS:
+        phone = str(row["owner_phone"])
+        if phone in seen:
+            continue
+        seen.add(phone)
+        owner = {
+            "phone": phone,
+            "phone_e164": f"+91{phone}",
+            "name": row["owner_name"],
+            "email": row["owner_email"],
+            "kitchen_label": row["kitchen_name"],
+        }
+        pairs.append(
+            (
+                owner,
+                {
+                    "name": row["kitchen_name"],
+                    "description": row.get("description") or f"Sales-onboarded kitchen for {row['owner_name']}",
+                    "address_line": row["address_line"],
+                    "city": row["city"],
+                    "state": row["state"],
+                    "pincode": row["pincode"],
+                    "latitude": row["latitude"],
+                    "longitude": row["longitude"],
+                },
+            )
+        )
+    return pairs
+
+
+def demo_protected_owner_phones() -> list[str]:
+    """E.164 phones seed-dev must never orphan-suspend."""
+    phones = [DEMO_OWNER["phone_e164"]]
+    phones.extend(o["phone_e164"] for o in DEMO_OWNERS_EXTRA)
+    phones.extend(o["phone_e164"] for o in DEMO_OWNERS_VOLUME)
+    phones.extend(o["phone_e164"] for o, _ in presence_kitchen_owner_pairs())
+    phones.extend(o["phone_e164"] for o, _ in sales_onboard_owner_specs())
+    return list(dict.fromkeys(phones))
 
 
 def presence_kitchen_owner_pairs() -> list[tuple[dict, dict]]:

@@ -11,6 +11,7 @@ from demo_data import (
     DEMO_KITCHEN,
     DEMO_KITCHENS_CITIES,
     DEMO_OWNERS_EXTRA,
+    DEMO_OWNERS_VOLUME,
     food_media,
     media_for_dish,
 )
@@ -176,10 +177,7 @@ EXTRA_OWNERS = [
         "name": o["name"],
         "email": o["email"],
     }
-    for o in DEMO_OWNERS_EXTRA
-] + [
-    {"phone": "9876543214", "phone_e164": "+919876543214", "name": "Vikram Patil", "email": "vikram@kitchcu.dev"},
-    {"phone": "9876543215", "phone_e164": "+919876543215", "name": "Ananya Joshi", "email": "ananya@kitchcu.dev"},
+    for o in [*DEMO_OWNERS_EXTRA, *DEMO_OWNERS_VOLUME]
 ]
 
 CUSTOMER_NAMES = [

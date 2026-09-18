@@ -38,8 +38,9 @@ GCP (VM repo is /opt/ckac):
   sudo bash /opt/ckac/infra/gcp-vm/bulk-seed.sh
 
 On a full run (CKAC_BULK_FULL=1, the seed-all / GCP default) every demo login
-gets the same fill: extra owners 3211–3215, city hosts 3220+, pantry photos,
-recipes, 6-month order history, and feature volume. Dry-run smoke
+gets the same fill: extra owners 3211–3215 (3 kitchens each), city hosts 3220+,
+sales-onboarded owners 3301+, pantry photos, recipes, 6-month order history,
+admin staff (ops/support/finance/sales), and feature volume. Dry-run smoke
 (CKAC_BULK_FULL=0) still only expands the primary owner.
 
 Requires: docker compose up (gateway + postgres). The primary demo owner is
@@ -88,6 +89,7 @@ from demo_data import (  # noqa: E402
     DEMO_OTP,
     DEMO_OWNER,
     pune_extra_kitchen_spec,
+    sales_onboard_owner_specs,
     secondary_demo_owner_specs,
 )
 from seed_common import (  # noqa: E402
@@ -127,7 +129,6 @@ def env_int(name: str, default: int, *, minimum: int = 0) -> int:
 
 
 BULK_KITCHENS = env_int("CKAC_BULK_KITCHENS", 30, minimum=1)
-BULK_OWNERS = env_int("CKAC_BULK_OWNERS", 0)
 BULK_KITCHENS_PER_OWNER = env_int("CKAC_BULK_KITCHENS_PER_OWNER", 3, minimum=1)
 BULK_ORDERS = env_int("CKAC_BULK_ORDERS", 250)
 BULK_DRAFTS = env_int("CKAC_BULK_DRAFTS", 25)
@@ -135,8 +136,14 @@ BULK_ORDERS_PER_OWNER = env_int("CKAC_BULK_ORDERS_PER_OWNER", 40)
 BULK_DRAFTS_PER_OWNER = env_int("CKAC_BULK_DRAFTS_PER_OWNER", 5)
 BULK_DRAFTS_PER_KITCHEN = env_int("CKAC_BULK_DRAFTS_PER_KITCHEN", 5)
 BULK_DISHES_PER_KITCHEN = env_int("CKAC_BULK_DISHES_PER_KITCHEN", 6, minimum=1)
-BULK_CUSTOMERS_PER_CITY = env_int("CKAC_BULK_CUSTOMERS_PER_CITY", 3, minimum=0)
 BULK_FULL = os.environ.get("CKAC_BULK_FULL", "1").strip().lower() not in ("0", "false", "no")
+# Extra owners + city customers stay tiny on dry-run (CKAC_BULK_FULL=0).
+BULK_OWNERS = env_int("CKAC_BULK_OWNERS", len(EXTRA_OWNERS) if BULK_FULL else 0)
+BULK_CUSTOMERS_PER_CITY = env_int(
+    "CKAC_BULK_CUSTOMERS_PER_CITY",
+    6 if BULK_FULL else 3,
+    minimum=0,
+)
 # Every kitchen + every diner gets coupons, tiffin, tickets, addresses, ratings…
 FEATURE_VOLUME = os.environ.get("CKAC_FEATURE_VOLUME", "1").strip().lower() not in (
     "0",
@@ -672,15 +679,16 @@ def harvest_secondary_demo_kitchens(
     dish_ids_by_kitchen: dict[str, dict[str, str]],
     kitchen_ctxs: list[dict],
 ) -> list[tuple[dict, list[dict]]]:
-    """Fill extra owners + city hosts so every demo login has 6-month history.
+    """Fill extra owners, city hosts, and sales-onboarded kitchens with 6-month history.
 
-    seed-dev already registers these logins with a menu. Bulk used to skip them
-    (CKAC_BULK_OWNERS defaulted to 0), so Reports / CRM / GST / mapper were empty
-    the moment someone signed in as Priya, Amit, Sneha, or a city host.
+    seed-dev already registers extra/presence logins with a menu. Bulk used to skip
+    them, so Reports / CRM / GST / mapper were empty the moment someone signed in
+    as Priya, Amit, Sneha, a city host, or a sales-onboarded owner.
     """
     seen_ids = {ctx["id"] for ctx in kitchen_ctxs}
     harvested: list[tuple[dict, list[dict]]] = []
     pairs = list(secondary_demo_owner_specs())
+    pairs.extend(sales_onboard_owner_specs())
     have = {owner["phone"] for owner, _ in pairs}
     for owner in EXTRA_OWNERS:
         if owner["phone"] in have:

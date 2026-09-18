@@ -29,8 +29,11 @@ from demo_data import (  # noqa: E402
     DEMO_OWNER,
     DEMO_OWNERS_EXTRA,
     DEMO_ADMIN,
+    DEMO_ADMIN_STAFF,
     DEMO_CUSTOMER_ADDRESSES,
     DEMO_CUSTOMERS,
+    DEMO_SALES,
+    demo_protected_owner_phones,
     presence_kitchen_owner_pairs,
     pune_extra_kitchen_spec,
 )
@@ -77,11 +80,7 @@ def ensure_owner() -> None:
 
 def retire_orphan_kitchens() -> None:
     """Hide kitchens left on the shared DB by identity pytest (not demo owners)."""
-    phones = [
-        DEMO_OWNER["phone_e164"],
-        *[owner["phone_e164"] for owner in DEMO_OWNERS_EXTRA],
-        *[owner["phone_e164"] for owner, _ in presence_kitchen_owner_pairs()],
-    ]
+    phones = demo_protected_owner_phones()
     listed = ", ".join("'" + phone.replace("'", "''") + "'" for phone in phones)
     sql = (
         "UPDATE ckac_identity.kitchens AS k "
@@ -368,7 +367,12 @@ def main() -> None:
         first_phone = presence[0][0]["phone"]
         last_phone = presence[-1][0]["phone"]
         print(f"  City hosts    : {first_phone}–{last_phone} — one kitchen each")
-    print(f"  Admin         : {DEMO_ADMIN['email']} / {DEMO_ADMIN['password']}")
+    print(f"  Admin         : {DEMO_ADMIN['email']} / {DEMO_ADMIN['password']} (superadmin)")
+    print(f"  Sales         : {DEMO_SALES['email']} / {DEMO_SALES['password']} (role sales — bulk extras)")
+    for staff in DEMO_ADMIN_STAFF:
+        if staff["email"] == DEMO_SALES["email"]:
+            continue
+        print(f"  Admin {staff['role']:<8}: {staff['email']} / {staff['password']}")
     for c in DEMO_CUSTOMERS:
         print(f"  Customer      : {c['phone']} — {c['name']} ({c.get('note', '')})")
     print("  Referrals     : seeded by seed-bulk-data / seed-all (P37 dual program)")

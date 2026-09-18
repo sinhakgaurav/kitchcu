@@ -3,12 +3,12 @@
 | Field | Value |
 |-------|-------|
 | Document | `QA-INSTRUCTION-PACK.md` |
-| Version | 1.3 |
-| Date | September 2026 (2026-09-17) |
+| Version | 1.4 |
+| Date | September 2026 (2026-09-18) |
 | Audience | QA Lead, engineers, founders doing release verification |
 | Companion PDF | `docs/QA-INSTRUCTION-PACK.pdf` — generate via `python scripts/generate_qa_instruction_pdf.py` |
 | Full tester steps | [`TESTER-INSTRUCTION-PACK.md`](./TESTER-INSTRUCTION-PACK.md) · [`TESTER-INSTRUCTION-PACK.pdf`](./TESTER-INSTRUCTION-PACK.pdf) — numbered UI + Swagger/API for every persona |
-| Scope | Local Docker demo + GCP production smoke; owner kitchen lists/UI polish; F19/F19b stock + bulk prep; **P55** store apps + sales onboard + in-dashboard tours |
+| Scope | Local Docker demo + GCP production smoke; owner kitchen lists/UI polish; F19/F19b stock + bulk prep; **P55** store apps + sales; **P56** Today OS + bounded order list |
 
 ---
 
@@ -90,9 +90,9 @@ Focus: kitchen PWA `:13002`. Login as owner `9876543210`.
 
 | ID | Check | Expected |
 |----|-------|----------|
-| H1 | Hero layout | Greeting + kitchen name + code on left; primary CTAs (e.g. New order / Brand) on the **same row top-right** — not a tall empty column with button at bottom |
+| H1 | Hero layout | Greeting + kitchen name + code on left; **Do this now** CTA + New order on the **same row top-right** |
 | H2 | Pills / meta | Subscription + drafts/live pills readable; no overflow clip |
-| H3 | Recent orders list | Rows clickable; status chips coherent |
+| H3 | Do this now + live board | Now card matches the highest-priority open work (drafts/accept/handoff/cook). Live board shows **only** in-flight tickets — no delivered 6-month dump. Rows clickable |
 | H4 | Kitchen setup | After create, name / address / map pin stay editable; kitchen **code does not change** |
 | H5 | Ratings | `/dashboard/ratings` loads aggregates; Reports shows payment mix + period compare |
 | H6 | Settlements | Payments page lists Route settlements with status filter |

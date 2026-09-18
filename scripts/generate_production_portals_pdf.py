@@ -8,7 +8,7 @@ from pathlib import Path
 
 from pdf_guide import GuidePDF
 
-GUIDE_VERSION = "1.3"
+GUIDE_VERSION = "1.4"
 GUIDE_DATE = "September 2026"
 OUTPUT = Path(__file__).resolve().parent.parent / "docs" / "PRODUCTION-PORTALS-CREDENTIALS-QA.pdf"
 
@@ -88,10 +88,11 @@ def build() -> GuidePDF:
     pdf.table(
         ["Persona", "Login", "Notes"],
         [
-            ["Owner", "9876543210 / OTP 123456", "Kitchen CKPNQ001 + multi-city kitchens"],
-            ["Customer", "9123456789 / OTP 123456", "Extra phones in AGENTS.md"],
+            ["Owner", "9876543210 / OTP 123456", "CKPNQ001 + 3211-3215 / 3301-3303"],
+            ["Customer", "9123456789 / OTP 123456", "Extra phones in AGENTS.md + 6/city"],
             ["Admin", "admin@kitchcu.dev / admin123456", "Dev only"],
-            ["Sales", "sales@kitchcu.dev / sales123456", "Role sales; Sales + Kitchens"],
+            ["Ops/support/finance", "ops@ / support@ / finance@", "RBAC; Admin English"],
+            ["Sales", "sales@ / sales.west@ / sales123456", "Role sales; Sales + Kitchens"],
         ],
         widths=[35, 75, 60],
     )
@@ -177,6 +178,7 @@ def build() -> GuidePDF:
             ["F45-F48", "Notify + live stream", "Status notify; Go live / watch"],
             ["P52-P54", "Diet / calories / Healthy", "Report filter; Control kcal cap"],
             ["P55", "Store apps + sales", "sales@ onboard; Train 8 steps; three listings"],
+            ["P56", "Owner Today OS", "Do this now + live board; open=true&limit=50"],
         ],
         widths=[25, 55, 90],
     )

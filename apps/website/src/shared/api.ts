@@ -858,13 +858,21 @@ export async function updateDish(
 export async function fetchOrders(
   kitchenId: string,
   status?: string,
-  filters?: { created_after?: string; created_before?: string; source?: string },
-): Promise<{ orders: Order[]; total: number }> {
+  filters?: {
+    created_after?: string;
+    created_before?: string;
+    source?: string;
+    open?: boolean;
+    limit?: number;
+  },
+): Promise<{ orders: Order[]; total: number; lane_counts?: Record<string, number> | null }> {
   const params = new URLSearchParams();
   if (status) params.set("status", status);
   if (filters?.source) params.set("source", filters.source);
   if (filters?.created_after) params.set("created_after", filters.created_after);
   if (filters?.created_before) params.set("created_before", filters.created_before);
+  if (filters?.open) params.set("open", "true");
+  if (filters?.limit) params.set("limit", String(filters.limit));
   const q = params.toString() ? `?${params.toString()}` : "";
   return apiFetch(`/api/v1/kitchens/${kitchenId}/orders${q}`);
 }

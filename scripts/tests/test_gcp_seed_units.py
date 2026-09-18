@@ -68,6 +68,8 @@ def test_dry_run_smoke_skips_feature_volume() -> None:
     text = (GCP / "dry-run-local.ps1").read_text(encoding="utf-8")
     assert 'CKAC_FEATURE_VOLUME = "0"' in text
     assert 'CKAC_BULK_KITCHENS = "1"' in text
+    assert 'CKAC_BULK_OWNERS = "0"' in text
+    assert 'CKAC_BULK_CUSTOMERS_PER_CITY = "1"' in text
 
 
 def test_startup_installs_weekly_timer_and_bulk_oneshot() -> None:

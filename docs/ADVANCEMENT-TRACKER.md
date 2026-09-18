@@ -7,7 +7,7 @@
 | Baseline | Phase 1 **S1–S18** complete (gateway + 13 domain services + 4 PWAs + GST) |
 | Production | `*.kitchcu.com` (GCP VM + Caddy) |
 | Local demo | `*.kitchcu.in` / `admin@kitchcu.dev` |
-| Last updated | 2026-09-17 |
+| Last updated | 2026-09-18 |
 | Portals / QA pack | [PRODUCTION-PORTALS-CREDENTIALS-QA.md](./PRODUCTION-PORTALS-CREDENTIALS-QA.md) (+ PDF) |
 | Tester book | [TESTER-INSTRUCTION-PACK.md](./TESTER-INSTRUCTION-PACK.md) (+ [PDF](./TESTER-INSTRUCTION-PACK.pdf)) — numbered UI + API steps |
 | Architecture flows | [PLATFORM-ARCHITECTURE-FLOWS.md](./PLATFORM-ARCHITECTURE-FLOWS.md) |
@@ -119,6 +119,7 @@ For **manual QA / release sign-off** (short Must/Should) see [QA-INSTRUCTION-PAC
 | P53 | **Dish calories + healthy tag** | Owner pantry `kcal_per_100` + dish calories note; recipe qty × SKU kcal auto-sums the plate; **Healthy** automatic (complete map, kcal ≤ Control cap, P50 score ≥ floor); customer menu/Health; Admin Pantry kcal column | ✅ | Catalog `011`; design `DISH-INGREDIENT-CALORIES-DESIGN.md`. Kitchen estimate — not a lab/FSSAI/medical claim |
 | P54 | **Super-admin calories / Healthy controls** | Control enable/disable `dish_calories` + `dish_healthy_tag`; configurable `healthy_max_kcal` (default 500, 50–5000) + score floor; catalog menus honor live cap | ✅ | Identity `029`; `GET/PATCH /admin/healthy-food`; design `DISH-CALORIES-ADMIN-SETTINGS-DESIGN.md` |
 | P55 | **Store apps + sales onboarding** | Android TWA + iOS WKWebView shells for Customer / Kitchen / Admin PWAs; in-dashboard skippable tours; employee role `sales` onboards kitchens + 8-step owner training; Sales tab + kitchen Train; flag `sales_onboarding` | ✅ | Identity `030`; `POST /admin/sales/onboard`; design `SALES-ONBOARDING-ANDROID-APPS-DESIGN.md`. Not a native rewrite |
+| P56 | **Owner Today OS + scale-safe order list** | Kitchen Home **Do this now** + live board; `GET …/orders?open=true&limit=` (default 50, max 100) + `lane_counts`; partial index `ix_orders_kitchen_open_created`; list hydrate in 2 queries; CSV remains full history | ✅ | Order Alembic `012`; home never dumps 6-month history. Super-admin gate: none |
 
 ---
 
@@ -150,8 +151,9 @@ Source: QA workbook, sheets **Bug Issue** · **Bug Resolved** · **API Bug Repor
 | Local / Docker demo | `admin@kitchcu.dev` | `admin123456` |
 | Production (`admin.kitchcu.com`) | `admin@kitchcu.com` | GCE metadata `admin-password` → VM `ADMIN_PASSWORD` (printed on Sign in when `ADMIN_LOGIN_REVEAL_PASSWORD=1`; synced to DB on login) |
 
-Owners (all envs with seed): `9876543210`–`9876543213`, OTP `123456`.  
-Customers: `9123456789`, `9123456780`, `9988776655`, `9123456781`, `9123456782`, OTP `123456`.
+Owners (all envs with seed): `9876543210`–`9876543213` (named), OTP `123456`. Full bulk also mints volume owners `9876543214`–`9876543215` (multiple kitchens each), city hosts `9876543220+`, and sales-onboarded `9876543301`–`9876543303`.  
+Customers: named `9123456789`, `9123456780`, `9988776655`, `9123456781`, `9123456782`, plus **6 per city** on a full bulk run (`CKAC_BULK_FULL=1`). OTP `123456`.  
+Platform staff (local extras): `ops@kitchcu.dev` / `ops123456` · `support@kitchcu.dev` / `support123456` · `finance@kitchcu.dev` / `finance123456` · `sales@kitchcu.dev` / `sales123456` · `sales.west@kitchcu.dev` / `sales123456`. Admin UI stays English.
 
 After GCP reset: `infra/gcp-vm/reset-fresh.sh` re-exports `ADMIN_*` and re-seeds.
 
@@ -164,8 +166,11 @@ Run `.\scripts\seed-all.ps1` / `bash scripts/seed-all.sh` (or GCP `run-seed=1` �
 | Persona / module | Seed path | Status |
 |------------------|-----------|--------|
 | Platform admin | identity bootstrap + extras login | ✅ |
+| Admin staff roles (ops / support / finance / sales / sales.west) | `seed_platform_extras.ensure_admin_staff` | ✅ |
+| Sales-onboarded kitchens (`3301`–`3303`) | `ensure_sales_onboards` | ✅ |
 | Owners + kitchens + menus | `seed-dev-data` / `seed-bulk-data` | ✅ |
-| Customers + orders + ratings | `seed_platform_extras` | ✅ |
+| Extra owners with multiple kitchens (`3214`–`3215`) | `BULK_OWNERS` = `len(EXTRA_OWNERS)` when `CKAC_BULK_FULL=1` | ✅ |
+| Customers + orders + ratings | `seed_platform_extras` + 6 diners/city on full bulk | ✅ |
 | WhatsApp + payment gateway per kitchen | `ensure_whatsapp_integration` / `ensure_payment_gateway` | ✅ |
 | GST / refunds / delivery quote | extras | ✅ |
 | Referral settings + demo leads | identity referral seed (extras/bulk) | 🟡 | Settings table seeded by migration; leads via UI or API |
@@ -176,7 +181,7 @@ Run `.\scripts\seed-all.ps1` / `bash scripts/seed-all.sh` (or GCP `run-seed=1` �
 | Learning trials / community | extras (`cover_url` on community recipe) | ✅ |
 | Tiffin plans (thali / single_dish / combo) | `ensure_tiffin_plans` | ✅ |
 | Weekly QA cohort (5 owners · 10 customers · 21 orders/kitchen over 7 days · Saturday 03:30 IST) | `scripts/weekly_test_data.py` via `kitchcu-weekly-seed.timer` | ✅ |
-| GCP bulk seeder (30 kitchens · 6-month history · 15 cities · 3 customers/city · live-capture-safe) | `infra/gcp-vm/bulk-seed.sh` → `scripts/seed-bulk-data.py` · `kitchcu-bulk-seed.service` | ✅ |
+| GCP bulk seeder (30 kitchens · 6-month history · 15 cities · **6 customers/city** on full run · live-capture-safe) | `infra/gcp-vm/bulk-seed.sh` → `scripts/seed-bulk-data.py` · `kitchcu-bulk-seed.service` | ✅ |
 | Feature volume (every kitchen + every diner: coupons, templates, tiffin, GST, refunds, prep batches, tickets, ratings, referrals) | `scripts/seed_feature_volume.py` via `CKAC_FEATURE_VOLUME=1` (default on) | ✅ |
 
 ### Weekly QA cohort

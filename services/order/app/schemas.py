@@ -30,7 +30,7 @@ from pydantic import BaseModel, Field, field_validator, model_validator
 from sqlalchemy import bindparam, func, or_, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models import MasterOrder, Order, OrderItem, OrderStatusEvent, can_transition
+from app.models import MasterOrder, Order, OrderItem, OrderStatusEvent, TERMINAL_STATUSES, can_transition
 from app.exports import (
     EXPORT_MAX_ROWS,
     PARSE_STATS_DEFAULT_DAYS,
@@ -420,6 +420,10 @@ class OrderListResponse(BaseModel):
     )
     orders: list[OrderResponse] = Field(..., description="Orders matching the query, newest first.")
     total: int = Field(..., description="Number of orders returned in `orders`.")
+    lane_counts: dict[str, int] | None = Field(
+        default=None,
+        description="Open-order counts by status for the kitchen. Set when `open=true` so the live board can show the full rush, not just this page.",
+    )
 
 
 class OrderStatusUpdateRequest(BaseModel):
@@ -1355,15 +1359,11 @@ async def update_order_status(
     return order
 
 
-async def order_to_response(session: AsyncSession, order: Order) -> OrderResponse:
-    items_result = await session.execute(
-        select(OrderItem).where(OrderItem.order_id == order.id)
-    )
-    events_result = await session.execute(
-        select(OrderStatusEvent)
-        .where(OrderStatusEvent.order_id == order.id)
-        .order_by(OrderStatusEvent.created_at)
-    )
+def _order_response(
+    order: Order,
+    items: list[OrderItem],
+    events: list[OrderStatusEvent],
+) -> OrderResponse:
     return OrderResponse(
         id=order.id,
         kitchen_id=order.kitchen_id,
@@ -1400,9 +1400,40 @@ async def order_to_response(session: AsyncSession, order: Order) -> OrderRespons
         porter_auto_book_at=getattr(order, "porter_auto_book_at", None),
         cancel_reason=order.cancel_reason,
         created_at=order.created_at,
-        items=[OrderItemResponse.model_validate(i) for i in items_result.scalars().all()],
-        status_events=[StatusEventResponse.model_validate(e) for e in events_result.scalars().all()],
+        items=[OrderItemResponse.model_validate(i) for i in items],
+        status_events=[StatusEventResponse.model_validate(e) for e in events],
     )
+
+
+async def orders_to_responses(
+    session: AsyncSession,
+    orders: list[Order],
+) -> list[OrderResponse]:
+    """Hydrate a page of orders in two queries, not 2N."""
+    if not orders:
+        return []
+    ids = [order.id for order in orders]
+    items_result = await session.execute(select(OrderItem).where(OrderItem.order_id.in_(ids)))
+    events_result = await session.execute(
+        select(OrderStatusEvent)
+        .where(OrderStatusEvent.order_id.in_(ids))
+        .order_by(OrderStatusEvent.created_at)
+    )
+    items_by: dict[uuid.UUID, list[OrderItem]] = {oid: [] for oid in ids}
+    events_by: dict[uuid.UUID, list[OrderStatusEvent]] = {oid: [] for oid in ids}
+    for item in items_result.scalars().all():
+        items_by.setdefault(item.order_id, []).append(item)
+    for event in events_result.scalars().all():
+        events_by.setdefault(event.order_id, []).append(event)
+    return [
+        _order_response(order, items_by.get(order.id, []), events_by.get(order.id, []))
+        for order in orders
+    ]
+
+
+async def order_to_response(session: AsyncSession, order: Order) -> OrderResponse:
+    rows = await orders_to_responses(session, [order])
+    return rows[0]
 
 
 async def master_order_to_response(
@@ -1414,10 +1445,7 @@ async def master_order_to_response(
         .where(Order.master_order_id == master.id)
         .order_by(Order.created_at, Order.id)
     )
-    orders = [
-        await order_to_response(session, order)
-        for order in orders_result.scalars().all()
-    ]
+    orders = await orders_to_responses(session, list(orders_result.scalars().all()))
     return MasterOrderResponse(
         id=master.id,
         master_order_code=master.master_order_code,
@@ -1432,6 +1460,10 @@ async def master_order_to_response(
     )
 
 
+LIST_DEFAULT_LIMIT = 50
+LIST_MAX_LIMIT = 100
+
+
 async def list_kitchen_orders(
     session: AsyncSession,
     kitchen_id: uuid.UUID,
@@ -1440,11 +1472,14 @@ async def list_kitchen_orders(
     source: str | None = None,
     created_after: datetime | None = None,
     created_before: datetime | None = None,
+    open_only: bool = False,
     limit: int | None = None,
 ) -> list[Order]:
     query = select(Order).where(Order.kitchen_id == kitchen_id)
     if status:
         query = query.where(Order.status == status)
+    elif open_only:
+        query = query.where(Order.status.notin_(tuple(TERMINAL_STATUSES)))
     if source:
         query = query.where(Order.source == source)
     if created_after:
@@ -1456,6 +1491,21 @@ async def list_kitchen_orders(
         query = query.limit(limit)
     result = await session.execute(query)
     return list(result.scalars().all())
+
+
+async def count_open_orders_by_status(
+    session: AsyncSession,
+    kitchen_id: uuid.UUID,
+) -> dict[str, int]:
+    result = await session.execute(
+        select(Order.status, func.count())
+        .where(
+            Order.kitchen_id == kitchen_id,
+            Order.status.notin_(tuple(TERMINAL_STATUSES)),
+        )
+        .group_by(Order.status)
+    )
+    return {str(status): int(n) for status, n in result.all()}
 
 
 async def export_kitchen_orders_csv(

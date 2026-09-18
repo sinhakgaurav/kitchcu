@@ -8,7 +8,15 @@ import os
 import subprocess
 from datetime import datetime, timedelta, timezone
 
-from demo_data import DEMO_ADMIN, DEMO_CUSTOMERS, DEMO_OTP, DEMO_REFERRAL, DEMO_SALES, media_for_dish
+from demo_data import (  # noqa: E402
+    DEMO_ADMIN,
+    DEMO_ADMIN_STAFF,
+    DEMO_CUSTOMERS,
+    DEMO_OTP,
+    DEMO_REFERRAL,
+    DEMO_SALES_ONBOARDS,
+    media_for_dish,
+)
 from seed_common import (
     ApiError,
     login_admin,
@@ -133,28 +141,144 @@ def ensure_admin_session() -> str:
     return token
 
 
-def ensure_demo_sales_rep(admin_token: str) -> None:
-    """Local QA field login — Super Admin still hires live sales on Employees."""
+def _employee_rows(payload: object) -> list[dict]:
+    if isinstance(payload, list):
+        return [row for row in payload if isinstance(row, dict)]
+    if isinstance(payload, dict):
+        rows = payload.get("employees") or payload.get("items") or []
+        if isinstance(rows, list):
+            return [row for row in rows if isinstance(row, dict)]
+    return []
+
+
+def ensure_admin_staff(admin_token: str) -> int:
+    """Ops / support / finance / sales logins so Employees and Sales tabs have rows."""
     try:
-        emps = request("GET", "/api/v1/admin/employees", token=admin_token)
-        rows = emps if isinstance(emps, list) else []
-        if any(str(e.get("email", "")).lower() == DEMO_SALES["email"] for e in rows):
-            log(f"  Sales login ready ({DEMO_SALES['email']})")
-            return
-        request(
-            "POST",
-            "/api/v1/admin/employees",
-            token=admin_token,
-            body={
-                "email": DEMO_SALES["email"],
-                "name": DEMO_SALES["name"],
-                "password": DEMO_SALES["password"],
-                "role": DEMO_SALES["role"],
-            },
-        )
-        log(f"  Created sales employee {DEMO_SALES['email']} / {DEMO_SALES['password']}")
+        listed = request("GET", "/api/v1/admin/employees", token=admin_token)
     except ApiError as exc:
-        log(f"  ! sales employee: {exc}")
+        log(f"  ! employees list: {exc}")
+        return 0
+    have = {str(row.get("email") or "").lower() for row in _employee_rows(listed)}
+    created = 0
+    for staff in DEMO_ADMIN_STAFF:
+        email = staff["email"].lower()
+        if email in have:
+            log(f"  Staff ready ({staff['email']}, role={staff['role']})")
+            continue
+        try:
+            request(
+                "POST",
+                "/api/v1/admin/employees",
+                token=admin_token,
+                body={
+                    "email": staff["email"],
+                    "name": staff["name"],
+                    "password": staff["password"],
+                    "role": staff["role"],
+                },
+            )
+            created += 1
+            have.add(email)
+            log(f"  Created {staff['role']} employee {staff['email']} / {staff['password']}")
+        except ApiError as exc:
+            if "409" in str(exc) or "already" in str(exc).lower():
+                log(f"  Staff ready ({staff['email']}, role={staff['role']})")
+            else:
+                log(f"  ! employee {staff['email']}: {exc}")
+    return created
+
+
+def ensure_demo_sales_rep(admin_token: str) -> None:
+    """Back-compat wrapper — full staff list includes sales@."""
+    ensure_admin_staff(admin_token)
+
+
+def _kitchen_rows(payload: object) -> list[dict]:
+    if isinstance(payload, list):
+        return [row for row in payload if isinstance(row, dict)]
+    if isinstance(payload, dict):
+        for key in ("kitchens", "items", "results"):
+            rows = payload.get(key)
+            if isinstance(rows, list):
+                return [row for row in rows if isinstance(row, dict)]
+    return []
+
+
+def ensure_sales_onboards() -> int:
+    """P55: each sales login has onboarded kitchens + training ticks."""
+    created = 0
+    for spec in DEMO_SALES_ONBOARDS:
+        try:
+            sales_token = login_admin(spec["sales_email"], spec["sales_password"])
+        except ApiError as exc:
+            log(f"  ! sales login {spec['sales_email']}: {exc}")
+            continue
+        try:
+            listed = request("GET", "/api/v1/admin/kitchens", token=sales_token)
+        except ApiError as exc:
+            log(f"  ! sales kitchens {spec['sales_email']}: {exc}")
+            listed = []
+        already = any(
+            str(row.get("name") or "") == spec["kitchen_name"] for row in _kitchen_rows(listed)
+        )
+        kitchen_id = None
+        if already:
+            kitchen_id = next(
+                (
+                    str(row.get("id"))
+                    for row in _kitchen_rows(listed)
+                    if str(row.get("name") or "") == spec["kitchen_name"] and row.get("id")
+                ),
+                None,
+            )
+            log(f"  Sales kitchen ready ({spec['kitchen_name']})")
+        else:
+            try:
+                result = request(
+                    "POST",
+                    "/api/v1/admin/sales/onboard",
+                    token=sales_token,
+                    body={
+                        "owner_name": spec["owner_name"],
+                        "owner_phone": spec["owner_phone"],
+                        "owner_email": spec["owner_email"],
+                        "kitchen_name": spec["kitchen_name"],
+                        "description": spec.get("description"),
+                        "address_line": spec["address_line"],
+                        "city": spec["city"],
+                        "state": spec["state"],
+                        "pincode": spec["pincode"],
+                        "latitude": spec["latitude"],
+                        "longitude": spec["longitude"],
+                    },
+                )
+                kitchen = result.get("kitchen") if isinstance(result, dict) else None
+                kitchen_id = str((kitchen or {}).get("id") or "")
+                created += 1
+                log(
+                    f"  Sales onboard {spec['kitchen_name']} "
+                    f"({spec['owner_phone']}) via {spec['sales_email']}"
+                )
+            except ApiError as exc:
+                if "409" in str(exc) or "already" in str(exc).lower():
+                    log(f"  Sales kitchen ready ({spec['kitchen_name']})")
+                else:
+                    log(f"  ! sales onboard {spec['kitchen_name']}: {exc}")
+                    continue
+        if not kitchen_id:
+            continue
+        for step in spec.get("training_steps") or []:
+            try:
+                request(
+                    "PATCH",
+                    f"/api/v1/admin/kitchens/{kitchen_id}/training",
+                    token=sales_token,
+                    body={"step_key": step, "completed": True},
+                )
+            except ApiError as exc:
+                if "already" not in str(exc).lower() and "409" not in str(exc):
+                    log(f"  ! training {spec['kitchen_name']} {step}: {exc}")
+    return created
 
 
 def ensure_customer_sessions() -> list[dict]:
@@ -1170,7 +1294,8 @@ def seed_platform_extras(
     log("Platform extras (all user types + all modules)")
     log("-" * 50)
     admin_token = ensure_admin_session()
-    ensure_demo_sales_rep(admin_token)
+    ensure_admin_staff(admin_token)
+    ensure_sales_onboards()
     customers = ensure_customer_sessions()
     if dish_ids:
         ensure_customer_orders(customers, kitchen_id, dish_ids, owner_token)

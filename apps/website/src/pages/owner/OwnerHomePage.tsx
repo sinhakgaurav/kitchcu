@@ -53,6 +53,103 @@ const QUICK_ACTIONS = [
   { to: "/dashboard/menu/new", titleKey: "owner.home.quickAddDish", descKey: "owner.home.quickAddDishDesc", accent: "orange" },
 ] as const;
 
+const LIVE_LANES = ["received", "accepted", "preparing", "ready", "out_for_delivery"] as const;
+
+type NowMove = {
+  titleKey: string;
+  descKey: string;
+  ctaKey: string;
+  to: string;
+  tone: "alert" | "live" | "calm";
+  count?: number;
+};
+
+function pickNowMove(input: {
+  draftCount: number;
+  received: number;
+  cooking: number;
+  ready: number;
+  out: number;
+  dishCount: number;
+  brandedEnabled: boolean;
+}): NowMove {
+  if (input.draftCount > 0) {
+    return {
+      titleKey: "owner.home.nowDraftsTitle",
+      descKey: "owner.home.nowDraftsDesc",
+      ctaKey: "owner.home.nowDraftsCta",
+      to: "/dashboard/orders?tab=drafts",
+      tone: "alert",
+      count: input.draftCount,
+    };
+  }
+  if (input.received > 0) {
+    return {
+      titleKey: "owner.home.nowAcceptTitle",
+      descKey: "owner.home.nowAcceptDesc",
+      ctaKey: "owner.home.nowAcceptCta",
+      to: "/dashboard/orders",
+      tone: "alert",
+      count: input.received,
+    };
+  }
+  if (input.ready > 0) {
+    return {
+      titleKey: "owner.home.nowHandoffTitle",
+      descKey: "owner.home.nowHandoffDesc",
+      ctaKey: "owner.home.nowHandoffCta",
+      to: "/dashboard/orders",
+      tone: "live",
+      count: input.ready,
+    };
+  }
+  if (input.cooking > 0) {
+    return {
+      titleKey: "owner.home.nowCookTitle",
+      descKey: "owner.home.nowCookDesc",
+      ctaKey: "owner.home.nowCookCta",
+      to: "/dashboard/orders",
+      tone: "live",
+      count: input.cooking,
+    };
+  }
+  if (input.out > 0) {
+    return {
+      titleKey: "owner.home.nowTrackTitle",
+      descKey: "owner.home.nowTrackDesc",
+      ctaKey: "owner.home.nowTrackCta",
+      to: "/dashboard/orders",
+      tone: "live",
+      count: input.out,
+    };
+  }
+  if (input.dishCount < 3) {
+    return {
+      titleKey: "owner.home.nowMenuTitle",
+      descKey: "owner.home.nowMenuDesc",
+      ctaKey: "owner.home.nowMenuCta",
+      to: "/dashboard/menu/new",
+      tone: "calm",
+    };
+  }
+  if (!input.brandedEnabled) {
+    return {
+      titleKey: "owner.home.nowBrandTitle",
+      descKey: "owner.home.nowBrandDesc",
+      ctaKey: "owner.home.nowBrandCta",
+      to: "/dashboard/brand",
+      tone: "calm",
+    };
+  }
+  return {
+    titleKey: "owner.home.nowClearTitle",
+    descKey: "owner.home.nowClearDesc",
+    ctaKey: "owner.home.nowClearCta",
+    to: "/dashboard/orders/new",
+    tone: "calm",
+  };
+}
+
 export function OwnerHomePage() {
   const { t, i18n } = useTranslation();
   const locale = i18n.language?.startsWith("en") ? "en-IN" : i18n.language || "en-IN";
@@ -65,6 +162,7 @@ export function OwnerHomePage() {
     return t("owner.home.greetingEvening");
   };
   const [orders, setOrders] = useState<Order[]>([]);
+  const [laneCounts, setLaneCounts] = useState<Record<string, number>>({});
   const [draftCount, setDraftCount] = useState(0);
   const [dishCount, setDishCount] = useState(0);
   const [summary, setSummary] = useState<RevenueSummary | null>(null);
@@ -80,7 +178,7 @@ export function OwnerHomePage() {
     if (!kitchen) return;
     setPageLoading(true);
     Promise.allSettled([
-      fetchOrders(kitchen.id),
+      fetchOrders(kitchen.id, undefined, { open: true, limit: 50 }),
       fetchDrafts(kitchen.id),
       fetchMenu(kitchen.id),
       fetchRevenueSummary(kitchen.id, 7),
@@ -102,7 +200,10 @@ export function OwnerHomePage() {
         const streamSettings = val<Awaited<ReturnType<typeof fetchStreamSettings>>>(6);
         const growth = val<Awaited<ReturnType<typeof fetchGrowthSuggestions>>>(7);
         const pins = val<Awaited<ReturnType<typeof fetchGoldenRecipes>>>(8);
-        if (orderRes) setOrders(orderRes.orders);
+        if (orderRes) {
+          setOrders(orderRes.orders);
+          setLaneCounts(orderRes.lane_counts ?? {});
+        }
         if (drafts) setDraftCount(drafts.total);
         if (menu) setDishCount(menu.dishes.length);
         if (rev) setSummary(rev);
@@ -123,9 +224,23 @@ export function OwnerHomePage() {
     () => orders.filter((o) => !["delivered", "cancelled"].includes(o.status)),
     [orders],
   );
+  const laneCount = (status: string) =>
+    laneCounts[status] ?? orders.filter((o) => o.status === status).length;
+  const receivedCount = laneCount("received");
+  const cookingCount = laneCount("accepted") + laneCount("preparing");
+  const readyCount = laneCount("ready");
+  const outCount = laneCount("out_for_delivery");
+  const liveByStatus = useMemo(() => {
+    const map: Record<string, Order[]> = {};
+    for (const lane of LIVE_LANES) map[lane] = [];
+    for (const order of activeOrders) {
+      (map[order.status] ??= []).push(order);
+    }
+    return map;
+  }, [activeOrders]);
   const recentOrders = useMemo(
-    () => [...orders].sort((a, b) => b.created_at.localeCompare(a.created_at)).slice(0, 5),
-    [orders],
+    () => [...activeOrders].sort((a, b) => b.created_at.localeCompare(a.created_at)).slice(0, 8),
+    [activeOrders],
   );
   const maxRevenue = useMemo(
     () => Math.max(1, ...(series?.points.map((p) => p.revenue) ?? [1])),
@@ -142,9 +257,22 @@ export function OwnerHomePage() {
   const brandedLink = customerUrl(`/k/${kitchen.code}`);
   const subTier = owner?.subscription_tier ?? "trial";
   const subStatus = owner?.subscription_status ?? "active";
+  const nowMove = pickNowMove({
+    draftCount,
+    received: receivedCount,
+    cooking: cookingCount,
+    ready: readyCount,
+    out: outCount,
+    dishCount,
+    brandedEnabled,
+  });
 
-  const hasOrder = orders.length > 0 || draftCount > 0;
-  const hasAccepted = orders.some((o) => !["received", "cancelled"].includes(o.status));
+  const liveOpenCount = Object.values(laneCounts).reduce((sum, n) => sum + n, 0);
+  const hasOrder = orders.length > 0 || draftCount > 0 || (summary?.total_orders ?? 0) > 0;
+  const hasAccepted =
+    orders.some((o) => !["received", "cancelled"].includes(o.status)) ||
+    cookingCount + readyCount + outCount > 0 ||
+    (summary?.completed_orders ?? 0) > 0;
   const hasRevenue = (summary?.gross_revenue ?? 0) > 0;
   const day1Steps = [
     {
@@ -230,34 +358,23 @@ export function OwnerHomePage() {
                 {t("owner.home.draftsWaiting", { count: draftCount })}
               </Link>
             )}
-            {activeOrders.length > 0 && (
+            {(liveOpenCount > 0 || activeOrders.length > 0) && (
               <Link to="/dashboard/orders" className="od-pill od-pill--live">
-                {t("owner.home.inProgress", { count: activeOrders.length })}
+                {t("owner.home.inProgress", { count: liveOpenCount || activeOrders.length })}
               </Link>
             )}
           </div>
         </div>
         <div className="od-board__hero-actions">
           <TourReplayButton id="kitchen" label={t("owner.tour.replay")} />
-          {activeOrders.length > 0 ? (
-            <>
-              <Link to="/dashboard/orders" className="btn btn--primary">
-                {t("owner.home.openOrders")}
-              </Link>
-              <Link to="/dashboard/orders/new" className="btn btn--ghost">
-                {t("owner.home.quickNewOrder")}
-              </Link>
-            </>
-          ) : (
-            <>
-              <Link to="/dashboard/orders/new" className="btn btn--primary">
-                {t("owner.home.quickNewOrder")}
-              </Link>
-              <Link to="/dashboard/brand" className="btn btn--ghost">
-                {t("owner.home.quickBrand")}
-              </Link>
-            </>
+          {!pageLoading && (
+            <Link to={nowMove.to} className="btn btn--primary">
+              {t(nowMove.ctaKey, { count: nowMove.count ?? 0 })}
+            </Link>
           )}
+          <Link to="/dashboard/orders/new" className="btn btn--ghost">
+            {t("owner.home.quickNewOrder")}
+          </Link>
         </div>
       </section>
 
@@ -316,6 +433,17 @@ export function OwnerHomePage() {
         </div>
       ) : (
         <>
+          <section className={`dash-card od-now od-now--${nowMove.tone}`} aria-labelledby="owner-now-title">
+            <div className="od-now__copy">
+              <p className="od-now__eyebrow">{t("owner.home.nowEyebrow")}</p>
+              <h2 id="owner-now-title">{t(nowMove.titleKey, { count: nowMove.count ?? 0 })}</h2>
+              <p>{t(nowMove.descKey, { count: nowMove.count ?? 0 })}</p>
+            </div>
+            <Link to={nowMove.to} className="btn btn--primary">
+              {t(nowMove.ctaKey, { count: nowMove.count ?? 0 })}
+            </Link>
+          </section>
+
           <div className="od-board__kpi-grid">
             <Link to="/dashboard/reports" className="od-kpi dash-card">
               <span className="od-kpi__icon od-kpi__icon--revenue" aria-hidden="true" />
@@ -489,28 +617,42 @@ export function OwnerHomePage() {
             </section>
           </div>
 
-          <section className="dash-card od-panel od-orders__table">
+          <section className="dash-card od-panel od-live">
             <header className="od-panel__head">
               <div>
-                <h2>{t("owner.home.recentOrders")}</h2>
-                <p>{t("owner.home.recentOrdersDesc")}</p>
+                <h2>{t("owner.home.liveBoard")}</h2>
+                <p>{t("owner.home.liveBoardDesc")}</p>
               </div>
               <Link to="/dashboard/orders" className="od-panel__link">{t("owner.home.viewAllOrders")}</Link>
             </header>
-            {recentOrders.length === 0 ? (
+            {activeOrders.length === 0 ? (
               <div className="od-panel__empty">
-                <p>{t("owner.home.noOrders")}</p>
+                <p>{t("owner.home.liveBoardEmpty")}</p>
                 <div className="od-board__hero-actions" style={{ marginTop: "0.75rem" }}>
                   <Link to="/dashboard/orders/new" className="btn btn--primary btn--sm">
                     {t("owner.home.quickNewOrder")}
                   </Link>
-                  <Link to="/dashboard/menu/new" className="btn btn--ghost btn--sm">
-                    {t("owner.home.addDish")}
+                  <Link to="/dashboard/orders?tab=drafts" className="btn btn--ghost btn--sm">
+                    {t("owner.home.quickDrafts")}
                   </Link>
                 </div>
               </div>
             ) : (
               <>
+                <ul className="od-live__lanes" aria-label={t("owner.home.liveBoard")}>
+                  {LIVE_LANES.map((lane) => {
+                    const n = laneCounts[lane] ?? liveByStatus[lane]?.length ?? 0;
+                    if (n === 0) return null;
+                    return (
+                      <li key={lane}>
+                        <span className={`status-badge status-badge--${lane}`}>
+                          {t(`status.${lane}`, { defaultValue: STATUS_LABELS[lane] ?? lane })}
+                        </span>
+                        <strong>{n}</strong>
+                      </li>
+                    );
+                  })}
+                </ul>
                 <div className="od-recent__head" aria-hidden="true">
                   <span>{t("owner.home.colOrder")}</span>
                   <span>{t("owner.home.colCustomer")}</span>

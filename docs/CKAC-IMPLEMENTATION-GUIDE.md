@@ -5,10 +5,10 @@
 | Field | Value |
 |-------|-------|
 | Version | **2.0** |
-| Status | **S1–S18 shipped** + post-S18 **P19–P55** (store apps, sales onboard, tours, calories/Healthy, diet filter); E1/E2 = design pack only |
-| Last updated | 2026-09-17 |
+| Status | **S1–S18 shipped** + post-S18 **P19–P56** (Today OS, bounded order list, store apps, sales onboard, calories/Healthy, diet filter); E1/E2 = design pack only |
+| Last updated | 2026-09-18 |
 | Advancement | **[ADVANCEMENT-TRACKER.md](./ADVANCEMENT-TRACKER.md)** — sprint board + release gate |
-| Encyclopedia | **[CKAC-COMPLETE-GUIDE.md](./CKAC-COMPLETE-GUIDE.md) v3.2.7** — through P55; UI Catalog; OpenAPI |
+| Encyclopedia | **[CKAC-COMPLETE-GUIDE.md](./CKAC-COMPLETE-GUIDE.md) v3.2.8** — through P56; UI Catalog; OpenAPI |
 | Companion docs | [Planning Benchmark](./CKAC-COMPLETE-PLANNING-BENCHMARK.md) · [System Benchmark](./CKAC-SYSTEM-BENCHMARK.md) · [CPO Blueprint v4.2](./CKAC-CPO-PRODUCT-BLUEPRINT.md) · [CTO Architecture](./CKAC-ARCHITECTURE-CTO.md) · [Development Phases](./DEVELOPMENT-PHASES.md) · [User Flows](./CKAC-USERFLOWS.md) · [API.md](./API.md) · [AGENTS.md](../AGENTS.md) · [UI shots](./assets/ui/) |
 
 > For deep definitions, module logic, Mermaid flows, and annotated screenshots, prefer the Complete Guide. This file remains the **code ↔ feature map** (what's wired where).
@@ -109,7 +109,7 @@ Legend: ✅ Done · 🟡 Partial · ⏳ Not started
 | **F02** | Normal message order capture | Must | ✅ | `POST .../orders/parse-message`, source `manual_message` |
 | **F03** | Custom manual order input | Must | ✅ | `POST .../orders/manual`, source `manual` |
 | **F04** | Order lifecycle management | Must | ✅ | State machine in `order/app/models.py`; `PATCH .../status`; `order_status_events` |
-| **F05** | Order history tracker | Must | ✅ | `GET .../orders` with `status`, `source` filters; index `(kitchen_id, created_at DESC)` |
+| **F05** | Order history tracker | Must | ✅ | `GET …/orders` with `status`, `source`, **`open`**, **`limit` (50/100)**; `lane_counts`; partial index `ix_orders_kitchen_open_created`; CSV for full history |
 | **F07** | Revenue report | Must | 🟡 | `services/order/app/analytics.py` — summary, timeseries, top dishes, peak hours, customer segments; owner Reports UI |
 | **F13** | Add dish with live photo | Must | ✅ | `POST .../dishes` + `DishMediaInput` validator |
 | **F14** | Price, ingredients, quality | Must | ✅ | Dish model fields + create API |
@@ -136,7 +136,7 @@ Legend: ✅ Done · 🟡 Partial · ⏳ Not started
 
 F19–F24, F46–F48 — **shipped** in S15–S18 (see [ADVANCEMENT-TRACKER.md](./ADVANCEMENT-TRACKER.md)). Per-dish go-live showcase = **P22**.
 
-### Post-S18 platform ops (P19–P55)
+### Post-S18 platform ops (P19–P56)
 
 | ID | Feature | Status | Code / notes |
 |----|---------|--------|--------------|
@@ -155,6 +155,7 @@ F19–F24, F46–F48 — **shipped** in S15–S18 (see [ADVANCEMENT-TRACKER.md](
 | P53 | Dish calories + Healthy tag | ✅ | Catalog `011` · pantry kcal · automatic Healthy |
 | P54 | Calories / Healthy Control | ✅ | Identity `029` · Admin Control kcal cap |
 | P55 | Store apps + sales onboard | ✅ | Identity `030` · Admin Sales/Train · `apps/android/` · `apps/ios/` · tours |
+| P56 | Owner Today OS + scale-safe list | ✅ | Order `012` · Home Now + live board · `open`/`limit`/`lane_counts` |
 
 **Maps to:** Planning Benchmark [§11 Feature Index](./CKAC-COMPLETE-PLANNING-BENCHMARK.md#11-feature-index-all-45-features) · [ADVANCEMENT-TRACKER.md](./ADVANCEMENT-TRACKER.md) · DEVELOPMENT-PHASES.md
 
@@ -469,7 +470,7 @@ Base URL (dev): `http://localhost:18000/api/v1`
 | POST | `/kitchens/{id}/orders/parse-message` | Bearer | F02 |
 | GET | `/kitchens/{id}/orders/drafts` | Bearer | F01/F02 inbox |
 | POST | `/kitchens/{id}/orders/drafts/{id}/confirm` | Bearer | F01/F02 |
-| GET | `/kitchens/{id}/orders` | Bearer | F05 |
+| GET | `/kitchens/{id}/orders` | Bearer | F05 / P56 (`open`, `limit`≤100, `lane_counts`) |
 | GET | `/orders/{id}` | Bearer | F05 |
 | PATCH | `/orders/{id}/status` | Bearer | F04 |
 | POST | `/internal/kitchens/{id}/orders/from-whatsapp` | X-Internal-Key | F01 |

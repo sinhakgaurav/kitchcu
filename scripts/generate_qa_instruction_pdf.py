@@ -9,7 +9,7 @@ from pathlib import Path
 
 from pdf_guide import GuidePDF
 
-GUIDE_VERSION = "1.3"
+GUIDE_VERSION = "1.4"
 GUIDE_DATE = "September 2026"
 OUTPUT = Path(__file__).resolve().parent.parent / "docs" / "QA-INSTRUCTION-PACK.pdf"
 
@@ -35,6 +35,7 @@ def build() -> GuidePDF:
             "Bulk prep, CRM, Coupons) + header/dropdown/layout polish checks",
             "F19/F19b: pantry, recipes, deduct modes, mark prepared, Ready-time stock",
             "P47: Swagger OAuth2Password /api/v1/auth/token; public ops no padlock",
+            "P56: Home Do this now + live board; GET .../orders?open=true&limit=50 + lane_counts",
             "P55: sales@kitchcu.dev onboard + Train; first-run tips; three store apps",
             "Security, correlation IDs, tenant isolation, pytest focus commands",
         ],
@@ -150,7 +151,7 @@ def build() -> GuidePDF:
         [
             ["H1", "Hero layout", "CTAs top-right on same row; not button under empty column"],
             ["H2", "Pills / meta", "Readable; no overflow clip"],
-            ["H3", "Recent orders", "Clickable rows; status chips coherent"],
+            ["H3", "Do this now + live board", "Now = highest-priority open work; live board in-flight only"],
         ],
         widths=[18, 40, 112],
     )

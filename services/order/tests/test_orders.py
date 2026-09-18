@@ -139,6 +139,119 @@ async def test_list_orders_by_kitchen(client: AsyncClient, order_ctx, manual_ord
 
 
 @pytest.mark.asyncio
+async def test_list_orders_defaults_to_a_bounded_page(client: AsyncClient, order_ctx):
+    from datetime import UTC, datetime, timedelta
+
+    from tests.test_analytics import _insert_order
+
+    _, kitchen_id, dish_id, _, token = order_ctx
+    now = datetime.now(UTC)
+    for i in range(3):
+        _insert_order(
+            kitchen_id,
+            total=199,
+            status="delivered",
+            created_at=now - timedelta(minutes=i),
+            dish_id=dish_id,
+        )
+    headers = {"Authorization": f"Bearer {token}"}
+    capped = await client.get(
+        f"/api/v1/kitchens/{kitchen_id}/orders",
+        params={"limit": 2},
+        headers=headers,
+    )
+    assert capped.status_code == 200
+    body = capped.json()
+    assert body["total"] == 2
+    assert len(body["orders"]) == 2
+
+    too_big = await client.get(
+        f"/api/v1/kitchens/{kitchen_id}/orders",
+        params={"limit": 500},
+        headers=headers,
+    )
+    assert too_big.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_list_open_orders_skips_terminal_states(client: AsyncClient, order_ctx):
+    from datetime import UTC, datetime, timedelta
+
+    from tests.test_analytics import _insert_order
+
+    _, kitchen_id, dish_id, _, token = order_ctx
+    now = datetime.now(UTC)
+    live_id = _insert_order(
+        kitchen_id,
+        total=199,
+        status="received",
+        created_at=now,
+        dish_id=dish_id,
+    )
+    _insert_order(
+        kitchen_id,
+        total=199,
+        status="delivered",
+        created_at=now - timedelta(hours=1),
+        dish_id=dish_id,
+    )
+    _insert_order(
+        kitchen_id,
+        total=50,
+        status="cancelled",
+        created_at=now - timedelta(hours=2),
+        dish_id=dish_id,
+    )
+    headers = {"Authorization": f"Bearer {token}"}
+    response = await client.get(
+        f"/api/v1/kitchens/{kitchen_id}/orders",
+        params={"open": "true"},
+        headers=headers,
+    )
+    assert response.status_code == 200
+    ids = {row["id"] for row in response.json()["orders"]}
+    assert str(live_id) in ids
+    assert response.json()["total"] == 1
+    assert response.json()["lane_counts"] == {"received": 1}
+    assert all(row["status"] not in {"delivered", "cancelled"} for row in response.json()["orders"])
+
+
+@pytest.mark.asyncio
+async def test_open_order_lane_counts_cover_the_full_rush(client: AsyncClient, order_ctx):
+    from datetime import UTC, datetime, timedelta
+
+    from tests.test_analytics import _insert_order
+
+    _, kitchen_id, dish_id, _, token = order_ctx
+    now = datetime.now(UTC)
+    for i in range(3):
+        _insert_order(
+            kitchen_id,
+            total=199,
+            status="received",
+            created_at=now - timedelta(minutes=i),
+            dish_id=dish_id,
+        )
+    _insert_order(
+        kitchen_id,
+        total=249,
+        status="ready",
+        created_at=now - timedelta(minutes=30),
+        dish_id=dish_id,
+    )
+    headers = {"Authorization": f"Bearer {token}"}
+    response = await client.get(
+        f"/api/v1/kitchens/{kitchen_id}/orders",
+        params={"open": "true", "limit": 1},
+        headers=headers,
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert len(body["orders"]) == 1
+    assert body["lane_counts"] == {"received": 3, "ready": 1}
+
+
+@pytest.mark.asyncio
 async def test_list_orders_date_filters(client: AsyncClient, order_ctx):
     from datetime import UTC, datetime, timedelta
 

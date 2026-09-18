@@ -90,6 +90,7 @@ export function OrdersPage() {
         fetchOrders(kitchen.id, statusFilter || undefined, {
           source: sourceFilter || undefined,
           ...listBounds,
+          limit: 100,
         }),
         fetchDrafts(kitchen.id),
         fetchMenu(kitchen.id).catch(() => null),
@@ -119,6 +120,7 @@ export function OrdersPage() {
         fetchOrders(kitchen.id, statusFilter || undefined, {
           source: sourceFilter || undefined,
           ...listBounds,
+          limit: 100,
         }),
         fetchDrafts(kitchen.id),
       ])

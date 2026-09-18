@@ -4,11 +4,11 @@
 
 | Field | Value |
 |-------|-------|
-| Version | **1.1** |
-| Date | 2026-09-17 |
+| Version | **1.2** |
+| Date | 2026-09-18 |
 | Audience | QA testers, release sign-off, founders doing a full pass |
 | Companion PDF | [`docs/TESTER-INSTRUCTION-PACK.pdf`](./TESTER-INSTRUCTION-PACK.pdf) — `python scripts/generate_tester_instruction_pdf.py` |
-| Aligned with | Complete Guide **v3.2.7** · Userflows **v1.6** · API.md **v1.2** · QA pack **v1.3** |
+| Aligned with | Complete Guide **v3.2.8** · Userflows **v1.7** · API.md **v1.3** · QA pack **v1.4** |
 
 This pack is the **how to click / how to call** book. The existing [QA Instruction Pack](./QA-INSTRUCTION-PACK.md) is the short Must/Should checklist. Use **this** document when you need every numbered step.
 
@@ -65,11 +65,15 @@ Production substitutes: `https://kitchcu.com`, `https://customer.kitchcu.com`, `
 |---------|------------|--------|---------|
 | Owner (primary) | `9876543210` | OTP `123456` | Kitchen `CKPNQ001` — Sharma Home Kitchen, Pune |
 | Owner (alt) | `9876543211`–`9876543213` | OTP `123456` | Other seeded kitchens (use for tenant-isolation) |
+| Owner (volume, full bulk) | `9876543214`–`9876543215` | OTP `123456` | Multiple kitchens — kitchen switcher |
+| Sales-onboarded | `9876543301`–`9876543303` | OTP `123456` | Train kitchens from Sales |
 | Customer (primary) | `9123456789` | OTP `123456` | Priya — discovery home |
 | Customer (repeat) | `9123456780` | OTP `123456` | Rahul — richer order history |
 | Customer (guest path) | `9988776655` | OTP `123456` | Ananya |
 | Super Admin | `admin@kitchcu.dev` | `admin123456` | Admin Overview |
+| Ops / support / finance | `ops@` / `support@` / `finance@kitchcu.dev` | `ops123456` / `support123456` / `finance123456` | RBAC; Admin stays English |
 | Sales (field) | `sales@kitchcu.dev` | `sales123456` | Admin **Sales** only (extras seed; role `sales`) |
+| Sales west | `sales.west@kitchcu.dev` | `sales123456` | Second sales book |
 
 **Production:** Super Admin is `admin@kitchcu.com` + the live `ADMIN_PASSWORD`. OTP `123456` is **refused** when `APP_ENV=production`. Never use `.dev` on `*.kitchcu.com`.
 
@@ -97,7 +101,7 @@ Do these in order. Fail on S1–S4 → stop the session.
 | ID | Steps | Expected |
 |----|-------|----------|
 | S1 | Browser → gateway `/health/live` then `/health/ready` | Both 200 |
-| S2 | Kitchen `:13002/login` → phone `9876543210` → Request OTP → enter `123456` → Continue | Lands Overview / Orders. Hero shows kitchen **name + CKPNQ001**. No blank screen |
+| S2 | Kitchen `:13002/login` → phone `9876543210` → Request OTP → enter `123456` → Continue | Lands **Home Today OS**. Hero shows kitchen **name + CKPNQ001**. **Do this now** + live board (open tickets only). No blank screen |
 | S3 | Customer `:13001/login` → `9123456789` → OTP `123456` | Discovery home loads kitchens / cities |
 | S4 | Admin `:13003` → `admin@kitchcu.dev` / `admin123456` | Overview KPIs load. Sign in card shows username + password **when** reveal gate is on (`development`/`test` or `ADMIN_LOGIN_REVEAL_PASSWORD=1`) |
 | S5 | Portal `:13000` | Brand hero; cities strip; no console crash |
@@ -205,15 +209,17 @@ Login as `9876543210` / `123456` unless a step says otherwise. After login, kitc
 
 1. Open http://localhost:13002 — marketing landing (not a crash).
 2. Open `/login`. Demo strip lists owner phones. OTP story matches §1.3 (no fake SMS).
-3. Login. Land on `/dashboard` (Overview) or inbox-first Orders — never a black screen.
-4. Hero: kitchen **name + code CKPNQ001** on the left; primary CTAs (New order / Brand) **same row, top-right**.
+3. Login. Land on `/dashboard` (**Today OS**: Do this now + live board) — never a black screen.
+4. Hero: kitchen **name + code CKPNQ001** on the left; **Do this now** CTA + New order **same row, top-right**.
 5. **First-run tips:** overlay Skip / Next / Done — **14 steps** covering Orders, Menu, Ingredients/Healthy, bulk prep, Reports, CRM, stream, WhatsApp/payments, GST, Setup/KYC, and Your plan. **Show tips** in the top bar or Home replays it. Every dashboard route has a collapsible **What you can do here** list (Home, Orders, Menu, Ingredients, …). Collapse it when you know the page — it stays on every screen.
 
-### 5.2 Overview (`/dashboard`)
+### 5.2 Home / Today OS (`/dashboard`)
 
 1. Greeting, subscription pill, drafts/live pills readable (no clip).
-2. Recent orders list: rows are clickable; status chips use the real machine (`received` → `delivered` / `cancelled`).
-3. Open a recent order → `/dashboard/orders/{id}`. Back returns to the list.
+2. **Do this now** matches the highest-priority open work (WhatsApp drafts → accept received → handoff ready → cooking → track). CTA deep-links to the right screen.
+3. **Live board** lists only in-flight statuses (received / accepted / preparing / ready / out for delivery). A delivered 6-month history row on Home is a **fail**.
+4. Open a live-board row → `/dashboard/orders/{id}`. Back returns to Home.
+5. **View all orders** → `/dashboard/orders`. Active tab is the cook-line; All + date filters hold the 6-month harvest.
 
 ### 5.3 Orders (`/dashboard/orders`) — Must
 
@@ -434,7 +440,7 @@ Public clients use the **gateway only**: http://localhost:18000. Do not call `:1
 1. Authorize as owner (`9876543210` / `123456`).
 2. `GET /api/v1/owners/me` → 200, owner profile. **Must not** succeed with a customer token (switch token and expect 401).
 3. From `/owners/me` or kitchens list, copy the **CKPNQ001 kitchen id**.
-4. `GET /api/v1/kitchens/{kitchen_id}/orders` → 200, seeded history (not only today).
+4. `GET /api/v1/kitchens/{kitchen_id}/orders?open=true&limit=50` → 200, in-flight only, `lane_counts` present. Default list without `open` is capped (`limit` default 50, max 100; `limit=500` → 422). Full 6-month history is **CSV / analytics**, not this list.
 5. `GET /api/v1/kitchens/{kitchen_id}/analytics` (or reports/analytics path in the spec) → 200; 6-month style series present if seeded.
 6. `GET /api/v1/kitchens/{kitchen_id}/menu` or dishes → 200.
 7. `GET /api/v1/kitchens/{kitchen_id}/crm/contacts` (or CRM list in the spec) → 200; after 6-month seed this is **not** 0–2 rows on CKPNQ001.
@@ -570,7 +576,7 @@ Workaround:
 | Auth / OpenAPI cheat-sheet | [`API.md`](./API.md) §1.1–1.2 |
 | Prod URLs + feature matrix | [`PRODUCTION-PORTALS-CREDENTIALS-QA.md`](./PRODUCTION-PORTALS-CREDENTIALS-QA.md) |
 | Seed + credentials | [`ADVANCEMENT-TRACKER.md`](./ADVANCEMENT-TRACKER.md) |
-| Product encyclopedia | [`CKAC-COMPLETE-GUIDE.md`](./CKAC-COMPLETE-GUIDE.md) v3.2.7 |
+| Product encyclopedia | [`CKAC-COMPLETE-GUIDE.md`](./CKAC-COMPLETE-GUIDE.md) v3.2.8 |
 | Store shells | [`apps/android/README.md`](../apps/android/README.md) · [`apps/ios/README.md`](../apps/ios/README.md) |
 
 ---
