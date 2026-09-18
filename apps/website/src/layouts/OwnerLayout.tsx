@@ -101,7 +101,7 @@ export function RequireAuth({ children }: { children: React.ReactNode }) {
 export function OwnerLayout() {
   const { t } = useTranslation();
   const { owner, logout, token } = useKitchenAuth();
-  const { kitchen, kitchens, setKitchenId, loading } = useKitchen();
+  const { kitchen, kitchens, setKitchenId, loading, loadError, reloadKitchens } = useKitchen();
   const location = useLocation();
   const [navOpen, setNavOpen] = useState(false);
   const [modules, setModules] = useState<Record<string, boolean> | null>(null);
@@ -184,8 +184,14 @@ export function OwnerLayout() {
   }
 
   // New owners land on setup before any ops screen — otherwise menu/orders
-  // render an empty shell and look broken.
-  if (!loading && kitchens.length === 0 && location.pathname !== "/dashboard/setup") {
+  // render an empty shell and look broken. Do not bounce there when the list
+  // API failed; swagger can still show kitchens the UI has not loaded yet.
+  if (
+    !loading &&
+    !loadError &&
+    kitchens.length === 0 &&
+    location.pathname !== "/dashboard/setup"
+  ) {
     return <Navigate to="/dashboard/setup" replace />;
   }
 
@@ -213,18 +219,28 @@ export function OwnerLayout() {
           </button>
         </div>
 
-        {kitchens.length > 1 && (
+        {kitchens.length > 0 && (
           <label className="kc-field owner-app__kitchen-field">
             <span className="kc-field__label">{t("owner.shell.activeKitchen")}</span>
-            <select
-              className="kc-select owner-app__kitchen-select"
-              value={kitchen?.id ?? ""}
-              onChange={(e) => setKitchenId(e.target.value)}
-            >
-              {kitchens.map((k) => (
-                <option key={k.id} value={k.id}>{k.name}</option>
-              ))}
-            </select>
+            {kitchens.length === 1 ? (
+              <span className="owner-app__kitchen-name">
+                {kitchens[0].name}
+                {kitchens[0].code ? ` · ${kitchens[0].code}` : ""}
+              </span>
+            ) : (
+              <select
+                className="kc-select owner-app__kitchen-select"
+                value={kitchen?.id ?? ""}
+                onChange={(e) => setKitchenId(e.target.value)}
+              >
+                {kitchens.map((k) => (
+                  <option key={k.id} value={k.id}>
+                    {k.name}
+                    {k.code ? ` · ${k.code}` : ""}
+                  </option>
+                ))}
+              </select>
+            )}
           </label>
         )}
 
@@ -279,6 +295,13 @@ export function OwnerLayout() {
         <div className="owner-app__main">
           {loading ? (
             <div className="app-loading">{t("owner.shell.loadingKitchen")}</div>
+          ) : loadError ? (
+            <div className="auth-card__error" style={{ margin: "1.25rem" }}>
+              <p>{loadError}</p>
+              <button type="button" className="btn btn--secondary btn--sm" onClick={() => void reloadKitchens()}>
+                Retry kitchen list
+              </button>
+            </div>
           ) : (
             <>
               <OwnerPageHowTo pathname={location.pathname} />

@@ -347,7 +347,7 @@ export function LoginPage() {
                   {fieldErrors.otp ? <span className="field-error">{fieldErrors.otp}</span> : null}
                 </label>
               )}
-              <button type="submit" className="btn btn--primary btn--lg" disabled={busy}>
+              <button type="submit" className="btn btn--primary btn--lg" disabled={busy} aria-busy={busy}>
                 {busy ? t("common.loading") : otpSent ? t("owner.auth.verify") : t("owner.auth.sendOtp")}
               </button>
               {otpSent && (
@@ -379,6 +379,7 @@ export function LoginPage() {
                     type="button"
                     className="btn btn--primary btn--sm"
                     disabled={busy}
+                    aria-busy={busyPhone === account.phone}
                     onClick={() => handleDemoLogin(account)}
                   >
                     {busyPhone === account.phone ? "Signing in…" : "Sign in"}

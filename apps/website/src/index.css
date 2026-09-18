@@ -131,6 +131,10 @@ img {
 
 .btn:disabled {
   opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.btn[aria-busy="true"] {
   cursor: wait;
 }
 

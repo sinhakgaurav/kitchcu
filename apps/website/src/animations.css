@@ -96,6 +96,26 @@
   pointer-events: none;
 }
 
+.btn--primary:disabled::after {
+  animation: none;
+  opacity: 0;
+}
+
+.btn--primary[aria-busy="true"]::after {
+  animation: shimmer 1.2s ease-in-out infinite;
+  opacity: 1;
+}
+
+.btn--primary:disabled::after {
+  animation: none;
+  opacity: 0;
+}
+
+.btn--primary[aria-busy="true"]::after {
+  animation: shimmer 1.2s ease-in-out infinite;
+  opacity: 1;
+}
+
 /* Animated mesh backgrounds */
 .animated-mesh {
   position: absolute;

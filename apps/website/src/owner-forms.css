@@ -643,7 +643,7 @@ form.auth-card > .btn {
 .kc-tabs button:disabled,
 .owner-tabs button:disabled {
   opacity: 0.5;
-  cursor: wait;
+  cursor: not-allowed;
 }
 
 /* ── Action bar ─────────────────────────────────────────── */

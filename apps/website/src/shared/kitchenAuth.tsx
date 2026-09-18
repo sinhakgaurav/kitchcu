@@ -62,6 +62,9 @@ export function KitchenAuthProvider({ children }: { children: ReactNode }) {
       setToken(newToken);
       setTokenState(newToken);
       await refresh();
+      if (!getToken()) {
+        throw new Error("Signed in, but the kitchen profile did not load. Retry.");
+      }
     },
     [refresh],
   );

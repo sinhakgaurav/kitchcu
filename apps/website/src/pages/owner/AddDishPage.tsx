@@ -22,6 +22,8 @@ export function AddDishPage() {
   const navigate = useNavigate();
   const [categories, setCategories] = useState<Category[]>([]);
   const [cuisines, setCuisines] = useState<Cuisine[]>([]);
+  const [cuisineId, setCuisineId] = useState("");
+  const [categoryId, setCategoryId] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [heroUrl, setHeroUrl] = useState("");
@@ -42,23 +44,41 @@ export function AddDishPage() {
   const sheetRef = useRef<HTMLInputElement>(null);
   const imagesRef = useRef<HTMLInputElement>(null);
   const zipRef = useRef<HTMLInputElement>(null);
+  const metaReq = useRef(0);
 
   const loadMetadata = useCallback(() => {
     if (!kitchen) return;
+    const kid = kitchen.id;
+    const req = ++metaReq.current;
     setMetaBusy(true);
-    Promise.all([fetchCategories(kitchen.id), fetchCuisines(kitchen.id)])
-      .then(([cats, cuis]) => {
+    Promise.all([fetchCategories(kid), fetchCuisines(kid)])
+      .then(([catsRaw, cuisRaw]) => {
+        if (req !== metaReq.current) return;
+        const cats = Array.isArray(catsRaw) ? catsRaw : [];
+        const cuis = Array.isArray(cuisRaw) ? cuisRaw : [];
         setCategories(cats);
         setCuisines(cuis);
-        setError("");
+        setCuisineId((prev) => prev || cuis[0]?.id || "");
+        setCategoryId(
+          (prev) => prev || cats.find((c) => c.slug === "veg")?.id || cats[0]?.id || "",
+        );
+        setError(cats.length && cuis.length ? "" : "Categories and cuisines did not load.");
       })
       .catch((err) => {
+        if (req !== metaReq.current) return;
         setCategories([]);
         setCuisines([]);
         setError(err instanceof Error ? err.message : "Could not load categories and cuisines");
       })
-      .finally(() => setMetaBusy(false));
+      .finally(() => {
+        if (req === metaReq.current) setMetaBusy(false);
+      });
   }, [kitchen]);
+
+  useEffect(() => {
+    setCuisineId("");
+    setCategoryId("");
+  }, [kitchen?.id]);
 
   useEffect(() => {
     loadMetadata();
@@ -67,7 +87,7 @@ export function AddDishPage() {
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!kitchen) return;
-    if (!categories.length || !cuisines.length) {
+    if (!categories.length || !cuisines.length || !cuisineId || !categoryId) {
       setError("Categories and cuisines are still loading. Retry if this persists.");
       return;
     }
@@ -96,8 +116,8 @@ export function AddDishPage() {
         prep_time_min: prep,
         delivery_time_min: delivery,
         max_time_min: maxTime,
-        cuisine_id: String(fd.get("cuisine_id")),
-        category_id: String(fd.get("category_id")),
+        cuisine_id: cuisineId,
+        category_id: categoryId,
         description: descriptionHtml.trim() || undefined,
         ingredients_description: ingredientsHtml.trim() || undefined,
         calories_description: caloriesNote.trim() || undefined,
@@ -318,7 +338,8 @@ export function AddDishPage() {
         </p>
         <label>
           Cuisine
-          <select name="cuisine_id" required defaultValue={cuisines[0]?.id}>
+          <select name="cuisine_id" required value={cuisineId} onChange={(e) => setCuisineId(e.target.value)}>
+            {cuisines.length === 0 ? <option value="">Loading…</option> : null}
             {cuisines.map((c) => (
               <option key={c.id} value={c.id}>{c.name}</option>
             ))}
@@ -326,7 +347,8 @@ export function AddDishPage() {
         </label>
         <label>
           Diet (Veg / Non Veg)
-          <select name="category_id" required defaultValue={categories.find((c) => c.slug === "veg")?.id}>
+          <select name="category_id" required value={categoryId} onChange={(e) => setCategoryId(e.target.value)}>
+            {categories.length === 0 ? <option value="">Loading…</option> : null}
             {categories.map((c) => (
               <option key={c.id} value={c.id}>{c.name}</option>
             ))}
@@ -413,10 +435,14 @@ export function AddDishPage() {
         <p className="auth-card__hint">
           Menu hierarchy: cuisine → veg/non-veg → dish. Hero images must be live-capture.
         </p>
+        {!heroUrl ? (
+          <p className="auth-card__hint">Open the camera and capture a live hero photo to save this dish.</p>
+        ) : null}
         <button
           type="submit"
           className="btn btn--primary btn--lg"
-          disabled={busy || !heroUrl || !categories.length || !cuisines.length}
+          disabled={busy}
+          aria-busy={busy}
         >
           {busy ? "Saving..." : "Add to menu"}
         </button>

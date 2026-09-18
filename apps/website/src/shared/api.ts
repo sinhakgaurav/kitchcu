@@ -1,7 +1,7 @@
 /** Kitchen owner portal — isolated localStorage keys (kitchen.kitchcu.in only) */
 
 import { APP_STORAGE_PREFIX } from "./brand";
-import { apiHeaders, correlationHeaders } from "./http";
+import { apiHeaders, correlationHeaders, formatApiDetail } from "./http";
 import { normalizeEmail, normalizePersonName, normalizePhone } from "./validation";
 
 const TOKEN_KEY = `${APP_STORAGE_PREFIX}_kitchen_token`;
@@ -444,6 +444,8 @@ export type OwnerSubscription = {
 // exactly one rule set. Re-exported here because callers import them from api.ts.
 export { normalizeEmail, normalizePersonName, normalizePhone };
 
+const API_FETCH_TIMEOUT_MS = 25_000;
+
 /** Authenticated owner API fetch — used by feature modules (referrals, etc.). */
 export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
   const token = getToken();
@@ -452,10 +454,24 @@ export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> 
   });
   if (token) headers.Authorization = `Bearer ${token}`;
 
-  const res = await fetch(path, { ...init, headers });
+  const timeoutCtrl = init?.signal ? null : new AbortController();
+  const timer = timeoutCtrl
+    ? window.setTimeout(() => timeoutCtrl.abort(), API_FETCH_TIMEOUT_MS)
+    : null;
+  let res: Response;
+  try {
+    res = await fetch(path, { ...init, headers, signal: init?.signal ?? timeoutCtrl?.signal });
+  } catch (err) {
+    if (err instanceof DOMException && err.name === "AbortError") {
+      throw new Error("Request timed out — check the API and try again");
+    }
+    throw err;
+  } finally {
+    if (timer != null) window.clearTimeout(timer);
+  }
   const body = await res.json().catch(() => ({}));
   if (!res.ok) {
-    const detail = typeof body.detail === "string" ? body.detail : "Request failed";
+    const detail = formatApiDetail((body as { detail?: unknown }).detail);
     if (
       res.status === 401 &&
       (detail === "Invalid token" || detail === "Not authenticated" || detail === "Invalid token type")

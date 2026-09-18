@@ -36,6 +36,7 @@ export function LiveCapturePhotoField({
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [phase, setPhase] = useState<Phase>("idle");
+  const [opening, setOpening] = useState(false);
   const [error, setError] = useState("");
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [pendingBlob, setPendingBlob] = useState<Blob | null>(null);
@@ -64,14 +65,28 @@ export function LiveCapturePhotoField({
   const startCamera = async () => {
     setError("");
     stopCamera();
+    setOpening(true);
     try {
       if (!navigator.mediaDevices?.getUserMedia) {
         throw new Error("Camera API not available");
       }
-      const stream = await navigator.mediaDevices.getUserMedia({
+      const request = navigator.mediaDevices.getUserMedia({
         video: { facingMode: { ideal: facingMode }, width: { ideal: 1280 } },
         audio: false,
       });
+      request
+        .then((late) => {
+          if (streamRef.current !== late) {
+            late.getTracks().forEach((t) => t.stop());
+          }
+        })
+        .catch(() => {
+          /* timeout or permission error handled below */
+        });
+      const timeout = new Promise<never>((_, reject) => {
+        window.setTimeout(() => reject(new Error("Camera timed out")), 8000);
+      });
+      const stream = await Promise.race([request, timeout]);
       streamRef.current = stream;
       // Mount video first; effect above attaches the stream.
       setPhase("camera");
@@ -82,6 +97,8 @@ export function LiveCapturePhotoField({
           : "Camera access denied or unavailable. Use upload instead.",
       );
       setPhase("idle");
+    } finally {
+      setOpening(false);
     }
   };
 
@@ -234,8 +251,14 @@ export function LiveCapturePhotoField({
 
       {(phase === "idle" || (phase === "preview" && !pendingBlob)) && (
         <div className="live-capture-field__actions">
-          <button type="button" className="btn btn--primary btn--sm" onClick={() => void startCamera()}>
-            {value ? "Retake with camera" : "Open camera"}
+          <button
+            type="button"
+            className="btn btn--primary btn--sm"
+            disabled={opening}
+            aria-busy={opening}
+            onClick={() => void startCamera()}
+          >
+            {opening ? "Starting camera…" : value ? "Retake with camera" : "Open camera"}
           </button>
           {!requireLiveCapture && (
             <>

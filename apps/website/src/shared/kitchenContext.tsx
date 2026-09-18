@@ -16,6 +16,7 @@ type KitchenState = {
   setKitchenId: (id: string) => void;
   reloadKitchens: () => Promise<void>;
   loading: boolean;
+  loadError: string | null;
 };
 
 const KitchenContext = createContext<KitchenState | null>(null);
@@ -25,17 +26,23 @@ export function KitchenProvider({ children }: { children: ReactNode }) {
   const [kitchens, setKitchens] = useState<Kitchen[]>([]);
   const [kitchenId, setKitchenIdState] = useState<string | null>(() => getStoredKitchenId());
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const reloadKitchens = useCallback(async () => {
     if (!token) {
       setKitchens([]);
+      setLoadError(null);
       setLoading(false);
       return;
     }
     setLoading(true);
     try {
-      const list = [...(await fetchKitchens())].sort((a, b) => a.code.localeCompare(b.code));
+      const raw = await fetchKitchens();
+      const list = (Array.isArray(raw) ? raw : [])
+        .slice()
+        .sort((a, b) => String(a.code || "").localeCompare(String(b.code || "")));
       setKitchens(list);
+      setLoadError(null);
       const stored = getStoredKitchenId();
       const valid = list.find((k) => k.id === stored);
       if (valid) {
@@ -46,6 +53,8 @@ export function KitchenProvider({ children }: { children: ReactNode }) {
       } else {
         setKitchenIdState(null);
       }
+    } catch (err) {
+      setLoadError(err instanceof Error ? err.message : "Could not load kitchens");
     } finally {
       setLoading(false);
     }
@@ -63,8 +72,8 @@ export function KitchenProvider({ children }: { children: ReactNode }) {
   const kitchen = kitchens.find((k) => k.id === kitchenId) ?? null;
 
   const value = useMemo(
-    () => ({ kitchens, kitchen, setKitchenId, reloadKitchens, loading }),
-    [kitchens, kitchen, setKitchenId, reloadKitchens, loading],
+    () => ({ kitchens, kitchen, setKitchenId, reloadKitchens, loading, loadError }),
+    [kitchens, kitchen, setKitchenId, reloadKitchens, loading, loadError],
   );
 
   return <KitchenContext.Provider value={value}>{children}</KitchenContext.Provider>;

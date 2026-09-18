@@ -40,7 +40,7 @@ export function kitchcuPwaPlugin(appName: string, shortName: string): PluginOpti
       globPatterns: ["**/*.{js,css,html,svg,png,woff2}"],
       runtimeCaching: [
         {
-          urlPattern: ({ url }) => url.pathname.includes("/menu"),
+          urlPattern: ({ url }) => /\/api\/v1\/kitchens\/[^/]+\/menu(?:\/|$)/.test(url.pathname),
           handler: "NetworkFirst",
           options: {
             cacheName: "kitchcu-menu",
