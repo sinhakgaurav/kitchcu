@@ -65,6 +65,7 @@ def _truncate_all() -> None:
         cur.execute("TRUNCATE TABLE ckac_identity.customers CASCADE")
         cur.execute("TRUNCATE TABLE ckac_identity.owners CASCADE")
         cur.execute("TRUNCATE TABLE ckac_events.outbox")
+        cur.execute("TRUNCATE TABLE ckac_ratings.dish_ratings CASCADE")
     conn.close()
 
 

@@ -889,7 +889,13 @@
       "lede": "Track, rate, and reorder home meals from kitchens you trust.",
       "masterReceipt": "Master receipt · {{count}} kitchens",
       "itemsCount": "{{count}} items",
-      "rateMeal": "Rate meal"
+      "rateMeal": "Rate meal",
+      "homeTaste": "Home taste",
+      "quality": "Quality",
+      "saveRating": "Save rating",
+      "savingRating": "Saving…",
+      "rateHint": "Tap stars for home taste, then quality.",
+      "rateStars": "Rate {{name}}, {{score}} of 5"
     },
     "track": {
       "title": "Track order",

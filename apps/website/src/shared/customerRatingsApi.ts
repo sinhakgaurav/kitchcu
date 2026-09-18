@@ -1,6 +1,6 @@
 /** Customer ratings API (F16–F18) */
 
-import { apiHeaders } from "./http";
+import { apiHeaders, formatApiDetail } from "./http";
 import { getCustomerToken } from "./customerApi";
 
 export type DishRatingSummary = {
@@ -48,8 +48,7 @@ async function ratingsFetch<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(path, { ...init, headers });
   const body = await res.json().catch(() => ({}));
   if (!res.ok) {
-    const detail = typeof body.detail === "string" ? body.detail : "Request failed";
-    throw new Error(detail);
+    throw new Error(formatApiDetail(body.detail));
   }
   return body as T;
 }

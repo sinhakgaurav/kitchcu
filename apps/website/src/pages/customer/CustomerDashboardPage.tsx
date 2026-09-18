@@ -705,13 +705,13 @@ function OrderCard({
             Repeat
           </button>
           {row.is_rated && (
-            <Link className="btn btn--ghost btn--sm" to={`/orders/${row.order.id}/rate`}>
+            <Link className="btn btn--ghost btn--sm" to={`/orders?rate=${row.order.id}`}>
               ★ {row.rating_home_taste?.toFixed(1) ?? "—"} taste
               {row.rating_quality != null ? ` · ${row.rating_quality.toFixed(1)} quality` : ""}
             </Link>
           )}
           {row.can_rate && (
-            <Link className="btn btn--ghost btn--sm" to={`/orders/${row.order.id}/rate`}>
+            <Link className="btn btn--ghost btn--sm" to={`/orders?rate=${row.order.id}`}>
               Rate
             </Link>
           )}

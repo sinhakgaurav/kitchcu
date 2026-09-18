@@ -36,7 +36,13 @@
       "lede": "ट्रैक करें, रेट करें, और भरोसेमंद किचन से दोबारा ऑर्डर करें।",
       "masterReceipt": "मास्टर रसीद · {{count}} किचन",
       "itemsCount": "{{count}} आइटम",
-      "rateMeal": "भोजन रेट करें"
+      "rateMeal": "भोजन रेट करें",
+      "homeTaste": "घर जैसा स्वाद",
+      "quality": "क्वालिटी",
+      "saveRating": "रेटिंग सेव करें",
+      "savingRating": "सेव हो रहा है…",
+      "rateHint": "घर जैसा स्वाद के लिए स्टार टैप करें, फिर क्वालिटी।",
+      "rateStars": "{{name}} को {{score}} में से रेट करें"
     },
     "dashboard": {
       "spaceEyebrow": "आपकी किचन स्पेस",

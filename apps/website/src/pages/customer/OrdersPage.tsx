@@ -1,11 +1,13 @@
-import { Link, Navigate, useNavigate } from "react-router-dom";
+import { Link, Navigate, useNavigate, useSearchParams } from "react-router-dom";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { OrderDishRatings } from "../../components/OrderDishRatings";
 import type { DishHealthSnapshot, Order } from "../../shared/api";
 import { getCustomerToken } from "../../shared/customerApi";
 import { useCustomerAuth } from "../../shared/customerAuth";
 import { addItemsToCart, kitchenFromOrderCode } from "../../shared/customerCart";
 import { fetchMyOrders } from "../../shared/customerCheckoutApi";
+import type { HealthNudge } from "../../shared/customerRatingsApi";
 import { fetchDishesHealth } from "../../shared/publicApi";
 import { customerStatusTone, humanStatus } from "../../shared/customerUi";
 
@@ -26,11 +28,14 @@ export function OrdersPage() {
   const { loading } = useCustomerAuth();
   const token = getCustomerToken();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const focusOrderId = searchParams.get("rate");
   const [orders, setOrders] = useState<Order[]>([]);
   const [dishHealth, setDishHealth] = useState<Record<string, DishHealthSnapshot>>({});
   const [fetching, setFetching] = useState(true);
   const [error, setError] = useState("");
   const [repeatingId, setRepeatingId] = useState<string | null>(null);
+  const [nudges, setNudges] = useState<Record<string, HealthNudge>>({});
 
   const load = useCallback(async () => {
     setFetching(true);
@@ -49,6 +54,12 @@ export function OrdersPage() {
   useEffect(() => {
     if (token) load();
   }, [token, load]);
+
+  useEffect(() => {
+    if (!focusOrderId || fetching) return;
+    const el = document.getElementById(`order-${focusOrderId}`);
+    el?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [focusOrderId, fetching, orders.length]);
 
   useEffect(() => {
     const ids = orders.flatMap((order) => order.items.map((item) => item.dish_id));
@@ -174,7 +185,11 @@ export function OrdersPage() {
                 </div>
               )}
               {group.orders.map((order) => (
-                <article key={order.id} className="glass customer-dash__order">
+                <article
+                  key={order.id}
+                  id={`order-${order.id}`}
+                  className={`glass customer-dash__order${focusOrderId === order.id ? " customer-dash__order--focus" : ""}`}
+                >
                   <div className="customer-dash__order-head">
                     <div>
                       <div className="customer-dash__order-title">
@@ -188,19 +203,6 @@ export function OrdersPage() {
                         {t("customer.orders.itemsCount", { count: order.items.length })} · ₹
                         {order.total.toFixed(0)}
                       </span>
-                      <ul className="customer-dash__order-items">
-                        {order.items.slice(0, 4).map((item) => (
-                          <li key={item.id}>
-                            {item.quantity}× {item.dish_name}
-                            {dishHealth[item.dish_id]?.score != null
-                              ? ` · health ${dishHealth[item.dish_id].score}`
-                              : ""}
-                          </li>
-                        ))}
-                        {order.items.length > 4 && (
-                          <li>+{order.items.length - 4} more</li>
-                        )}
-                      </ul>
                     </div>
                     <div className="customer-dash__order-actions">
                       {order.tracking_token && (
@@ -216,18 +218,75 @@ export function OrdersPage() {
                       >
                         {repeatingId === order.id ? t("common.loading") : t("customer.orders.repeat")}
                       </button>
-                      {order.status === "delivered" && order.is_rated && (
-                        <Link to={`/orders/${order.id}/rate`} className="btn btn--ghost btn--sm">
-                          ★ {order.rating_home_taste?.toFixed(1) ?? "—"}
-                        </Link>
-                      )}
-                      {order.status === "delivered" && !order.is_rated && (
-                        <Link to={`/orders/${order.id}/rate`} className="btn btn--ghost btn--sm">
-                          {t("customer.orders.rateMeal")}
-                        </Link>
-                      )}
                     </div>
                   </div>
+                  <ul className="customer-dash__order-items">
+                    {(order.status === "delivered" ? order.items : order.items.slice(0, 4)).map((item) => (
+                      <li key={item.id} className="customer-dash__order-item">
+                        <div>
+                          {item.quantity}× {item.dish_name}
+                          {dishHealth[item.dish_id]?.score != null
+                            ? ` · health ${dishHealth[item.dish_id].score}`
+                            : ""}
+                        </div>
+                        {order.status === "delivered" && (
+                          <OrderDishRatings
+                            orderId={order.id}
+                            item={item}
+                            canRate
+                            onError={setError}
+                            onRated={({ dishId, home_taste, quality, health_nudge }) => {
+                              setError("");
+                              setNudges((prev) => ({ ...prev, [order.id]: health_nudge }));
+                              setOrders((prev) =>
+                                prev.map((row) => {
+                                  if (row.id !== order.id) return row;
+                                  const items = row.items.map((line) =>
+                                    line.dish_id === dishId
+                                      ? {
+                                          ...line,
+                                          rating_home_taste: home_taste,
+                                          rating_quality: quality,
+                                        }
+                                      : line,
+                                  );
+                                  const scored = items.filter((line) => line.rating_home_taste != null);
+                                  const avgTaste =
+                                    scored.length > 0
+                                      ? scored.reduce((sum, line) => sum + (line.rating_home_taste ?? 0), 0) /
+                                        scored.length
+                                      : null;
+                                  const avgQuality =
+                                    scored.length > 0
+                                      ? scored.reduce((sum, line) => sum + (line.rating_quality ?? 0), 0) /
+                                        scored.length
+                                      : null;
+                                  return {
+                                    ...row,
+                                    items,
+                                    is_rated: scored.length > 0,
+                                    rating_home_taste: avgTaste,
+                                    rating_quality: avgQuality,
+                                  };
+                                }),
+                              );
+                            }}
+                          />
+                        )}
+                      </li>
+                    ))}
+                    {order.status !== "delivered" && order.items.length > 4 && (
+                      <li>+{order.items.length - 4} more</li>
+                    )}
+                  </ul>
+                  {nudges[order.id] && (
+                    <p className="customer-wellness-nudge" role="status">
+                      {nudges[order.id].message}{" "}
+                      <span className="customer-wellness-nudge__meta">
+                        (~{nudges[order.id].walk_minutes} min walk · ~{nudges[order.id].water_ml} ml water)
+                      </span>
+                    </p>
+                  )}
                 </article>
               ))}
             </li>

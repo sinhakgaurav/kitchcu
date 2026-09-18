@@ -347,3 +347,115 @@ async def test_customer_order_repeat(client: AsyncClient, order_ctx):
         headers={"Authorization": f"Bearer {token}"},
     )
     assert listing.json()["total"] == 2
+
+
+def _seed_second_dish(kitchen_id: uuid.UUID) -> uuid.UUID:
+    dish_id = uuid.uuid4()
+    conn = psycopg2.connect(SYNC_DB_URL)
+    conn.autocommit = True
+    with conn.cursor() as cur:
+        cur.execute(
+            "SELECT id FROM ckac_catalog.categories WHERE kitchen_id = %s::uuid LIMIT 1",
+            (str(kitchen_id),),
+        )
+        category_id = cur.fetchone()[0]
+        cur.execute(
+            """
+            INSERT INTO ckac_catalog.dishes
+            (id, kitchen_id, category_id, name, price, prep_time_min, delivery_time_min, max_time_min, is_active)
+            VALUES (%s::uuid, %s::uuid, %s::uuid, 'Jeera Rice', 80.00, 10, 15, 30, true)
+            """,
+            (str(dish_id), str(kitchen_id), str(category_id)),
+        )
+    conn.close()
+    return dish_id
+
+
+def _insert_dish_rating(
+    *,
+    kitchen_id: uuid.UUID,
+    order_id: str,
+    dish_id: uuid.UUID,
+    customer_id: uuid.UUID,
+    home_taste: int,
+    quality: int,
+) -> None:
+    conn = psycopg2.connect(SYNC_DB_URL)
+    conn.autocommit = True
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            INSERT INTO ckac_ratings.dish_ratings
+            (id, kitchen_id, dish_id, order_id, customer_id, home_taste_score, quality_score, is_anonymous, is_verified_purchase)
+            VALUES (%s::uuid, %s::uuid, %s::uuid, %s::uuid, %s::uuid, %s, %s, true, true)
+            """,
+            (
+                str(uuid.uuid4()),
+                str(kitchen_id),
+                str(dish_id),
+                order_id,
+                str(customer_id),
+                home_taste,
+                quality,
+            ),
+        )
+    conn.close()
+
+
+@pytest.mark.asyncio
+async def test_customer_order_list_attaches_per_dish_ratings(client: AsyncClient, order_ctx):
+    _, kitchen_id, dish_id, _, owner_token = order_ctx
+    rice_id = _seed_second_dish(kitchen_id)
+    customer_id = _seed_customer(phone="+919955566677")
+    token = _make_customer_token(customer_id)
+    payload = CUSTOMER_ORDER_PAYLOAD.copy()
+    payload["items"] = [
+        {"dish_id": str(dish_id), "quantity": 1},
+        {"dish_id": str(rice_id), "quantity": 1},
+    ]
+    create = await client.post(
+        f"/api/v1/kitchens/{kitchen_id}/orders/customer",
+        json=payload,
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert create.status_code == 201, create.text
+    order_id = create.json()["id"]
+    headers = {"Authorization": f"Bearer {owner_token}"}
+    for status in ("accepted", "preparing", "ready", "delivered"):
+        walked = await client.patch(
+            f"/api/v1/orders/{order_id}/status",
+            json={"status": status},
+            headers=headers,
+        )
+        assert walked.status_code == 200, walked.text
+
+    _insert_dish_rating(
+        kitchen_id=kitchen_id,
+        order_id=order_id,
+        dish_id=dish_id,
+        customer_id=customer_id,
+        home_taste=5,
+        quality=4,
+    )
+
+    listing = await client.get(
+        "/api/v1/customers/me/orders",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert listing.status_code == 200
+    order = listing.json()["orders"][0]
+    by_dish = {item["dish_id"]: item for item in order["items"]}
+    assert by_dish[str(dish_id)]["rating_home_taste"] == 5
+    assert by_dish[str(dish_id)]["rating_quality"] == 4
+    assert by_dish[str(rice_id)]["rating_home_taste"] is None
+    assert by_dish[str(rice_id)]["rating_quality"] is None
+    assert order["is_rated"] is True
+
+    single = await client.get(
+        f"/api/v1/customers/me/orders/{order_id}",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert single.status_code == 200
+    assert single.json()["items"][0]["dish_id"] in {str(dish_id), str(rice_id)}
+    rated = next(item for item in single.json()["items"] if item["dish_id"] == str(dish_id))
+    assert rated["rating_home_taste"] == 5

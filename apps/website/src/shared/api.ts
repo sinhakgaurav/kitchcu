@@ -227,6 +227,8 @@ export type OrderItem = {
   unit_price: number;
   special_instructions: string | null;
   prep_time_min: number;
+  rating_home_taste?: number | null;
+  rating_quality?: number | null;
 };
 
 export type Order = {

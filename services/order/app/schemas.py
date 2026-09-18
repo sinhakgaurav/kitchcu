@@ -23,6 +23,7 @@ computed server-side from live catalog prices and kitchen delivery-radius rules
 
 import secrets
 import uuid
+from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from typing import Literal
 
@@ -269,8 +270,38 @@ class OrderItemResponse(BaseModel):
     unit_price: float = Field(..., description="Price per unit snapshotted at order time, in INR.", examples=[220.0])
     special_instructions: str | None = Field(default=None, description="Prep note supplied at order time.")
     prep_time_min: int = Field(..., description="Dish prep time in minutes, used to compute the order's `estimated_ready_at`.")
+    rating_home_taste: int | None = Field(
+        default=None,
+        description="Customer's home-taste score (1-5) for this dish on this order, if already rated.",
+    )
+    rating_quality: int | None = Field(
+        default=None,
+        description="Customer's quality score (1-5) for this dish on this order, if already rated.",
+    )
 
     model_config = {"from_attributes": True}
+
+
+def apply_item_ratings(
+    items: list[OrderItemResponse],
+    by_dish: dict[uuid.UUID, tuple[int, int]],
+) -> list[OrderItemResponse]:
+    """Copy per-dish scores onto line items. Missing dishes stay null (not yet rated)."""
+    out: list[OrderItemResponse] = []
+    for item in items:
+        scores = by_dish.get(item.dish_id)
+        if not scores:
+            out.append(item)
+            continue
+        out.append(
+            item.model_copy(
+                update={
+                    "rating_home_taste": scores[0],
+                    "rating_quality": scores[1],
+                }
+            )
+        )
+    return out
 
 
 class StatusEventResponse(BaseModel):
@@ -1225,53 +1256,68 @@ async def list_customer_orders(
     return list(result.scalars().all())
 
 
+@dataclass(frozen=True)
+class OrderRatingStats:
+    count: int
+    avg_home_taste: float
+    avg_quality: float
+    by_dish: dict[uuid.UUID, tuple[int, int]]
+
+
 async def load_order_rating_stats(
     session: AsyncSession,
     order_ids: list[uuid.UUID],
-) -> dict[uuid.UUID, tuple[int, float, float]]:
-    """Cross-schema read of the customer's existing dish ratings, keyed by order."""
+) -> dict[uuid.UUID, OrderRatingStats]:
+    """One cross-schema read of dish ratings for a page of orders — no per-order N+1."""
     if not order_ids:
         return {}
     result = await session.execute(
         text(
             """
-            SELECT order_id,
-                   count(*)::int AS rating_count,
-                   avg(home_taste_score)::float AS avg_home_taste,
-                   avg(quality_score)::float AS avg_quality
+            SELECT order_id, dish_id, home_taste_score, quality_score
             FROM ckac_ratings.dish_ratings
             WHERE order_id IN :ids
-            GROUP BY order_id
             """
         ).bindparams(bindparam("ids", expanding=True)),
         {"ids": list(order_ids)},
     )
-    stats: dict[uuid.UUID, tuple[int, float, float]] = {}
+    buckets: dict[uuid.UUID, list[tuple[uuid.UUID, int, int]]] = {}
     for row in result.mappings():
         oid = row["order_id"]
         if not isinstance(oid, uuid.UUID):
             oid = uuid.UUID(str(oid))
-        stats[oid] = (
-            int(row["rating_count"]),
-            round(float(row["avg_home_taste"]), 2),
-            round(float(row["avg_quality"]), 2),
+        did = row["dish_id"]
+        if not isinstance(did, uuid.UUID):
+            did = uuid.UUID(str(did))
+        buckets.setdefault(oid, []).append(
+            (did, int(row["home_taste_score"]), int(row["quality_score"]))
+        )
+    stats: dict[uuid.UUID, OrderRatingStats] = {}
+    for oid, rows in buckets.items():
+        tastes = [r[1] for r in rows]
+        qualities = [r[2] for r in rows]
+        stats[oid] = OrderRatingStats(
+            count=len(rows),
+            avg_home_taste=round(sum(tastes) / len(tastes), 2),
+            avg_quality=round(sum(qualities) / len(qualities), 2),
+            by_dish={dish_id: (taste, quality) for dish_id, taste, quality in rows},
         )
     return stats
 
 
 def attach_rating_stats(
     resp: OrderResponse,
-    stats: dict[uuid.UUID, tuple[int, float, float]],
+    stats: dict[uuid.UUID, OrderRatingStats],
 ) -> OrderResponse:
     row = stats.get(resp.id)
     if not row:
         return resp
-    count, home, quality = row
     return resp.model_copy(
         update={
-            "is_rated": count > 0,
-            "rating_home_taste": home,
-            "rating_quality": quality,
+            "is_rated": row.count > 0,
+            "rating_home_taste": row.avg_home_taste,
+            "rating_quality": row.avg_quality,
+            "items": apply_item_ratings(resp.items, row.by_dish),
         }
     )
 

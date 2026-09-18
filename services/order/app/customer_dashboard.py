@@ -10,7 +10,13 @@ from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import OrderItem
-from app.schemas import OrderResponse, list_customer_orders, load_order_rating_stats, order_to_response
+from app.schemas import (
+    OrderResponse,
+    attach_rating_stats,
+    list_customer_orders,
+    load_order_rating_stats,
+    order_to_response,
+)
 
 
 class EnrichedOrderItem(BaseModel):
@@ -239,17 +245,18 @@ async def build_customer_dashboard(
         if live_media_only and not has_live:
             continue
 
-        order_resp = await order_to_response(session, order)
+        order_resp = attach_rating_stats(await order_to_response(session, order), rating_stats)
         rated_row = rating_stats.get(order.id)
         rated = rated_row is not None
+        pending_dishes = any(item.rating_home_taste is None for item in order_resp.items)
         dash_orders.append(
             DashboardOrder(
                 order=order_resp,
                 items=enriched_items,
-                can_rate=order.status == "delivered" and not rated,
+                can_rate=order.status == "delivered" and pending_dishes,
                 is_rated=rated,
-                rating_home_taste=rated_row[1] if rated_row else None,
-                rating_quality=rated_row[2] if rated_row else None,
+                rating_home_taste=rated_row.avg_home_taste if rated_row else None,
+                rating_quality=rated_row.avg_quality if rated_row else None,
                 tracking_token=order.tracking_token,
                 has_live_media=has_live,
                 diets=sorted(order_diets),
