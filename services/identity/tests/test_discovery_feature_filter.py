@@ -10,7 +10,7 @@ import pytest
 from httpx import AsyncClient
 
 from tests.conftest import SYNC_DB_URL
-from tests.test_kitchens import KITCHEN_PAYLOAD
+from tests.test_kitchens import KITCHEN_PAYLOAD, _seed_catalog_for_kitchen
 
 
 def _assign_package_without_feature(kitchen_id: uuid.UUID, missing: str) -> None:
@@ -60,6 +60,8 @@ async def test_nearby_excludes_hard_mode_kitchen_without_discovery(
     assert allowed.status_code == 201, allowed.text
     blocked_id = blocked.json()["id"]
     allowed_id = allowed.json()["id"]
+    _seed_catalog_for_kitchen(uuid.UUID(blocked_id))
+    _seed_catalog_for_kitchen(uuid.UUID(allowed_id))
     _assign_package_without_feature(uuid.UUID(blocked_id), "discovery")
 
     resp = await client.get(

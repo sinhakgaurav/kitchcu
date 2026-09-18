@@ -151,7 +151,7 @@ export function ReferralsPage() {
       {error && <div className="auth-card__error">{error}</div>}
 
       {dash && (
-        <OwnerPanel title="Subscription credit">
+        <OwnerPanel title={t("owner.panels.subCredit")}>
           <div className="owner-stat-grid">
             <div>
               <strong>{inr(dash.credit.balance_inr)}</strong>
@@ -178,7 +178,7 @@ export function ReferralsPage() {
         </OwnerPanel>
       )}
 
-      <OwnerPanel title="Add referrals">
+      <OwnerPanel title={t("owner.panels.addReferrals")}>
         <div className="owner-form-actions" style={{ marginBottom: "1rem" }}>
           <button type="button" className="btn btn--ghost btn--sm" onClick={downloadTemplate}>
             Download Excel template (CSV)
@@ -253,7 +253,7 @@ export function ReferralsPage() {
       </OwnerPanel>
 
       {dash && dash.leads.length > 0 && (
-        <OwnerPanel title="Your referral leads">
+        <OwnerPanel title={t("owner.panels.referralLeads")}>
           <div className="owner-table-wrap">
             <table className="owner-table">
               <thead>

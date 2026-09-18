@@ -7,12 +7,14 @@ import {
   type CrmCustomer,
 } from "../../lib/api";
 import { useKitchen } from "../../lib/kitchen";
+import { useTranslation } from "react-i18next";
 
 const inr = (n: number) => `₹${Math.round(n).toLocaleString("en-IN")}`;
 
 type CrmSort = "spend_desc" | "spend_asc" | "orders_desc" | "name_asc" | "name_desc";
 
 export function CrmPage() {
+  const { t } = useTranslation();
   const { kitchen } = useKitchen();
   const [customers, setCustomers] = useState<CrmCustomer[]>([]);
   const [syncedAt, setSyncedAt] = useState<string | null>(null);
@@ -95,9 +97,9 @@ export function CrmPage() {
 
   return (
     <OwnerPageShell
-      eyebrow="Growth"
-      title="Customer CRM"
-      description="Spend, favorites & order patterns — synced from your orders"
+      eyebrow={t("owner.nav.growth")}
+      title={t("owner.pages.crm")}
+      description={t("owner.pageDesc.crm")}
       meta={
         syncedAt ? (
           <p className="owner-page__meta">
@@ -123,13 +125,13 @@ export function CrmPage() {
         <OwnerEmpty message="No customers yet — orders with phone numbers appear here." />
       ) : (
         <OwnerPanel
-          title="Your customers"
+          title={t("owner.panels.yourCustomers")}
           description={`${customers.length} contact${customers.length !== 1 ? "s" : ""} with order history`}
         >
           <ListingToolbar
             search={search}
             onSearchChange={setSearch}
-            searchPlaceholder="Search name, phone, tags, dishes…"
+            searchPlaceholder={t("owner.list.searchCustomers")}
             sort={sort}
             onSortChange={(v) => setSort(v as CrmSort)}
             sortOptions={[

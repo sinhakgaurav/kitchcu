@@ -223,6 +223,10 @@ async def build_discovery_home(
                 ) AS min_dish_price
             FROM ckac_identity.kitchens k
             WHERE k.status = 'active'
+              AND EXISTS (
+                    SELECT 1 FROM ckac_catalog.dishes d
+                    WHERE d.kitchen_id = k.id AND d.is_active = true
+              )
               AND ST_DWithin(
                     k.location,
                     ST_SetSRID(ST_MakePoint(:lng, :lat), 4326)::geography,

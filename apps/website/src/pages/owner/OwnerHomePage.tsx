@@ -24,6 +24,8 @@ import {
 } from "../../lib/api";
 import { customerUrl } from "../../shared/urls";
 import { ProductTour, TourReplayButton } from "../../components/ProductTour";
+import { tourI18n } from "../../components/DashboardHowTo";
+import { OWNER_TOUR_STEP_COUNT } from "../../data/dashboardGuides";
 
 const inr = (n: number) => `₹${Math.round(n).toLocaleString("en-IN")}`;
 const pct = (n: number) => `${(n * 100).toFixed(0)}%`;
@@ -148,31 +150,31 @@ export function OwnerHomePage() {
     {
       id: "dishes",
       done: dishCount >= 3,
-      label: dishCount >= 3 ? `${dishCount} dishes on menu` : "Add 3 dishes with real photos",
+      label: dishCount >= 3 ? t("owner.home.day1DishesDone", { count: dishCount }) : t("owner.home.day1AddDishes"),
       to: "/dashboard/menu/new",
     },
     {
       id: "order",
       done: hasOrder,
-      label: hasOrder ? "First order is in" : "Create your first manual order",
+      label: hasOrder ? t("owner.home.day1OrderDone") : t("owner.home.day1FirstOrder"),
       to: "/dashboard/orders/new",
     },
     {
       id: "accept",
       done: hasAccepted,
-      label: hasAccepted ? "You accepted an order" : "Accept a received order in the inbox",
+      label: hasAccepted ? t("owner.home.day1AcceptDone") : t("owner.home.day1Accept"),
       to: "/dashboard/orders",
     },
     {
       id: "brand",
       done: brandedEnabled,
-      label: brandedEnabled ? "Your customer page is live" : "Publish your customer page",
+      label: brandedEnabled ? t("owner.home.day1PublishDone") : t("owner.home.day1Publish"),
       to: "/dashboard/brand",
     },
     {
       id: "reports",
       done: hasRevenue,
-      label: hasRevenue ? "Same-day revenue is on Reports" : "Check today's revenue on Reports",
+      label: hasRevenue ? t("owner.home.day1ReportsDone") : t("owner.home.day1Reports"),
       to: "/dashboard/reports",
     },
   ];
@@ -205,16 +207,11 @@ export function OwnerHomePage() {
         backLabel={t("owner.tour.back")}
         doneLabel={t("owner.tour.done")}
         stepLabel={(current, total) => t("owner.tour.step", { current, total })}
-        steps={[
-          { title: t("owner.tour.s1Title"), body: t("owner.tour.s1Body") },
-          { title: t("owner.tour.s2Title"), body: t("owner.tour.s2Body") },
-          { title: t("owner.tour.s3Title"), body: t("owner.tour.s3Body") },
-          { title: t("owner.tour.s4Title"), body: t("owner.tour.s4Body") },
-        ]}
+        steps={tourI18n(t, "owner.tour", OWNER_TOUR_STEP_COUNT)}
       />
       <section className="od-board__hero dash-card">
         <div className="od-board__hero-text">
-          <p className="od-board__eyebrow">{greeting()}, {owner?.name?.split(" ")[0] ?? "chef"}</p>
+          <p className="od-board__eyebrow">{greeting()}, {owner?.name?.split(" ")[0] ?? t("owner.home.chef")}</p>
           <h1>{kitchen.name}</h1>
           <p className="od-board__meta">
             <span className="od-board__code">{kitchen.code}</span>
@@ -222,8 +219,8 @@ export function OwnerHomePage() {
           </p>
           <div className="od-board__pills">
             <span className={`od-pill od-pill--sub od-pill--${subStatus}`}>
-              {subTier === "trial" ? "Trial plan" : `${subTier} plan`}
-              {subStatus === "active" || subStatus === "trial" ? "" : ` · ${subStatus}`}
+              {subTier === "trial" ? t("owner.home.trialPlan") : t("owner.home.namedPlan", { tier: subTier })}
+              {subStatus === "active" || subStatus === "trial" ? "" : ` · ${t(`status.${subStatus}`, { defaultValue: subStatus })}`}
             </span>
             {stream?.is_live && (
               <span className="od-pill od-pill--live">{t("owner.home.liveNow")}</span>
@@ -235,7 +232,7 @@ export function OwnerHomePage() {
             )}
             {activeOrders.length > 0 && (
               <Link to="/dashboard/orders" className="od-pill od-pill--live">
-                {activeOrders.length} in progress
+                {t("owner.home.inProgress", { count: activeOrders.length })}
               </Link>
             )}
           </div>
@@ -245,7 +242,7 @@ export function OwnerHomePage() {
           {activeOrders.length > 0 ? (
             <>
               <Link to="/dashboard/orders" className="btn btn--primary">
-                Open orders
+                {t("owner.home.openOrders")}
               </Link>
               <Link to="/dashboard/orders/new" className="btn btn--ghost">
                 {t("owner.home.quickNewOrder")}
@@ -265,19 +262,42 @@ export function OwnerHomePage() {
       </section>
 
       {showDay1 && (
-        <section className="dash-card owner-day1">
-          <h2>Get ready to take orders</h2>
-          <p className="owner-muted">
-            {day1Done}/{day1Steps.length} steps — menu, first order, accept, publish, then check revenue.
-          </p>
+        <section className="dash-card owner-day1" aria-labelledby="owner-day1-title">
+          <header className="owner-day1__head">
+            <div>
+              <h2 id="owner-day1-title">{t("owner.home.day1Title")}</h2>
+              <p className="owner-muted">
+                {t("owner.home.day1Desc")}
+              </p>
+            </div>
+            <span className="owner-day1__count">
+              {t("owner.home.day1Count", { done: day1Done, total: day1Steps.length })}
+            </span>
+          </header>
+          <div
+            className="owner-day1__track"
+            role="progressbar"
+            aria-valuemin={0}
+            aria-valuemax={day1Steps.length}
+            aria-valuenow={day1Done}
+            aria-label={t("owner.home.day1Aria", { done: day1Done, total: day1Steps.length })}
+          >
+            <span style={{ width: `${(day1Done / day1Steps.length) * 100}%` }} />
+          </div>
           <ul className="owner-day1__list">
             {day1Steps.map((step) => (
               <li key={step.id} className={step.done ? "owner-day1__done" : undefined}>
-                <span>{step.done ? "✓" : "○"}</span>
                 {step.done ? (
-                  <span>{step.label}</span>
+                  <>
+                    <span className="owner-day1__mark" aria-hidden="true">✓</span>
+                    <span>{step.label}</span>
+                  </>
                 ) : (
-                  <Link to={step.to}>{step.label}</Link>
+                  <Link to={step.to} className="owner-day1__step">
+                    <span className="owner-day1__mark" aria-hidden="true">○</span>
+                    <span>{step.label}</span>
+                    <span className="owner-day1__go" aria-hidden="true">→</span>
+                  </Link>
                 )}
               </li>
             ))}
@@ -482,20 +502,20 @@ export function OwnerHomePage() {
                 <p>{t("owner.home.noOrders")}</p>
                 <div className="od-board__hero-actions" style={{ marginTop: "0.75rem" }}>
                   <Link to="/dashboard/orders/new" className="btn btn--primary btn--sm">
-                    New order
+                    {t("owner.home.quickNewOrder")}
                   </Link>
                   <Link to="/dashboard/menu/new" className="btn btn--ghost btn--sm">
-                    Add a dish
+                    {t("owner.home.addDish")}
                   </Link>
                 </div>
               </div>
             ) : (
               <>
                 <div className="od-recent__head" aria-hidden="true">
-                  <span>Order</span>
-                  <span>Customer</span>
-                  <span>Status</span>
-                  <span>Total</span>
+                  <span>{t("owner.home.colOrder")}</span>
+                  <span>{t("owner.home.colCustomer")}</span>
+                  <span>{t("owner.home.colStatus")}</span>
+                  <span>{t("owner.home.colTotal")}</span>
                 </div>
                 <ul className="od-recent">
                   {recentOrders.map((o) => (

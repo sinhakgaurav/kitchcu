@@ -2,8 +2,6 @@ import { useCallback, useEffect, useMemo, useState, type CSSProperties, type Ref
 import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { ListingToolbar } from "./ListingToolbar";
-import { DeliveryAddressPicker } from "./DeliveryAddressPicker";
-import { ReportFoodFilter } from "./ReportFoodFilter";
 import { kitchenCardImage } from "../data/content";
 import type { KitchenNearby, LiveKitchenSummary } from "../shared/api";
 import { fetchLiveKitchens } from "../shared/api";
@@ -27,12 +25,20 @@ type SortOrder = "asc" | "desc";
 type DietFilter = "" | "veg" | "non_veg" | "vegan";
 type ListSort = "distance_asc" | "distance_desc" | "name_asc" | "name_desc";
 
-export function NearbyKitchensList() {
+export function NearbyKitchensList({
+  query,
+  maxKm,
+  onClearSearch,
+}: {
+  query: string;
+  maxKm: number;
+  onClearSearch?: () => void;
+}) {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const { updateSession } = useCustomerAuth();
   const { ref, visible } = useInView(0.06);
-  const { coords, selectedAddress, geoStatus, geoError, loading: deliveryLoading, useGps, useDemo } = useCustomerDelivery();
+  const { coords, selectedAddress, geoError, loading: deliveryLoading, useDemo } = useCustomerDelivery();
   const [kitchens, setKitchens] = useState<KitchenNearby[]>([]);
   const [nearest, setNearest] = useState<KitchenNearby[]>([]);
   const [liveByKitchen, setLiveByKitchen] = useState<Record<string, LiveKitchenSummary>>({});
@@ -40,9 +46,6 @@ export function NearbyKitchensList() {
   const [fetchError, setFetchError] = useState("");
   const [sort, setSort] = useState<SortOrder>("asc");
   const [listSort, setListSort] = useState<ListSort>("distance_asc");
-  const [search, setSearch] = useState("");
-  const [activeSearch, setActiveSearch] = useState("");
-  const [maxKm, setMaxKm] = useState(25);
   const [diet, setDiet] = useState<DietFilter>("");
   const [liveCaptureOnly, setLiveCaptureOnly] = useState(false);
   const [liveOnly, setLiveOnly] = useState(false);
@@ -83,7 +86,7 @@ export function NearbyKitchensList() {
           diet: diet || undefined,
           live_capture: liveCaptureOnly || undefined,
           live_only: liveOnly || undefined,
-          q: activeSearch || undefined,
+          q: query || undefined,
         }),
         fetchLiveKitchens().catch(() => ({ kitchens: [] as LiveKitchenSummary[], total: 0 })),
       ]);
@@ -102,7 +105,7 @@ export function NearbyKitchensList() {
     } finally {
       setLoading(false);
     }
-  }, [coords.latitude, coords.longitude, maxKm, sort, diet, liveCaptureOnly, liveOnly, activeSearch]);
+  }, [coords.latitude, coords.longitude, maxKm, sort, diet, liveCaptureOnly, liveOnly, query]);
 
   useEffect(() => {
     if (deliveryLoading) return;
@@ -122,14 +125,6 @@ export function NearbyKitchensList() {
     return () => window.removeEventListener(DIET_FILTER_CHANGED, onChange);
   }, [diet, load]);
 
-  // Search hits the API so dish and cuisine names match, not just kitchen names.
-  useEffect(() => {
-    const trimmed = search.trim();
-    if (trimmed === activeSearch) return;
-    const timer = window.setTimeout(() => setActiveSearch(trimmed), 350);
-    return () => window.clearTimeout(timer);
-  }, [search, activeSearch]);
-
   const openKitchen = (kitchen: KitchenNearby) => {
     const next = saveKitchenToSession(kitchen);
     updateSession(next);
@@ -138,7 +133,6 @@ export function NearbyKitchensList() {
 
   const useDemoLocation = () => {
     useDemo();
-    setMaxKm((km) => (km < 50 ? 50 : km));
   };
 
   const placeLabel = selectedAddress
@@ -169,41 +163,23 @@ export function NearbyKitchensList() {
 
   return (
     <section
-      className="nearby-kitchens"
-      id="nearby"
+      className="nearby-kitchens nearby-kitchens--on-home"
+      id="near-you"
       ref={ref as RefObject<HTMLElement>}
     >
-      <div className="container">
         <div className={`nearby-kitchens__head reveal ${visible ? "reveal--visible" : ""}`}>
           <div>
             <span className="section__eyebrow">Near you</span>
-            <h2>{placeLabel ? `Cloud kitchens near ${placeLabel}` : "Cloud kitchens nearby"}</h2>
+            <h2>{placeLabel ? `Kitchens near ${placeLabel}` : "Kitchens nearby"}</h2>
             <p>
-              {mapsEnabled ? "Google Map" : "Map"} + list sorted by distance. Filter by diet,
-              checkup report food, live-capture menu photos, or kitchens streaming now.
-              {geoError && <span className="nearby-kitchens__geo-hint"> {geoError}</span>}
+              Map and list of kitchens in this radius{query ? ` matching “${query}”` : ""}.
+              {geoError ? <span className="nearby-kitchens__geo-hint"> {geoError}</span> : null}
             </p>
             {dietFilterApplied ? (
               <p className="nearby-kitchens__geo-hint">{t("customer.discovery.dietFilterOn")}</p>
             ) : null}
           </div>
           <div className="nearby-kitchens__controls">
-            <DeliveryAddressPicker variant="bar" />
-            <label>
-              Radius (km)
-              <select value={maxKm} onChange={(e) => setMaxKm(Number(e.target.value))}>
-                {[10, 25, 50, 100].map((km) => (
-                  <option key={km} value={km}>{km} km</option>
-                ))}
-              </select>
-            </label>
-            <label>
-              Sort
-              <select value={sort} onChange={(e) => setSort(e.target.value as SortOrder)}>
-                <option value="asc">Distance ↑ nearest</option>
-                <option value="desc">Distance ↓ farthest</option>
-              </select>
-            </label>
             <label>
               Diet
               <select value={diet} onChange={(e) => setDiet(e.target.value as DietFilter)}>
@@ -213,14 +189,13 @@ export function NearbyKitchensList() {
                 <option value="vegan">Vegan</option>
               </select>
             </label>
-            <ReportFoodFilter diet={diet} onDietChange={(next) => setDiet(next as DietFilter)} />
             <label className="nearby-kitchens__checkbox">
               <input
                 type="checkbox"
                 checked={liveOnly}
                 onChange={(e) => setLiveOnly(e.target.checked)}
               />
-              Live prep streaming only
+              Live now
             </label>
             <label className="nearby-kitchens__checkbox">
               <input
@@ -228,14 +203,8 @@ export function NearbyKitchensList() {
                 checked={liveCaptureOnly}
                 onChange={(e) => setLiveCaptureOnly(e.target.checked)}
               />
-              Live-capture photos only
+              Live photos
             </label>
-            <button type="button" className="btn btn--ghost btn--sm" onClick={() => void useGps()} disabled={geoStatus === "loading"}>
-              {geoStatus === "loading" ? "Locating…" : "Use my location"}
-            </button>
-            <button type="button" className="btn btn--primary btn--sm" onClick={useDemoLocation}>
-              Demo: Pune kitchens
-            </button>
           </div>
         </div>
 
@@ -270,9 +239,6 @@ export function NearbyKitchensList() {
         {fetchError && <div className="auth-card__error">{fetchError}</div>}
 
         <ListingToolbar
-          search={search}
-          onSearchChange={setSearch}
-          searchPlaceholder="Search a dish, cuisine, kitchen, or city…"
           sort={listSort}
           onSortChange={onListSortChange}
           sortOptions={[
@@ -291,16 +257,16 @@ export function NearbyKitchensList() {
             <p>
               {dietFilterApplied
                 ? t("customer.discovery.dietFilterEmpty")
-                : activeSearch
-                ? `No kitchen on kitchCU matches “${activeSearch}” yet.`
+                : query
+                ? `No kitchen on kitchCU matches “${query}” yet.`
                 : "No active kitchens with these filters."}
             </p>
             <div className="nearby-kitchens__empty-actions">
-              {activeSearch && (
-                <button type="button" className="btn btn--ghost btn--sm" onClick={() => setSearch("")}>
+              {query && onClearSearch ? (
+                <button type="button" className="btn btn--ghost btn--sm" onClick={onClearSearch}>
                   Clear search
                 </button>
-              )}
+              ) : null}
               <button type="button" className="btn btn--primary btn--sm" onClick={useDemoLocation}>
                 Demo: Pune kitchens
               </button>
@@ -311,8 +277,8 @@ export function NearbyKitchensList() {
             {fallbackNearest && (
               <div className="glass nearby-kitchens__empty nearby-kitchens__empty--hint">
                 <p>
-                  {activeSearch
-                    ? `No kitchen within ${maxKm} km serves “${activeSearch}”.`
+                  {query
+                    ? `No kitchen within ${maxKm} km serves “${query}”.`
                     : `No kitchens within ${maxKm} km of you yet.`}
                 </p>
                 <p className="nearby-kitchens__empty-hint">
@@ -321,11 +287,11 @@ export function NearbyKitchensList() {
                   right now.
                 </p>
                 <div className="nearby-kitchens__empty-actions">
-                  {activeSearch && (
-                    <button type="button" className="btn btn--ghost btn--sm" onClick={() => setSearch("")}>
+                  {query && onClearSearch ? (
+                    <button type="button" className="btn btn--ghost btn--sm" onClick={onClearSearch}>
                       Clear search
                     </button>
-                  )}
+                  ) : null}
                   <button type="button" className="btn btn--primary btn--sm" onClick={useDemoLocation}>
                     Demo: Pune kitchens
                   </button>
@@ -402,7 +368,6 @@ export function NearbyKitchensList() {
             </ul>
           </>
         )}
-      </div>
     </section>
   );
 }

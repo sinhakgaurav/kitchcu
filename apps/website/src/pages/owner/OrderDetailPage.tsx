@@ -1,5 +1,6 @@
 import { Link, useParams } from "react-router-dom";
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { DishRecipeGuide } from "../../components/DishRecipeGuide";
 import {
   capturePayment,
@@ -42,6 +43,7 @@ function OrderDetailSkeleton() {
 }
 
 export function OrderDetailPage() {
+  const { t } = useTranslation();
   const { kitchen } = useKitchen();
   const { orderId } = useParams<{ orderId: string }>();
   const [order, setOrder] = useState<Order | null>(null);
@@ -256,7 +258,7 @@ export function OrderDetailPage() {
           </p>
           <div className="od-board__pills">
             <span className={`status-badge status-badge--${order.status} status-badge--lg`}>
-              {STATUS_LABELS[order.status]}
+              {t(`status.${order.status}`, { defaultValue: STATUS_LABELS[order.status] })}
             </span>
             <span className="od-pill od-pill--sub">{order.payment_method.toUpperCase()}</span>
             {paymentCaptured && <span className="od-pill od-pill--active">Paid</span>}
@@ -703,7 +705,7 @@ export function OrderDetailPage() {
             <div className="owner-status-actions">
               {next.filter((s) => s !== "cancelled").map((s) => (
                 <button key={s} type="button" className="btn btn--primary" disabled={busy} onClick={() => advance(s)}>
-                  Mark {STATUS_LABELS[s]}
+                  {t("owner.orders.markStatus", { status: t(`status.${s}`, { defaultValue: STATUS_LABELS[s] }) })}
                 </button>
               ))}
             </div>
@@ -736,7 +738,7 @@ export function OrderDetailPage() {
               <div key={e.id} className="owner-timeline__item">
                 <time>{new Date(e.created_at).toLocaleString("en-IN")}</time>
                 <span className={`status-badge status-badge--${e.to_status}`}>
-                  {STATUS_LABELS[e.to_status] ?? e.to_status}
+                  {t(`status.${e.to_status}`, { defaultValue: STATUS_LABELS[e.to_status] ?? e.to_status })}
                 </span>
                 {e.note && <small>{e.note}</small>}
               </div>

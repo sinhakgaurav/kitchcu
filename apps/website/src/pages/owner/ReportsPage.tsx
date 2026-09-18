@@ -22,13 +22,14 @@ import {
 } from "../../lib/api";
 import { bucketRevenuePoints, chartGrainLabel, chartPointLabel } from "../../lib/reportSeries";
 import { useKitchen } from "../../lib/kitchen";
+import { useTranslation } from "react-i18next";
 
 const RANGES = [
-  { days: 7, label: "7 days" },
-  { days: 30, label: "30 days" },
-  { days: 90, label: "90 days" },
-  { days: 180, label: "6 months" },
-];
+  { days: 7, labelKey: "owner.reports.days7" },
+  { days: 30, labelKey: "owner.reports.days30" },
+  { days: 90, labelKey: "owner.reports.days90" },
+  { days: 180, labelKey: "owner.reports.months6" },
+] as const;
 
 const inr = (n: number) => `₹${Math.round(n).toLocaleString("en-IN")}`;
 const pct = (n: number) => `${(n * 100).toFixed(1)}%`;
@@ -52,6 +53,7 @@ function ReportsSkeleton() {
 }
 
 export function ReportsPage() {
+  const { t } = useTranslation();
   const { kitchen } = useKitchen();
   const [days, setDays] = useState(30);
   const [summary, setSummary] = useState<RevenueSummary | null>(null);
@@ -131,10 +133,10 @@ export function ReportsPage() {
     <div className="owner-screen od-board od-reports">
       <section className="od-board__hero dash-card">
         <div className="od-board__hero-text">
-          <p className="od-board__eyebrow">Growth intelligence</p>
-          <h1>Reports</h1>
+          <p className="od-board__eyebrow">{t("owner.reports.eyebrow")}</p>
+          <h1>{t("owner.pages.reports")}</h1>
           <p className="od-board__meta">
-            Revenue trends · best sellers · peak hours · customer retention
+            {t("owner.pageDesc.reports")}
           </p>
         </div>
         <div className="od-board__hero-actions od-board__hero-actions--tools">
@@ -147,13 +149,13 @@ export function ReportsPage() {
                 onClick={() => setDays(r.days)}
                 disabled={loading}
               >
-                {r.label}
+                {t(r.labelKey)}
               </button>
             ))}
           </div>
-                  <Link to="/dashboard/ratings" className="btn btn--ghost btn--sm">Ratings →</Link>
-          <Link to="/dashboard/crm" className="btn btn--ghost btn--sm">Open CRM →</Link>
-          <Link to="/dashboard/tiffin" className="btn btn--ghost btn--sm">Tiffin plans →</Link>
+                  <Link to="/dashboard/ratings" className="btn btn--ghost btn--sm">{t("owner.reports.ratingsLink")}</Link>
+          <Link to="/dashboard/crm" className="btn btn--ghost btn--sm">{t("owner.reports.crmLink")}</Link>
+          <Link to="/dashboard/tiffin" className="btn btn--ghost btn--sm">{t("owner.reports.tiffinLink")}</Link>
         </div>
       </section>
 
@@ -163,7 +165,7 @@ export function ReportsPage() {
         <ReportsSkeleton />
       ) : summary ? (
         <div className={refreshing ? "od-reports__body od-reports__body--refreshing" : "od-reports__body"}>
-          {refreshing && <p className="od-reports__refresh-hint">Updating {days}-day window…</p>}
+          {refreshing && <p className="od-reports__refresh-hint">{t("owner.reports.updating", { days })}</p>}
           {tiffin && (
             <div className="od-board__kpi-grid od-reports__kpis" style={{ marginBottom: "1rem" }}>
               <div className="od-kpi dash-card">

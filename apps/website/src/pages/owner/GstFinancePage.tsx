@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { OwnerPageShell, OwnerPanel, OwnerEmpty } from "../../components/owner/OwnerPageShell";
 import { useKitchen } from "../../lib/kitchen";
+import { useTranslation } from "react-i18next";
 import {
   closeGstAudit,
   downloadGstMonthlyExcel,
@@ -68,6 +69,7 @@ function BalanceSheetView({ sheet }: { sheet: GstBalanceSheet }) {
 }
 
 export function GstFinancePage() {
+  const { t } = useTranslation();
   const { kitchen } = useKitchen();
   const now = useMemo(() => new Date(), []);
   const [year, setYear] = useState(now.getFullYear());
@@ -221,9 +223,9 @@ export function GstFinancePage() {
 
   return (
     <OwnerPageShell
-      eyebrow="Finance"
-      title="GST & monthly audit"
-      description="Register your GSTIN, sync tax invoices from delivered orders, and close monthly audits with balance sheet snapshots."
+      eyebrow={t("owner.nav.gst")}
+      title={t("owner.pages.gst")}
+      description={t("owner.pageDesc.gst")}
       actions={
         profile ? (
           <>
@@ -239,7 +241,7 @@ export function GstFinancePage() {
     >
       {error && <p className="owner-alert owner-alert--error">{error}</p>}
 
-      <OwnerPanel title="Period">
+      <OwnerPanel title={t("owner.panels.period")}>
         <div className="gst-period-row">
           <label className="kc-field">
             <span className="kc-field__label">Year</span>
@@ -266,7 +268,7 @@ export function GstFinancePage() {
       </OwnerPanel>
 
       {(!profile || showSetup) && (
-        <OwnerPanel title={profile ? "Update GST registration" : "Enable GST registration"}>
+        <OwnerPanel title={profile ? t("owner.panels.gstUpdate") : t("owner.panels.gstEnable")}>
           <div className="gst-setup-grid">
             <label className="kc-field">
               <span className="kc-field__label">GSTIN (15 characters)</span>
@@ -409,7 +411,7 @@ export function GstFinancePage() {
           </OwnerPanel>
 
           {balanceSheet && (
-            <OwnerPanel title="Balance sheet (month-end snapshot)">
+            <OwnerPanel title={t("owner.panels.balanceSheet")}>
               <BalanceSheetView sheet={balanceSheet} />
             </OwnerPanel>
           )}

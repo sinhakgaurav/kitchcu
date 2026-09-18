@@ -86,9 +86,9 @@ export function SubscriptionPage() {
 
   return (
     <OwnerPageShell
-      eyebrow="Billing"
+      eyebrow={t("owner.nav.subscription")}
       title={t("owner.subscription.title")}
-      description="No per-order commission — flat kitchen SaaS billing only"
+      description={t("owner.pageDesc.subscription")}
       actions={
         <span className={`status-badge status-badge--lg owner-sub-badge owner-sub-badge--${activeStatus}`}>
           {activeStatus} · {TIER_LABELS[activeTier ?? "starter"] ?? activeTier}
@@ -110,7 +110,7 @@ export function SubscriptionPage() {
       )}
 
       {subscription && subscription.status !== "active" && (
-        <OwnerPanel title="Complete payment">
+        <OwnerPanel title={t("owner.panels.completePayment")}>
           <p>
             {TIER_LABELS[subscription.plan_tier]} plan · ₹{subscription.amount.toFixed(0)} /{" "}
             {subscription.billing_cycle}

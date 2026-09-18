@@ -5,6 +5,7 @@ import { PhoneField } from "../../components/PhoneField";
 import { OwnerPageShell, OwnerPanel } from "../../components/owner/OwnerPageShell";
 import { createManualOrder, fetchMenu, type Dish } from "../../lib/api";
 import { useKitchen } from "../../lib/kitchen";
+import { useTranslation } from "react-i18next";
 import {
   filterAndSortDishes,
   type DishHighlight,
@@ -20,6 +21,7 @@ import {
 type Line = { dish_id: string; quantity: number };
 
 export function NewOrderPage() {
+  const { t } = useTranslation();
   const { kitchen } = useKitchen();
   const navigate = useNavigate();
   const [dishes, setDishes] = useState<Dish[]>([]);
@@ -98,14 +100,14 @@ export function NewOrderPage() {
 
   return (
     <OwnerPageShell
-      eyebrow="Order operations"
-      title="New manual order"
-      description="Walk-in, phone, or counter orders — add dishes and place instantly"
+      eyebrow={t("owner.nav.operations")}
+      title={t("owner.pages.newManualOrder")}
+      description={t("owner.pageDesc.newOrder")}
       backTo="/dashboard/orders"
-      backLabel="← Back to orders"
+      backLabel={t("common.back")}
     >
       <div className="owner-new-order">
-        <OwnerPanel title="Menu" description="Tap dishes to add to the order">
+        <OwnerPanel title={t("owner.panels.newOrderMenu")} description={t("owner.panels.newOrderMenuDesc")}>
           {dishes.length === 0 ? (
             <p className="owner-muted">No dishes yet. <Link to="/dashboard/menu/new">Add dishes</Link> first.</p>
           ) : (
@@ -113,7 +115,7 @@ export function NewOrderPage() {
               <ListingToolbar
                 search={search}
                 onSearchChange={setSearch}
-                searchPlaceholder="Search dishes…"
+                searchPlaceholder={t("owner.list.searchDishes")}
                 sort={sort}
                 onSortChange={(v) => setSort(v as DishSort)}
                 highlights={highlights}

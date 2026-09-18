@@ -14,8 +14,10 @@ import {
   type DishTrial,
 } from "../../lib/api";
 import { useKitchen } from "../../lib/kitchen";
+import { useTranslation } from "react-i18next";
 
 export function TrialDetailPage() {
+  const { t } = useTranslation();
   const { trialId } = useParams<{ trialId: string }>();
   const { kitchen } = useKitchen();
   const [trial, setTrial] = useState<DishTrial | null>(null);
@@ -154,8 +156,8 @@ export function TrialDetailPage() {
   if (!kitchen || !trial) {
     return (
       <OwnerPageShell
-        eyebrow="Growth"
-        title="Dish trial"
+        eyebrow={t("owner.nav.growth")}
+        title={t("owner.pages.trial")}
         backTo="/dashboard/learning"
         backLabel="← Back to learning"
       >
@@ -171,9 +173,9 @@ export function TrialDetailPage() {
 
   return (
     <OwnerPageShell
-      eyebrow="Growth"
+      eyebrow={t("owner.nav.growth")}
       title={trial.dish_name}
-      description="Trial dish — inactive on public menu until promoted"
+      description={t("owner.pageDesc.trial")}
       backTo="/dashboard/learning"
       backLabel="← Back to learning"
       meta={
@@ -193,7 +195,7 @@ export function TrialDetailPage() {
 
       {trial.status === "draft" && (
         <OwnerPanel
-          title="Select sample customers"
+          title={t("owner.panels.selectSamples")}
           description="Pick 5–20 regulars from your CRM for WhatsApp sample offers"
         >
           <ul className="owner-crm-list">
@@ -220,7 +222,7 @@ export function TrialDetailPage() {
       )}
 
       {trial.invite_count >= 5 && trial.status !== "promoted" && !trial.whatsapp_sent_at && (
-        <OwnerPanel title="Send sample offers">
+        <OwnerPanel title={t("owner.panels.sendSamples")}>
           <p className="owner-muted">
             WhatsApp blast to {trial.invite_count} customers — free sample trial.
           </p>
@@ -231,7 +233,7 @@ export function TrialDetailPage() {
       )}
 
       {trial.invites.length > 0 && (
-        <OwnerPanel title="Sample feedback">
+        <OwnerPanel title={t("owner.panels.sampleFeedback")}>
           <ul className="owner-detail-items">
             {trial.invites.map((inv) => (
               <li key={inv.id}>
@@ -257,7 +259,7 @@ export function TrialDetailPage() {
 
       {trial.status !== "promoted" && (
         <OwnerPanel
-          title="Live-capture dish hero"
+          title={t("owner.panels.liveHero")}
           description="Truth in media — replace the curated stock photo with a camera capture before promote."
         >
           <LiveCapturePhotoField
@@ -273,7 +275,7 @@ export function TrialDetailPage() {
       )}
 
       {canPromote && (
-        <OwnerPanel title="Promote to official menu">
+        <OwnerPanel title={t("owner.panels.promoteMenu")}>
           <p className="owner-muted">
             Average home-taste rating meets your threshold — activate this dish on your public menu.
             {!heroLive && " Capture a live hero photo above first."}

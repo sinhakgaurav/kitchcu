@@ -2,6 +2,7 @@
 
 import type { DishHealthSnapshot, KitchenNearbyList, Menu } from "./api";
 import { getCustomerToken } from "./customerApi";
+import { DEMO } from "./demo";
 
 export type PublicActivePromotion = {
   promotion_id: string;
@@ -104,6 +105,27 @@ export async function fetchKitchenByCode(code: string): Promise<import("./api").
   return publicFetch(
     `/api/v1/kitchens/public/by-code/${encodeURIComponent(code.trim().toUpperCase())}`,
   );
+}
+
+export async function resolveDemoKitchen(): Promise<import("./api").KitchenPublic> {
+  try {
+    const kitchen = await fetchKitchenByCode(DEMO.kitchenCode);
+    if (kitchen.name === DEMO.kitchenName) return kitchen;
+  } catch {
+    /* code may have been consumed by leftover test data */
+  }
+  const nearby = await fetchPublicNearbyKitchens({
+    latitude: DEMO.defaultLocation.latitude,
+    longitude: DEMO.defaultLocation.longitude,
+    max_km: 15,
+    q: DEMO.kitchenName,
+    limit: 20,
+  });
+  const match =
+    nearby.kitchens.find((k) => k.name === DEMO.kitchenName) ??
+    nearby.nearest.find((k) => k.name === DEMO.kitchenName);
+  if (!match) throw new Error("Demo kitchen not found. Run seed-dev-data.py.");
+  return fetchKitchenByCode(match.code);
 }
 
 export async function fetchPublicNearbyKitchens(params: {

@@ -14,6 +14,7 @@ import {
   type Promotion,
 } from "../../lib/api";
 import { useKitchen } from "../../lib/kitchen";
+import { useTranslation } from "react-i18next";
 
 const SEGMENTS = [
   { value: "all", label: "Everyone" },
@@ -24,6 +25,7 @@ const SEGMENTS = [
 ] as const;
 
 export function CouponsPage() {
+  const { t } = useTranslation();
   const { kitchen } = useKitchen();
   const [coupons, setCoupons] = useState<Coupon[]>([]);
   const [promotions, setPromotions] = useState<Promotion[]>([]);
@@ -156,16 +158,16 @@ export function CouponsPage() {
 
   return (
     <OwnerPageShell
-      eyebrow="Marketing"
-      title="Coupons & promotions"
-      description="Share codes on WhatsApp or run targeted dish pricing"
+      eyebrow={t("owner.nav.growth")}
+      title={t("owner.pages.coupons")}
+      description={t("owner.pageDesc.coupons")}
     >
       {error && <p className="form-error">{error}</p>}
       {loading ? (
         <div className="app-loading">Loading…</div>
       ) : (
         <>
-          <OwnerPanel title="New coupon" description="Create a code customers can apply at checkout">
+          <OwnerPanel title={t("owner.panels.newCoupon")} description={t("owner.panels.newCouponDesc")}>
             <form className="owner-form owner-form--inline" onSubmit={addCoupon}>
               <input
                 className="owner-input"
@@ -202,7 +204,7 @@ export function CouponsPage() {
             </form>
           </OwnerPanel>
 
-          <OwnerPanel title="Active coupons">
+          <OwnerPanel title={t("owner.panels.activeCoupons")}>
             {coupons.length === 0 ? (
               <OwnerEmpty message="No coupons yet — create one above to share on WhatsApp." />
             ) : (
@@ -210,7 +212,7 @@ export function CouponsPage() {
                 <ListingToolbar
                   search={couponSearch}
                   onSearchChange={setCouponSearch}
-                  searchPlaceholder="Search coupon codes…"
+                  searchPlaceholder={t("owner.list.searchCoupons")}
                   sort={couponSort}
                   onSortChange={(v) => setCouponSort(v as typeof couponSort)}
                   sortOptions={[
@@ -257,7 +259,7 @@ export function CouponsPage() {
           </OwnerPanel>
 
           <OwnerPanel
-            title="Targeted promotion"
+            title={t("owner.panels.targetedPromo")}
             description="Special pricing for a customer segment (F38)"
           >
             <form className="owner-form owner-form--wide" onSubmit={addPromotion}>

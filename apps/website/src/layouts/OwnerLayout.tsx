@@ -8,6 +8,9 @@ import { fetchKitchenEntitlements } from "../shared/api";
 import { useKitchenAuth } from "../shared/kitchenAuth";
 import { useKitchen } from "../shared/kitchenContext";
 import { customerUrl } from "../shared/urls";
+import { DashboardHowTo, numberedI18n } from "../components/DashboardHowTo";
+import { TourReplayButton } from "../components/ProductTour";
+import { OWNER_HOWTO_PAGES } from "../data/dashboardGuides";
 
 type NavItem = {
   to: string;
@@ -73,6 +76,19 @@ const NAV_SECTIONS: { labelKey: string; items: NavItem[] }[] = [
     ],
   },
 ];
+
+function OwnerPageHowTo({ pathname }: { pathname: string }) {
+  const { t } = useTranslation();
+  const page = OWNER_HOWTO_PAGES.find((row) => row.test(pathname));
+  if (!page) return null;
+  return (
+    <DashboardHowTo
+      id={`owner-${page.prefix}`}
+      title={t(`${page.prefix}.title`)}
+      steps={numberedI18n(t, page.prefix, page.count)}
+    />
+  );
+}
 
 export function RequireAuth({ children }: { children: React.ReactNode }) {
   const { token, loading } = useKitchenAuth();
@@ -257,13 +273,17 @@ export function OwnerLayout() {
             <strong>{currentSection?.label ?? t("common.dashboard")}</strong>
             {kitchen && <span>{kitchen.name}</span>}
           </div>
+          <TourReplayButton id="kitchen" label={t("owner.tour.replay")} />
         </header>
 
         <div className="owner-app__main">
           {loading ? (
             <div className="app-loading">{t("owner.shell.loadingKitchen")}</div>
           ) : (
-            <Outlet context={{ kitchen }} />
+            <>
+              <OwnerPageHowTo pathname={location.pathname} />
+              <Outlet context={{ kitchen }} />
+            </>
           )}
         </div>
       </div>

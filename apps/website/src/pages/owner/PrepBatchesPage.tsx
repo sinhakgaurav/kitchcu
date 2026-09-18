@@ -15,8 +15,10 @@ import {
   type StockDeductMode,
 } from "../../lib/api";
 import { useKitchen } from "../../lib/kitchen";
+import { useTranslation } from "react-i18next";
 
 export function PrepBatchesPage() {
+  const { t } = useTranslation();
   const { kitchen } = useKitchen();
   const [batches, setBatches] = useState<PrepBatch[]>([]);
   const [dishes, setDishes] = useState<{ id: string; name: string }[]>([]);
@@ -188,9 +190,9 @@ export function PrepBatchesPage() {
 
   return (
     <OwnerPageShell
-      eyebrow="Operations"
-      title="Bulk prep"
-      description="Cook once for many portions — expand recipes, edit totals, deduct inventory when prepared."
+      eyebrow={t("owner.nav.operations")}
+      title={t("owner.pages.prep")}
+      description={t("owner.pageDesc.prep")}
     >
       {error ? <p className="form-error">{error}</p> : null}
       {msg ? <div className="auth-card__success">{msg}</div> : null}
@@ -200,7 +202,7 @@ export function PrepBatchesPage() {
       ) : (
         <>
           <OwnerPanel
-            title="When does pantry deduct?"
+            title={t("owner.panels.pantryWhen")}
             description="À la carte kitchens use Order Ready. Thali kitchens use bulk prep only to avoid double-counting."
           >
             <div className="owner-status-actions">
@@ -222,11 +224,11 @@ export function PrepBatchesPage() {
               </button>
             </div>
             <p className="muted" style={{ marginTop: "0.85rem" }}>
-              Set dish recipes under <Link to="/dashboard/ingredients">Ingredients</Link> first.
+              Set dish recipes under <Link to="/dashboard/ingredients#recipe-map">Ingredients</Link> first.
             </p>
           </OwnerPanel>
 
-          <OwnerPanel title="New prep batch" description="Pick dishes and portions — recipes expand into editable totals">
+          <OwnerPanel title={t("owner.panels.newBatch")} description={t("owner.panels.newBatchDesc")}>
             <form className="owner-form owner-form--grid" onSubmit={onCreate}>
               <label>
                 Name
@@ -281,7 +283,7 @@ export function PrepBatchesPage() {
             </form>
           </OwnerPanel>
 
-          <OwnerPanel title="Batches">
+          <OwnerPanel title={t("owner.panels.batches")}>
             {batches.length === 0 ? (
               <OwnerEmpty message="No prep batches yet — create a morning cook above." />
             ) : (
@@ -289,7 +291,7 @@ export function PrepBatchesPage() {
               <ListingToolbar
                 search={batchSearch}
                 onSearchChange={setBatchSearch}
-                searchPlaceholder="Search batches, dishes, ingredients…"
+                searchPlaceholder={t("owner.list.searchBatches")}
                 sort={batchSort}
                 onSortChange={(v) => setBatchSort(v as typeof batchSort)}
                 sortOptions={[

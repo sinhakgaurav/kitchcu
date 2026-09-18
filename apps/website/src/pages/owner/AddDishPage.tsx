@@ -14,8 +14,10 @@ import {
   type Cuisine,
 } from "../../lib/api";
 import { useKitchen } from "../../lib/kitchen";
+import { useTranslation } from "react-i18next";
 
 export function AddDishPage() {
+  const { t } = useTranslation();
   const { kitchen } = useKitchen();
   const navigate = useNavigate();
   const [categories, setCategories] = useState<Category[]>([]);
@@ -161,14 +163,14 @@ export function AddDishPage() {
 
   return (
     <OwnerPageShell
-      eyebrow="Operations"
-      title="Add dish"
-      description="Live-capture hero for single dishes — or bulk import from Excel with mapped photos"
+      eyebrow={t("owner.nav.operations")}
+      title={t("owner.pages.addDish")}
+      description={t("owner.pageDesc.addDish")}
       backTo="/dashboard/menu"
       backLabel="← Back to menu"
     >
       <OwnerPanel
-        title="Bulk upload"
+        title={t("owner.panels.bulkUpload")}
         description="Download the sample Excel, fill rows, upload photos whose file names match the image_filename column."
       >
         {bulkError && <div className="auth-card__error">{bulkError}</div>}

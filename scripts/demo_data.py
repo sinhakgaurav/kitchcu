@@ -208,7 +208,7 @@ DEMO_KITCHEN = {
 
 DEMO_KITCHEN_CODE = "CKPNQ001"
 
-# Extra kitchens for nearby-distance demo (same owner, different Pune coords)
+# Extra kitchens for nearby-distance demo (dedicated owners — not Raj).
 DEMO_KITCHENS_EXTRA = [
     {
         "name": "Kalyani Nagar Tiffins",
@@ -232,7 +232,7 @@ DEMO_KITCHENS_EXTRA = [
     },
 ]
 
-# Multi-city presence kitchens (primary demo owner) — discovery + “cities we serve”
+# Multi-city presence kitchens (one dedicated owner each) — discovery + “cities we serve”
 DEMO_KITCHENS_CITIES = [
     {
         "name": "Delhi Home Thali",
@@ -335,6 +335,30 @@ DEMO_KITCHENS_CITIES = [
         "longitude": 72.8697,
     },
 ]
+
+# Reserved 3220+ block — do not collide with DEMO_OWNER / DEMO_OWNERS_EXTRA / EXTRA_OWNERS (3210–3215).
+PRESENCE_OWNER_PHONE_START = 9876543220
+
+
+def presence_kitchen_owner_pairs() -> list[tuple[dict, dict]]:
+    """(owner, kitchen payload) for extra Pune + city presence kitchens."""
+    pairs: list[tuple[dict, dict]] = []
+    for i, kitchen in enumerate([*DEMO_KITCHENS_EXTRA, *DEMO_KITCHENS_CITIES]):
+        phone = str(PRESENCE_OWNER_PHONE_START + i)
+        city_slug = "".join(ch for ch in kitchen["city"].lower() if ch.isalnum())
+        pairs.append(
+            (
+                {
+                    "phone": phone,
+                    "phone_e164": f"+91{phone}",
+                    "name": f"{kitchen['city']} Host",
+                    "email": f"host.{city_slug}.{i}@kitchcu.dev",
+                },
+                kitchen,
+            )
+        )
+    return pairs
+
 
 # Default customer location for nearby search (Pune — demo kitchen area)
 DEMO_CUSTOMER_LOCATION = {

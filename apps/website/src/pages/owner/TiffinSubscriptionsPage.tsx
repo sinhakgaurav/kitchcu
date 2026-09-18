@@ -16,6 +16,7 @@ import {
   type SubscriptionSummary,
 } from "../../lib/api";
 import { useKitchen } from "../../lib/kitchen";
+import { useTranslation } from "react-i18next";
 
 const PLAN_TYPES = [
   { value: "thali", label: "Thali" },
@@ -41,6 +42,7 @@ function stripHtml(html: string): string {
 }
 
 export function TiffinSubscriptionsPage() {
+  const { t } = useTranslation();
   const { kitchen } = useKitchen();
   const [plans, setPlans] = useState<KitchenMealPlan[]>([]);
   const [subs, setSubs] = useState<CustomerKitchenSubscription[]>([]);
@@ -236,9 +238,9 @@ export function TiffinSubscriptionsPage() {
 
   return (
     <OwnerPageShell
-      eyebrow="Growth"
-      title="Tiffin & monthly plans"
-      description="Combo packs (2+ dishes) or a single-dish monthly subscription. Customers request — you accept or deny. No food commission."
+      eyebrow={t("owner.nav.growth")}
+      title={t("owner.pages.tiffin")}
+      description={t("owner.pageDesc.tiffin")}
     >
       {error && <div className="auth-card__error">{error}</div>}
 
@@ -431,7 +433,7 @@ export function TiffinSubscriptionsPage() {
         </form>
       </OwnerPanel>
 
-      <OwnerPanel title="Plans">
+      <OwnerPanel title={t("owner.panels.plans")}>
         {loading ? (
           <p className="owner-muted">Loading…</p>
         ) : plans.length === 0 ? (
@@ -491,7 +493,7 @@ export function TiffinSubscriptionsPage() {
         )}
       </OwnerPanel>
 
-      <OwnerPanel title="Subscription requests">
+      <OwnerPanel title={t("owner.panels.subRequests")}>
         <div className="form-row" style={{ marginBottom: "0.75rem" }}>
           <label>
             Filter

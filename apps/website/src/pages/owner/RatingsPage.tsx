@@ -10,6 +10,7 @@ import {
   type DishSuggestion,
 } from "../../lib/api";
 import { useKitchen } from "../../lib/kitchen";
+import { useTranslation } from "react-i18next";
 
 function stars(n: number): string {
   if (!Number.isFinite(n) || n <= 0) return "—";
@@ -17,6 +18,7 @@ function stars(n: number): string {
 }
 
 export function RatingsPage() {
+  const { t } = useTranslation();
   const { kitchen } = useKitchen();
   const [summaries, setSummaries] = useState<DishRatingSummary[]>([]);
   const [suggestions, setSuggestions] = useState<DishSuggestion[]>([]);
@@ -91,9 +93,9 @@ export function RatingsPage() {
 
   return (
     <OwnerPageShell
-      eyebrow="Grow"
-      title="Ratings"
-      description="Home-taste scores from delivered orders, plus customer dish suggestions to accept or reject."
+      eyebrow={t("owner.nav.growth")}
+      title={t("owner.pages.ratings")}
+      description={t("owner.pageDesc.ratings")}
       actions={
         <>
           <Link to="/dashboard/reports" className="btn btn--ghost btn--sm">Reports →</Link>
@@ -107,7 +109,7 @@ export function RatingsPage() {
       ) : (
         <>
           {kitchenStats && (
-            <OwnerPanel title="Kitchen score" description="Weighted from verified purchase ratings">
+            <OwnerPanel title={t("owner.panels.kitchenScore")} description={t("owner.panels.kitchenScoreDesc")}>
               <p className="od-ratings__kitchen-score">
                 <strong>{stars(kitchenStats.overall)}</strong>
                 <span className="report-rank__meta">
@@ -118,7 +120,7 @@ export function RatingsPage() {
             </OwnerPanel>
           )}
 
-          <OwnerPanel title="Dish scores" description="Verified purchase ratings only">
+          <OwnerPanel title={t("owner.panels.dishScores")} description={t("owner.panels.dishScoresDesc")}>
             {ranked.length === 0 ? (
               <OwnerEmpty message="No ratings yet — scores appear after delivered orders are rated." />
             ) : (
@@ -139,7 +141,7 @@ export function RatingsPage() {
             )}
           </OwnerPanel>
 
-          <OwnerPanel title="Pending suggestions" description="Customers asking for a dish change or new item">
+          <OwnerPanel title={t("owner.panels.pendingSuggestions")} description={t("owner.panels.pendingSuggestionsDesc")}>
             {suggestions.length === 0 ? (
               <p className="od-panel__empty">No pending suggestions.</p>
             ) : (

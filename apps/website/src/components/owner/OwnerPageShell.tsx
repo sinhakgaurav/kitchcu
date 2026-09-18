@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { Link } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 
 type OwnerPageShellProps = {
   eyebrow: string;
@@ -20,15 +21,17 @@ export function OwnerPageShell({
   meta,
   actions,
   backTo,
-  backLabel = "← Back",
+  backLabel,
   children,
   className = "",
 }: OwnerPageShellProps) {
+  const { t } = useTranslation();
+  const backText = backLabel ?? `← ${t("common.back")}`;
   return (
     <div className={`owner-screen od-board ${className}`.trim()}>
       {backTo && (
         <Link to={backTo} className="owner-back">
-          {backLabel}
+          {backText}
         </Link>
       )}
       <section className="od-board__hero dash-card">
@@ -53,15 +56,17 @@ export function OwnerPanel({
   action,
   children,
   className = "",
+  id,
 }: {
   title: string;
   description?: string;
   action?: ReactNode;
   children: ReactNode;
   className?: string;
+  id?: string;
 }) {
   return (
-    <section className={`dash-card od-panel owner-panel ${className}`.trim()}>
+    <section id={id} className={`dash-card od-panel owner-panel ${className}`.trim()}>
       <header className="od-panel__head">
         <div>
           <h2>{title}</h2>

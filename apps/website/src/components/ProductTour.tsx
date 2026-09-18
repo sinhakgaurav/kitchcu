@@ -6,7 +6,7 @@ export type ProductTourStep = {
 };
 
 function storageKey(id: string): string {
-  return `kitchcu_tour_${id}_v1`;
+  return `kitchcu_tour_${id}_v3`;
 }
 
 export function isTourDismissed(id: string): boolean {
@@ -81,7 +81,7 @@ export function ProductTour({
           {stepLabel ? stepLabel(index + 1, steps.length) : `${index + 1} / ${steps.length}`}
         </p>
         <h2 id={`kc-tour-${id}-title`}>{step.title}</h2>
-        <p>{step.body}</p>
+        <p className="kc-tour__body">{step.body}</p>
         <div className="kc-tour__actions">
           <button type="button" className="btn btn--ghost btn--sm" onClick={close}>
             {skipLabel}

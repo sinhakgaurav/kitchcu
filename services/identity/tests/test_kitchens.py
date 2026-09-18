@@ -71,6 +71,44 @@ async def test_list_kitchens_returns_owner_kitchens(client: AsyncClient, auth_he
 
 
 @pytest.mark.asyncio
+async def test_list_kitchens_excludes_other_owner_kitchens(
+    client: AsyncClient, auth_headers: dict
+):
+    mine_created = await client.post("/api/v1/kitchens", json=KITCHEN_PAYLOAD, headers=auth_headers)
+    assert mine_created.status_code == 201
+    mine_id = mine_created.json()["id"]
+
+    other_phone = str(uuid.uuid4().int % 4_000_000_000 + 6_000_000_000)
+    reg = await client.post(
+        "/api/v1/owners/register",
+        json={"phone": other_phone, "name": "Other Owner"},
+    )
+    assert reg.status_code == 201
+    await client.post("/api/v1/auth/otp/request", json={"phone": reg.json()["phone"]})
+    token_resp = await client.post(
+        "/api/v1/auth/otp/verify",
+        json={"phone": reg.json()["phone"], "otp": "123456"},
+    )
+    other_headers = {"Authorization": f"Bearer {token_resp.json()['access_token']}"}
+
+    other_created = await client.post(
+        "/api/v1/kitchens",
+        json={**KITCHEN_PAYLOAD, "name": "Other Home Kitchen"},
+        headers=other_headers,
+    )
+    assert other_created.status_code == 201
+    other_id = other_created.json()["id"]
+
+    mine = await client.get("/api/v1/kitchens/me", headers=auth_headers)
+    assert mine.status_code == 200
+    assert {row["id"] for row in mine.json()} == {mine_id}
+
+    theirs = await client.get("/api/v1/kitchens/me", headers=other_headers)
+    assert theirs.status_code == 200
+    assert {row["id"] for row in theirs.json()} == {other_id}
+
+
+@pytest.mark.asyncio
 async def test_create_kitchen_invalid_coordinates(client: AsyncClient, auth_headers: dict):
     payload = {**KITCHEN_PAYLOAD, "latitude": 999}
     response = await client.post("/api/v1/kitchens", json=payload, headers=auth_headers)
@@ -203,6 +241,21 @@ async def test_nearby_kitchens_empty(client: AsyncClient):
 
 
 @pytest.mark.asyncio
+async def test_nearby_omits_kitchens_without_active_dishes(
+    client: AsyncClient, auth_headers: dict
+):
+    created = await client.post("/api/v1/kitchens", json=KITCHEN_PAYLOAD, headers=auth_headers)
+    assert created.status_code == 201
+    resp = await client.get(
+        "/api/v1/kitchens/public/nearby",
+        params={"latitude": 18.5362, "longitude": 73.8958},
+    )
+    assert resp.status_code == 200
+    assert resp.json()["kitchens"] == []
+    assert resp.json()["nearest"] == []
+
+
+@pytest.mark.asyncio
 async def test_nearby_kitchens_sorted_by_distance(client: AsyncClient, auth_headers: dict):
     """Nearest kitchen first (sort=asc)."""
     locations = [
@@ -212,6 +265,7 @@ async def test_nearby_kitchens_sorted_by_distance(client: AsyncClient, auth_head
     for payload in locations:
         r = await client.post("/api/v1/kitchens", json=payload, headers=auth_headers)
         assert r.status_code == 201
+        _seed_catalog_for_kitchen(uuid.UUID(r.json()["id"]))
 
     resp = await client.get(
         "/api/v1/kitchens/public/nearby",
@@ -229,7 +283,9 @@ async def test_nearby_kitchens_sorted_by_distance(client: AsyncClient, auth_head
 
 @pytest.mark.asyncio
 async def test_nearby_kitchens_sort_desc(client: AsyncClient, auth_headers: dict):
-    await client.post("/api/v1/kitchens", json=KITCHEN_PAYLOAD, headers=auth_headers)
+    created = await client.post("/api/v1/kitchens", json=KITCHEN_PAYLOAD, headers=auth_headers)
+    assert created.status_code == 201
+    _seed_catalog_for_kitchen(uuid.UUID(created.json()["id"]))
     resp = await client.get(
         "/api/v1/kitchens/public/nearby",
         params={"latitude": 18.5362, "longitude": 73.8958, "sort": "desc"},
@@ -387,6 +443,7 @@ async def test_nearby_kitchens_search_matches_kitchen_fields(client: AsyncClient
         headers=auth_headers,
     )
     assert created.status_code == 201
+    _seed_catalog_for_kitchen(uuid.UUID(created.json()["id"]))
     code = created.json()["code"]
 
     for term in ("sharma", "pune", code.lower()):
@@ -400,7 +457,9 @@ async def test_nearby_kitchens_search_matches_kitchen_fields(client: AsyncClient
 
 @pytest.mark.asyncio
 async def test_nearby_kitchens_search_without_match_is_empty(client: AsyncClient, auth_headers: dict):
-    await client.post("/api/v1/kitchens", json=KITCHEN_PAYLOAD, headers=auth_headers)
+    created = await client.post("/api/v1/kitchens", json=KITCHEN_PAYLOAD, headers=auth_headers)
+    assert created.status_code == 201
+    _seed_catalog_for_kitchen(uuid.UUID(created.json()["id"]))
     resp = await client.get(
         "/api/v1/kitchens/public/nearby",
         params={"latitude": 18.5362, "longitude": 73.8958, "q": "definitely-not-on-any-menu"},
@@ -419,7 +478,9 @@ async def test_nearby_falls_back_to_nearest_when_radius_is_empty(client: AsyncCl
         "latitude": 19.0760,
         "longitude": 72.8777,
     }
-    assert (await client.post("/api/v1/kitchens", json=mumbai, headers=auth_headers)).status_code == 201
+    mumbai_resp = await client.post("/api/v1/kitchens", json=mumbai, headers=auth_headers)
+    assert mumbai_resp.status_code == 201
+    _seed_catalog_for_kitchen(uuid.UUID(mumbai_resp.json()["id"]))
 
     resp = await client.get(
         "/api/v1/kitchens/public/nearby",
@@ -468,7 +529,9 @@ async def test_nearest_fallback_respects_the_search_term(client: AsyncClient, au
 
 @pytest.mark.asyncio
 async def test_nearby_omits_nearest_when_radius_has_results(client: AsyncClient, auth_headers: dict):
-    assert (await client.post("/api/v1/kitchens", json=KITCHEN_PAYLOAD, headers=auth_headers)).status_code == 201
+    created = await client.post("/api/v1/kitchens", json=KITCHEN_PAYLOAD, headers=auth_headers)
+    assert created.status_code == 201
+    _seed_catalog_for_kitchen(uuid.UUID(created.json()["id"]))
     resp = await client.get(
         "/api/v1/kitchens/public/nearby",
         params={"latitude": 18.5362, "longitude": 73.8958, "max_km": 10},

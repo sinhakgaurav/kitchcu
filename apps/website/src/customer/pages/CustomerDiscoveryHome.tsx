@@ -6,7 +6,8 @@ import { DeliveryAddressPicker } from "../../components/DeliveryAddressPicker";
 import { NearbyKitchensList } from "../../components/NearbyKitchensList";
 import { ReportFoodFilter } from "../../components/ReportFoodFilter";
 import { ProductTour, TourReplayButton } from "../../components/ProductTour";
-import { SuperAdminLink } from "../../components/SuperAdminAccess";
+import { tourI18n } from "../../components/DashboardHowTo";
+import { CUSTOMER_TOUR_STEP_COUNT } from "../../data/dashboardGuides";
 import { CitiesPresence } from "../../components/CitiesPresence";
 import { images } from "../../data/content";
 import { DEMO } from "../../shared/demo";
@@ -18,6 +19,7 @@ import { saveKitchenToSession } from "../../shared/customerSession";
 import {
   fetchDiscoveryHome,
   fetchKitchenByCode,
+  resolveDemoKitchen,
   type DiscoveryDishCard,
   type DiscoveryHome,
   type DiscoveryKitchenCard,
@@ -208,10 +210,8 @@ export function CustomerDiscoveryHome() {
     coords,
     source,
     selectedAddress,
-    geoStatus,
     geoError,
     loading: deliveryLoading,
-    useGps,
     useDemo,
   } = useCustomerDelivery();
   const [maxKm, setMaxKm] = useState(25);
@@ -314,7 +314,6 @@ export function CustomerDiscoveryHome() {
 
   // The feed is already scoped to the search term by the API — filtering again here
   // would only re-narrow the 12-item rail slices and hide real matches.
-  const nearYou = feed?.near_you ?? [];
   const featured = feed?.featured ?? [];
   const mostLiked = feed?.most_liked ?? [];
   const liveNow = (() => {
@@ -376,12 +375,7 @@ export function CustomerDiscoveryHome() {
         backLabel={t("customer.tour.back")}
         doneLabel={t("customer.tour.done")}
         stepLabel={(current, total) => t("customer.tour.step", { current, total })}
-        steps={[
-          { title: t("customer.tour.s1Title"), body: t("customer.tour.s1Body") },
-          { title: t("customer.tour.s2Title"), body: t("customer.tour.s2Body") },
-          { title: t("customer.tour.s3Title"), body: t("customer.tour.s3Body") },
-          { title: t("customer.tour.s4Title"), body: t("customer.tour.s4Body") },
-        ]}
+        steps={tourI18n(t, "customer.tour", CUSTOMER_TOUR_STEP_COUNT)}
       />
       <header className="disc-home__hero">
         <div
@@ -399,9 +393,6 @@ export function CustomerDiscoveryHome() {
               : t("customer.discovery.title")}
           </h1>
           <p className="disc-home__lede">{t("customer.discovery.lede")}</p>
-          <p className="disc-home__ops">
-            <TourReplayButton id="customer" label={t("customer.tour.replay")} />
-          </p>
           {isCustomerSignedIn(session) ? (
             <div className="disc-home__welcome">
               <Link to="/dashboard">{t("customer.nav.dashboard")}</Link>
@@ -409,44 +400,49 @@ export function CustomerDiscoveryHome() {
               <Link to="/dashboard?tab=account">{t("customer.nav.profile")}</Link>
             </div>
           ) : null}
-          <p className="disc-home__ops">
-            <SuperAdminLink className="disc-home__ops-link" />
-          </p>
 
           <form
             className="disc-home__search"
+            role="search"
             onSubmit={(e) => {
               e.preventDefault();
               const trimmed = query.trim();
-              // Enter should not wait out the debounce.
               if (trimmed === activeQuery) void load();
               else setActiveQuery(trimmed);
             }}
           >
-            <label className="disc-home__search-field">
-              <span className="visually-hidden">{t("common.search")}</span>
-              <input
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                placeholder={t("customer.discovery.searchPlaceholder")}
-                autoComplete="off"
-                enterKeyHint="search"
-              />
-            </label>
-            <div className="disc-home__loc">
-              <DeliveryAddressPicker variant="hero" />
-              <button
-                type="button"
-                className="btn btn--ghost btn--sm"
-                onClick={() => {
-                  void useGps();
-                }}
-                disabled={geoStatus === "loading"}
-              >
-                {geoStatus === "loading" ? t("common.loading") : t("customer.discovery.useLocation")}
+            <div className="disc-home__search-row">
+              <label className="disc-home__search-field">
+                <span className="visually-hidden">{t("common.search")}</span>
+                <input
+                  type="search"
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  placeholder={t("customer.discovery.searchPlaceholder")}
+                  autoComplete="off"
+                  enterKeyHint="search"
+                />
+              </label>
+              {query ? (
+                <button
+                  type="button"
+                  className="btn btn--ghost disc-home__search-clear"
+                  onClick={() => {
+                    setQuery("");
+                    setActiveQuery("");
+                  }}
+                >
+                  Clear
+                </button>
+              ) : null}
+              <button type="submit" className="btn btn--primary disc-home__search-go">
+                {t("common.search")}
               </button>
-              <label>
-                <span className="visually-hidden">Radius</span>
+            </div>
+            <div className="disc-home__toolbar">
+              <DeliveryAddressPicker variant="hero" />
+              <label className="disc-home__radius">
+                <span>Within</span>
                 <select
                   value={maxKm}
                   onChange={(e) => setMaxKm(Number(e.target.value))}
@@ -459,6 +455,7 @@ export function CustomerDiscoveryHome() {
                 </select>
               </label>
               <ReportFoodFilter variant="hero" />
+              <TourReplayButton id="customer" label={t("customer.tour.replay")} />
             </div>
           </form>
 
@@ -523,9 +520,15 @@ export function CustomerDiscoveryHome() {
         </div>
       </header>
 
-      <NearbyKitchensList />
-
       <div className="container disc-home__body">
+        <NearbyKitchensList
+          query={activeQuery}
+          maxKm={maxKm}
+          onClearSearch={() => {
+            setQuery("");
+            setActiveQuery("");
+          }}
+        />
         {session && session.savedKitchens.length > 0 ? (
           <section className="disc-rail" id="saved">
             <header className="disc-rail__head">
@@ -556,25 +559,9 @@ export function CustomerDiscoveryHome() {
         ) : null}
 
         {fetchError ? <div className="auth-card__error">{fetchError}</div> : null}
-        {loading ? <p className="app-loading">Finding kitchens near you…</p> : null}
 
         {!loading && feed ? (
           <>
-            <Rail
-              id="near-you"
-              title="Near you"
-              subtitle={
-                placeLabel
-                  ? `${feed.total_kitchens} near ${placeLabel}`
-                  : `${feed.total_kitchens} within ${maxKm} km`
-              }
-              empty="No kitchens in this radius. Widen search or try demo kitchens."
-            >
-              {nearYou.map((k) => (
-                <KitchenCard key={k.id} kitchen={k} onOpen={openDiscoveryKitchen} />
-              ))}
-            </Rail>
-
             <Rail
               id="featured"
               title="Featured"
@@ -654,11 +641,12 @@ export function CustomerDiscoveryHome() {
                 className="btn btn--ghost"
                 disabled={codeBusy}
                 onClick={() => {
-                  setCode(DEMO.kitchenCode);
                   void (async () => {
                     setCodeBusy(true);
+                    setCodeError("");
                     try {
-                      const kitchen = await fetchKitchenByCode(DEMO.kitchenCode);
+                      const kitchen = await resolveDemoKitchen();
+                      setCode(kitchen.code);
                       openKitchen(kitchen);
                     } catch (err) {
                       setCodeError(err instanceof Error ? err.message : "Demo kitchen not found");

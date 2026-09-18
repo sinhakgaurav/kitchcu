@@ -103,7 +103,7 @@ Do these in order. Fail on S1–S4 → stop the session.
 | S5 | Portal `:13000` | Brand hero; cities strip; no console crash |
 | S6 | Gateway `/docs` | Schema loads. Public ops have **no padlock**. **Authorize → OAuth2Password** accepts the three demo logins in §1.3 |
 | S7 | Admin logout → `sales@kitchcu.dev` / `sales123456` | Nav is **Sales + Kitchens only**. Overview / Employees / API Keys / Control **must not** appear. Overview KPIs must **not** load |
-| S8 | Customer / Kitchen / Admin first-run tour | Overlay **Skip / Next / Done**. **Show tips** in the header restarts it. Completing or skipping does not block the page |
+| S8 | Customer / Kitchen / Admin first-run tour | Overlay **Skip / Next / Done** (kitchen **14** steps, admin **12**, sales **7**). **Show tips** replays it. Every kitchen dashboard page has a collapsible **What you can do here** list. Super Admin: one list per top tab, plus a **per-workspace-tab** list after you open a kitchen (Profile, Train, KYC, …). Completing or skipping does not block the page |
 
 ---
 
@@ -207,7 +207,7 @@ Login as `9876543210` / `123456` unless a step says otherwise. After login, kitc
 2. Open `/login`. Demo strip lists owner phones. OTP story matches §1.3 (no fake SMS).
 3. Login. Land on `/dashboard` (Overview) or inbox-first Orders — never a black screen.
 4. Hero: kitchen **name + code CKPNQ001** on the left; primary CTAs (New order / Brand) **same row, top-right**.
-5. **First-run tips:** overlay Skip / Next / Done; **Show tips** restarts. Must not block Orders.
+5. **First-run tips:** overlay Skip / Next / Done — **14 steps** covering Orders, Menu, Ingredients/Healthy, bulk prep, Reports, CRM, stream, WhatsApp/payments, GST, Setup/KYC, and Your plan. **Show tips** in the top bar or Home replays it. Every dashboard route has a collapsible **What you can do here** list (Home, Orders, Menu, Ingredients, …). Collapse it when you know the page — it stays on every screen.
 
 ### 5.2 Overview (`/dashboard`)
 
@@ -299,6 +299,7 @@ Admin UI stays **English**. Login `admin@kitchcu.dev` / `admin123456`.
 3. Confirm links to Swagger, ReDoc, and portal `/openapi`.
 4. Sign in. Overview loads KPIs (owners, kitchens, customers, orders, open refunds).
 5. Expired / cleared token returns you to Sign in (not a broken shell).
+6. **First-run tips:** overlay Skip / Next / Done — **12 steps** (Overview → sales onboard → kitchen workspace inner tabs → owners/customers → orders/refunds/tickets → packages → API Keys → Control/calories → referrals/audit). **Show tips** replays it. Each top tab has **What you can do — {tab}**. After you open a kitchen, the list switches to that workspace tab (Profile, Train, KYC, …).
 
 ### 6.2 Walk every top tab
 
@@ -323,7 +324,7 @@ For each tab: open it, wait for load, confirm no white-crash, then do the action
 
 ### 6.3 Kitchen workspace (open CKPNQ001)
 
-Open each workspace tab and confirm it loads:
+Open each workspace tab. Confirm it loads **and** the collapsible **Workspace — {tab}** how-to lists the actions for that tab (not the generic kitchens list).
 
 | Tab | Check |
 |-----|-------|
@@ -508,7 +509,7 @@ Do **not** run `.\scripts\run-tests.ps1` or identity/community/billing pytest on
 | X7 | Media truth | Customer menu vs owner menu | Public heroes match the dish; drafts stay off the diner menu |
 | X8 | Commission | Owner subscription + reports | No “platform commission % of food” line |
 | X9 | Sales scope | Sales JWT vs `/admin/stats` and `/admin/api-keys` | 403 |
-| X10 | Tours | C / O / A first-run overlay | Skip or complete; Show tips restarts |
+| X10 | Tours | C / O / A first-run overlay + how-to lists | Kitchen 14 / admin 12 / sales 7; Show tips restarts; kitchen pages + admin tabs + kitchen workspace inner tabs all have What you can do |
 
 ---
 

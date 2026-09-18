@@ -18,7 +18,7 @@ import {
   validateOtp,
   validatePersonName,
 } from "../../shared/validation";
-import { fetchKitchenByCode } from "../../shared/publicApi";
+import { fetchKitchenByCode, resolveDemoKitchen } from "../../shared/publicApi";
 import { CUSTOMER_HOST, KITCHEN_HOST } from "../../shared/brand";
 import { CustomerSocialLogin } from "../../components/CustomerSocialLogin";
 import { PolicyAgreement } from "../../components/PolicyAgreement";
@@ -417,7 +417,20 @@ export function CustomerHomePage() {
             type="button"
             className="btn btn--ghost btn--lg"
             disabled={busy}
-            onClick={() => openKitchen(DEMO.kitchenCode)}
+            onClick={async () => {
+              setError("");
+              setBusy(true);
+              try {
+                const kitchen = await resolveDemoKitchen();
+                const next = saveKitchenToSession(kitchen);
+                updateSession(next);
+                navigate(`/kitchen/${kitchen.id}/menu`);
+              } catch (err) {
+                setError(err instanceof Error ? err.message : "Demo kitchen not found. Run seed-dev-data.py.");
+              } finally {
+                setBusy(false);
+              }
+            }}
           >
             Open demo ({DEMO.kitchenCode})
           </button>

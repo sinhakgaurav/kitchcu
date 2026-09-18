@@ -171,7 +171,7 @@ export function BrandPage() {
     <OwnerPageShell
       eyebrow={t("owner.nav.growth")}
       title={t("owner.pages.brand")}
-      description={`Your kitchen-first storefront on ${CUSTOMER_HOST} — logo, hero, menu, cart, checkout. Powered by kitchCU at the foot.`}
+      description={t("owner.pageDesc.brand")}
       meta={
         <div className="od-board__pills">
           <span className={`od-pill ${enabled ? "od-pill--live" : "od-pill--sub"}`}>
@@ -214,7 +214,7 @@ export function BrandPage() {
       {msg && <p className="auth-card__success">{msg}</p>}
 
       <OwnerPanel
-        title="Brand visuals"
+        title={t("owner.panels.brandVisuals")}
         description="Upload your kitchen logo and a hero background. Shown on the customer storefront at /k/{code}. JPEG, PNG, or WebP · max 10MB."
       >
         <div className="od-brand-media">
@@ -335,7 +335,7 @@ export function BrandPage() {
       </OwnerPanel>
 
       <OwnerPanel
-        title="Share link"
+        title={t("owner.panels.shareLink")}
         description="WhatsApp Status, Instagram bio, flyer QR — also injected as {{storefront_url}} in message templates."
       >
         <div className="kc-copy-field owner-share__row">
@@ -357,7 +357,7 @@ export function BrandPage() {
       </OwnerPanel>
 
       <OwnerPanel
-        title="Page content"
+        title={t("owner.panels.pageContent")}
         description="Tagline, accent, and header alignment on the storefront."
       >
         <label className="kc-field">
@@ -428,7 +428,7 @@ export function BrandPage() {
       </OwnerPanel>
 
       <OwnerPanel
-        title="Message templates"
+        title={t("owner.panels.messageTemplates")}
         description="WhatsApp / email blasts can include {{storefront_url}} and {{tagline}} so customers land on this brand page."
       >
         <p className="owner-muted">Suggested body:</p>
@@ -440,7 +440,7 @@ export function BrandPage() {
         </div>
       </OwnerPanel>
 
-      <OwnerPanel title="What customers see">
+      <OwnerPanel title={t("owner.panels.customerPreview")}>
         <ul className="od-share__tips">
           <li>Your logo, hero background, name &amp; tagline — not the kitchCU discover home</li>
           <li>Your live-capture menu → cart → checkout → PDF bill</li>

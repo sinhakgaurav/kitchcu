@@ -283,17 +283,17 @@ export function OrdersPage() {
                 className="od-pill od-pill--alert"
                 onClick={() => setParams({ tab: "drafts" })}
               >
-                {drafts.length} draft{drafts.length !== 1 ? "s" : ""} need review
+                {t("owner.orders.draftsNeedReview", { count: drafts.length })}
               </button>
             </div>
           )}
         </div>
         <div className="od-board__hero-actions">
           <button type="button" className="btn btn--ghost" disabled={exporting} onClick={() => void handleExportCsv()}>
-            {exporting ? "Exporting…" : "Export CSV"}
+            {exporting ? t("owner.orders.exporting") : t("owner.orders.exportCsv")}
           </button>
-          <Link to="/dashboard/orders/new" className="btn btn--primary">New order</Link>
-          <Link to="/dashboard" className="btn btn--ghost">Dashboard</Link>
+          <Link to="/dashboard/orders/new" className="btn btn--primary">{t("owner.orders.newOrder")}</Link>
+          <Link to="/dashboard" className="btn btn--ghost">{t("common.dashboard")}</Link>
         </div>
       </section>
 
@@ -302,19 +302,19 @@ export function OrdersPage() {
           <span className="od-kpi__icon od-kpi__icon--orders" aria-hidden="true" />
           <div>
             <strong>{activeOrders.length}</strong>
-            <span>Active now</span>
-            <em>In kitchen pipeline</em>
+            <span>{t("owner.orders.activeNow")}</span>
+            <em>{t("owner.orders.inPipeline")}</em>
           </div>
         </div>
         <div className="od-kpi dash-card">
           <span className="od-kpi__icon od-kpi__icon--drafts" aria-hidden="true" />
           <div>
             <strong>{drafts.length}</strong>
-            <span>WhatsApp drafts</span>
+            <span>{t("owner.home.kpiDrafts")}</span>
             <em>
               {parseStats && parseStats.lines_total > 0
-                ? `${Math.round((parseStats.match_rate ?? 0) * 100)}% lines mapped (30d)`
-                : "Awaiting confirmation"}
+                ? t("owner.orders.linesMapped", { pct: Math.round((parseStats.match_rate ?? 0) * 100) })
+                : t("owner.orders.awaitingConfirm")}
             </em>
           </div>
         </div>
@@ -322,8 +322,8 @@ export function OrdersPage() {
           <span className="od-kpi__icon od-kpi__icon--revenue" aria-hidden="true" />
           <div>
             <strong>{inr(todayRevenue)}</strong>
-            <span>Today&apos;s revenue</span>
-            <em>{todayOrders.length} order{todayOrders.length !== 1 ? "s" : ""}</em>
+            <span>{t("owner.orders.todayRevenue")}</span>
+            <em>{t("owner.orders.orderCount", { count: todayOrders.length })}</em>
           </div>
         </div>
         <div className="od-kpi dash-card">
@@ -357,8 +357,8 @@ export function OrdersPage() {
             Status
             <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
               <option value="">All statuses</option>
-              {Object.entries(STATUS_LABELS).map(([value, label]) => (
-                <option key={value} value={value}>{label}</option>
+              {Object.keys(STATUS_LABELS).map((value) => (
+                <option key={value} value={value}>{t(`status.${value}`, { defaultValue: value })}</option>
               ))}
             </select>
           </label>
@@ -394,7 +394,7 @@ export function OrdersPage() {
       <ListingToolbar
         search={search}
         onSearchChange={setSearch}
-        searchPlaceholder="Search orders, customer, dishes…"
+        searchPlaceholder={t("owner.list.searchOrders")}
         sort={sort}
         onSortChange={(v) => setSort(v as "newest" | "name_asc" | "name_desc")}
         sortOptions={[
@@ -527,7 +527,7 @@ export function OrdersPage() {
                     </div>
                     <div className="od-recent__cell od-recent__cell--status">
                       <span className={`status-badge status-badge--${o.status}`}>
-                        {STATUS_LABELS[o.status] ?? o.status}
+                        {t(`status.${o.status}`, { defaultValue: STATUS_LABELS[o.status] ?? o.status })}
                       </span>
                     </div>
                     <div className="od-recent__cell od-recent__cell--meta">

@@ -41,10 +41,8 @@ export function KitchenProvider({ children }: { children: ReactNode }) {
       if (valid) {
         setKitchenIdState(valid.id);
       } else if (list.length > 0) {
-        const preferred =
-          list.find((k) => k.code === "CKPNQ001") ?? list[0];
-        setKitchenIdState(preferred.id);
-        setStoredKitchenId(preferred.id);
+        setKitchenIdState(list[0].id);
+        setStoredKitchenId(list[0].id);
       } else {
         setKitchenIdState(null);
       }

@@ -14,8 +14,10 @@ import {
   type SharedRecipe,
 } from "../../lib/api";
 import { useKitchen } from "../../lib/kitchen";
+import { useTranslation } from "react-i18next";
 
 export function CommunityPage() {
+  const { t } = useTranslation();
   const { kitchen } = useKitchen();
   const [recipes, setRecipes] = useState<SharedRecipe[]>([]);
   const [rewards, setRewards] = useState<RewardBalance | null>(null);
@@ -107,15 +109,15 @@ export function CommunityPage() {
 
   return (
     <OwnerPageShell
-      eyebrow="Community"
-      title="Community"
-      description="Share recipes, earn reward points, climb chef rankings (F23–F24)"
+      eyebrow={t("owner.nav.community")}
+      title={t("owner.pages.community")}
+      description={t("owner.pageDesc.community")}
     >
       {error && <p className="form-error">{error}</p>}
       {msg && <div className="auth-card__success">{msg}</div>}
 
       <OwnerPanel
-        title="Reward points"
+        title={t("owner.panels.rewardPoints")}
         description="10 pts per appreciation · 100 = subscription discount · 500 = featured listing"
         action={
           <strong style={{ fontSize: "1.25rem" }}>{rewards?.points_balance ?? 0} pts</strong>
@@ -141,7 +143,7 @@ export function CommunityPage() {
         </div>
       </OwnerPanel>
 
-      <OwnerPanel title="Share an original recipe">
+      <OwnerPanel title={t("owner.panels.shareRecipe")}>
         <form className="owner-form" onSubmit={onShare}>
           <label>
             Title
@@ -178,7 +180,7 @@ export function CommunityPage() {
         </form>
       </OwnerPanel>
 
-      <OwnerPanel title="Your shared recipes">
+      <OwnerPanel title={t("owner.panels.sharedRecipes")}>
         {recipes.length === 0 ? (
           <OwnerEmpty message="No shared recipes yet — share your first original recipe above." />
         ) : (
@@ -196,7 +198,7 @@ export function CommunityPage() {
       </OwnerPanel>
 
       <OwnerPanel
-        title="City chef rankings"
+        title={t("owner.panels.chefRankings")}
         description={`Top kitchens in ${kitchen.city ?? "your city"}`}
         action={
           <button type="button" className="btn btn--ghost btn--sm" disabled={busy} onClick={onComputeRankings}>

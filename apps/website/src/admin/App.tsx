@@ -96,6 +96,8 @@ import {
 } from "./adminCharts";
 import { roleHasPermission } from "./rbac";
 import { ProductTour, TourReplayButton } from "../components/ProductTour";
+import { DashboardHowTo } from "../components/DashboardHowTo";
+import { ADMIN_KITCHEN_PANEL_GUIDES, ADMIN_TAB_GUIDES, ADMIN_TOUR_STEPS, SALES_TOUR_STEPS } from "./adminGuides";
 import { ADMIN_DEV_EMAIL, ADMIN_HOST, CUSTOMER_HOST, KITCHEN_HOST } from "../shared/brand";
 import { DEMO_ADMIN, DEMO_OWNERS, adminLoginDefaults } from "../shared/demo";
 import { showDemoCredentials } from "../shared/env";
@@ -188,7 +190,7 @@ const TAB_META: Record<Tab, { title: string; desc: string }> = {
   },
   kitchens: {
     title: "Kitchens",
-    desc: "Kitchen workspace — brand, WhatsApp, payments, GST, pantry, KYC, package, marketing, modules, streaming, owner training",
+    desc: "Search, then open a kitchen — each workspace tab has its own What you can do list (Profile, Train, KYC, keys, GST, …)",
   },
   sales: {
     title: "Sales onboarding",
@@ -452,42 +454,30 @@ export default function AdminApp() {
             </div>
             <TourReplayButton id={me?.role === "sales" ? "sales" : "admin"} label="Show tips" />
           </header>
+          {tab !== "kitchens" &&
+            (me?.role === "sales" ? (
+              <DashboardHowTo
+                id={`admin-${tab}`}
+                title={ADMIN_TAB_GUIDES.sales.title}
+                steps={ADMIN_TAB_GUIDES.sales.steps}
+              />
+            ) : (
+              <DashboardHowTo
+                id={`admin-${tab}`}
+                title={ADMIN_TAB_GUIDES[tab]?.title || "What you can do here"}
+                steps={ADMIN_TAB_GUIDES[tab]?.steps || []}
+              />
+            ))}
 
           {me?.role === "sales" ? (
             <ProductTour
               id="sales"
-              steps={[
-                {
-                  title: "Onboard on-site",
-                  body: "Open Sales. Enter the owner’s phone and name, kitchen address, and the map pin that matches the stall. Create — they get a kitchen code.",
-                },
-                {
-                  title: "Train with the owner",
-                  body: "Tick the playbook while they do it on the Kitchen app: live dish photo, recipe, radius, KYC, a test order, then they log in alone.",
-                },
-                {
-                  title: "Your kitchen book",
-                  body: "Kitchens lists only kitchens you onboarded. You can correct profile and pin. You cannot open Control, API Keys, or another rep’s book.",
-                },
-              ]}
+              steps={SALES_TOUR_STEPS}
             />
           ) : (
             <ProductTour
               id="admin"
-              steps={[
-                {
-                  title: "Platform pulse",
-                  body: "Overview is KPIs only. Hire sales under Employees (role sales) so field staff onboard without seeing secrets.",
-                },
-                {
-                  title: "Kitchen workspace",
-                  body: "Open a kitchen for profile, KYC, WhatsApp phone id, payments, package, and Train. Kitchen code never changes.",
-                },
-                {
-                  title: "Control and keys",
-                  body: "Flags and platform Meta/Razorpay secrets stay here. Sales never pastes SaaS secrets. Same product in the Admin store app.",
-                },
-              ]}
+              steps={ADMIN_TOUR_STEPS}
             />
           )}
 
@@ -1582,6 +1572,14 @@ function AdminKitchens({
       {error && <p className="auth-card__error">{error}</p>}
       {ok && <p className="auth-card__success">{ok}</p>}
 
+      {!detail ? (
+        <DashboardHowTo
+          id="admin-kitchens-list"
+          title={ADMIN_TAB_GUIDES.kitchens.title}
+          steps={ADMIN_TAB_GUIDES.kitchens.steps}
+        />
+      ) : null}
+
       <div
         className={`admin-kitchen-workspace${detail && selectedId ? "" : " admin-kitchen-workspace--list-only"}`}
       >
@@ -1666,6 +1664,14 @@ function AdminKitchens({
                 ))}
               </div>
             </div>
+
+            <DashboardHowTo
+              id={`admin-kitchen-${panelTab}`}
+              title={
+                ADMIN_KITCHEN_PANEL_GUIDES[panelTab]?.title || "What you can do in this workspace"
+              }
+              steps={ADMIN_KITCHEN_PANEL_GUIDES[panelTab]?.steps || []}
+            />
 
             {panelTab === "orders" && (
               <div className="admin-kitchen-panel__body">

@@ -19,12 +19,14 @@ import {
   type SubscriptionSummary,
 } from "../../lib/api";
 import { useKitchen } from "../../lib/kitchen";
+import { useTranslation } from "react-i18next";
 
 function isGolden(s: GrowthSuggestion) {
   return s.suggestion_type === "golden_performance_day";
 }
 
 export function GrowthPage() {
+  const { t } = useTranslation();
   const { kitchen } = useKitchen();
   const [suggestions, setSuggestions] = useState<GrowthSuggestion[]>([]);
   const [combos, setCombos] = useState<DishCombo[]>([]);
@@ -149,9 +151,9 @@ export function GrowthPage() {
 
   return (
     <OwnerPageShell
-      eyebrow="Growth"
-      title="Growth intelligence"
-      description="Actionable suggestions, dish combos & daily menu WhatsApp push"
+      eyebrow={t("owner.nav.growth")}
+      title={t("owner.pages.growth")}
+      description={t("owner.pageDesc.growth")}
       actions={
         <button type="button" className="btn btn--primary" onClick={onGenerate} disabled={generating}>
           {generating ? "Generating…" : "Generate suggestions"}
@@ -166,7 +168,7 @@ export function GrowthPage() {
         <>
           {tiffin && (
             <OwnerPanel
-              title="Tiffin & monthly plans"
+              title={t("owner.panels.tiffinPlans")}
               description="Subscription pipeline — recurring kitchen revenue without food commission"
             >
               <p className="owner-muted">
@@ -181,7 +183,7 @@ export function GrowthPage() {
           )}
           {(goldenSuggestions.length > 0 || goldenPins.length > 0) && (
             <OwnerPanel
-              title="Golden performance days"
+              title={t("owner.panels.goldenDays")}
               description="Peak order days with strong ratings & positive comments — save that recipe"
             >
               {goldenSuggestions.length > 0 && (
@@ -248,7 +250,7 @@ export function GrowthPage() {
             </OwnerPanel>
           )}
 
-          <OwnerPanel title="Suggestions" description="AI-powered actions from your order data">
+          <OwnerPanel title={t("owner.panels.suggestions")} description={t("owner.panels.suggestionsDesc")}>
             {otherSuggestions.length === 0 ? (
               <OwnerEmpty message="No active suggestions — click Generate to analyze your orders." />
             ) : (
@@ -272,7 +274,7 @@ export function GrowthPage() {
           </OwnerPanel>
 
           <div className="report-grid">
-            <OwnerPanel title="Top dish combos" description="Frequently ordered together">
+            <OwnerPanel title={t("owner.panels.combos")} description={t("owner.panels.combosDesc")}>
               {combos.length === 0 ? (
                 <OwnerEmpty message="Need more multi-item orders to detect combos." />
               ) : (
@@ -292,7 +294,7 @@ export function GrowthPage() {
               )}
             </OwnerPanel>
 
-            <OwnerPanel title="Order patterns" description="Busiest days of the week">
+            <OwnerPanel title={t("owner.panels.patterns")} description={t("owner.panels.patternsDesc")}>
               {patterns ? (
                 <>
                   <p className="report-hint">{patterns.insight}</p>
@@ -316,7 +318,7 @@ export function GrowthPage() {
           </div>
 
           <OwnerPanel
-            title="Daily menu WhatsApp push"
+            title={t("owner.panels.dailyMenuPush")}
             description="Select today's dishes — we queue a blast to your CRM contacts (F39)"
           >
             <div className="owner-tabs" style={{ flexWrap: "wrap", gap: "0.5rem" }}>

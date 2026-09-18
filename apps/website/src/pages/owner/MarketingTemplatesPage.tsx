@@ -11,6 +11,7 @@ import {
   type MarketingTemplate,
 } from "../../lib/api";
 import { useKitchen } from "../../lib/kitchen";
+import { useTranslation } from "react-i18next";
 import { customerUrl } from "../../shared/urls";
 
 async function buildMenuLine(kitchenId: string): Promise<string> {
@@ -24,6 +25,7 @@ async function buildMenuLine(kitchenId: string): Promise<string> {
 }
 
 export function MarketingTemplatesPage() {
+  const { t } = useTranslation();
   const { kitchen } = useKitchen();
   const [rows, setRows] = useState<MarketingTemplate[]>([]);
   const [loading, setLoading] = useState(true);
@@ -166,9 +168,9 @@ export function MarketingTemplatesPage() {
 
   return (
     <OwnerPageShell
-      eyebrow="Marketing"
-      title="Message templates"
-      description="Reusable WhatsApp & email copy for CRM blasts — use {{variables}} for personalization"
+      eyebrow={t("owner.nav.templates")}
+      title={t("owner.pages.templates")}
+      description={t("owner.pageDesc.templates")}
     >
       {error && <p className="auth-card__error">{error}</p>}
       {ok && <p className="auth-card__success">{ok}</p>}
@@ -239,7 +241,7 @@ export function MarketingTemplatesPage() {
         </form>
       </OwnerPanel>
 
-      <OwnerPanel title="Send to CRM" description="Audience for Preview / Send actions below">
+      <OwnerPanel title={t("owner.panels.sendCrm")} description={t("owner.panels.sendCrmDesc")}>
         <label className="owner-forms">
           Audience
           <select className="kc-select" value={audience} onChange={(e) => setAudience(e.target.value)}>
@@ -256,7 +258,7 @@ export function MarketingTemplatesPage() {
         )}
       </OwnerPanel>
 
-      <OwnerPanel title="Your templates" description={`${rows.length} saved`}>
+      <OwnerPanel title={t("owner.panels.yourTemplates")} description={t("owner.panels.templatesSaved", { count: rows.length })}>
         {loading ? (
           <p className="app-loading">Loading…</p>
         ) : rows.length === 0 ? (

@@ -10,6 +10,7 @@ import {
   type DishTrial,
 } from "../../lib/api";
 import { useKitchen } from "../../lib/kitchen";
+import { useTranslation } from "react-i18next";
 import { filterAndSortByName } from "../../shared/listingControls";
 
 const CATEGORIES = [
@@ -20,6 +21,7 @@ const CATEGORIES = [
 ];
 
 export function LearningPage() {
+  const { t } = useTranslation();
   const { kitchen } = useKitchen();
   const [category, setCategory] = useState("");
   const [recipes, setRecipes] = useState<CuratedRecipe[]>([]);
@@ -82,16 +84,16 @@ export function LearningPage() {
 
   return (
     <OwnerPageShell
-      eyebrow="Growth"
-      title="Learning portal"
-      description="Browse curated recipes, learn dishes, run sample trials (F21–F22)"
+      eyebrow={t("owner.nav.growth")}
+      title={t("owner.pages.learning")}
+      description={t("owner.pageDesc.learning")}
     >
       {error && <p className="form-error">{error}</p>}
 
       <ListingToolbar
         search={search}
         onSearchChange={setSearch}
-        searchPlaceholder="Search recipes & trials…"
+        searchPlaceholder={t("owner.list.searchRecipes")}
         sort={sort}
         onSortChange={(v) => setSort(v as "name_asc" | "name_desc" | "newest")}
         sortOptions={[
@@ -105,7 +107,7 @@ export function LearningPage() {
         resultCount={visibleRecipes.length}
       />
 
-      <OwnerPanel title="Your trials" description="Dishes you're testing before adding to menu">
+      <OwnerPanel title={t("owner.panels.yourTrials")} description={t("owner.panels.yourTrialsDesc")}>
         {visibleTrials.length === 0 ? (
           <OwnerEmpty message='No trials yet — pick a recipe below and tap "I learned this dish".' />
         ) : (
@@ -123,7 +125,7 @@ export function LearningPage() {
       </OwnerPanel>
 
       <OwnerPanel
-        title="Curated recipes"
+        title={t("owner.panels.curatedRecipes")}
         description="Learn from the community and test with your regulars"
       >
         {loading ? (

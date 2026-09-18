@@ -9,8 +9,10 @@ import {
   type Settlement,
 } from "../../lib/api";
 import { useKitchen } from "../../shared/kitchenContext";
+import { useTranslation } from "react-i18next";
 
 export function PaymentGatewayPage() {
+  const { t } = useTranslation();
   const { kitchen } = useKitchen();
   const [cfg, setCfg] = useState<KitchenPaymentGateway | null>(null);
   const [keyId, setKeyId] = useState("");
@@ -109,11 +111,11 @@ export function PaymentGatewayPage() {
 
   return (
     <OwnerPageShell
-      eyebrow="Integrations"
-      title="Payment gateway"
-      description="Razorpay keys for this kitchen — customer checkout and Route settlements. KitchCu takes no food commission."
+      eyebrow={t("owner.nav.paymentGateway")}
+      title={t("owner.pages.paymentGateway")}
+      description={t("owner.pageDesc.payments")}
     >
-      <OwnerPanel title="Razorpay credentials">
+      <OwnerPanel title={t("owner.panels.razorpay")}>
         {error && <p className="auth-card__error">{error}</p>}
         {ok && <p className="owner-forms__success">{ok}</p>}
         <form className="owner-forms" onSubmit={onSubmit}>
@@ -189,7 +191,7 @@ export function PaymentGatewayPage() {
         </p>
       </OwnerPanel>
       <OwnerPanel
-        title="Route settlements"
+        title={t("owner.panels.routeSettlements")}
         description="Money transferred to this kitchen after multi-kitchen checkout. Platform food commission is always ₹0."
         action={
           <label className="od-settle__filter">

@@ -1,9 +1,11 @@
 """Customer discovery home feed — near you, featured, liked, cheapest dishes."""
 
+import uuid
+
 import pytest
 from httpx import AsyncClient
 
-from tests.test_kitchens import KITCHEN_PAYLOAD
+from tests.test_kitchens import KITCHEN_PAYLOAD, _seed_catalog_for_kitchen
 
 
 @pytest.mark.asyncio
@@ -27,6 +29,7 @@ async def test_discovery_home_includes_nearby_kitchen(client: AsyncClient, auth_
     created = await client.post("/api/v1/kitchens", json=KITCHEN_PAYLOAD, headers=auth_headers)
     assert created.status_code == 201
     kitchen_id = created.json()["id"]
+    _seed_catalog_for_kitchen(uuid.UUID(kitchen_id))
 
     await client.patch(
         f"/api/v1/kitchens/{kitchen_id}/branded-page",
@@ -73,6 +76,7 @@ async def test_discovery_search_matches_kitchen_name_case_insensitively(
     created = await client.post("/api/v1/kitchens", json=KITCHEN_PAYLOAD, headers=auth_headers)
     assert created.status_code == 201
     kitchen_id = created.json()["id"]
+    _seed_catalog_for_kitchen(uuid.UUID(kitchen_id))
     name = created.json()["name"]
 
     hit = await _discovery(client, q=name[:6].lower())
@@ -86,6 +90,7 @@ async def test_discovery_search_matches_kitchen_code_and_city(
 ):
     created = await client.post("/api/v1/kitchens", json=KITCHEN_PAYLOAD, headers=auth_headers)
     kitchen = created.json()
+    _seed_catalog_for_kitchen(uuid.UUID(kitchen["id"]))
 
     by_code = await _discovery(client, q=kitchen["code"])
     assert any(k["id"] == kitchen["id"] for k in by_code["near_you"])
@@ -118,6 +123,7 @@ async def test_discovery_search_wildcards_are_literal(client: AsyncClient, auth_
 async def test_discovery_blank_search_is_ignored(client: AsyncClient, auth_headers: dict):
     created = await client.post("/api/v1/kitchens", json=KITCHEN_PAYLOAD, headers=auth_headers)
     kitchen_id = created.json()["id"]
+    _seed_catalog_for_kitchen(uuid.UUID(kitchen_id))
 
     blank = await _discovery(client, q="   ")
     assert any(k["id"] == kitchen_id for k in blank["near_you"])

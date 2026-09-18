@@ -106,7 +106,7 @@ export function MenuPage() {
           <ListingToolbar
             search={search}
             onSearchChange={setSearch}
-            searchPlaceholder="Search dishes…"
+            searchPlaceholder={t("owner.list.searchDishes")}
             sort={sort}
             onSortChange={(v) => setSort(v as DishSort)}
             highlights={highlights}
@@ -184,7 +184,7 @@ export function MenuPage() {
                       >
                         {editingId === d.id ? "Close edit" : "Edit dish"}
                       </button>
-                      <Link to={`/dashboard/ingredients?dish=${d.id}`} className="btn btn--ghost btn--sm">
+                      <Link to={`/dashboard/ingredients?dish=${d.id}#recipe-map`} className="btn btn--ghost btn--sm">
                         Recipe & prep
                       </Link>
                     </div>

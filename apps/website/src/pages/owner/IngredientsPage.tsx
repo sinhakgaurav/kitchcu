@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { ListingToolbar } from "../../components/ListingToolbar";
 import { LiveCapturePhotoField } from "../../components/LiveCapturePhotoField";
@@ -23,6 +23,22 @@ import {
   type RecipeLine,
 } from "../../lib/api";
 import { useKitchen } from "../../lib/kitchen";
+import { useTranslation } from "react-i18next";
+import {
+  applyPantryToUnmappedLines,
+  mergeDishIngredientsWithRecipe,
+  parseDishIngredientTokens,
+  type MapperRecipeLine,
+} from "../../shared/ingredientMapper";
+
+type OwnerDishOpt = {
+  id: string;
+  name: string;
+  is_active: boolean;
+  ingredients_description: string | null;
+};
+
+type MapperRecipe = Omit<DishRecipe, "lines"> & { lines: MapperRecipeLine[] };
 
 const PCS = new Set(["pcs", "pc", "piece", "pieces"]);
 
@@ -63,13 +79,16 @@ const EMPTY_STEP = (order: number): PrepStep => ({
 });
 
 export function IngredientsPage() {
+  const { t } = useTranslation();
   const { kitchen } = useKitchen();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const dishFromUrl = searchParams.get("dish") ?? "";
   const [ingredients, setIngredients] = useState<Ingredient[]>([]);
-  const [dishes, setDishes] = useState<{ id: string; name: string; is_active: boolean }[]>([]);
+  const [dishes, setDishes] = useState<OwnerDishOpt[]>([]);
   const [selectedDishId, setSelectedDishId] = useState("");
-  const [recipe, setRecipe] = useState<DishRecipe | null>(null);
+  const [recipe, setRecipe] = useState<MapperRecipe | null>(null);
+  const [focusStockId, setFocusStockId] = useState("");
+  const newNameRef = useRef<HTMLInputElement>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [pantrySearch, setPantrySearch] = useState("");
@@ -104,6 +123,7 @@ export function IngredientsPage() {
         id: d.id,
         name: d.name,
         is_active: d.is_active,
+        ingredients_description: d.ingredients_description,
       }));
       setDishes(allDishes);
       if (dishFromUrl && allDishes.some((d) => d.id === dishFromUrl)) {
@@ -122,13 +142,22 @@ export function IngredientsPage() {
     load();
   }, [kitchen]);
 
+  const selectedDish = dishes.find((d) => d.id === selectedDishId);
+  const dishTokens = useMemo(
+    () => parseDishIngredientTokens(selectedDish?.ingredients_description),
+    [selectedDish?.ingredients_description],
+  );
+
+  const bindRecipeLines = (lines: RecipeLine[]): MapperRecipeLine[] =>
+    mergeDishIngredientsWithRecipe(dishTokens, lines, ingredients);
+
   useEffect(() => {
     if (!kitchen || !selectedDishId) return;
     fetchDishRecipe(kitchen.id, selectedDishId)
       .then((r) => {
         setRecipe({
           ...r,
-          lines: r.lines.length ? r.lines : [],
+          lines: bindRecipeLines(r.lines),
           prep_steps: r.prep_steps?.length ? r.prep_steps : [],
         });
         setCaloriesNote(r.calories_description ?? "");
@@ -138,7 +167,7 @@ export function IngredientsPage() {
         setRecipe({
           dish_id: selectedDishId,
           dish_name: dishes.find((d) => d.id === selectedDishId)?.name ?? "",
-          lines: [],
+          lines: bindRecipeLines([]),
           prep_steps: [],
         });
       });
@@ -159,6 +188,40 @@ export function IngredientsPage() {
     });
   }, [kitchen, selectedDishId, dishes]);
 
+  useEffect(() => {
+    if (loading) return;
+    const hash = window.location.hash.replace("#", "");
+    const target = hash || (dishFromUrl ? "recipe-map" : "");
+    if (!target) return;
+    const el = document.getElementById(target);
+    if (!el) return;
+    if (target.startsWith("stock-")) setFocusStockId(target.slice("stock-".length));
+    requestAnimationFrame(() => el.scrollIntoView({ behavior: "smooth", block: "start" }));
+  }, [loading, selectedDishId, dishFromUrl]);
+
+  const selectDish = (id: string) => {
+    setSelectedDishId(id);
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      if (id) next.set("dish", id);
+      else next.delete("dish");
+      return next;
+    }, { replace: true });
+  };
+
+  const goToStock = (ingredientId?: string) => {
+    const target = ingredientId ? `stock-${ingredientId}` : "pantry-stock";
+    setFocusStockId(ingredientId ?? "");
+    const el = document.getElementById(target);
+    el?.scrollIntoView({ behavior: "smooth", block: ingredientId ? "center" : "start" });
+  };
+
+  const addToPantryFromToken = (name: string) => {
+    setNewName(name);
+    goToStock();
+    requestAnimationFrame(() => newNameRef.current?.focus());
+  };
+
   const onAddIngredient = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!kitchen || !newName.trim()) return;
@@ -177,7 +240,9 @@ export function IngredientsPage() {
         photo_url: newPhoto.trim() || undefined,
         kcal_per_100: newKcal.trim() ? Number(newKcal) : undefined,
       });
-      setIngredients((prev) => [...prev, row].sort((a, b) => a.name.localeCompare(b.name)));
+      const nextPantry = [...ingredients, row].sort((a, b) => a.name.localeCompare(b.name));
+      setIngredients(nextPantry);
+      setRecipe((prev) => (prev ? { ...prev, lines: applyPantryToUnmappedLines(prev.lines, nextPantry) } : prev));
       setNewName("");
       setNewPhoto("");
       setNewBrand("");
@@ -352,21 +417,69 @@ export function IngredientsPage() {
 
   return (
     <OwnerPageShell
-      eyebrow="Operations"
-      title="Ingredient mapper"
-      description="Pantry SKUs (brand, pack weight, photo, kcal) map onto dish recipes. Plate calories sum automatically from quantity × pantry kcal. The Healthy tag is automatic — you cannot pin it. Health scores are a platform library match on the SKU name — typical home-kitchen use, not medical advice."
+      eyebrow={t("owner.nav.operations")}
+      title={t("owner.pages.ingredientsMapper")}
+      description={t("owner.pageDesc.ingredients")}
+      actions={
+        <>
+          <a
+            href="#recipe-map"
+            className="btn btn--ghost btn--sm"
+            onClick={(e) => {
+              e.preventDefault();
+              document.getElementById("recipe-map")?.scrollIntoView({ behavior: "smooth", block: "start" });
+            }}
+          >
+            {t("owner.streamUi.mapIngredients")}
+          </a>
+          <a
+            href="#pantry-stock"
+            className="btn btn--ghost btn--sm"
+            onClick={(e) => {
+              e.preventDefault();
+              goToStock();
+            }}
+          >
+            {t("owner.streamUi.ingredientStocks")}
+          </a>
+        </>
+      }
     >
       {error && <p className="form-error">{error}</p>}
       {savedMsg && <div className="auth-card__success">{savedMsg}</div>}
       {loading ? (
         <div className="app-loading">Loading pantry…</div>
       ) : (
-        <>
-          <OwnerPanel title="Pantry stock" description="Brand, pack size, photo, kcal per 100 g/ml (or per piece), and on-hand quantity in the same unit">
+        <div className="owner-mapper-flow">
+          <OwnerPanel
+            id="pantry-stock"
+            className="owner-mapper-stock"
+            title={t("owner.panels.ingredientStocks")}
+            description={t("owner.panels.ingredientStocksDesc")}
+            action={
+              <a
+                href="#recipe-map"
+                className="od-panel__link"
+                onClick={(e) => {
+                  e.preventDefault();
+                  document.getElementById("recipe-map")?.scrollIntoView({ behavior: "smooth", block: "start" });
+                }}
+              >
+                {t("owner.panels.mapIngredients")} →
+              </a>
+            }
+          >
             <form className="owner-form owner-form--grid" onSubmit={onAddIngredient}>
               <label>
                 Name
-                <input value={newName} onChange={(e) => setNewName(e.target.value)} required placeholder="Garam masala" />
+                <input
+                  ref={newNameRef}
+                  id="new-ingredient-name"
+                  value={newName}
+                  onChange={(e) => setNewName(e.target.value)}
+                  required
+                  placeholder="Garam masala"
+                />
               </label>
               <label>
                 Brand
@@ -438,7 +551,7 @@ export function IngredientsPage() {
             <ListingToolbar
               search={pantrySearch}
               onSearchChange={setPantrySearch}
-              searchPlaceholder="Search pantry…"
+              searchPlaceholder={t("owner.list.searchPantry")}
               sort={pantrySort}
               onSortChange={(v) => setPantrySort(v as typeof pantrySort)}
               sortOptions={[
@@ -470,7 +583,13 @@ export function IngredientsPage() {
                 </thead>
                 <tbody>
                   {shownIngredients.map((ing) => (
-                    <tr key={ing.id} className={ing.is_low ? "owner-row--warn" : undefined}>
+                    <tr
+                      id={`stock-${ing.id}`}
+                      key={ing.id}
+                      className={[ing.is_low ? "owner-row--warn" : "", focusStockId === ing.id ? "owner-row--focus" : ""]
+                        .filter(Boolean)
+                        .join(" ") || undefined}
+                    >
                       <td>
                         {ing.photo_url ? (
                           <img src={ing.photo_url} alt="" className="owner-thumb" onError={(e) => {
@@ -559,13 +678,20 @@ export function IngredientsPage() {
           </OwnerPanel>
 
           <OwnerPanel
-            title="Dish recipe & prep"
-            description={`Every dish maps to pantry SKUs. Calories are quantity × pantry kcal — the Healthy tag is awarded automatically when the map is complete, the plate is ≤ ${recipe?.healthy_max_kcal ?? 500} kcal, and the health score is ≥ ${recipe?.healthy_min_score ?? 65}. Super Admin Control sets that kcal cap.`}
+            id="recipe-map"
+            className="owner-mapper-dish"
+            title={t("owner.panels.mapIngredients")}
+            description={`Menu ingredients for this dish map to pantry stock. Calories are quantity × pantry kcal — Healthy is automatic when the map is complete, the plate is ≤ ${recipe?.healthy_max_kcal ?? 500} kcal, and the health score is ≥ ${recipe?.healthy_min_score ?? 65}.`}
+            action={
+              <button type="button" className="od-panel__link" onClick={() => goToStock()}>
+                {t("owner.panels.ingredientStocks")} →
+              </button>
+            }
           >
             <div className="owner-form">
             <label>
               Dish
-              <select value={selectedDishId} onChange={(e) => setSelectedDishId(e.target.value)}>
+              <select value={selectedDishId} onChange={(e) => selectDish(e.target.value)}>
                 {dishes.map((d) => (
                   <option key={d.id} value={d.id}>
                     {d.name}
@@ -605,6 +731,13 @@ export function IngredientsPage() {
                   ) : (
                     <p>Add pantry kcal on every SKU to calculate this plate.</p>
                   )}
+                  <p className="owner-mapper-coverage">
+                    {recipe.lines.filter((l) => l.ingredient_id).length} of {recipe.lines.length || dishTokens.length}{" "}
+                    dish ingredients mapped to pantry stock.
+                    {dishTokens.length === 0
+                      ? " Add an ingredients list on Menu so the mapper can pre-fill rows."
+                      : ""}
+                  </p>
                   <p className="auth-card__hint">
                     Kitchen estimate from recipe amounts — not a lab nutrition label. You cannot pin Healthy.
                   </p>
@@ -618,13 +751,53 @@ export function IngredientsPage() {
                     placeholder="Light lunch bowl — dal + greens."
                   />
                 </label>
-                <h3 className="owner-subhead">Ingredients (per portion)</h3>
+                <h3 className="owner-subhead">Dish ingredients → pantry stock (per portion)</h3>
+                {recipe.lines.length === 0 && (
+                  <p className="auth-card__hint">
+                    No ingredients on this dish yet. Add lines below, or write the ingredient list on Menu
+                    and reopen this mapper.
+                  </p>
+                )}
                 <div className="owner-recipe-cards">
                   {recipe.lines.map((line, idx) => (
-                    <div key={`line-${idx}`} className="owner-recipe-card">
+                    <div
+                      key={`line-${idx}`}
+                      className={`owner-recipe-card${line.ingredient_id ? "" : " owner-recipe-card--unmapped"}`}
+                    >
+                      <div className="owner-recipe-card__map">
+                        <div>
+                          <p className="owner-recipe-card__source-label">Dish ingredient</p>
+                          <p className="owner-recipe-card__source">{line.source_name || "Extra pantry line"}</p>
+                        </div>
+                        {(() => {
+                          const picked = ingredients.find((i) => i.id === line.ingredient_id);
+                          if (picked) {
+                            return (
+                              <button
+                                type="button"
+                                className="od-panel__link owner-recipe-card__stock"
+                                onClick={() => goToStock(picked.id)}
+                              >
+                                Stock {picked.current_stock} {picked.unit}
+                                {picked.is_low ? " · Low" : ""} →
+                              </button>
+                            );
+                          }
+                          return (
+                            <button
+                              type="button"
+                              className="od-panel__link owner-recipe-card__stock"
+                              onClick={() => addToPantryFromToken(line.source_name || "")}
+                              disabled={!line.source_name}
+                            >
+                              Add to pantry stock →
+                            </button>
+                          );
+                        })()}
+                      </div>
                       <div className="owner-recipe-card__row">
                         <label>
-                          Ingredient
+                          Maps to stock
                           <select
                             value={line.ingredient_id}
                             onChange={(e) => {
@@ -858,7 +1031,7 @@ export function IngredientsPage() {
             )}
             </div>
           </OwnerPanel>
-        </>
+        </div>
       )}
     </OwnerPageShell>
   );

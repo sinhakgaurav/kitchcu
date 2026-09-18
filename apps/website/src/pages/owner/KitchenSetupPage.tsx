@@ -6,12 +6,14 @@ import { OwnerPageShell, OwnerPanel } from "../../components/owner/OwnerPageShel
 import { useGeolocation } from "../../hooks/useGeolocation";
 import { createKitchen, updateKitchenDeliverySettings, updateKitchenProfile } from "../../lib/api";
 import { useKitchen } from "../../lib/kitchen";
+import { useTranslation } from "react-i18next";
 import { customerUrl } from "../../shared/urls";
 import { firstError, pincodeInputValue, validatePincode, validateText } from "../../shared/validation";
 
 const PUNE_DEFAULT = { latitude: 18.5362, longitude: 73.8958 };
 
 export function KitchenSetupPage() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const location = useLocation();
   const { reloadKitchens, kitchen } = useKitchen();
@@ -176,19 +178,15 @@ export function KitchenSetupPage() {
 
   return (
     <OwnerPageShell
-      eyebrow="Settings"
-      title={kitchen ? "Kitchen settings" : "Create your kitchen"}
-      description={
-        kitchen
-          ? "Your identity, kitchen profile, delivery radius, and who pays when customers are beyond range"
-          : "Identify yourself, then set up your cloud kitchen to start taking orders"
-      }
+      eyebrow={t("owner.nav.account")}
+      title={kitchen ? t("owner.pages.kitchenSettings") : t("owner.pages.createKitchen")}
+      description={kitchen ? t("owner.pageDesc.setup") : t("owner.pageDesc.setupNew")}
     >
       <OwnerIdentityPanel />
       {kitchen ? (
         <>
           <OwnerPanel
-            title="Kitchen profile"
+            title={t("owner.panels.kitchenProfile")}
             description={`Code ${kitchen.code} is permanent. City can change without renaming the code.`}
           >
             <form className="owner-form owner-form--wide" onSubmit={handleProfileSave}>
@@ -308,7 +306,7 @@ export function KitchenSetupPage() {
           </OwnerPanel>
 
           <OwnerPanel
-            title="Brand page"
+            title={t("owner.panels.brandPage")}
             description="Share your kitchen-first storefront with customers — publish tagline and /k/code link."
           >
             <p className="owner-muted" style={{ marginBottom: "0.75rem" }}>
@@ -322,7 +320,7 @@ export function KitchenSetupPage() {
           </OwnerPanel>
 
           <OwnerPanel
-            title="Delivery cost share"
+            title={t("owner.panels.deliveryShare")}
             description="In range: kitchen pays 100%. Beyond max radius: kitchen pays your subsidy % only if cart meets min order; otherwise customer pays full."
           >
             <form className="owner-form owner-form--wide" onSubmit={handleDeliverySettings}>

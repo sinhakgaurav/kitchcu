@@ -1049,6 +1049,11 @@ async def list_kitchens_nearby(
                 {kitchen_rating_select_sql("ckac_identity.kitchens.id")}
             FROM ckac_identity.kitchens
             WHERE status = 'active'
+              AND EXISTS (
+                    SELECT 1 FROM ckac_catalog.dishes d
+                    WHERE d.kitchen_id = ckac_identity.kitchens.id
+                      AND d.is_active = true
+              )
               AND ST_DWithin(
                     location,
                     ST_SetSRID(ST_MakePoint(:lng, :lat), 4326)::geography,
@@ -1157,6 +1162,11 @@ async def list_nearest_kitchens(
                 {kitchen_rating_select_sql("ckac_identity.kitchens.id")}
             FROM ckac_identity.kitchens
             WHERE status = 'active'
+              AND EXISTS (
+                    SELECT 1 FROM ckac_catalog.dishes d
+                    WHERE d.kitchen_id = ckac_identity.kitchens.id
+                      AND d.is_active = true
+              )
               {hard_mode_missing_feature_sql("ckac_identity.kitchens.id", "discovery")}
               {search_filter}
             ORDER BY location::geometry <-> ST_SetSRID(ST_MakePoint(:lng, :lat), 4326)

@@ -20,6 +20,7 @@ import {
   type StreamSettings,
 } from "../../lib/api";
 import { useKitchen } from "../../lib/kitchen";
+import { useTranslation } from "react-i18next";
 
 type PublishCreds = { url: string; token: string };
 
@@ -42,6 +43,7 @@ const PHASES: { id: ShowcasePhase; label: string; hint: string }[] = [
 ];
 
 export function StreamPage() {
+  const { t } = useTranslation();
   const { kitchen } = useKitchen();
   const [settings, setSettings] = useState<StreamSettings | null>(null);
   const [session, setSession] = useState<LiveSession | null>(null);
@@ -229,14 +231,14 @@ export function StreamPage() {
 
   return (
     <OwnerPageShell
-      eyebrow="Engagement"
-      title="Live streaming"
-      description="Go live per dish — showcase ingredients, walk prep steps, mark prepared (F46–F47)."
+      eyebrow={t("owner.nav.stream")}
+      title={t("owner.pages.streamLive")}
+      description={t("owner.pageDesc.stream")}
     >
       {error && <div className="auth-card__error">{error}</div>}
       {msg && <div className="auth-card__success">{msg}</div>}
 
-      <OwnerPanel title="Sharing settings">
+      <OwnerPanel title={t("owner.panels.sharing")}>
         {settings && (
           <div className="stream-settings">
             <label className="stream-settings__toggle">
@@ -246,7 +248,7 @@ export function StreamPage() {
                 disabled={busy || settings.is_live}
                 onChange={(e) => onToggleSharing(e.target.checked)}
               />
-              Allow live kitchen sharing
+              {t("owner.streamUi.allowSharing")}
             </label>
             <label className="stream-settings__toggle">
               <input
@@ -268,7 +270,7 @@ export function StreamPage() {
                   }
                 }}
               />
-              Q&amp;A during live sessions
+              {t("owner.streamUi.qaDuring")}
             </label>
             <p className="stream-settings__meta">
               LiveKit: {settings.livekit_configured ? "configured" : "not configured (dev mode — no camera token)"}
@@ -278,7 +280,10 @@ export function StreamPage() {
         )}
       </OwnerPanel>
 
-      <OwnerPanel title="Go live with a dish">
+      <OwnerPanel
+        title={t("owner.panels.goLiveDish")}
+        description={t("owner.panels.goLiveDishDesc")}
+      >
         {isLive ? (
           <div className="stream-live">
             <p>
@@ -316,13 +321,13 @@ export function StreamPage() {
 
             <div className="stream-dish-pick">
               <label>
-                Feature dish
+                {t("owner.streamUi.featureDish")}
                 <select
                   value={dishId}
                   onChange={(e) => setDishId(e.target.value)}
                   disabled={busy}
                 >
-                  <option value="">Select dish…</option>
+                  <option value="">{t("owner.streamUi.selectDish")}</option>
                   {dishes.map((d) => (
                     <option key={d.id} value={d.id}>
                       {d.name}
@@ -336,7 +341,7 @@ export function StreamPage() {
                 disabled={busy || !dishId}
                 onClick={onFeatureDish}
               >
-                Load showcase
+                {t("owner.streamUi.loadShowcase")}
               </button>
               {dishes.length === 0 && (
                 <p className="owner-muted">
@@ -376,7 +381,7 @@ export function StreamPage() {
                     {showcase.ingredients.length === 0 && (
                       <li className="owner-muted">
                         No recipe lines — add them under{" "}
-                        <Link to={`/dashboard/ingredients?dish=${session.dish_id}`}>Recipe & prep</Link>.
+                        <Link to={`/dashboard/ingredients?dish=${session.dish_id}#recipe-map`}>Recipe & prep</Link>.
                       </li>
                     )}
                   </ul>
@@ -423,51 +428,61 @@ export function StreamPage() {
             )}
 
             <button type="button" className="btn btn--danger" disabled={busy} onClick={onEndLive}>
-              End stream
+              {t("owner.streamUi.endStream")}
             </button>
           </div>
         ) : (
-          <form className="stream-go-live" onSubmit={onGoLive}>
+          <form className="owner-form stream-go-live" onSubmit={onGoLive}>
             <label>
-              Stream title
+              {t("owner.streamUi.streamTitle")}
               <input
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
                 maxLength={255}
+                placeholder={t("owner.streamUi.streamTitlePh")}
                 disabled={busy || !settings?.live_sharing_enabled}
               />
+              <span className="stream-go-live__hint">{t("owner.streamUi.streamTitleHint")}</span>
             </label>
             <label>
-              Dish to feature
+              {t("owner.streamUi.dishToFeature")}
               <select
                 value={dishId}
                 onChange={(e) => setDishId(e.target.value)}
                 disabled={busy || !settings?.live_sharing_enabled}
               >
-                <option value="">Kitchen-only (feature dish later)</option>
+                <option value="">{t("owner.streamUi.pickLater")}</option>
                 {dishes.map((d) => (
                   <option key={d.id} value={d.id}>
                     {d.name}
                   </option>
                 ))}
               </select>
+              <span className="stream-go-live__hint">
+                {t("owner.streamUi.dishHint")}
+              </span>
             </label>
-            <p className="owner-forms__hint">
-              Starts on <strong>ingredients</strong> showcase when a dish is selected — then move to
-              prep steps and mark prepared.
-            </p>
+            {!settings?.live_sharing_enabled && (
+              <p className="stream-go-live__warn">{t("owner.streamUi.turnOnFirst")}</p>
+            )}
+            {settings?.live_sharing_enabled && dishes.length === 0 && (
+              <p className="stream-go-live__hint">
+                No live dishes yet — <Link to="/dashboard/menu/new">add a dish</Link> with a recipe, or go
+                live first and feature one later.
+              </p>
+            )}
             <button
               type="submit"
               className="btn btn--primary"
               disabled={busy || !settings?.live_sharing_enabled}
             >
-              Go live
+              {t("owner.streamUi.goLive")}
             </button>
           </form>
         )}
       </OwnerPanel>
 
-      <OwnerPanel title="Kitchens live now" description="Other kitchens broadcasting on kitchCU">
+      <OwnerPanel title={t("owner.panels.liveNow")} description={t("owner.panels.liveNowDesc")}>
         {liveKitchens.length === 0 ? (
           <p className="owner-muted">No kitchens are streaming right now.</p>
         ) : (

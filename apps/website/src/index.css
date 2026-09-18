@@ -5151,7 +5151,9 @@ html.theme-brand-light .social-btn {
   background: rgba(11, 27, 50, 0.45);
 }
 .kc-tour__card {
-  width: min(28rem, 100%);
+  width: min(36rem, 100%);
+  max-height: min(88vh, 40rem);
+  overflow: auto;
   background: var(--cream, #fff8ee);
   color: var(--navy, #0b1b32);
   border-radius: var(--radius-lg);
@@ -5164,7 +5166,7 @@ html.theme-brand-light .social-btn {
   font-size: 1.2rem;
   margin: 0 0 0.4rem;
 }
-.kc-tour__card p { margin: 0 0 1rem; color: #334155; }
+.kc-tour__card p { margin: 0 0 1rem; color: #334155; white-space: pre-wrap; }
 .kc-tour__count {
   font-size: 0.75rem;
   letter-spacing: 0.04em;
@@ -5179,6 +5181,51 @@ html.theme-brand-light .social-btn {
   gap: 0.75rem;
 }
 .kc-tour__nav { display: flex; gap: 0.4rem; }
+.kc-howto {
+  margin: 0 0 1.1rem;
+  border: 1px solid rgba(11, 27, 50, 0.12);
+  border-radius: 12px;
+  background: #fff;
+  color: #0b1b32;
+  box-shadow: 0 10px 28px rgba(11, 27, 50, 0.06);
+}
+.kc-howto__toggle {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.7rem 0.95rem;
+  border: 0;
+  background: transparent;
+  font: inherit;
+  font-weight: 650;
+  text-align: left;
+  cursor: pointer;
+}
+.kc-howto__chevron {
+  font-size: 1.1rem;
+  color: var(--teal-deep, #1a9b90);
+}
+.kc-howto__steps {
+  margin: 0;
+  padding: 0 1.15rem 0.85rem 2.1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  color: #334155;
+  font-size: 0.92rem;
+  line-height: 1.45;
+}
+.admin-main .kc-howto {
+  background: rgba(255, 248, 238, 0.08);
+  border-color: rgba(46, 196, 182, 0.28);
+  color: inherit;
+}
+.admin-main .kc-howto__toggle,
+.admin-main .kc-howto__steps {
+  color: inherit;
+}
 .kc-train-list {
   list-style: none;
   margin: 0;

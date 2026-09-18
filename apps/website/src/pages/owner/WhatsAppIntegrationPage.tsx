@@ -11,8 +11,10 @@ import {
   type MessagingWallet,
 } from "../../lib/api";
 import { useKitchen } from "../../shared/kitchenContext";
+import { useTranslation } from "react-i18next";
 
 export function WhatsAppIntegrationPage() {
+  const { t } = useTranslation();
   const { kitchen } = useKitchen();
   const [cfg, setCfg] = useState<KitchenWhatsAppIntegration | null>(null);
   const [wallet, setWallet] = useState<MessagingWallet | null>(null);
@@ -101,9 +103,9 @@ export function WhatsAppIntegrationPage() {
 
   return (
     <OwnerPageShell
-      eyebrow="Integrations"
-      title="WhatsApp Business"
-      description="Connect your Meta phone number ID so customer WhatsApp orders land in this kitchen. Platform App Secret stays with Super Admin."
+      eyebrow={t("owner.nav.whatsapp")}
+      title={t("owner.pages.whatsapp")}
+      description={t("owner.pageDesc.whatsapp")}
       actions={
         cfg?.connected ? (
           <span className="status-badge status-badge--lg owner-sub-badge owner-sub-badge--active">
@@ -120,7 +122,7 @@ export function WhatsAppIntegrationPage() {
       {ok && <p className="owner-forms__success">{ok}</p>}
 
       {wallet && (
-        <OwnerPanel title="Messaging wallet">
+        <OwnerPanel title={t("owner.panels.messagingWallet")}>
           <p>
             Balance: <strong>₹{wallet.balance_inr.toFixed(0)}</strong>
             {wallet.low_balance ? " · Low balance — top up via Enterprise renewal" : ""}
@@ -132,7 +134,7 @@ export function WhatsAppIntegrationPage() {
         </OwnerPanel>
       )}
 
-      <OwnerPanel title="Meta Cloud API">
+      <OwnerPanel title={t("owner.panels.metaCloud")}>
         <form className="owner-forms" onSubmit={onSubmit}>
           <label>
             Phone Number ID

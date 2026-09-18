@@ -23,8 +23,6 @@ from demo_data import (  # noqa: E402
     CAPTURED_AT,
     DEMO_DISHES,
     DEMO_KITCHEN,
-    DEMO_KITCHENS_EXTRA,
-    DEMO_KITCHENS_CITIES,
     DEMO_KITCHEN_CODE,
     DEMO_ORDERS,
     DEMO_OTP,
@@ -33,6 +31,7 @@ from demo_data import (  # noqa: E402
     DEMO_ADMIN,
     DEMO_CUSTOMER_ADDRESSES,
     DEMO_CUSTOMERS,
+    presence_kitchen_owner_pairs,
 )
 from seed_common import (  # noqa: E402
     ApiError,
@@ -45,6 +44,7 @@ from seed_common import (  # noqa: E402
     login_owner,
     owner_dishes,
     request,
+    run_psql,
     wait_for_gateway,
 )
 from ingredient_demo_data import DEMO_PANTRY, DISH_PREP_STEPS, DISH_RECIPES  # noqa: E402
@@ -72,6 +72,29 @@ def _register_owner(owner: dict) -> None:
 
 def ensure_owner() -> None:
     _register_owner(DEMO_OWNER)
+
+
+def retire_orphan_kitchens() -> None:
+    """Hide kitchens left on the shared DB by identity pytest (not demo owners)."""
+    phones = [
+        DEMO_OWNER["phone_e164"],
+        *[owner["phone_e164"] for owner in DEMO_OWNERS_EXTRA],
+        *[owner["phone_e164"] for owner, _ in presence_kitchen_owner_pairs()],
+    ]
+    listed = ", ".join("'" + phone.replace("'", "''") + "'" for phone in phones)
+    sql = (
+        "UPDATE ckac_identity.kitchens AS k "
+        "SET status = 'suspended' "
+        "FROM ckac_identity.owners AS o "
+        "WHERE k.owner_id = o.id "
+        f"AND o.phone NOT IN ({listed}) "
+        "AND k.status = 'active';"
+    )
+    ok, err = run_psql(sql)
+    if not ok:
+        print(f"  ! orphan kitchen cleanup: {err}")
+    else:
+        print("Retired leftover test kitchens (not owned by demo hosts).")
 
 
 def ensure_extra_owners() -> list[tuple[dict, dict]]:
@@ -112,24 +135,63 @@ def ensure_extra_owners() -> list[tuple[dict, dict]]:
 
 
 def ensure_kitchens(token: str) -> dict:
+    """Primary demo owner keeps only Sharma Home Kitchen (CKPNQ001)."""
     kitchens = request("GET", "/api/v1/kitchens/me", token=token)
-    existing_names = {k["name"] for k in kitchens}
-
-    if not kitchens:
-        kitchen = request("POST", "/api/v1/kitchens", DEMO_KITCHEN, token=token)
-        print(f"Created kitchen {kitchen['code']} - {kitchen['name']}")
-        kitchens = [kitchen]
-
-    for extra in [*DEMO_KITCHENS_EXTRA, *DEMO_KITCHENS_CITIES]:
-        if extra["name"] not in existing_names:
-            k = request("POST", "/api/v1/kitchens", extra, token=token)
-            print(f"Created kitchen {k['code']} - {k['name']} ({extra['city']})")
-            kitchens.append(k)
-            existing_names.add(extra["name"])
-
-    primary = next((k for k in kitchens if k.get("code") == DEMO_KITCHEN_CODE), kitchens[0])
-    print(f"Primary demo kitchen: {primary['code']} - {primary['name']} ({len(kitchens)} total)")
+    primary = next((k for k in kitchens if k.get("code") == DEMO_KITCHEN_CODE), None)
+    if primary is None:
+        primary = next((k for k in kitchens if k.get("name") == DEMO_KITCHEN["name"]), None)
+    if primary is None:
+        primary = request("POST", "/api/v1/kitchens", DEMO_KITCHEN, token=token)
+        print(f"Created kitchen {primary['code']} - {primary['name']}")
+    print(f"Primary demo kitchen: {primary['code']} - {primary['name']}")
     return primary
+
+
+def _reassign_kitchen_owner(*, kitchen_name: str, owner_phone_e164: str) -> None:
+    escaped_name = kitchen_name.replace("'", "''")
+    escaped_phone = owner_phone_e164.replace("'", "''")
+    sql = (
+        "UPDATE ckac_identity.kitchens AS k "
+        "SET owner_id = o.id "
+        "FROM ckac_identity.owners AS o "
+        f"WHERE k.name = '{escaped_name}' "
+        f"AND o.phone = '{escaped_phone}' "
+        "AND k.owner_id IS DISTINCT FROM o.id;"
+    )
+    ok, err = run_psql(sql)
+    if not ok:
+        print(f"  ! reassign {kitchen_name}: {err}")
+
+
+def ensure_presence_kitchens() -> list[tuple[dict, dict]]:
+    """City / extra Pune kitchens belong to dedicated hosts, not Raj."""
+    created: list[tuple[dict, dict]] = []
+    print()
+    print("Presence kitchens (dedicated owners)")
+    print("-" * 40)
+    for owner, spec in presence_kitchen_owner_pairs():
+        _register_owner(owner)
+        token = login_owner(owner["phone_e164"], DEMO_OTP)
+        mine = request("GET", "/api/v1/kitchens/me", token=token)
+        kitchen = next((k for k in mine if k.get("name") == spec["name"]), None)
+        if kitchen is None:
+            _reassign_kitchen_owner(
+                kitchen_name=spec["name"],
+                owner_phone_e164=owner["phone_e164"],
+            )
+            mine = request("GET", "/api/v1/kitchens/me", token=token)
+            kitchen = next((k for k in mine if k.get("name") == spec["name"]), None)
+        if kitchen is None:
+            kitchen = request("POST", "/api/v1/kitchens", spec, token=token)
+            print(f"  Created {kitchen['code']} - {kitchen['name']} ({spec['city']})")
+        else:
+            print(f"  {owner['name']}: {kitchen.get('code')} - {kitchen.get('name')}")
+        try:
+            seed_kitchen_menu(token, kitchen["id"])
+        except Exception as exc:  # noqa: BLE001
+            print(f"  (menu seed skipped: {exc})")
+        created.append((owner, kitchen))
+    return created
 
 
 def category_map(token: str, kitchen_id: str) -> dict[str, str]:
@@ -232,11 +294,19 @@ def main() -> None:
     print("CKAC dev seed")
     print("=" * 40)
     wait_for_gateway()
+    retire_orphan_kitchens()
     ensure_owner()
     token = login_owner(DEMO_OWNER["phone_e164"], DEMO_OTP)
     print("Authenticated demo owner.")
     kitchen = ensure_kitchens(token)
+    presence = ensure_presence_kitchens()
     kitchens = request("GET", "/api/v1/kitchens/me", token=token)
+    leftover = [k for k in kitchens if k["id"] != kitchen["id"]]
+    if leftover:
+        print(
+            f"  ! primary owner still has {len(leftover)} extra kitchen(s); "
+            "re-run seed after postgres is reachable so presence hosts can claim them."
+        )
     dish_ids: dict[str, str] = {}
     for k in kitchens:
         try:
@@ -286,6 +356,10 @@ def main() -> None:
     print(f"  Primary owner : {DEMO_OWNER['phone']} — {DEMO_OWNER['name']} ({kitchen.get('code', DEMO_KITCHEN_CODE)})")
     for owner, k in extra:
         print(f"  Owner         : {owner['phone']} — {owner['name']} ({k.get('code', '?')})")
+    if presence:
+        first_phone = presence[0][0]["phone"]
+        last_phone = presence[-1][0]["phone"]
+        print(f"  City hosts    : {first_phone}–{last_phone} — one kitchen each")
     print(f"  Admin         : {DEMO_ADMIN['email']} / {DEMO_ADMIN['password']}")
     for c in DEMO_CUSTOMERS:
         print(f"  Customer      : {c['phone']} — {c['name']} ({c.get('note', '')})")
